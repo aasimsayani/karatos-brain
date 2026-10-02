@@ -1,0 +1,31 @@
+# Roadmap
+
+This is a rebuild of the original Brain A work (v0.1.0 to v0.1.9, April 2026). The original design docs live in the Fuse Jewelry Google Drive under "BrainA".
+
+## Phase 1: Foundation (this release)
+- [x] Seven-layer contracts and pipeline
+- [x] Event validation and idempotent ingestion
+- [x] Config validation with optional integrations
+- [x] Jewelry domain math
+- [x] Secret scanning and CI
+
+## Phase 2: Database
+- [ ] Supabase migrations: events, entities, signals, recommendations, feedback, audit log, sync checkpoints
+- [ ] Organization and identity tables with row-level security
+- [ ] Seed data for a sample jewelry store
+- [ ] `SupabaseMemoryStore` implementing `MemoryStore`
+- [ ] Supabase readiness check
+
+## Phase 3: First connectors
+- [ ] CSV import (orders, products, bank transactions)
+- [ ] Shopify orders and products
+- [ ] Stripe payments
+
+## Phase 4: First reasoners
+- [ ] Claude-powered reasoner with provenance and confidence
+- [ ] Feedback loop into future reasoning
+
+## Later
+- Bank-statement PDF intelligence (5 to 6 years of Chase statements)
+- HubSpot, Slack, Monday.com
+- Meta, WhatsApp and Instagram, once the Facebook account is recovered
