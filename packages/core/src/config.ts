@@ -11,6 +11,8 @@ export const ConfigSchema = z.object({
   SUPABASE_URL: z.url(),
   SUPABASE_ANON_KEY: z.string().min(20),
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(20).optional(),
+  /** Direct Postgres connection string, used only to run migrations. */
+  SUPABASE_DB_URL: z.string().startsWith("postgres").optional(),
 
   ANTHROPIC_API_KEY: z.string().optional(),
   SHOPIFY_SHOP_DOMAIN: z.string().optional(),

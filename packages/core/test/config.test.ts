@@ -17,7 +17,7 @@ describe("checkConfig", () => {
   it("treats an integration as configured only when all of its keys are present", () => {
     const partial = checkConfig({ ...base, SHOPIFY_SHOP_DOMAIN: "fuse.myshopify.com" });
     expect(partial.integrations.shopify).toBe("not_configured");
-    const full = checkConfig({ ...partial, ...base, SHOPIFY_SHOP_DOMAIN: "fuse.myshopify.com", SHOPIFY_ADMIN_ACCESS_TOKEN: "x" });
+    const full = checkConfig({ ...base, SHOPIFY_SHOP_DOMAIN: "fuse.myshopify.com", SHOPIFY_ADMIN_ACCESS_TOKEN: "x" });
     expect(full.integrations.shopify).toBe("configured");
   });
 
