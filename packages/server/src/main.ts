@@ -27,8 +27,9 @@ try {
 }
 
 const pool = new pg.Pool({ connectionString: config.SUPABASE_DB_URL, max: 10 });
+const memory = new PostgresMemoryStore(pool);
 const pipeline = new BrainPipeline({
-  memory: new PostgresMemoryStore(pool),
+  memory,
   normalizers: [],
   extractors: [],
   reasoners: [],
@@ -36,7 +37,7 @@ const pipeline = new BrainPipeline({
 });
 
 const server = createServer(
-  createBrainApp({ pipeline, organizationId: config.ORGANIZATION_ID, apiKey: config.INSTANCE_API_KEY }),
+  createBrainApp({ pipeline, memory, organizationId: config.ORGANIZATION_ID, apiKey: config.INSTANCE_API_KEY }),
 );
 server.listen(config.PORT, () => {
   console.log(`${config.INSTANCE_NAME} (${config.ORGANIZATION_ID}) listening on :${config.PORT}`);

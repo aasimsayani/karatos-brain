@@ -40,7 +40,11 @@ expect 202 "$(post /v1/events "$EVENT" -H "authorization: Bearer $KEY")" "first 
 expect 200 "$(post /v1/events "$EVENT" -H "authorization: Bearer $KEY")" "replayed event"
 OTHER='{"organizationId":"other-jeweler","id":"evt_smoke_2","source":"manual","type":"order.created","occurredAt":"2026-10-01T12:00:00Z","receivedAt":"2026-10-01T12:00:01Z","idempotencyKey":"smoke-2","payload":{}}'
 expect 403 "$(post /v1/events "$OTHER" -H "authorization: Bearer $KEY")" "other client's event"
+expect 400 "$(post /v1/events '{"type":"Not Valid"}' -H "authorization: Bearer $KEY")" "invalid event"
 expect 200 "$(post /v1/reason '{}' -H "authorization: Bearer $KEY")" "reason"
+expect 200 "$(curl -s -o /dev/null -w '%{http_code}' -H "authorization: Bearer $KEY" http://127.0.0.1:8080/v1/recommendations)" "list recommendations"
 
 ROWS=$(psql "$DB_URL" -tAc "select count(*) from events where organization_id = 'smoke-test'")
 expect 1 "$ROWS" "events stored in Postgres"
+expect 1 "$(psql "$DB_URL" -tAc "select count(*) from dead_letter_events where organization_id = 'smoke-test'")" "dead letter stored"
+expect 1 "$(psql "$DB_URL" -tAc "select count(*) from reasoning_runs where organization_id = 'smoke-test'")" "reasoning run stored"

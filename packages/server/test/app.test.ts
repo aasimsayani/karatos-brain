@@ -46,7 +46,7 @@ async function start(docIds: string[] = ["doc_arch"], maxBodyBytes?: number, rea
     documentation: new StaticDocumentationSource(docIds),
   });
   server = createServer(
-    createBrainApp({ pipeline, organizationId: ORG, apiKey: KEY, ...(maxBodyBytes ? { maxBodyBytes } : {}) }),
+    createBrainApp({ pipeline, memory, organizationId: ORG, apiKey: KEY, ...(maxBodyBytes ? { maxBodyBytes } : {}) }),
   );
   await new Promise<void>((resolve) => server!.listen(0, resolve));
   const base = `http://127.0.0.1:${(server!.address() as AddressInfo).port}`;
@@ -154,5 +154,55 @@ describe("Brain API", () => {
     } finally {
       console.error = original;
     }
+  });
+});
+
+describe("Brain API: memory endpoints", () => {
+  it("lists recommendations and records feedback on them", async () => {
+    const { call, memory } = await start();
+    await call("/v1/reason", { method: "POST", body: "{}" });
+
+    const list = await call("/v1/recommendations?limit=5");
+    expect(list.status).toBe(200);
+    const { recommendations } = (await list.json()) as { recommendations: { id: string }[] };
+    expect(recommendations.map((r) => r.id)).toEqual(["rec_1"]);
+
+    const ok = await call("/v1/recommendations/rec_1/feedback", {
+      method: "POST",
+      body: JSON.stringify({ outcome: "overridden", actor: "owner", note: "Already called them" }),
+    });
+    expect(ok.status).toBe(201);
+    expect(memory.feedback[0]).toMatchObject({ recommendationId: "rec_1", organizationId: ORG, outcome: "overridden" });
+  });
+
+  it("validates feedback and 404s unknown recommendations", async () => {
+    const { call } = await start();
+    await call("/v1/reason", { method: "POST", body: "{}" });
+    expect((await call("/v1/recommendations/nope/feedback", { method: "POST", body: "{}" })).status).toBe(404);
+    const bad = await call("/v1/recommendations/rec_1/feedback", { method: "POST", body: JSON.stringify({ outcome: "maybe" }) });
+    expect(bad.status).toBe(400);
+    expect(((await bad.json()) as { details: { path: string }[] }).details.map((d) => d.path)).toEqual(["outcome", "actor"]);
+  });
+
+  it("returns entities by kind and id", async () => {
+    const { call, memory } = await start();
+    await memory.upsertEntities([
+      {
+        ref: { kind: "repair_ticket", id: "R 1" },
+        organizationId: ORG,
+        attributes: {},
+        sourceEventIds: [],
+        updatedAt: "2026-10-01T00:00:00Z",
+      },
+    ]);
+    expect((await call("/v1/entities/repair_ticket/R%201")).status).toBe(200);
+    expect((await call("/v1/entities/repair_ticket/missing")).status).toBe(404);
+  });
+
+  it("returns the dead-letter id for invalid events", async () => {
+    const { call, memory } = await start();
+    const res = await call("/v1/events", { method: "POST", body: JSON.stringify({ type: "Bad" }) });
+    const body = (await res.json()) as { deadLetterId: string };
+    expect(body.deadLetterId).toBe(memory.deadLetters[0]?.id);
   });
 });
