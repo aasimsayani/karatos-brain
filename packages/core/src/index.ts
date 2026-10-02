@@ -7,3 +7,4 @@ export * from "./pipeline.js";
 export * from "./memory.js";
 export * from "./jewelry.js";
 export * from "./config.js";
+export * from "./secrets.js";

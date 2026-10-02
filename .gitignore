@@ -9,3 +9,4 @@ coverage/
 # Private bank statements and imports never belong in this repo
 data/
 imports/
+coverage/

@@ -1,6 +1,18 @@
 # Changelog
 
-## 0.2.0 (unreleased)
+## 0.3.0 (unreleased)
+
+One instance per client, and an agent-readable secrets system.
+
+- `@karatos/server`: an HTTP API (`/healthz`, `/v1/events`, `/v1/reason`) that serves exactly one organization. It needs a per-instance API key and refuses events for any other organization.
+- Docker image, published to `ghcr.io/aasimsayani/karatos-brain` from `main`, plus a CI smoke test that runs the image against real Postgres
+- `secrets/manifest.json` and its JSON Schema describe every secret and setting, with no values: how to get each one, a pattern to check it, rotation, and whether a machine can generate it
+- `npm run secrets:plan [--json]` and `npm run secrets:setup [--generate-only]`
+- Reasoning is marked degraded when no documentation registry is configured
+- `deploy/instance-template` for a client's private deploy repo; `AGENTS.md` for AI agents
+- Coverage gate: 90% lines, functions and statements, and 85% branches
+
+## 0.2.0 (2026-10-02)
 
 Phase 2: the database layer.
 

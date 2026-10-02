@@ -1,0 +1,158 @@
+import { createServer, type Server } from "node:http";
+import type { AddressInfo } from "node:net";
+import { afterEach, describe, expect, it } from "vitest";
+import { BrainPipeline, InMemoryStore, type Reasoner } from "@karatos/core";
+import { createBrainApp, StaticDocumentationSource } from "../src/index.js";
+
+const ORG = "fuse-jewelry";
+const KEY = "k".repeat(40);
+
+const event = {
+  id: "evt_1",
+  source: "manual",
+  type: "order.created",
+  occurredAt: "2026-10-01T12:00:00Z",
+  receivedAt: "2026-10-01T12:00:01Z",
+  idempotencyKey: "order-1001",
+  payload: { orderId: "1001" },
+};
+
+const echoReasoner: Reasoner = {
+  name: "echo",
+  reason: ({ organizationId }) => [
+    {
+      id: "rec_1",
+      organizationId,
+      summary: "Check in with the customer",
+      confidence: 0.5,
+      expectedImpact: "Retention",
+      provenance: { eventIds: [], signalIds: [], documentIds: [] },
+      degraded: false,
+      createdAt: "2026-10-01T12:00:02Z",
+    },
+  ],
+};
+
+let server: Server | undefined;
+afterEach(() => new Promise<void>((resolve) => (server ? server.close(() => resolve()) : resolve())));
+
+async function start(docIds: string[] = ["doc_arch"], maxBodyBytes?: number, reasoner: Reasoner = echoReasoner) {
+  const memory = new InMemoryStore();
+  const pipeline = new BrainPipeline({
+    memory,
+    normalizers: [],
+    extractors: [],
+    reasoners: [reasoner],
+    documentation: new StaticDocumentationSource(docIds),
+  });
+  server = createServer(
+    createBrainApp({ pipeline, organizationId: ORG, apiKey: KEY, ...(maxBodyBytes ? { maxBodyBytes } : {}) }),
+  );
+  await new Promise<void>((resolve) => server!.listen(0, resolve));
+  const base = `http://127.0.0.1:${(server!.address() as AddressInfo).port}`;
+  const call = (path: string, init: RequestInit & { auth?: string | false } = {}) => {
+    const headers: Record<string, string> = { "content-type": "application/json" };
+    if (init.auth !== false) headers.authorization = `Bearer ${init.auth ?? KEY}`;
+    return fetch(base + path, { ...init, headers });
+  };
+  return { memory, call };
+}
+
+describe("Brain API", () => {
+  it("reports health without authentication", async () => {
+    const { call } = await start();
+    const res = await call("/healthz", { auth: false });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ status: "ok" });
+  });
+
+  it("rejects requests without the instance API key", async () => {
+    const { call, memory } = await start();
+    expect((await call("/v1/events", { method: "POST", body: JSON.stringify(event), auth: false })).status).toBe(401);
+    expect((await call("/v1/events", { method: "POST", body: JSON.stringify(event), auth: "wrong" })).status).toBe(401);
+    expect(memory.events).toHaveLength(0);
+  });
+
+  it("stamps events with the instance organization", async () => {
+    const { call, memory } = await start();
+    const res = await call("/v1/events", { method: "POST", body: JSON.stringify(event) });
+    expect(res.status).toBe(202);
+    expect(await res.json()).toEqual({ id: "evt_1", duplicate: false, entities: 0, signals: 0 });
+    expect(memory.events[0]?.organizationId).toBe(ORG);
+  });
+
+  it("refuses events addressed to another client", async () => {
+    const { call, memory } = await start();
+    const res = await call("/v1/events", {
+      method: "POST",
+      body: JSON.stringify({ ...event, organizationId: "other-jeweler" }),
+    });
+    expect(res.status).toBe(403);
+    expect(memory.events).toHaveLength(0);
+  });
+
+  it("reports replays as duplicates", async () => {
+    const { call } = await start();
+    await call("/v1/events", { method: "POST", body: JSON.stringify(event) });
+    const res = await call("/v1/events", { method: "POST", body: JSON.stringify({ ...event, id: "evt_2" }) });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ duplicate: true });
+  });
+
+  it("explains invalid events", async () => {
+    const { call } = await start();
+    const res = await call("/v1/events", { method: "POST", body: JSON.stringify({ ...event, type: "Bad Type" }) });
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { error: string; details: { path: string }[] };
+    expect(body.error).toBe("invalid event");
+    expect(body.details.map((d) => d.path)).toContain("type");
+  });
+
+  it("rejects malformed and oversized bodies", async () => {
+    const { call } = await start(["doc_arch"], 100);
+    expect((await call("/v1/events", { method: "POST", body: "{not json" })).status).toBe(400);
+    expect((await call("/v1/events", { method: "POST", body: "[]" })).status).toBe(400);
+    expect((await call("/v1/events", { method: "POST", body: JSON.stringify(event) })).status).toBe(413);
+  });
+
+  it("returns 404 and 405 for unknown routes and methods", async () => {
+    const { call } = await start();
+    expect((await call("/v1/nope", { method: "POST", body: "{}" })).status).toBe(404);
+    expect((await call("/v1/events", { method: "GET" })).status).toBe(405);
+  });
+
+  it("returns recommendations scoped to the instance", async () => {
+    const { call } = await start();
+    const res = await call("/v1/reason", { method: "POST", body: "{}" });
+    expect(res.status).toBe(200);
+    const { recommendations } = (await res.json()) as { recommendations: { organizationId: string; degraded: boolean }[] };
+    expect(recommendations).toHaveLength(1);
+    expect(recommendations[0]).toMatchObject({ organizationId: ORG, degraded: false });
+  });
+
+  it("marks reasoning degraded when no documentation is registered", async () => {
+    const { call } = await start([]);
+    const res = await call("/v1/reason", { method: "POST", body: "{}" });
+    const { recommendations } = (await res.json()) as { recommendations: { degraded: boolean }[] };
+    expect(recommendations[0]?.degraded).toBe(true);
+  });
+
+  it("hides internal errors from callers", async () => {
+    const failing: Reasoner = {
+      name: "broken",
+      reason: () => {
+        throw new Error("database password is hunter2");
+      },
+    };
+    const { call } = await start(["doc_arch"], undefined, failing);
+    const original = console.error;
+    console.error = () => {};
+    try {
+      const res = await call("/v1/reason", { method: "POST", body: "{}" });
+      expect(res.status).toBe(500);
+      expect(await res.text()).not.toContain("hunter2");
+    } finally {
+      console.error = original;
+    }
+  });
+});
