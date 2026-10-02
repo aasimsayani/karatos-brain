@@ -24,6 +24,8 @@ Each retail department module emits signals into one shared memory. Reasoners in
 
 The number of useful cross-department combinations grows much faster than the number of departments.
 
+Several of these links are already built: sales feeds inventory, clienteling, compliance and finance, and metal prices feed inventory valuation and gold buying. The [departments guide](../departments/README.md) lists them.
+
 ## 3. Decisions teach the system
 
 Every recommendation carries confidence and provenance. Every human accept, reject or override is stored (`feedback`, `decisions`), and so is what happened next (`outcomes`). That gives Brain A the data to calibrate its confidence, so a reasoner whose advice keeps getting overridden loses weight, and one that keeps paying off gains it. The owner's judgment becomes part of the system instead of staying in their head.

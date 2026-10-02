@@ -41,10 +41,14 @@ expect 200 "$(post /v1/events "$EVENT" -H "authorization: Bearer $KEY")" "replay
 OTHER='{"organizationId":"other-jeweler","id":"evt_smoke_2","source":"manual","type":"order.created","occurredAt":"2026-10-01T12:00:00Z","receivedAt":"2026-10-01T12:00:01Z","idempotencyKey":"smoke-2","payload":{}}'
 expect 403 "$(post /v1/events "$OTHER" -H "authorization: Bearer $KEY")" "other client's event"
 expect 400 "$(post /v1/events '{"type":"Not Valid"}' -H "authorization: Bearer $KEY")" "invalid event"
+SALE='{"id":"evt_smoke_sale","source":"pos","type":"sale.completed","occurredAt":"2026-10-01T12:00:00Z","receivedAt":"2026-10-01T12:00:01Z","idempotencyKey":"smoke-sale-1","payload":{"saleId":"S1","channel":"store","lines":[{"sku":"RING-1","quantity":1,"unitPriceCents":120000}],"totalCents":120000,"payments":[{"method":"card","amountCents":120000}]}}'
+expect 202 "$(post /v1/events "$SALE" -H "authorization: Bearer $KEY")" "retail sale event"
+expect 400 "$(post /v1/events "${SALE/\"channel\":\"store\"/\"channel\":\"fax\"}" -H "authorization: Bearer $KEY")" "retail sale with bad payload"
 expect 200 "$(post /v1/reason '{}' -H "authorization: Bearer $KEY")" "reason"
 expect 200 "$(curl -s -o /dev/null -w '%{http_code}' -H "authorization: Bearer $KEY" http://127.0.0.1:8080/v1/recommendations)" "list recommendations"
 
 ROWS=$(psql "$DB_URL" -tAc "select count(*) from events where organization_id = 'smoke-test'")
-expect 1 "$ROWS" "events stored in Postgres"
-expect 1 "$(psql "$DB_URL" -tAc "select count(*) from dead_letter_events where organization_id = 'smoke-test'")" "dead letter stored"
+expect 2 "$ROWS" "events stored in Postgres"
+expect 2 "$(psql "$DB_URL" -tAc "select count(*) from dead_letter_events where organization_id = 'smoke-test'")" "dead letters stored"
+expect t "$(psql "$DB_URL" -tAc "select count(*) > 0 from signals where organization_id = 'smoke-test' and kind like 'sale.%'")" "retail signals stored"
 expect 1 "$(psql "$DB_URL" -tAc "select count(*) from reasoning_runs where organization_id = 'smoke-test'")" "reasoning run stored"

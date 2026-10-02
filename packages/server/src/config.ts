@@ -1,4 +1,17 @@
 import { z } from "zod";
+import { RETAIL_DEPARTMENTS } from "@karatos/retail";
+
+const DEPARTMENT_IDS = RETAIL_DEPARTMENTS.map((d) => d.id);
+
+const commaList = z
+  .string()
+  .default("")
+  .transform((v) =>
+    v
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean),
+  );
 
 /**
  * Settings for one deployed instance. An instance belongs to exactly one
@@ -18,15 +31,11 @@ export const InstanceConfigSchema = z.object({
     .default("true")
     .transform((v) => v === "true"),
   /** Comma-separated ids of the source-of-truth docs reasoning must consult. */
-  DOC_REGISTRY_IDS: z
-    .string()
-    .default("")
-    .transform((v) =>
-      v
-        .split(",")
-        .map((s) => s.trim())
-        .filter(Boolean),
-    ),
+  DOC_REGISTRY_IDS: commaList,
+  /** Comma-separated retail departments to run, e.g. sales,inventory,repairs. Empty runs all of them. */
+  ENABLED_DEPARTMENTS: commaList.refine((ids) => ids.every((id) => DEPARTMENT_IDS.includes(id)), {
+    message: `use any of: ${DEPARTMENT_IDS.join(", ")}`,
+  }),
 });
 
 export type InstanceConfig = z.infer<typeof InstanceConfigSchema>;

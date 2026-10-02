@@ -20,6 +20,7 @@ export default defineConfig({
     alias: {
       "@karatos/core": src("./packages/core/src/index.ts"),
       "@karatos/store-postgres": src("./packages/store-postgres/src/index.ts"),
+      "@karatos/retail": src("./packages/retail/src/index.ts"),
     },
   },
 });

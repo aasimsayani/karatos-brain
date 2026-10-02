@@ -4,10 +4,13 @@ WORKDIR /app
 COPY package.json package-lock.json tsconfig.base.json ./
 COPY packages/core/package.json packages/core/
 COPY packages/store-postgres/package.json packages/store-postgres/
+COPY packages/retail/package.json packages/retail/
 COPY packages/server/package.json packages/server/
 RUN npm ci --ignore-scripts
 COPY packages packages
-RUN npm run build -w @karatos/core -w @karatos/store-postgres -w @karatos/server \
+RUN npm run build -w @karatos/core -w @karatos/store-postgres \
+ && npm run build -w @karatos/retail \
+ && npm run build -w @karatos/server \
  && npm prune --omit=dev
 
 FROM node:22-alpine
@@ -19,6 +22,8 @@ COPY --from=build /app/packages/core/package.json packages/core/
 COPY --from=build /app/packages/core/dist packages/core/dist
 COPY --from=build /app/packages/store-postgres/package.json packages/store-postgres/
 COPY --from=build /app/packages/store-postgres/dist packages/store-postgres/dist
+COPY --from=build /app/packages/retail/package.json packages/retail/
+COPY --from=build /app/packages/retail/dist packages/retail/dist
 COPY --from=build /app/packages/server/package.json packages/server/
 COPY --from=build /app/packages/server/dist packages/server/dist
 COPY supabase/migrations supabase/migrations

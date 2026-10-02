@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.5.0 (unreleased)
+
+Retail jewelry departments.
+
+- New `@karatos/retail` package with eleven department modules: sales, inventory, clienteling, repairs, custom orders, appraisals, buying and memo, metals and gold buying, marketing, finance and compliance
+- Each department validates its own event payloads; bad payloads are dead-lettered with the failing field
+- Departments read each other's signals, e.g. sales cash payments drive Form 8300 and deposit checks, and spot prices value aged gold stock
+- `ENABLED_DEPARTMENTS` picks departments per instance; the server runs them through `createInstancePipeline`
+- Core: reasoners receive `now`, signals can carry structured values, extractors run on every event
+- Docs: [departments guide](docs/departments/README.md), roadmap adds manufacturing
+
 ## 0.4.0 (unreleased)
 
 Completes the original Brain A design (v0.1.x docs) on the rebuilt foundation.

@@ -11,7 +11,7 @@ const valid = {
 describe("loadInstanceConfig", () => {
   it("applies defaults", () => {
     const config = loadInstanceConfig(valid);
-    expect(config).toMatchObject({ PORT: 8080, MIGRATE_ON_START: true, DOC_REGISTRY_IDS: [] });
+    expect(config).toMatchObject({ PORT: 8080, MIGRATE_ON_START: true, DOC_REGISTRY_IDS: [], ENABLED_DEPARTMENTS: [] });
   });
 
   it("parses the documentation registry list", () => {
@@ -34,5 +34,10 @@ describe("loadInstanceConfig", () => {
     } catch (error) {
       expect(String(error)).not.toContain("tiny-secret");
     }
+  });
+
+  it("reads the enabled departments and rejects unknown ones without echoing values", () => {
+    expect(loadInstanceConfig({ ...valid, ENABLED_DEPARTMENTS: "sales, repairs" }).ENABLED_DEPARTMENTS).toEqual(["sales", "repairs"]);
+    expect(() => loadInstanceConfig({ ...valid, ENABLED_DEPARTMENTS: "sales,manufacturing" })).toThrow(/ENABLED_DEPARTMENTS: use any of: sales/);
   });
 });

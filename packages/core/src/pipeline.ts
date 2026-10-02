@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { ZodError } from "zod";
+import { ZodError, type ZodType } from "zod";
 import { parseEvent, type EventEnvelope } from "./events.js";
 import type { NormalizedEntity } from "./entities.js";
 import type { Signal } from "./signals.js";
@@ -12,6 +12,11 @@ export interface BrainPipelineOptions {
   extractors: SignalExtractor[];
   reasoners: Reasoner[];
   documentation: DocumentationSource;
+  /**
+   * Payload schemas by event type. An event whose payload fails its schema is
+   * dead-lettered before it is stored, just like a malformed envelope.
+   */
+  payloadSchemas?: Record<string, ZodType>;
   /** How many recent signals the reasoners see. */
   reasoningWindow?: number;
   now?: () => Date;
@@ -62,6 +67,13 @@ export class BrainPipeline {
     let event: EventEnvelope;
     try {
       event = parseEvent(input);
+      const schema = this.options.payloadSchemas?.[event.type];
+      if (schema) {
+        const issues = schema.safeParse(event.payload);
+        if (!issues.success) {
+          throw new ZodError(issues.error.issues.map((i) => ({ ...i, path: ["payload", ...i.path] })));
+        }
+      }
     } catch (error) {
       if (!(error instanceof ZodError)) throw error;
       const id = `dl_${this.newId()}`;
@@ -92,11 +104,11 @@ export class BrainPipeline {
     }
     await this.options.memory.upsertEntities(entities);
 
+    // Extractors see every stored event: status changes and prices carry
+    // signals even when they create no entity.
     const signals: Signal[] = [];
-    if (entities.length > 0) {
-      for (const extractor of this.options.extractors) {
-        signals.push(...(await extractor.extract(entities, event)));
-      }
+    for (const extractor of this.options.extractors) {
+      signals.push(...(await extractor.extract(entities, event)));
     }
     await this.options.memory.appendSignals(signals);
 
@@ -110,7 +122,7 @@ export class BrainPipeline {
 
     const recommendations: Recommendation[] = [];
     for (const reasoner of this.options.reasoners) {
-      const produced = await reasoner.reason({ organizationId, signals, documentation });
+      const produced = await reasoner.reason({ organizationId, signals, documentation, now: startedAt });
       recommendations.push(
         ...produced.map((r) => ({
           ...r,
