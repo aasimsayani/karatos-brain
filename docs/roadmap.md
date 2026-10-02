@@ -10,11 +10,12 @@ This is a rebuild of the original Brain A work (v0.1.0 to v0.1.9, April 2026). T
 - [x] Secret scanning and CI
 
 ## Phase 2: Database
-- [ ] Supabase migrations: events, entities, signals, recommendations, feedback, audit log, sync checkpoints
-- [ ] Organization and identity tables with row-level security
-- [ ] Seed data for a sample jewelry store
-- [ ] `SupabaseMemoryStore` implementing `MemoryStore`
-- [ ] Supabase readiness check
+- [x] Supabase migrations: events, entities, signals, recommendations, feedback, audit log, sync checkpoints
+- [x] Organization and identity tables with row-level security
+- [x] Seed data for a sample jewelry store
+- [x] `PostgresMemoryStore` implementing `MemoryStore`
+- [x] Supabase readiness check and migration runner
+- [ ] Apply to the Fuse Jewelry Supabase project (needs owner credentials)
 
 ## Phase 3: First connectors
 - [ ] CSV import (orders, products, bank transactions)

@@ -25,6 +25,8 @@ npm install
 npm test
 cp .env.example .env.local   # fill in Supabase values
 npm run env:check
+npm run supabase:check
+npm run db:migrate
 ```
 
 ## Packages
@@ -32,6 +34,9 @@ npm run env:check
 | Package | What it is |
 | --- | --- |
 | `@karatos/core` | Event envelope, layer contracts, pipeline, in-memory store, jewelry math (karat purity, melt value), config validation |
+| `@karatos/store-postgres` | Postgres/Supabase `MemoryStore`, migration runner |
+
+The database schema lives in [`supabase/migrations`](supabase/migrations). See the [Supabase setup runbook](docs/runbooks/supabase-setup.md).
 
 ## Open core
 
