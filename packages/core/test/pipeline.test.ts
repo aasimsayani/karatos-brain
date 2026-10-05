@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   BrainPipeline,
+  DeadLetteredError,
   InMemoryStore,
   type EventEnvelope,
   type Normalizer,
@@ -112,10 +113,45 @@ describe("BrainPipeline", () => {
     expect(memory.signals).toHaveLength(1);
   });
 
-  it("rejects malformed events before they reach memory", async () => {
+  it("dead-letters malformed events instead of storing them", async () => {
     const { memory, pipeline } = build();
-    await expect(pipeline.ingest({ ...orderEvent(), type: "OrderCreated" })).rejects.toThrow();
+    await expect(pipeline.ingest({ ...orderEvent(), type: "OrderCreated" })).rejects.toBeInstanceOf(DeadLetteredError);
     expect(memory.events).toHaveLength(0);
+    expect(memory.deadLetters).toHaveLength(1);
+    expect(memory.deadLetters[0]).toMatchObject({
+      organizationId: ORG,
+      source: "shopify",
+      reason: "validation_failed",
+      issues: [{ path: "type" }],
+    });
+  });
+
+  it("records each reasoning run with its documentation state", async () => {
+    const { memory, pipeline } = build(true);
+    await pipeline.ingest(orderEvent());
+    await pipeline.reason(ORG);
+    expect(memory.reasoningRuns).toHaveLength(1);
+    expect(memory.reasoningRuns[0]).toMatchObject({
+      organizationId: ORG,
+      reasoners: ["follow-up"],
+      degraded: true,
+      recommendationIds: ["rec_sig_1001"],
+    });
+  });
+
+  it("rethrows errors that are not validation failures", async () => {
+    const memory = new InMemoryStore();
+    memory.appendEvent = async () => {
+      throw new Error("disk full");
+    };
+    const pipeline = new BrainPipeline({
+      memory,
+      normalizers: [],
+      extractors: [],
+      reasoners: [],
+      documentation: { current: () => ({ documentIds: [], stale: false }) },
+    });
+    await expect(pipeline.ingest(orderEvent())).rejects.toThrow("disk full");
   });
 
   it("marks recommendations degraded when documentation is stale", async () => {

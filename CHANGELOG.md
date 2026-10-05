@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.4.0 (unreleased)
+
+Completes the original Brain A design (v0.1.x docs) on the rebuilt foundation.
+
+- Dead letters: invalid input is stored with its validation issues and raises `DeadLetteredError`. The API returns the dead-letter id.
+- Connector contract (`Connector`, `runSync`): historical import, incremental sync, webhooks, checkpointed batches, retries that restart from the checkpoint, and dead-letter counting
+- Identity resolution with collision detection (`linkIdentity`, `IdentityCollisionError`)
+- Reasoning runs, decisions, outcomes, text-searchable memories and a documentation registry, all with row-level security; decisions and outcomes are audited
+- `RegistryDocumentationSource` detects documentation drift and marks reasoning degraded
+- Entity kinds are open (lowercase snake_case) so department modules can add their own
+- API: `GET /v1/recommendations`, `POST /v1/recommendations/:id/feedback`, `GET /v1/entities/:kind/:id`
+- Integration catalog from the original mapping sheet, checked against the secrets manifest
+- Docs: compounding-value design, incident runbook and integrations guide
+
 ## 0.3.0 (unreleased)
 
 One instance per client, and an agent-readable secrets system.
