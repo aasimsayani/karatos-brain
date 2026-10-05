@@ -30,3 +30,14 @@ describe("meltValueCents", () => {
     expect(meltValueCents({ metal: "gold", karat: 14, weightGrams: 10, spotPerTroyOunceCents: 250_000 })).toBe(46_887);
   });
 });
+
+describe("other metals", () => {
+  it("uses standard fineness for platinum and palladium", () => {
+    expect(purity("platinum")).toBe(0.95);
+    expect(purity("palladium")).toBe(0.95);
+  });
+
+  it("rejects negative weights", () => {
+    expect(() => meltValueCents({ metal: "silver", weightGrams: -1, spotPerTroyOunceCents: 3_000 })).toThrow(RangeError);
+  });
+});

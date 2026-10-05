@@ -23,11 +23,15 @@ See [docs/architecture/overview.md](docs/architecture/overview.md) for details.
 ```bash
 npm install
 npm test
-cp .env.example .env.local   # fill in Supabase values
-npm run env:check
+cp .env.example .env.local
+npm run secrets:setup        # generates keys, then asks for the rest one at a time
 npm run supabase:check
 npm run db:migrate
 ```
+
+## One instance per client
+
+Each business runs its own instance: its own Supabase project, container, API key and private deploy repo, all on the same public image. See [docs/deployment/instances.md](docs/deployment/instances.md).
 
 ## Packages
 
@@ -35,6 +39,7 @@ npm run db:migrate
 | --- | --- |
 | `@karatos/core` | Event envelope, layer contracts, pipeline, in-memory store, jewelry math (karat purity, melt value), config validation |
 | `@karatos/store-postgres` | Postgres/Supabase `MemoryStore`, migration runner |
+| `@karatos/server` | HTTP API for one client instance, shipped as the `ghcr.io/aasimsayani/karatos-brain` image |
 
 The database schema lives in [`supabase/migrations`](supabase/migrations). See the [Supabase setup runbook](docs/runbooks/supabase-setup.md).
 
@@ -44,7 +49,9 @@ The core is MIT-licensed and stays open. Some vertical modules may later ship un
 
 ## Security
 
-This repository is public. Credentials live only in `.env.local`, which git ignores. CI runs `npm run secrets:scan` on every push. Never commit real customer data or bank statements.
+This repository is public. Every secret an instance needs is described, without values, in [`secrets/manifest.json`](secrets/manifest.json). See [docs/secrets.md](docs/secrets.md). Values live only in `.env.local` or a host's secret store. CI runs `npm run secrets:scan` on every push. Never commit real customer data or bank statements.
+
+AI agents working in this repo should read [AGENTS.md](AGENTS.md).
 
 ## License
 

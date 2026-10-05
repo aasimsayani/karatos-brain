@@ -17,6 +17,12 @@ This is a rebuild of the original Brain A work (v0.1.0 to v0.1.9, April 2026). T
 - [x] Supabase readiness check and migration runner
 - [ ] Apply to the Fuse Jewelry Supabase project (needs owner credentials)
 
+## Phase 2.5: Client instances
+- [x] One-instance-per-client API with organization lockdown
+- [x] Docker image and real-Postgres smoke test in CI
+- [x] Secrets manifest, plan and setup tools
+- [ ] Fuse Jewelry instance: Supabase project, host and private repo (needs owner accounts)
+
 ## Phase 3: First connectors
 - [ ] CSV import (orders, products, bank transactions)
 - [ ] Shopify orders and products
