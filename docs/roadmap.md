@@ -23,6 +23,24 @@ This is a rebuild of the original Brain A work (v0.1.0 to v0.1.9, April 2026). T
 - [x] Secrets manifest, plan and setup tools
 - [ ] Fuse Jewelry instance: Supabase project, host and private repo (needs owner accounts)
 
+## Phase 2.6: Original Brain A plan, completed
+- [x] Dead letters, reasoning runs, decisions, outcomes, memories, documentation registry
+- [x] Connector contract with checkpoints and retries
+- [x] Identity resolution with collision detection
+- [x] Documentation drift detection
+- [ ] Documentation embeddings for semantic search (pgvector)
+- [ ] Reasoning sessions and agent task API
+
+## Phase 2.7: Retail departments
+- [x] Department contract with payload schemas, normalizers, extractors and reasoners
+- [x] Sales, inventory, clienteling, repairs, custom orders, appraisals, buying and memo, metals and gold buying, marketing, finance, compliance (see [docs/departments](departments/README.md))
+- [x] `ENABLED_DEPARTMENTS` per instance
+- [ ] Tune thresholds with Fuse Jewelry's real data once connectors are live
+
+## Phase 2.8: Manufacturing departments
+- [ ] Bench jobs, casting, stone setting, finishing and quality control
+- [ ] Production planning, metal loss and labor cost per piece
+
 ## Phase 3: First connectors
 - [ ] CSV import (orders, products, bank transactions)
 - [ ] Shopify orders and products

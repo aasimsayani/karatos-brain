@@ -22,6 +22,7 @@
   },
   "dependencies": {
     "@karatos/core": "0.1.0",
+    "@karatos/retail": "0.1.0",
     "@karatos/store-postgres": "0.1.0",
     "pg": "^8.23.1",
     "zod": "^4.6.5"

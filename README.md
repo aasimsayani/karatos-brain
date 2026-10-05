@@ -38,6 +38,7 @@ Each business runs its own instance: its own Supabase project, container, API ke
 | Package | What it is |
 | --- | --- |
 | `@karatos/core` | Event envelope, layer contracts, pipeline, in-memory store, jewelry math (karat purity, melt value), config validation |
+| `@karatos/retail` | Retail jewelry departments: sales, inventory, clienteling, repairs, custom orders, appraisals, buying, metals, marketing, finance, compliance. See [departments](docs/departments/README.md) |
 | `@karatos/store-postgres` | Postgres/Supabase `MemoryStore`, migration runner |
 | `@karatos/server` | HTTP API for one client instance, shipped as the `ghcr.io/aasimsayani/karatos-brain` image |
 

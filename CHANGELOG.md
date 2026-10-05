@@ -1,5 +1,30 @@
 # Changelog
 
+## 0.5.0 (unreleased)
+
+Retail jewelry departments.
+
+- New `@karatos/retail` package with eleven department modules: sales, inventory, clienteling, repairs, custom orders, appraisals, buying and memo, metals and gold buying, marketing, finance and compliance
+- Each department validates its own event payloads; bad payloads are dead-lettered with the failing field
+- Departments read each other's signals, e.g. sales cash payments drive Form 8300 and deposit checks, and spot prices value aged gold stock
+- `ENABLED_DEPARTMENTS` picks departments per instance; the server runs them through `createInstancePipeline`
+- Core: reasoners receive `now`, signals can carry structured values, extractors run on every event
+- Docs: [departments guide](docs/departments/README.md), roadmap adds manufacturing
+
+## 0.4.0 (unreleased)
+
+Completes the original Brain A design (v0.1.x docs) on the rebuilt foundation.
+
+- Dead letters: invalid input is stored with its validation issues and raises `DeadLetteredError`. The API returns the dead-letter id.
+- Connector contract (`Connector`, `runSync`): historical import, incremental sync, webhooks, checkpointed batches, retries that restart from the checkpoint, and dead-letter counting
+- Identity resolution with collision detection (`linkIdentity`, `IdentityCollisionError`)
+- Reasoning runs, decisions, outcomes, text-searchable memories and a documentation registry, all with row-level security; decisions and outcomes are audited
+- `RegistryDocumentationSource` detects documentation drift and marks reasoning degraded
+- Entity kinds are open (lowercase snake_case) so department modules can add their own
+- API: `GET /v1/recommendations`, `POST /v1/recommendations/:id/feedback`, `GET /v1/entities/:kind/:id`
+- Integration catalog from the original mapping sheet, checked against the secrets manifest
+- Docs: compounding-value design, incident runbook and integrations guide
+
 ## 0.3.0 (unreleased)
 
 One instance per client, and an agent-readable secrets system.

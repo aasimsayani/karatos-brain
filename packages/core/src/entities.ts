@@ -2,7 +2,11 @@
  * Layer 2, Entity Normalization. Source records are mapped onto a small set of
  * canonical jewelry-business entities so every later layer speaks one language.
  */
-export type EntityKind = "customer" | "product" | "order" | "payment" | "supplier";
+/** Kinds every Brain A instance understands. Department modules add their own. */
+export const CORE_ENTITY_KINDS = ["customer", "product", "order", "payment", "supplier"] as const;
+export type CoreEntityKind = (typeof CORE_ENTITY_KINDS)[number];
+/** Any lowercase snake_case kind; the core ones autocomplete. */
+export type EntityKind = CoreEntityKind | (string & {});
 
 export interface EntityRef {
   kind: EntityKind;

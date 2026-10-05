@@ -25,6 +25,8 @@ export interface ReasoningContext {
   organizationId: string;
   signals: Signal[];
   documentation: DocumentationState;
+  /** When this reasoning run started, as ISO 8601. Use it for anything time-based. */
+  now: string;
 }
 
 /**
@@ -48,4 +50,16 @@ export interface Feedback {
   note?: string;
   actor: string;
   recordedAt: string;
+}
+
+/** One call to BrainPipeline.reason, kept for audit and learning. */
+export interface ReasoningRun {
+  id: string;
+  organizationId: string;
+  startedAt: string;
+  finishedAt: string;
+  reasoners: string[];
+  documentation: DocumentationState;
+  degraded: boolean;
+  recommendationIds: string[];
 }

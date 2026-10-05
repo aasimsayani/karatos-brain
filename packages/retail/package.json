@@ -1,0 +1,26 @@
+{
+  "name": "@karatos/retail",
+  "version": "0.1.0",
+  "description": "Retail jewelry department modules for Brain A: sales, inventory, clienteling, repairs, custom orders, appraisals, buying, metals and compliance.",
+  "license": "MIT",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@karatos/core": "0.1.0",
+    "zod": "^4.6.5"
+  }
+}

@@ -23,3 +23,17 @@ export type EventEnvelope = z.infer<typeof EventEnvelopeSchema>;
 export function parseEvent(input: unknown): EventEnvelope {
   return EventEnvelopeSchema.parse(input);
 }
+
+/**
+ * An input that failed validation. It is kept, not dropped, so a person can
+ * fix the connector or the data and replay it.
+ */
+export interface DeadLetter {
+  id: string;
+  organizationId?: string;
+  source?: string;
+  reason: string;
+  issues: { path: string; message: string }[];
+  raw: unknown;
+  receivedAt: string;
+}
