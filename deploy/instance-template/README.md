@@ -8,7 +8,7 @@ This repo holds the client's **non-secret** settings and deploy notes. Secret va
 
 | File | Purpose |
 | --- | --- |
-| `instance.env` | Non-secret settings: `INSTANCE_NAME`, `ORGANIZATION_ID`, `ENABLED_INTEGRATIONS`, `DOC_REGISTRY_IDS` |
+| `instance.env` | Non-secret settings: `INSTANCE_NAME`, `ORGANIZATION_ID`, `ENABLED_INTEGRATIONS`, `ENABLED_DEPARTMENTS`, `DOC_REGISTRY_IDS` |
 | `IMAGE` | The exact `ghcr.io/aasimsayani/karatos-brain` tag this client runs. Bump it to upgrade. |
 
 ## Upgrading

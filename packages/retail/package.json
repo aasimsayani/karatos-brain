@@ -1,7 +1,7 @@
 {
-  "name": "@karatos/server",
+  "name": "@karatos/retail",
   "version": "0.1.0",
-  "description": "Brain A HTTP API. One running instance serves exactly one client organization.",
+  "description": "Retail jewelry department modules for Brain A: sales, inventory, clienteling, repairs, custom orders, appraisals, buying, metals and compliance.",
   "license": "MIT",
   "type": "module",
   "main": "dist/index.js",
@@ -17,14 +17,10 @@
   ],
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "typecheck": "tsc -p tsconfig.json --noEmit",
-    "start": "node dist/main.js"
+    "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
     "@karatos/core": "0.1.0",
-    "@karatos/retail": "0.1.0",
-    "@karatos/store-postgres": "0.1.0",
-    "pg": "^8.23.1",
     "zod": "^4.6.5"
   }
 }

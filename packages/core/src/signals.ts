@@ -9,7 +9,7 @@ export interface Signal {
   organizationId: string;
   kind: string;
   subject: EntityRef;
-  value: number | string | boolean;
+  value: number | string | boolean | Record<string, unknown>;
   /** 0 to 1. */
   confidence: number;
   derivedFromEventIds: string[];

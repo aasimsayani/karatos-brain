@@ -25,6 +25,8 @@ export interface ReasoningContext {
   organizationId: string;
   signals: Signal[];
   documentation: DocumentationState;
+  /** When this reasoning run started, as ISO 8601. Use it for anything time-based. */
+  now: string;
 }
 
 /**

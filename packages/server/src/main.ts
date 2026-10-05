@@ -1,9 +1,9 @@
 import { createServer } from "node:http";
 import { fileURLToPath } from "node:url";
 import pg from "pg";
-import { BrainPipeline } from "@karatos/core";
 import { loadMigrations, migrate, PostgresMemoryStore } from "@karatos/store-postgres";
 import { createBrainApp } from "./app.js";
+import { createInstancePipeline } from "./brain.js";
 import { loadInstanceConfig } from "./config.js";
 import { StaticDocumentationSource } from "./documentation.js";
 
@@ -28,12 +28,10 @@ try {
 
 const pool = new pg.Pool({ connectionString: config.SUPABASE_DB_URL, max: 10 });
 const memory = new PostgresMemoryStore(pool);
-const pipeline = new BrainPipeline({
+const pipeline = createInstancePipeline({
   memory,
-  normalizers: [],
-  extractors: [],
-  reasoners: [],
   documentation: new StaticDocumentationSource(config.DOC_REGISTRY_IDS),
+  departments: config.ENABLED_DEPARTMENTS,
 });
 
 const server = createServer(
