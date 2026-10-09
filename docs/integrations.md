@@ -185,3 +185,13 @@ Every connector implements `Connector` from `@karatos/core`:
 - Invalid records are dead-lettered and counted, and never stop the sync.
 - Replays are counted as duplicates and stored once.
 - Every record is stamped with the instance's organization and the connector's source.
+
+## Writing back: built, turned off
+
+Every connector starts read-only. A connector may declare the write actions it could perform (`writes` on `Connector`), such as adjusting Shopify stock or creating a QuickBooks invoice, but each one runs through a `WriteGate`:
+
+- The gate refuses any action the instance has not listed in `ENABLED_WRITES`, which is empty by default. Entries are `integration:action`, or `integration:*` for every action of one integration.
+- Every attempt is audited, whether it was refused, performed or failed, with who asked for it.
+- Connectors request only read scopes from vendors until a client agrees to writes.
+
+So write support can be built and tested now, and switched on per client and per action later.
