@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Write capability, off by default: connectors can declare write actions, `WriteGate` refuses any not listed in the new `ENABLED_WRITES` setting (empty means read-only) and audits every attempt
+
 - Integration catalog covers the wider jewelry stack (jewelry POS, diamond networks, suppliers, grading labs, metal prices, financing, ERP, EDI, insurance and secure shipping), with who uses each system and how it can be reached; `integrationsFor(segment)` filters it for retail, wholesale or manufacturing
 - README: what Brain A covers across departments, how to configure departments per business, what becomes possible as systems are connected (built versus next), and a status table
 

@@ -1,4 +1,5 @@
 import type { MemoryStore } from "./layers.js";
+import type { WriteAction } from "./writes.js";
 import { DeadLetteredError, type BrainPipeline } from "./pipeline.js";
 
 /** A page of raw source records plus the cursor to resume after it. */
@@ -24,6 +25,8 @@ export interface Connector {
   incrementalSync(context: SyncContext): AsyncIterable<SourceBatch>;
   /** Turns one webhook delivery into raw events. Verify signatures before calling. */
   handleWebhook?(body: unknown): unknown[];
+  /** Write actions this connector can perform. Each runs only through a WriteGate, which is off by default. */
+  readonly writes?: readonly WriteAction[];
 }
 
 export interface RunSyncOptions {

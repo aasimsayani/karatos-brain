@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { invalidWriteEntries } from "@karatos/core";
 import { RETAIL_DEPARTMENTS } from "@karatos/retail";
 
 const DEPARTMENT_IDS = RETAIL_DEPARTMENTS.map((d) => d.id);
@@ -35,6 +36,13 @@ export const InstanceConfigSchema = z.object({
   /** Comma-separated retail departments to run, e.g. sales,inventory,repairs. Empty runs all of them. */
   ENABLED_DEPARTMENTS: commaList.refine((ids) => ids.every((id) => DEPARTMENT_IDS.includes(id)), {
     message: `use any of: ${DEPARTMENT_IDS.join(", ")}`,
+  }),
+  /**
+   * Comma-separated writes to outside systems this instance allows, e.g.
+   * shopify:adjust_inventory or shopify:*. Empty keeps every integration read-only.
+   */
+  ENABLED_WRITES: commaList.refine((entries) => invalidWriteEntries(entries).length === 0, {
+    message: "use integration:action or integration:*, e.g. shopify:adjust_inventory",
   }),
 });
 
