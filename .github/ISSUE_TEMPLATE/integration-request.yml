@@ -1,0 +1,40 @@
+name: A jewelry system that doesn't work for you
+description: Tell us about a system in your jewelry business that's broken, missing or doesn't talk to the rest of your stack.
+title: "Integration request: "
+labels: ["integration", "needs-research"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        This repo is public, so please don't include passwords, API keys, customer names or financial figures.
+  - type: input
+    id: system
+    attributes:
+      label: Which system?
+      placeholder: e.g. our POS, a diamond feed, the refiner's statements
+    validations:
+      required: true
+  - type: dropdown
+    id: business
+    attributes:
+      label: What kind of business are you?
+      options: [Retail store, Wholesaler or diamond dealer, Manufacturer, Other]
+    validations:
+      required: true
+  - type: textarea
+    id: broken
+    attributes:
+      label: What's broken or missing?
+      description: What do you do by hand today, and what would you want to happen instead?
+    validations:
+      required: true
+  - type: dropdown
+    id: access
+    attributes:
+      label: How do you get data out of it today?
+      options: [It has an API, I can export CSV or PDF, Only by looking at the screen, Not sure]
+  - type: textarea
+    id: departments
+    attributes:
+      label: Which parts of the business does it touch?
+      placeholder: e.g. repairs, buying, finance

@@ -115,6 +115,8 @@ npm run db:migrate
 
 Each business runs its own instance: its own Supabase project, container, API key and private deploy repo, all on the same public image. See [docs/deployment/instances.md](docs/deployment/instances.md).
 
+Your data stays yours. The database, the container and every credential sit in accounts the business owns, so once setup is done we have no access to any of it. We only come back in if the business signs up for maintenance and asks us to, for example to add integrations it needs. See [docs/open-core.md](docs/open-core.md#your-instance-your-data).
+
 ## Packages
 
 | Package | What it is |

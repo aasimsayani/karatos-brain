@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { INTEGRATIONS, integrationsFor, parseManifest } from "../src/index.js";
+import { INTEGRATIONS, integrationsFor, parseManifest, selfServeIntegrations } from "../src/index.js";
 
 const catalogDoc = readFileSync(new URL("../../../docs/integrations.md", import.meta.url), "utf8");
 const manifest = parseManifest(
@@ -46,5 +46,17 @@ describe("integration catalog", () => {
   it("lists every integration in docs/integrations.md", () => {
     const missing = INTEGRATIONS.filter((i) => !catalogDoc.includes(`| ${i.name} |`)).map((i) => i.id);
     expect(missing).toEqual([]);
+  });
+
+  it("counts only integrations we can test without asking a vendor as self-serve", () => {
+    const selfServe = selfServeIntegrations();
+    const ids = selfServe.map((i) => i.id);
+    expect(ids).toEqual(expect.arrayContaining(["shopify", "quickbooks", "edi_x12", "bank_statements"]));
+    expect(ids).not.toContain("the_edge");
+    expect(ids).not.toContain("rapnet");
+    for (const integration of selfServe) {
+      expect(integration.access).not.toBe("partner");
+      expect(["sandbox", "fixtures"]).toContain(integration.testWith);
+    }
   });
 });
