@@ -98,7 +98,7 @@ See [docs/architecture/overview.md](docs/architecture/overview.md) for details.
 | Manufacturing departments | Planned |
 | Bank statement (PDF) intelligence, CRM, messaging | Later |
 
-See the [roadmap](docs/roadmap.md) and [integrations](docs/integrations.md).
+See the [roadmap](docs/roadmap.md), [integrations](docs/integrations.md) and the [website](docs/website.md).
 
 ## Quick start
 

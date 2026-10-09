@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- KaratOS website in `site/`: a static page whose integration directory and departments are generated from the catalog, with the private-instance pitch and the broken-systems campaign; deploys to Railway with Caddy
+
 - Integrations for every department: each entry names the departments it feeds, a test checks every retail department has at least two systems, and 16 systems are added for scheduling, sales tax, cash reporting (Form 8300), refiner statements, payroll, email and ad platforms, analytics, marketplaces, CAD and 3D printing
 - Integrations: each entry says how it is tested without a client's account (free sandbox, sample files, paid account, partner); `selfServeIntegrations()` lists the 37 we can build without contacting any vendor. Docs describe the self-serve-first build order and the four test levels each connector must meet
 - Bank statements: clients choose CSV, PDF or both; `CHASE_IMPORT_MODE` accepts `manual_csv`, `manual_pdf` or `manual_csv_and_pdf`, and a generic bank statements entry covers other banks

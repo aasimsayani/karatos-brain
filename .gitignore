@@ -10,3 +10,4 @@ coverage/
 data/
 imports/
 coverage/
+site/dist/
