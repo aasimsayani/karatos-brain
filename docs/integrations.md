@@ -6,7 +6,7 @@ The catalog lives in code at [`packages/core/src/integrations.ts`](../packages/c
 
 ## Build order: self-serve first
 
-The first phase builds every integration we can finish without asking any vendor, company or person for anything: a public API with a free developer sandbox, or a file or EDI format we can test with synthetic samples. `selfServeIntegrations()` returns that list (27 systems today). Systems that need a paid subscription, a trade account or a partnership come later, once the core is built out.
+The first phase builds every integration we can finish without asking any vendor, company or person for anything: a public API with a free developer sandbox, or a file or EDI format we can test with synthetic samples. `selfServeIntegrations()` returns that list (37 systems today). Systems that need a paid subscription, a trade account or a partnership come later, once the core is built out.
 
 Which vendors offer a free sandbox is our current understanding as of October 2026. Confirm it when signing up for each developer account.
 
@@ -43,6 +43,8 @@ Used by: R is retail, W is wholesale, M is manufacturing. Test with says how we 
 | BigCommerce | R, W | Public API | Free sandbox | Yes | Planned |
 | Wix | R | Public API | Free sandbox | Yes | Planned |
 | Punchmark | R | Partner | Partner | No | Planned |
+| Etsy | R, M | Public API | Unknown | No | Planned |
+| eBay | R, W | Public API | Free sandbox | Yes | Planned (Estate and pre-owned pieces) |
 
 ### Diamonds, suppliers and grading
 
@@ -86,6 +88,13 @@ Used by: R is retail, W is wholesale, M is manufacturing. Test with says how we 
 | Klaviyo | R | Public API | Free sandbox | Yes | Planned |
 | Attentive | R | Public API | Unknown | Yes | Planned |
 | Twilio | R, W | Public API | Free sandbox | Yes | Planned |
+| Calendly | R | Public API | Free sandbox | Yes | Planned (Appointments for consultations, bridal and repair drop-off) |
+| Acuity Scheduling | R | Public API | Paid account | Yes | Planned |
+| Mailchimp | R | Public API | Free sandbox | Yes | Planned |
+| Google Analytics 4 | R, W | Public API | Free sandbox | No | Planned |
+| Google Ads | R | Public API | Free sandbox | No | Planned (Test accounts for development; production needs an approved developer token) |
+| Meta Ads | R | Public API | Free sandbox | No | Planned |
+| Google Business Profile | R | Partner | Partner | No | Planned (Reviews and local listings; Google approves API access on request) |
 
 ### Money
 
@@ -102,6 +111,11 @@ Used by: R is retail, W is wholesale, M is manufacturing. Test with says how we 
 | Synchrony | R | Partner | Partner | No | Planned |
 | Acima | R | Partner | Partner | No | Planned |
 | Jewelers Board of Trade | W, M | Partner | Partner | No | Planned (Trade credit ratings) |
+| Avalara AvaTax | R, W, M | Public API | Free sandbox | No | Planned (Sales tax by jurisdiction) |
+| TaxJar | R, W | Public API | Unknown | No | Planned |
+| FinCEN Form 8300 cash reporting | R, W, M | File export | Sample files | No | Planned (Cash payments over $10,000; filed through BSA E-Filing, which has no API, so the brain prepares and tracks filings) |
+| Refiner and scrap settlement statements | R, W, M | File export | Sample files | No | Planned (CSV or PDF from the refiner) |
+| Gusto | R, W, M | Public API | Free sandbox | Yes | Planned (Payroll, commissions and staff costs) |
 
 ### Manufacturing and wholesale operations
 
@@ -115,6 +129,28 @@ Used by: R is retail, W is wholesale, M is manufacturing. Test with says how we 
 | Jewelers Mutual care plans | R | Public API | Partner | No | Planned |
 | Parcel Pro | R, W, M | Partner | Partner | No | Planned |
 | Malca-Amit | W, M | Partner | Partner | No | Planned |
+| MatrixGold CAD | R, M | Unknown | Unknown | No | Planned (Custom design files and metal weight estimates) |
+| Formlabs 3D printing | R, M | Unknown | Unknown | No | Planned (Print jobs for wax and resin models) |
+
+## Systems by department
+
+Every department reads from more than one system, and a test keeps it that way. This is also where to look when adding a department: if it has fewer than two systems, the catalog is missing something.
+
+| Department | Systems it reads from |
+| --- | --- |
+| Sales and POS | Shopify, Inventory and POS systems, Stripe, HubSpot, Monday.com, Slack, Instagram DMs, Facebook Messenger and WhatsApp Business, The Edge (Abbott Jewelry Systems), Jewel360, ARMS, Lightspeed Retail, Square, Clover, Valigara, WooCommerce, BigCommerce, Wix, Punchmark, Clientbook, Podium, Authorize.net, Affirm, Synchrony, Acima, EDI with retail partners (X12 850, 855, 856, 810, 846, 852), Jewelers Mutual care plans, Google Analytics 4, Etsy, eBay |
+| Inventory and Merchandising | Shopify, Inventory and POS systems, The Edge (Abbott Jewelry Systems), Jewel360, ARMS, Lightspeed Retail, Square, Clover, Valigara, WooCommerce, BigCommerce, Wix, Punchmark, RapNet and the Rapaport Price List, IDEX Online, Nivoda, VDB (Virtual Diamond Boutique), Polygon, Stuller, GemFind JewelCloud, Quality Gold, GIA Report Results, IGI report verification, PIRO, Adaptive Jewelry ERP, Acumatica JewelShop, DiamTrade, EDI with retail partners (X12 850, 855, 856, 810, 846, 852), Parcel Pro, Malca-Amit, Etsy, eBay |
+| Clienteling and CRM | HubSpot, Custom forms, Gmail, Instagram DMs, Facebook Messenger and WhatsApp Business, The Edge (Abbott Jewelry Systems), Jewel360, ARMS, Lightspeed Retail, Square, Clover, Clientbook, Podium, Birdeye, Klaviyo, Twilio, Calendly, Acuity Scheduling, Mailchimp, Google Business Profile |
+| Repairs and Service | Monday.com, Custom forms, Slack, The Edge (Abbott Jewelry Systems), Jewel360, ARMS, Lightspeed Retail, Square, Clover, Stuller, Geller's Blue Book, Twilio, Jewelers Mutual care plans, Parcel Pro, Malca-Amit, Calendly, Acuity Scheduling |
+| Custom and Special Orders | Monday.com, Custom forms, Gmail, Slack, Stuller, Quality Gold, Calendly, Acuity Scheduling, MatrixGold CAD, Formlabs 3D printing |
+| Appraisals | RapNet and the Rapaport Price List, IDEX Online, Nivoda, VDB (Virtual Diamond Boutique), GIA Report Results, IGI report verification, GemGuide Appraisal Software |
+| Buying, Vendors and Memo | Gmail, RapNet and the Rapaport Price List, IDEX Online, Nivoda, VDB (Virtual Diamond Boutique), Polygon, Stuller, GemFind JewelCloud, Quality Gold, GIA Report Results, nFusion Solutions metals feed, Metals-API, Jewelers Board of Trade, Adaptive Jewelry ERP, Acumatica JewelShop, DiamTrade |
+| Metals and Gold Buying | nFusion Solutions metals feed, Metals-API, Refiner and scrap settlement statements |
+| Marketing | Shopify, Inventory and POS systems, HubSpot, Instagram DMs, Facebook Messenger and WhatsApp Business, Valigara, WooCommerce, BigCommerce, Wix, Punchmark, GemFind JewelCloud, Podium, Birdeye, Klaviyo, Attentive, Twilio, Mailchimp, Google Analytics 4, Google Ads, Meta Ads, Google Business Profile, Etsy |
+| Finance | Stripe, Chase business bank accounts and credit cards, Bank and credit card statements (any bank), Google Workspace and Drive, QuickBooks Online, Xero, Plaid, Authorize.net, Affirm, Synchrony, Acima, Jewelers Board of Trade, Avalara AvaTax, TaxJar, Refiner and scrap settlement statements, Gusto |
+| Compliance | Chase business bank accounts and credit cards, Bank and credit card statements (any bank), Google Workspace and Drive, QuickBooks Online, Xero, Plaid, Jewelers Mutual care plans, Parcel Pro, Malca-Amit, Avalara AvaTax, TaxJar, FinCEN Form 8300 cash reporting, Gusto |
+| Manufacturing (planned) | PIRO, Adaptive Jewelry ERP, Acumatica JewelShop, DiamTrade, MatrixGold CAD, Formlabs 3D printing |
+| Wholesale (planned) | RapNet and the Rapaport Price List, IDEX Online, Nivoda, VDB (Virtual Diamond Boutique), Polygon, GemFind JewelCloud, Jewelers Board of Trade, PIRO, Adaptive Jewelry ERP, Acumatica JewelShop, DiamTrade, EDI with retail partners (X12 850, 855, 856, 810, 846, 852) |
 
 ## Bank and card statements
 
