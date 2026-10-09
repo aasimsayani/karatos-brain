@@ -11,7 +11,7 @@ const valid = {
 describe("loadInstanceConfig", () => {
   it("applies defaults", () => {
     const config = loadInstanceConfig(valid);
-    expect(config).toMatchObject({ PORT: 8080, MIGRATE_ON_START: true, DOC_REGISTRY_IDS: [], ENABLED_DEPARTMENTS: [] });
+    expect(config).toMatchObject({ PORT: 8080, MIGRATE_ON_START: true, DOC_REGISTRY_IDS: [], ENABLED_DEPARTMENTS: [], ENABLED_WRITES: [] });
   });
 
   it("parses the documentation registry list", () => {
@@ -39,5 +39,13 @@ describe("loadInstanceConfig", () => {
   it("reads the enabled departments and rejects unknown ones without echoing values", () => {
     expect(loadInstanceConfig({ ...valid, ENABLED_DEPARTMENTS: "sales, repairs" }).ENABLED_DEPARTMENTS).toEqual(["sales", "repairs"]);
     expect(() => loadInstanceConfig({ ...valid, ENABLED_DEPARTMENTS: "sales,manufacturing" })).toThrow(/ENABLED_DEPARTMENTS: use any of: sales/);
+  });
+
+  it("keeps every integration read-only unless writes are listed", () => {
+    expect(loadInstanceConfig({ ...valid, ENABLED_WRITES: "shopify:adjust_inventory, stripe:*" }).ENABLED_WRITES).toEqual([
+      "shopify:adjust_inventory",
+      "stripe:*",
+    ]);
+    expect(() => loadInstanceConfig({ ...valid, ENABLED_WRITES: "shopify" })).toThrow(/ENABLED_WRITES: use integration:action/);
   });
 });
