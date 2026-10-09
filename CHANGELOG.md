@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- README: what Brain A covers across departments, how to configure departments per business, what becomes possible as systems are connected (built versus next), and a status table
+
 ## 0.5.0 (unreleased)
 
 Retail jewelry departments.
