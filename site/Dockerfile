@@ -10,7 +10,7 @@ COPY packages/server/package.json packages/server/
 RUN npm ci --ignore-scripts
 COPY packages packages
 COPY site site
-RUN node --import tsx site/build.ts
+RUN npm run build -w @karatos/core && node --import tsx site/build.ts
 
 FROM caddy:2.10-alpine
 COPY site/Caddyfile /etc/caddy/Caddyfile
