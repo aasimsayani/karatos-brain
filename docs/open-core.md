@@ -19,6 +19,14 @@ These are decided case by case, not committed:
 - Managed hosting, multi-store dashboards and white-label agents for KaratOS customers
 - Premium connectors (HubSpot, Meta/WhatsApp/Instagram, Monday.com)
 
+## Your instance, your data
+
+Every business runs a private instance in accounts it owns: its own Supabase project, its own host and its own credentials. That matters for three reasons:
+
+- **No one else can see the data.** Once setup is finished, we hand over and have no access. Sales, customers, statements and margins never leave the business's own accounts.
+- **Nothing is shared by default.** One client's data is never used to price, benchmark or advise another, unless both opt in to a shared feature.
+- **The business decides when we come back.** A maintenance plan is optional. Clients who sign up give us access to keep the instance updated and to add integrations based on their needs; clients who don't keep running the public image on their own.
+
 ## Rules that keep the split clean
 
 1. Private modules depend on `@karatos/core`. The core never depends on a private module.
