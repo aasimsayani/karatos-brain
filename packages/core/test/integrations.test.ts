@@ -1,7 +1,8 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { INTEGRATIONS, parseManifest } from "../src/index.js";
+import { INTEGRATIONS, integrationsFor, parseManifest } from "../src/index.js";
 
+const catalogDoc = readFileSync(new URL("../../../docs/integrations.md", import.meta.url), "utf8");
 const manifest = parseManifest(
   JSON.parse(readFileSync(new URL("../../../secrets/manifest.json", import.meta.url), "utf8")),
 );
@@ -27,5 +28,23 @@ describe("integration catalog", () => {
         expect(scoped, `${setting} should be required for integration:${integration.id}`).toBe(true);
       }
     }
+  });
+
+  it("names at least one kind of business for every integration", () => {
+    const missing = INTEGRATIONS.filter((i) => i.segments.length === 0).map((i) => i.id);
+    expect(missing).toEqual([]);
+  });
+
+  it("filters the catalog by kind of business", () => {
+    const wholesale = integrationsFor("wholesale").map((i) => i.id);
+    expect(wholesale).toContain("rapnet");
+    expect(wholesale).toContain("edi_x12");
+    expect(wholesale).not.toContain("the_edge");
+    expect(integrationsFor("retail").map((i) => i.id)).toContain("the_edge");
+  });
+
+  it("lists every integration in docs/integrations.md", () => {
+    const missing = INTEGRATIONS.filter((i) => !catalogDoc.includes(`| ${i.name} |`)).map((i) => i.id);
+    expect(missing).toEqual([]);
   });
 });
