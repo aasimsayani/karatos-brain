@@ -11,8 +11,8 @@ import { RETAIL_DEPARTMENTS } from "../packages/retail/src/index.js";
 export const REPORT_URL =
   "https://github.com/aasimsayani/karatos-brain/issues/new?template=integration-request.yml";
 export const REPO_URL = "https://github.com/aasimsayani/karatos-brain";
-/** Where quote and Brain Console requests go until a private contact form exists. */
-export const QUOTE_URL = "https://github.com/aasimsayani/karatos-brain/issues/new?template=custom-services.yml";
+/** Quote and Brain Console requests go to the private form on the page. */
+export const CONTACT_ANCHOR = "#contact";
 export const CONSOLE_PRICE = "$99";
 
 const PLANNED_DEPARTMENTS = [
@@ -194,6 +194,24 @@ section{padding:80px 0;border-top:1px solid var(--line);scroll-margin-top:64px}
 .plan p{margin:0 0 14px;color:var(--ink-2)}
 .plan .btn{margin-top:auto;align-self:flex-start}
 .plan .fine{font-size:13px;color:var(--muted)}
+.contact{display:grid;grid-template-columns:1fr 2fr;gap:28px;margin-top:40px;background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:28px;scroll-margin-top:72px}
+@media (max-width:860px){.contact{grid-template-columns:1fr}}
+.contact h3{margin:0 0 8px;font-size:22px;font-family:Fraunces,serif}
+.contact-intro p{margin:0;color:var(--ink-2)}
+#inquiry{display:grid;gap:14px}
+#inquiry label{display:grid;gap:6px;font-size:14px;font-weight:500}
+#inquiry input,#inquiry select,#inquiry textarea{width:100%;padding:11px 13px;border-radius:10px;border:1px solid var(--line);background:var(--bg);color:var(--ink);font:inherit}
+#inquiry .row{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media (max-width:560px){#inquiry .row{grid-template-columns:1fr}}
+#inquiry .seats{max-width:260px}
+.interests{border:0;padding:0;margin:0;display:flex;flex-wrap:wrap;gap:10px 18px}
+.interests legend{font-size:14px;font-weight:500;margin-bottom:8px}
+.interests label{display:flex!important;align-items:center;gap:8px;font-weight:400}
+.interests input{width:auto!important}
+#inquiry .invalid{border-color:#c0392b}
+.hp{position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden}
+.submit-row{display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+#inquiry-status{margin:0;font-size:14px;color:var(--ink-2)}
 .campaign{background:var(--ink);color:var(--bg);border-radius:24px;padding:56px clamp(24px,5vw,64px);border:0}
 .campaign h2{max-width:22ch}
 .campaign p{color:color-mix(in srgb,var(--bg) 78%,transparent);max-width:60ch;font-size:17px}
@@ -299,21 +317,47 @@ ${cards}
       <p class="price"><strong>${CONSOLE_PRICE}</strong> per user per month</p>
       <p>Access to the dashboard itself, for each person on your team. It runs on a KaratOS instance you already have.</p>
       <p class="fine">Setting up the instance and connecting your systems isn't included; we quote that as a custom service.</p>
-      <a class="btn primary" href="${QUOTE_URL}">Get the Brain Console</a>
+      <a class="btn primary" href="${CONTACT_ANCHOR}" data-interest="brain_console">Get the Brain Console</a>
     </li>
     <li class="plan">
       <h3>Maintenance</h3>
       <p class="price"><strong>By quote</strong></p>
       <p>We keep your instance current, watch every sync, fix connections when a vendor changes something and add integrations as your stack grows.</p>
-      <a class="btn ghost" href="${QUOTE_URL}">Ask for a quote</a>
+      <a class="btn ghost" href="${CONTACT_ANCHOR}" data-interest="maintenance">Ask for a quote</a>
     </li>
     <li class="plan">
       <h3>Custom services</h3>
       <p class="price"><strong>By quote</strong></p>
       <p>Setting up your private instance, connecting your systems, integrations no one else builds, custom workflows and reports, and moving years of history out of old systems.</p>
-      <a class="btn ghost" href="${QUOTE_URL}">Ask for a quote</a>
+      <a class="btn ghost" href="${CONTACT_ANCHOR}" data-interest="custom_services">Ask for a quote</a>
     </li>
   </ul>
+
+  <div id="contact" class="contact">
+    <div class="contact-intro">
+      <h3>Talk to us</h3>
+      <p>Tell us what you run and what you need. This goes privately to our team and is never posted publicly.</p>
+    </div>
+    <form id="inquiry" novalidate>
+      <fieldset class="interests"><legend>Interested in</legend>
+        <label><input type="checkbox" name="interests" value="brain_console"> Brain Console</label>
+        <label><input type="checkbox" name="interests" value="maintenance"> Maintenance</label>
+        <label><input type="checkbox" name="interests" value="custom_services"> Custom services</label>
+      </fieldset>
+      <div class="row">
+        <label>Your name<input name="name" autocomplete="name" maxlength="120" required></label>
+        <label>Email<input name="email" type="email" autocomplete="email" maxlength="200" required></label>
+      </div>
+      <div class="row">
+        <label>Business<input name="business" autocomplete="organization" maxlength="160" required></label>
+        <label>Kind of business<select name="businessType" required><option value="">Choose one</option><option value="retail">Retail store</option><option value="wholesale">Wholesaler or diamond dealer</option><option value="manufacturing">Manufacturer</option><option value="other">Other</option></select></label>
+      </div>
+      <label class="seats">People who'd use the dashboard<input name="seats" type="number" min="1" max="10000" inputmode="numeric"></label>
+      <label>What do you need?<textarea name="message" rows="5" maxlength="4000" required placeholder="The systems you run, what isn't working, and what you'd like built."></textarea></label>
+      <label class="hp" aria-hidden="true">Website<input name="website" tabindex="-1" autocomplete="off"></label>
+      <div class="submit-row"><button class="btn primary" type="submit">Send</button><p id="inquiry-status" role="status" aria-live="polite"></p></div>
+    </form>
+  </div>
 </div></section>
 
 <section id="broken" style="border-top:0"><div class="wrap">
@@ -345,6 +389,32 @@ ${cards}
     empty.hidden=shown>0;
   }
   q.addEventListener('input',apply);seg.addEventListener('change',apply);dep.addEventListener('change',apply);
+})();
+(function(){
+  var form=document.getElementById('inquiry'),status=document.getElementById('inquiry-status');
+  document.querySelectorAll('[data-interest]').forEach(function(a){
+    a.addEventListener('click',function(){
+      var box=form.querySelector('input[name=interests][value="'+a.dataset.interest+'"]'); if(box) box.checked=true;
+    });
+  });
+  form.addEventListener('submit',function(e){
+    e.preventDefault();
+    form.querySelectorAll('.invalid').forEach(function(el){el.classList.remove('invalid')});
+    var data={interests:[].map.call(form.querySelectorAll('input[name=interests]:checked'),function(b){return b.value})};
+    ['name','email','business','businessType','seats','message','website'].forEach(function(k){data[k]=form.elements[k].value});
+    var button=form.querySelector('button');button.disabled=true;status.textContent='Sending...';
+    fetch('/api/inquiry',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)})
+      .then(function(r){return r.json().catch(function(){return {}}).then(function(b){return {status:r.status,body:b}})})
+      .then(function(r){
+        if(r.status===202){form.reset();status.textContent='Thanks. We have it and will be in touch.';return}
+        if(r.status===400&&r.body.fields){
+          r.body.fields.forEach(function(f){var el=f==='interests'?form.querySelector('.interests'):form.elements[f];if(el)el.classList.add('invalid')});
+          status.textContent='Please check the highlighted fields.';return}
+        status.textContent=r.status===429?'That is a lot of messages. Please try again in an hour.':'We could not send that just now. Please try again soon.';
+      })
+      .catch(function(){status.textContent='We could not send that just now. Please try again soon.'})
+      .then(function(){button.disabled=false});
+  });
 })();
 </script>
 </body>
