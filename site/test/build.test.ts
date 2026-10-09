@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { INTEGRATIONS, selfServeIntegrations } from "../../packages/core/src/index.js";
 import { RETAIL_DEPARTMENTS } from "../../packages/retail/src/index.js";
-import { REPORT_URL, buildingNow, escapeHtml, renderSite } from "../build.js";
+import { CONSOLE_PRICE, QUOTE_URL, REPORT_URL, buildingNow, escapeHtml, renderSite } from "../build.js";
 
 const html = renderSite();
 
@@ -33,5 +33,20 @@ describe("KaratOS website", () => {
 
   it("escapes text taken from the catalog", () => {
     expect(escapeHtml(`<a href="x">Tom's & co</a>`)).toBe("&lt;a href=&quot;x&quot;&gt;Tom&#39;s &amp; co&lt;/a&gt;");
+  });
+
+  it("offers the Brain Console at its list price and the other services by quote", () => {
+    expect(html).toContain(`<strong>${CONSOLE_PRICE}</strong> per user per month`);
+    expect(html.match(/<strong>By quote<\/strong>/g)?.length).toBe(2);
+    expect(html.split(`href="${QUOTE_URL}"`).length - 1).toBe(3);
+    expect(QUOTE_URL).toContain("template=custom-services.yml");
+    // The console price covers dashboard access only; setup is a quoted service.
+    expect(html).toContain("Setting up the instance and connecting your systems isn't included");
+  });
+
+  it("leads the header with Custom services instead of a GitHub button", () => {
+    const header = html.slice(html.indexOf('<header class="nav">'), html.indexOf("</header>"));
+    expect(header).toContain('href="#services">Custom services</a>');
+    expect(header).not.toContain("GitHub");
   });
 });

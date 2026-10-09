@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Website: Custom services and pricing section (Brain Console at $99 per user per month for dashboard access only; setup, maintenance and custom services by quote), a "Custom services" header button in place of the GitHub button, and an inquiry form
+- The Brain Console is a private, paid module; the open core keeps the API it reads from
+
 - KaratOS website in `site/`: a static page whose integration directory and departments are generated from the catalog, with the private-instance pitch and the broken-systems campaign; deploys to Railway with Caddy
 
 - Integrations for every department: each entry names the departments it feeds, a test checks every retail department has at least two systems, and 16 systems are added for scheduling, sales tax, cash reporting (Form 8300), refiner statements, payroll, email and ad platforms, analytics, marketplaces, CAD and 3D printing

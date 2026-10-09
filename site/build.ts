@@ -11,6 +11,9 @@ import { RETAIL_DEPARTMENTS } from "../packages/retail/src/index.js";
 export const REPORT_URL =
   "https://github.com/aasimsayani/karatos-brain/issues/new?template=integration-request.yml";
 export const REPO_URL = "https://github.com/aasimsayani/karatos-brain";
+/** Where quote and Brain Console requests go until a private contact form exists. */
+export const QUOTE_URL = "https://github.com/aasimsayani/karatos-brain/issues/new?template=custom-services.yml";
+export const CONSOLE_PRICE = "$99";
 
 const PLANNED_DEPARTMENTS = [
   { id: "manufacturing", name: "Manufacturing", purpose: "Casting, bench time and job costs, from wax to finished piece." },
@@ -122,6 +125,7 @@ header.nav{position:sticky;top:0;z-index:10;background:color-mix(in srgb,var(--b
 .btn:hover{transform:translateY(-1px)}
 .btn.primary{background:var(--ink);color:var(--bg)}
 .btn.ghost{background:transparent;color:var(--ink)}
+.btn.small{padding:9px 16px;font-size:14px}
 .hero{padding:96px 0 72px}
 .eyebrow{display:inline-block;font-size:13px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--gold);margin-bottom:18px}
 h1,h2{font-family:Fraunces,serif;font-weight:600;letter-spacing:-.02em;line-height:1.08;margin:0}
@@ -130,7 +134,7 @@ h2{font-size:clamp(30px,4.5vw,46px);max-width:20ch}
 .lede{font-size:clamp(17px,2.2vw,20px);color:var(--ink-2);max-width:60ch;margin:24px 0 32px}
 .actions{display:flex;flex-wrap:wrap;gap:12px}
 .note{margin-top:22px;font-size:14px;color:var(--muted)}
-section{padding:80px 0;border-top:1px solid var(--line)}
+section{padding:80px 0;border-top:1px solid var(--line);scroll-margin-top:64px}
 .section-intro{color:var(--ink-2);max-width:62ch;margin:16px 0 40px;font-size:17px}
 .steps{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;list-style:none;padding:0;margin:0;counter-reset:step}
 .steps li{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:28px;counter-increment:step}
@@ -167,6 +171,29 @@ section{padding:80px 0;border-top:1px solid var(--line)}
 .pillars h3{margin:0 0 8px;font-size:18px}
 .pillars p{margin:0;color:var(--ink-2)}
 @media (max-width:860px){.pillars{grid-template-columns:1fr}}
+.services{display:grid;grid-template-columns:1.1fr 1fr;gap:28px;margin-bottom:28px}
+@media (max-width:860px){.services{grid-template-columns:1fr}}
+.console-preview{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:20px;box-shadow:0 12px 32px -18px rgba(0,0,0,.25)}
+.cp-head{display:flex;justify-content:space-between;align-items:center;font-weight:600;margin-bottom:14px}
+.cp-row{border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin-bottom:10px}
+.cp-row.act{border-left:4px solid var(--gold)}
+.cp-row p{margin:4px 0 0;font-size:15px}
+.cp-dept{font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted)}
+.cp-note{margin:6px 0 0;font-size:13px;color:var(--muted)}
+.why-console h3{margin:0 0 12px;font-size:20px}
+.why-console ul{margin:0;padding-left:18px;color:var(--ink-2)}
+.why-console li{margin-bottom:12px}
+.why-console strong{color:var(--ink)}
+.plans{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;list-style:none;padding:0;margin:0}
+@media (max-width:860px){.plans{grid-template-columns:1fr}}
+.plan{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:26px;display:flex;flex-direction:column;gap:6px}
+.plan.featured{border-color:var(--gold);box-shadow:0 0 0 1px var(--gold)}
+.plan h3{margin:0;font-size:20px}
+.plan .price{margin:0;color:var(--muted)}
+.plan .price strong{font-family:Fraunces,serif;font-size:34px;color:var(--ink);font-weight:600;margin-right:4px}
+.plan p{margin:0 0 14px;color:var(--ink-2)}
+.plan .btn{margin-top:auto;align-self:flex-start}
+.plan .fine{font-size:13px;color:var(--muted)}
 .campaign{background:var(--ink);color:var(--bg);border-radius:24px;padding:56px clamp(24px,5vw,64px);border:0}
 .campaign h2{max-width:22ch}
 .campaign p{color:color-mix(in srgb,var(--bg) 78%,transparent);max-width:60ch;font-size:17px}
@@ -179,8 +206,8 @@ footer .wrap{display:flex;flex-wrap:wrap;justify-content:space-between;gap:12px}
 <body>
 <header class="nav"><div class="wrap">
   <a class="brand" href="#top"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M16 3 28 12 16 29 4 12Z" fill="#c9a45c"/><path d="M4 12h24M16 3l-5 9 5 17 5-17-5-9" fill="none" stroke="#16140f" stroke-opacity=".35" stroke-width="1.2"/></svg>KaratOS</a>
-  <nav><a href="#how">How it works</a><a href="#departments">Departments</a><a href="#integrations">Integrations</a><a href="#your-data">Your data</a><a href="#broken">Tell us what's broken</a></nav>
-  <a class="btn ghost" href="${REPO_URL}">GitHub</a>
+  <nav><a href="#how">How it works</a><a href="#departments">Departments</a><a href="#integrations">Integrations</a><a href="#services">Pricing</a><a href="#broken">Tell us what's broken</a></nav>
+  <a class="btn primary small" href="#services">Custom services</a>
 </div></header>
 
 <main id="top">
@@ -188,7 +215,7 @@ footer .wrap{display:flex;flex-wrap:wrap;justify-content:space-between;gap:12px}
   <span class="eyebrow">For jewelers, wholesalers and manufacturers</span>
   <h1>The operating brain for jewelry businesses.</h1>
   <p class="lede">KaratOS connects the systems your business already runs, from the POS and the books to diamond feeds and the repair bench, and turns them into a short list of things to act on today. Every suggestion shows the evidence behind it.</p>
-  <div class="actions"><a class="btn primary" href="#integrations">See the integrations</a><a class="btn ghost" href="#broken">Tell us what's broken</a></div>
+  <div class="actions"><a class="btn primary" href="#services">Custom services</a><a class="btn ghost" href="#integrations">See the integrations</a></div>
   <p class="note">Early access. The first integrations are being built and tested now.</p>
 </div>
 
@@ -244,6 +271,51 @@ ${cards}
   </div>
 </div></section>
 
+<section id="services"><div class="wrap">
+  <span class="eyebrow">Custom services</span>
+  <h2>We build it, connect it and keep it running.</h2>
+  <p class="section-intro">Start with the Brain Console on its own, or have us connect the systems you run, build the ones nobody else will, and look after your instance.</p>
+  <div class="services">
+    <div class="console-preview" aria-label="Brain Console preview">
+      <div class="cp-head"><span>Brain Console</span><span class="pill gold">3 need you today</span></div>
+      <div class="cp-row act"><span class="cp-dept">Repairs</span><p>Call about the Rivera ring. Promised Friday, still at the setter.</p></div>
+      <div class="cp-row"><span class="cp-dept">Inventory</span><p>Seven aged pieces are worth more at melt than on the case.</p></div>
+      <div class="cp-row"><span class="cp-dept">Clienteling</span><p>Twelve anniversaries in the next two weeks with a matching piece in stock.</p></div>
+      <p class="cp-note">Illustrative. Every card shows the records behind it, and Accept, Snooze or Dismiss.</p>
+    </div>
+    <div class="why-console">
+      <h3>Why the Brain Console</h3>
+      <ul>
+        <li><strong>One list for the whole business.</strong> Sales, repairs, buying, metals and the books in one place, ranked by what needs you first.</li>
+        <li><strong>The evidence, every time.</strong> Each suggestion shows the sales, tickets and statements it came from, and says when its data is out of date.</li>
+        <li><strong>Gets sharper as you use it.</strong> What you accept, snooze and dismiss tunes what it shows tomorrow.</li>
+        <li><strong>Private by design.</strong> It runs on your own instance. We can't see your numbers unless you sign up for maintenance.</li>
+      </ul>
+    </div>
+  </div>
+  <ul class="plans">
+    <li class="plan featured">
+      <h3>Brain Console</h3>
+      <p class="price"><strong>${CONSOLE_PRICE}</strong> per user per month</p>
+      <p>Access to the dashboard itself, for each person on your team. It runs on a KaratOS instance you already have.</p>
+      <p class="fine">Setting up the instance and connecting your systems isn't included; we quote that as a custom service.</p>
+      <a class="btn primary" href="${QUOTE_URL}">Get the Brain Console</a>
+    </li>
+    <li class="plan">
+      <h3>Maintenance</h3>
+      <p class="price"><strong>By quote</strong></p>
+      <p>We keep your instance current, watch every sync, fix connections when a vendor changes something and add integrations as your stack grows.</p>
+      <a class="btn ghost" href="${QUOTE_URL}">Ask for a quote</a>
+    </li>
+    <li class="plan">
+      <h3>Custom services</h3>
+      <p class="price"><strong>By quote</strong></p>
+      <p>Setting up your private instance, connecting your systems, integrations no one else builds, custom workflows and reports, and moving years of history out of old systems.</p>
+      <a class="btn ghost" href="${QUOTE_URL}">Ask for a quote</a>
+    </li>
+  </ul>
+</div></section>
+
 <section id="broken" style="border-top:0"><div class="wrap">
   <div class="campaign">
     <span class="eyebrow">Open call</span>
@@ -256,8 +328,8 @@ ${cards}
 </main>
 
 <footer><div class="wrap">
-  <span>KaratOS. The core is open source under the MIT license.</span>
-  <a href="${REPO_URL}">Source on GitHub</a>
+  <span>KaratOS. The core engine is open source under the MIT license. The Brain Console and custom services are paid.</span>
+  <a href="${REPO_URL}">Open-source core on GitHub</a>
 </div></footer>
 
 <script>

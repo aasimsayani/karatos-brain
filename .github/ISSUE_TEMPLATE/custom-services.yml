@@ -1,0 +1,40 @@
+name: Custom services or Brain Console inquiry
+description: Ask about the Brain Console, a maintenance plan, or custom integrations and systems built for your business.
+title: "Inquiry: "
+labels: ["inquiry"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        This form is public. Share only what you're comfortable posting, and leave out passwords, customer names and figures. We'll follow up to move the details somewhere private.
+  - type: dropdown
+    id: interest
+    attributes:
+      label: What are you interested in?
+      multiple: true
+      options: [Brain Console ($99 per user per month), Maintenance plan, Custom integrations or systems]
+    validations:
+      required: true
+  - type: dropdown
+    id: business
+    attributes:
+      label: What kind of business are you?
+      options: [Retail store, Wholesaler or diamond dealer, Manufacturer, Other]
+    validations:
+      required: true
+  - type: input
+    id: size
+    attributes:
+      label: How many people would use the dashboard?
+  - type: textarea
+    id: need
+    attributes:
+      label: What do you need?
+      description: The systems you run, what's not working, and what you'd like built.
+    validations:
+      required: true
+  - type: input
+    id: contact
+    attributes:
+      label: How should we reach you?
+      description: Optional. A public handle is fine; we'll arrange private contact from there.
