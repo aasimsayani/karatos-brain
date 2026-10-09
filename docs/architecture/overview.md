@@ -38,6 +38,14 @@ reason(org) ──► DocumentationSource.current()
 | Decisions and outcomes | `decisions`, `outcomes` | What people chose, and what happened next, to calibrate confidence |
 | Memories | `memories` | Long-lived, text-searchable knowledge about the business |
 | Documentation registry | `RegistryDocumentationSource`, `documentation_registry` | Drift in the source-of-truth docs marks reasoning degraded |
+| Connections | `PostgresIngestionLog`, `integration_connections` | Which systems an instance has connected, their streams and status. Stores secret names only; a check rejects anything shaped like a secret value. |
+| Sync runs | `sync_runs` | Every historical import, incremental sync, webhook batch and file import, with counts, cursors and errors. A failed run marks its connection as erroring. |
+| Webhook deliveries | `webhook_deliveries` | A vendor's retried delivery is processed once |
+| File imports | `file_imports` | Bank and card statements (CSV or PDF) and other uploads. The same file uploaded twice is one import, keyed by SHA-256. |
+| Entity links | `entity_links` | How entities relate (an order's customer, a repair's product), readable in both directions |
+| Write audit | `write_audit` | `PostgresIngestionLog` is a `WriteAuditLog`, so every write attempt, refusals included, is kept. Append-only. |
+
+All of these tables have row-level security keyed on the organization, and the migration ledger (`schema_migrations`) has row-level security with no policy, so only the service role can touch it.
 
 See [why Brain A compounds in value](../vision/compounding-value.md) and the [incident runbook](../runbooks/incidents.md).
 
