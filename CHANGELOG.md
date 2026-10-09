@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Database: ingestion tables for every integration (connections by secret name, sync runs, webhook deliveries, file imports for CSV and PDF statements, entity links, an append-only write audit), indexes for reading data back by system and entity, and row-level security on the migration ledger. `PostgresIngestionLog` writes them and is a `WriteAuditLog`
 - KaratOS website in `site/`: a static page whose integration directory and departments are generated from the catalog, with the private-instance pitch and the broken-systems campaign; deploys to Railway with Caddy
 
 - Integrations for every department: each entry names the departments it feeds, a test checks every retail department has at least two systems, and 16 systems are added for scheduling, sales tax, cash reporting (Form 8300), refiner statements, payroll, email and ad platforms, analytics, marketplaces, CAD and 3D printing
