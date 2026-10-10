@@ -7,6 +7,7 @@ COPY packages/core/package.json packages/core/
 COPY packages/store-postgres/package.json packages/store-postgres/
 COPY packages/retail/package.json packages/retail/
 COPY packages/server/package.json packages/server/
+COPY packages/testkit/package.json packages/testkit/
 RUN npm ci --ignore-scripts
 COPY packages packages
 COPY site site
