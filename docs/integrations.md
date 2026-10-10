@@ -160,7 +160,7 @@ Statements are customer data. They never go in a git repo, including private one
 
 ## Testing the integrations
 
-Every system we connect to changes over time, so each connector is tested at four levels as it is built. None of this runs yet because no connector is built; it is the bar each one must meet:
+Every system we connect to changes over time, so each connector is tested at four levels as it is built. The unit and contract levels use the connector test kit below; the live and docs levels are still to come:
 
 | Level | What it checks | When it runs |
 | --- | --- | --- |
@@ -170,6 +170,20 @@ Every system we connect to changes over time, so each connector is tested at fou
 | Docs watch | Each vendor's API changelog and version list is checked for changes, deprecations and new versions | Daily |
 
 A failure at the live or docs level opens an issue naming the integration, what changed and the evidence. Sandbox credentials are test-only and live in the CI secret store, never in the repo. Synthetic fixtures contain no real customer data.
+
+### The connector test kit
+
+`@karatos/connector-testkit` (in `packages/testkit`) is what every connector's tests use. A sample connector in `packages/testkit/test` uses every helper.
+
+| Helper | What it gives a connector test |
+| --- | --- |
+| `fixtureBuilder`, `synthetic` | Numbered synthetic records with reserved test emails (`.test`), fictional 555-01xx phone numbers, test SKUs and fixed timestamps |
+| `assertSynthetic` | Fails if a fixture holds a real-looking email, phone number or card number, and names where |
+| `replayFetch`, `loadRecordings` | A `fetch` that answers from recorded vendor responses, in order, so contract tests run without the network. `unused()` catches requests the connector stopped making |
+| `scrubRecording`, `assertScrubbed` | Recordings never hold request headers; tokens in URLs and cookie or auth headers in responses are redacted, and a recording that still holds one won't load |
+| `checkConnectorSync` | Runs the connector through a full import, a replay (everything must count as a duplicate), a crash after the first batch plus resume from the checkpoint, and a retried source outage. Every broken scenario is listed in one error |
+| `hmacSha256`, `timestampedSignature`, `tamper` | Signed webhook deliveries, and tampered ones, to test signature checks |
+| `assertWritesRefused` | Runs every write the connector declares through a read-only `WriteGate` and checks each is refused and audited |
 
 ## The connector contract
 
