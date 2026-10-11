@@ -167,13 +167,20 @@ function changeBody(target: VendorDocsTarget, diff: TextDiff, at: string): strin
   ].join("\n");
 }
 
+/** "fetch failed" alone says nothing; Node keeps the real reason (DNS, TLS, proxy) in the cause chain. */
+function errorChain(error: unknown): string {
+  const parts: string[] = [];
+  for (let e: unknown = error; e instanceof Error && parts.length < 4; e = e.cause) parts.push(e.message);
+  return parts.join(": ") || String(error);
+}
+
 async function watchOne(target: VendorDocsTarget, options: VendorDocsWatchOptions, at: string): Promise<WatchOutcome> {
   const { integration } = target;
   let response: Response;
   try {
     response = await options.fetch(target.url, { headers: { accept: "text/html,text/plain;q=0.9,*/*;q=0.1" } });
   } catch (error) {
-    return { integration, status: "error", detail: (error as Error).message };
+    return { integration, status: "error", detail: errorChain(error) };
   }
 
   if (response.status === 404 || response.status === 410) {

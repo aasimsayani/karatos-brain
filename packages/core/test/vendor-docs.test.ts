@@ -65,16 +65,18 @@ async function watch(fetch: typeof globalThis.fetch, store: MemoryStore, issues:
 }
 
 describe("the catalog's changelogs", () => {
-  it("are https URLs or null, and every self-serve public API has one", () => {
+  it("are https URLs or null, and a self-serve public API without one says why", () => {
     for (const spec of INTEGRATIONS) {
       if (spec.changelog !== null) expect(spec.changelog, spec.id).toMatch(/^https:\/\/[^\s]+$/);
       if (spec.access === "public_api" && spec.testWith === "sandbox" && spec.status !== "deferred") {
-        expect(spec.changelog, `${spec.id} needs a changelog to watch`).not.toBeNull();
+        if (spec.changelog === null) expect(spec.note, `${spec.id} needs a changelog, or a note saying why not`).toMatch(/changelog/i);
       }
     }
     const { targets, unwatched } = vendorDocsTargets();
     expect(targets.length + unwatched.length).toBe(INTEGRATIONS.length);
     expect(unwatched).toContain("bank_statements");
+    expect(targets.find((t) => t.integration === "shopify")?.url).toBe("https://shopify.dev/changelog");
+    expect(new Set(targets.map((t) => t.url)).size).toBe(targets.length);
   });
 });
 
@@ -190,6 +192,8 @@ describe("runVendorDocsWatch", () => {
       status: "error",
       detail: "ECONNRESET",
     });
+    const proxied = new Error("fetch failed", { cause: new Error("Request was cancelled.", { cause: new Error("Proxy response (403)") }) });
+    expect((await watch(sitePages(proxied), store, issues))[0]!.detail).toBe("fetch failed: Request was cancelled.: Proxy response (403)");
     expect(issues.issues).toHaveLength(1);
   });
 
