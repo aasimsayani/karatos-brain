@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Vendor docs watch: every catalog entry lists its vendor's API changelog, and a daily workflow opens one issue per change with the changed lines as evidence (`npm run docs:watch`)
 - KaratOS website in `site/`: a static page whose integration directory and departments are generated from the catalog, with the private-instance pitch and the broken-systems campaign; deploys to Railway with Caddy
 
 - Integrations for every department: each entry names the departments it feeds, a test checks every retail department has at least two systems, and 16 systems are added for scheduling, sales tax, cash reporting (Form 8300), refiner statements, payroll, email and ad platforms, analytics, marketplaces, CAD and 3D printing
