@@ -34,9 +34,12 @@ describe("gitHubIssueTracker", () => {
     const tracker = gitHubIssueTracker({ repo: "o/r", token: "t", labels: ["vendor-docs", "integration"], fetch });
     expect(await tracker.open("Title", "Body")).toBe(7);
     await tracker.comment(7, "Again");
+    await tracker.close(7, "Fixed");
     expect(calls.map((c) => [c.method, c.url, c.body])).toEqual([
       ["POST", "https://api.github.com/repos/o/r/issues", { title: "Title", body: "Body", labels: ["vendor-docs", "integration"] }],
       ["POST", "https://api.github.com/repos/o/r/issues/7/comments", { body: "Again" }],
+      ["POST", "https://api.github.com/repos/o/r/issues/7/comments", { body: "Fixed" }],
+      ["PATCH", "https://api.github.com/repos/o/r/issues/7", { state: "closed", state_reason: "completed" }],
     ]);
   });
 

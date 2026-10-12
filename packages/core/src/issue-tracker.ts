@@ -14,6 +14,8 @@ export interface IssueTracker {
   findOpen(marker: string): Promise<TrackedIssue | null>;
   open(title: string, body: string): Promise<number>;
   comment(issue: number, body: string): Promise<void>;
+  /** Comments, then closes the issue as completed. */
+  close(issue: number, comment: string): Promise<void>;
 }
 
 export interface GitHubIssueTrackerOptions {
@@ -61,6 +63,10 @@ export function gitHubIssueTracker(options: GitHubIssueTrackerOptions): IssueTra
     },
     async comment(issue, body) {
       await api(`/issues/${issue}/comments`, { method: "POST", body: JSON.stringify({ body }) });
+    },
+    async close(issue, comment) {
+      await api(`/issues/${issue}/comments`, { method: "POST", body: JSON.stringify({ body: comment }) });
+      await api(`/issues/${issue}`, { method: "PATCH", body: JSON.stringify({ state: "closed", state_reason: "completed" }) });
     },
   };
 }

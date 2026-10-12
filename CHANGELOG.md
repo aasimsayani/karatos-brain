@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Nightly sandbox run: every built connector runs a historical import, an incremental sync and a test webhook against its vendor's sandbox; a failure opens one issue naming the connector and step and closes it when the connector recovers, and connectors without sandbox credentials are skipped and listed (`npm run sandbox:run`). The GitHub issue tracker is shared with the docs watch
 - Vendor docs watch: every catalog entry lists its vendor's API changelog, and a daily workflow opens one issue per change with the changed lines as evidence (`npm run docs:watch`)
 - KaratOS website in `site/`: a static page whose integration directory and departments are generated from the catalog, with the private-instance pitch and the broken-systems campaign; deploys to Railway with Caddy
 
