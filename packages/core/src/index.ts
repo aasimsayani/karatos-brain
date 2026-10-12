@@ -13,4 +13,5 @@ export * from "./config.js";
 export * from "./secrets.js";
 export * from "./integrations.js";
 export * from "./writes.js";
+export * from "./issue-tracker.js";
 export * from "./vendor-docs.js";

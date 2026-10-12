@@ -4,7 +4,7 @@ import {
   gitHubIssueTracker,
   runVendorDocsWatch,
   vendorDocsTargets,
-  type DocsIssueTracker,
+  type IssueTracker,
   type DocsSnapshot,
   type SnapshotStore,
 } from "@karatos/core";
@@ -32,7 +32,7 @@ const store: SnapshotStore = {
   },
 };
 
-function dryRunTracker(): DocsIssueTracker {
+function dryRunTracker(): IssueTracker {
   let next = 1;
   return {
     findOpen: async () => null,

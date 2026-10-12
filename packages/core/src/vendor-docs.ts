@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { INTEGRATIONS, type IntegrationSpec } from "./integrations.js";
+import type { IssueTracker } from "./issue-tracker.js";
 
 /**
  * Vendor docs watch: every day, fetch each integration's public API
@@ -104,18 +105,6 @@ export interface SnapshotStore {
   put(snapshot: DocsSnapshot): Promise<void>;
 }
 
-export interface TrackedIssue {
-  number: number;
-  body: string;
-}
-
-export interface DocsIssueTracker {
-  /** The open issue whose body carries this marker, if any. */
-  findOpen(marker: string): Promise<TrackedIssue | null>;
-  open(title: string, body: string): Promise<number>;
-  comment(issue: number, body: string): Promise<void>;
-}
-
 export type WatchStatus = "baseline" | "unchanged" | "changed" | "moved" | "error";
 
 export interface WatchOutcome {
@@ -129,7 +118,7 @@ export interface VendorDocsWatchOptions {
   targets: readonly VendorDocsTarget[];
   fetch: typeof globalThis.fetch;
   store: SnapshotStore;
-  issues: DocsIssueTracker;
+  issues: IssueTracker;
   now?: () => Date;
 }
 
@@ -238,52 +227,4 @@ export async function runVendorDocsWatch(options: VendorDocsWatchOptions): Promi
     }
   }
   return outcomes;
-}
-
-export interface GitHubIssueTrackerOptions {
-  /** owner/name */
-  repo: string;
-  token: string;
-  labels?: string[];
-  fetch?: typeof globalThis.fetch;
-}
-
-/** Files docs-watch issues through the GitHub REST API. */
-export function gitHubIssueTracker(options: GitHubIssueTrackerOptions): DocsIssueTracker {
-  const fetch = options.fetch ?? globalThis.fetch;
-  const labels = options.labels ?? ["vendor-docs"];
-  const api = async (path: string, init: RequestInit = {}) => {
-    const response = await fetch(`https://api.github.com/repos/${options.repo}${path}`, {
-      ...init,
-      headers: {
-        accept: "application/vnd.github+json",
-        authorization: `Bearer ${options.token}`,
-        "x-github-api-version": "2022-11-28",
-        ...(init.body ? { "content-type": "application/json" } : {}),
-      },
-    });
-    if (!response.ok) throw new Error(`GitHub ${init.method ?? "GET"} ${path} answered ${response.status}`);
-    return response.json() as Promise<unknown>;
-  };
-  return {
-    async findOpen(marker) {
-      for (let page = 1; ; page++) {
-        const issues = (await api(
-          `/issues?state=open&labels=${encodeURIComponent(labels[0]!)}&per_page=100&page=${page}`,
-        )) as { number: number; body: string | null; pull_request?: unknown }[];
-        const match = issues.find((i) => !i.pull_request && (i.body ?? "").includes(marker));
-        if (match) return { number: match.number, body: match.body ?? "" };
-        if (issues.length < 100) return null;
-      }
-    },
-    async open(title, body) {
-      const created = (await api("/issues", { method: "POST", body: JSON.stringify({ title, body, labels }) })) as {
-        number: number;
-      };
-      return created.number;
-    },
-    async comment(issue, body) {
-      await api(`/issues/${issue}/comments`, { method: "POST", body: JSON.stringify({ body }) });
-    },
-  };
 }
