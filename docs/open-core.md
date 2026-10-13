@@ -27,6 +27,12 @@ Every business runs a private instance in accounts it owns: its own Supabase pro
 - **Nothing is shared by default.** One client's data is never used to price, benchmark or advise another, unless both opt in to a shared feature.
 - **The business decides when we come back.** A maintenance plan is optional. Clients who sign up give us access to keep the instance updated and to add integrations based on their needs; clients who don't keep running the public image on their own.
 
+## The Brain Console is paid
+
+The Brain Console, the owner's daily dashboard, is a private module. Its code lives in a private repository and runs only for clients who pay for it: $99 per user per month for access to the dashboard itself. Setting up an instance and connecting systems is a separate service, quoted per client, as are maintenance and custom integrations.
+
+The open core keeps everything the console reads from: the recommendations and feedback API, provenance and the degraded flag. Anyone can build their own interface on that API; the Brain Console is ours.
+
 ## Rules that keep the split clean
 
 1. Private modules depend on `@karatos/core`. The core never depends on a private module.
