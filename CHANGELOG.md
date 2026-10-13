@@ -2,7 +2,10 @@
 
 ## Unreleased
 
-- KaratOS website in `site/`: a static page whose integration directory and departments are generated from the catalog, with the private-instance pitch and the broken-systems campaign; deploys to Railway with Caddy
+- Website: Custom services and pricing section (Brain Console at $99 per user per month for dashboard access only; setup, maintenance and custom services by quote), a "Custom services" header button in place of the GitHub button, and a private inquiry form that files each request as an issue in a private repository (`INQUIRY_REPO`, `INQUIRY_GITHUB_TOKEN`)
+- The Brain Console is a private, paid module; the open core keeps the API it reads from
+
+- KaratOS website in `site/`: a static page whose integration directory and departments are generated from the catalog, with the private-instance pitch and the broken-systems campaign; deploys to Railway as a small Node server
 
 - Integrations for every department: each entry names the departments it feeds, a test checks every retail department has at least two systems, and 16 systems are added for scheduling, sales tax, cash reporting (Form 8300), refiner statements, payroll, email and ad platforms, analytics, marketplaces, CAD and 3D printing
 - Integrations: each entry says how it is tested without a client's account (free sandbox, sample files, paid account, partner); `selfServeIntegrations()` lists the 37 we can build without contacting any vendor. Docs describe the self-serve-first build order and the four test levels each connector must meet
