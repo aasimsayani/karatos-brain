@@ -1,7 +1,7 @@
 import { timingSafeEqual } from "node:crypto";
 import type { IncomingMessage, RequestListener, ServerResponse } from "node:http";
 import { z } from "zod";
-import { DeadLetteredError, type BrainPipeline, type MemoryStore } from "@karatos/core";
+import { DeadLetteredError, type BrainPipeline, type IntegrationStatus, type MemoryStore } from "@karatos/core";
 
 export interface BrainAppOptions {
   pipeline: BrainPipeline;
@@ -9,6 +9,8 @@ export interface BrainAppOptions {
   /** The only organization this instance serves. */
   organizationId: string;
   apiKey: string;
+  /** Catalog integrations and whether this instance has their settings, worked out once at startup. */
+  integrations?: IntegrationStatus[];
   maxBodyBytes?: number;
 }
 
@@ -128,6 +130,8 @@ export function createBrainApp(options: BrainAppOptions): RequestListener {
         return [201, { recorded: true }];
       },
     ],
+    ["GET", /^\/v1\/integrations$/, async () => [200, { integrations: options.integrations ?? [] }]],
+    ["GET", /^\/v1\/integrations$/, async () => [200, { integrations: options.integrations ?? [] }]],
     [
       "GET",
       /^\/v1\/entities\/([a-z][a-z0-9_]*)\/([^/]+)$/,
