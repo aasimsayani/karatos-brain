@@ -131,7 +131,6 @@ export function createBrainApp(options: BrainAppOptions): RequestListener {
       },
     ],
     ["GET", /^\/v1\/integrations$/, async () => [200, { integrations: options.integrations ?? [] }]],
-    ["GET", /^\/v1\/integrations$/, async () => [200, { integrations: options.integrations ?? [] }]],
     [
       "GET",
       /^\/v1\/entities\/([a-z][a-z0-9_]*)\/([^/]+)$/,
