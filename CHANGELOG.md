@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Website: Lighthouse runs in CI on mobile and fails under 90 in any category; the page is served gzipped, fonts no longer block the first paint, and small gold and grey text meets WCAG AA contrast
 - Website: Custom services and pricing section (Brain Console at $99 per user per month for dashboard access only; setup, maintenance and custom services by quote), a "Custom services" header button in place of the GitHub button, and a private inquiry form that files each request as an issue in a private repository (`INQUIRY_REPO`, `INQUIRY_GITHUB_TOKEN`)
 - The Brain Console is a private, paid module; the open core keeps the API it reads from
 

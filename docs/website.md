@@ -9,6 +9,18 @@ node --import tsx site/build.ts   # writes site/dist/index.html
 node site/server.ts                # serves it on :8080
 ```
 
+## Lighthouse
+
+CI's `website-lighthouse` job builds the site, serves it, runs Lighthouse with its default mobile emulation and fails if performance, accessibility, best practices or SEO score under 90 (`site/lighthouse.ts`). To run it locally:
+
+```sh
+node site/server.ts &
+npx lighthouse@12.8.2 http://127.0.0.1:8080/ --chrome-flags="--headless=new" --output=json --output-path=lighthouse.json
+node site/lighthouse.ts lighthouse.json
+```
+
+The page is served gzipped, web fonts load without blocking the first paint, and small gold or grey text uses the darker `--gold-text` and `--muted` colors so it stays at WCAG AA contrast.
+
 ## Inquiry form
 
 Quote and Brain Console requests use a private form on the page. `site/server.ts` serves the page and accepts `POST /api/inquiry`: it validates the fields, drops bot submissions (a hidden field), limits each address to five inquiries an hour and files each one as an issue labelled `inquiry` in a private GitHub repository. Visitor text is fenced in the issue so it renders as plain text. Nothing is posted publicly.

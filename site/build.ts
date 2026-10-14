@@ -14,6 +14,9 @@ export const REPO_URL = "https://github.com/aasimsayani/karatos-brain";
 /** Quote and Brain Console requests go to the private form on the page. */
 export const CONTACT_ANCHOR = "#contact";
 export const CONSOLE_PRICE = "$99";
+/** Loaded without blocking the first paint; the system font shows until it arrives. */
+export const FONTS_URL =
+  "https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600&family=Inter:wght@400;500;600&display=swap";
 
 const PLANNED_DEPARTMENTS = [
   { id: "manufacturing", name: "Manufacturing", purpose: "Casting, bench time and job costs, from wax to finished piece." },
@@ -104,10 +107,12 @@ export function renderSite(): string {
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath d='M16 3 28 12 16 29 4 12Z' fill='%23c9a45c'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="${FONTS_URL}" rel="stylesheet" media="print" onload="this.media='all'">
+<noscript><link href="${FONTS_URL}" rel="stylesheet"></noscript>
 <style>
-:root{--bg:#faf8f4;--surface:#ffffff;--ink:#16140f;--ink-2:#4a463d;--muted:#7a7468;--line:#e7e2d8;--gold:#a8833d;--gold-soft:#f4ecdc;--radius:14px}
-@media (prefers-color-scheme:dark){:root{--bg:#121110;--surface:#1b1a17;--ink:#f3efe6;--ink-2:#c8c1b3;--muted:#948d80;--line:#2e2b26;--gold:#d4b06a;--gold-soft:#2a2418}}
+/* --gold-text and --gold-on-ink keep gold lettering at 4.5:1 or better (WCAG AA) on light surfaces and on the inverted campaign panel. */
+:root{--bg:#faf8f4;--surface:#ffffff;--ink:#16140f;--ink-2:#4a463d;--muted:#6b665b;--line:#e7e2d8;--gold:#a8833d;--gold-text:#82632a;--gold-on-ink:#d4b06a;--gold-soft:#f4ecdc;--radius:14px}
+@media (prefers-color-scheme:dark){:root{--bg:#121110;--surface:#1b1a17;--ink:#f3efe6;--ink-2:#c8c1b3;--muted:#948d80;--line:#2e2b26;--gold:#d4b06a;--gold-text:#d4b06a;--gold-on-ink:#82632a;--gold-soft:#2a2418}}
 *{box-sizing:border-box}
 html{scroll-behavior:smooth}
 body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.6 Inter,system-ui,sans-serif;-webkit-font-smoothing:antialiased}
@@ -127,7 +132,7 @@ header.nav{position:sticky;top:0;z-index:10;background:color-mix(in srgb,var(--b
 .btn.ghost{background:transparent;color:var(--ink)}
 .btn.small{padding:9px 16px;font-size:14px}
 .hero{padding:96px 0 72px}
-.eyebrow{display:inline-block;font-size:13px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--gold);margin-bottom:18px}
+.eyebrow{display:inline-block;font-size:13px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--gold-text);margin-bottom:18px}
 h1,h2{font-family:Fraunces,serif;font-weight:600;letter-spacing:-.02em;line-height:1.08;margin:0}
 h1{font-size:clamp(40px,7vw,76px);max-width:14ch}
 h2{font-size:clamp(30px,4.5vw,46px);max-width:20ch}
@@ -143,7 +148,7 @@ section{padding:80px 0;border-top:1px solid var(--line);scroll-margin-top:64px}
 .steps p,.dept p{margin:0;color:var(--ink-2)}
 @media (max-width:860px){.steps{grid-template-columns:1fr}}
 .example{margin-top:28px;background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--gold);border-radius:var(--radius);padding:24px 28px;max-width:720px}
-.example .tag{font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--gold)}
+.example .tag{font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--gold-text)}
 .example p{margin:8px 0 0}
 .example .why{color:var(--muted);font-size:14px}
 .depts-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:16px;list-style:none;padding:0;margin:0}
@@ -163,7 +168,7 @@ section{padding:80px 0;border-top:1px solid var(--line);scroll-margin-top:64px}
 .meta{margin:0;font-size:14px;color:var(--ink-2)}
 .depts{margin:6px 0 0;font-size:13px;color:var(--muted)}
 .pill{font-size:12px;font-weight:600;padding:3px 10px;border-radius:999px;border:1px solid var(--line);white-space:nowrap;font-family:Inter,sans-serif}
-.pill.gold{background:var(--gold-soft);color:var(--gold);border-color:transparent}
+.pill.gold{background:var(--gold-soft);color:var(--gold-text);border-color:transparent}
 .pill.muted{color:var(--muted)}
 .empty{color:var(--muted);padding:24px 0}
 .pillars{display:grid;grid-template-columns:repeat(3,1fr);gap:20px}
@@ -214,6 +219,7 @@ section{padding:80px 0;border-top:1px solid var(--line);scroll-margin-top:64px}
 #inquiry-status{margin:0;font-size:14px;color:var(--ink-2)}
 .campaign{background:var(--ink);color:var(--bg);border-radius:24px;padding:56px clamp(24px,5vw,64px);border:0}
 .campaign h2{max-width:22ch}
+.campaign .eyebrow{color:var(--gold-on-ink)}
 .campaign p{color:color-mix(in srgb,var(--bg) 78%,transparent);max-width:60ch;font-size:17px}
 .campaign .btn.primary{background:var(--gold);border-color:var(--gold);color:#16140f}
 .campaign .small{font-size:14px;margin-top:18px}

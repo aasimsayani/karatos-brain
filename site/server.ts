@@ -6,6 +6,7 @@
  */
 import { readFileSync } from "node:fs";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
+import { gzipSync } from "node:zlib";
 
 export const INTERESTS = ["brain_console", "maintenance", "custom_services"] as const;
 export type Interest = (typeof INTERESTS)[number];
@@ -108,9 +109,13 @@ const SECURITY_HEADERS = {
   "X-Frame-Options": "DENY",
 };
 
-function send(res: ServerResponse, status: number, body: string, type: string): void {
-  res.writeHead(status, { "Content-Type": type, ...SECURITY_HEADERS });
+function send(res: ServerResponse, status: number, body: string | Buffer, type: string, headers: Record<string, string> = {}): void {
+  res.writeHead(status, { "Content-Type": type, ...SECURITY_HEADERS, ...headers });
   res.end(body);
+}
+
+function acceptsGzip(req: IncomingMessage): boolean {
+  return /(^|,)\s*gzip\s*(;\s*q=(?!0(\.0+)?\s*(,|$))[\d.]+)?\s*(,|$)/i.test(String(req.headers["accept-encoding"] ?? ""));
 }
 
 const json = (res: ServerResponse, status: number, body: unknown) => send(res, status, JSON.stringify(body), "application/json");
@@ -137,6 +142,8 @@ export function createSiteHandler(options: ServerOptions) {
   const now = options.now ?? (() => new Date());
   const limit = options.rateLimit ?? 5;
   const recent = new Map<string, number[]>();
+  // The page never changes while the server runs, so compress it once.
+  const gzippedHtml = gzipSync(options.html);
 
   async function handleInquiry(req: IncomingMessage, res: ServerResponse): Promise<void> {
     if (!options.token || !options.repo) return json(res, 503, { error: "not_configured" });
@@ -182,7 +189,9 @@ export function createSiteHandler(options: ServerOptions) {
     if (req.method === "POST" && path === "/api/inquiry") return handleInquiry(req, res);
     if (req.method === "GET" && path === "/healthz") return json(res, 200, { ok: true });
     if ((req.method === "GET" || req.method === "HEAD") && (path === "/" || path === "/index.html")) {
-      return send(res, 200, options.html, "text/html; charset=utf-8");
+      return acceptsGzip(req)
+        ? send(res, 200, gzippedHtml, "text/html; charset=utf-8", { "Content-Encoding": "gzip", Vary: "Accept-Encoding" })
+        : send(res, 200, options.html, "text/html; charset=utf-8", { Vary: "Accept-Encoding" });
     }
     return send(res, 404, "Not found", "text/plain; charset=utf-8");
   };

@@ -1,4 +1,5 @@
-import { createServer, type Server } from "node:http";
+import { createServer, get, type Server } from "node:http";
+import { gunzipSync } from "node:zlib";
 import type { AddressInfo } from "node:net";
 import { afterEach, describe, expect, it } from "vitest";
 import { createSiteHandler, issueFor, parseInquiry, type ServerOptions } from "../server.js";
@@ -61,7 +62,32 @@ describe("inquiry issue", () => {
   });
 });
 
+function rawGet(url: string, headers: Record<string, string>): Promise<{ headers: Record<string, unknown>; body: Buffer }> {
+  return new Promise((resolve, reject) => {
+    get(url, { headers }, (res) => {
+      const chunks: Buffer[] = [];
+      res.on("data", (c: Buffer) => chunks.push(c));
+      res.on("end", () => resolve({ headers: res.headers, body: Buffer.concat(chunks) }));
+    }).on("error", reject);
+  });
+}
+
 describe("site server", () => {
+  it("gzips the page for browsers that accept it, and only them", async () => {
+    const { base } = await start();
+    const zipped = await rawGet(base, { "accept-encoding": "br, gzip;q=0.8" });
+    expect(zipped.headers["content-encoding"]).toBe("gzip");
+    expect(zipped.headers.vary).toBe("Accept-Encoding");
+    expect(gunzipSync(zipped.body).toString()).toBe("<h1>KaratOS</h1>");
+    for (const encoding of ["identity", "gzip;q=0", "deflate"]) {
+      const plain = await rawGet(base, { "accept-encoding": encoding });
+      expect(plain.headers["content-encoding"]).toBeUndefined();
+      expect(plain.body.toString()).toBe("<h1>KaratOS</h1>");
+    }
+    const none = await rawGet(base, {});
+    expect(none.body.toString()).toBe("<h1>KaratOS</h1>");
+  });
+
   it("serves the page and a health check, and 404s anything else", async () => {
     const { base } = await start();
     const page = await fetch(base);
