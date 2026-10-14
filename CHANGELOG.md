@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Website: the broken-systems campaign now goes to the private form ("Reporting a broken system", with the system's name), filed with a `broken-system` label for weekly triage; the public GitHub form stays as the alternative
 - Website: Custom services and pricing section (Brain Console at $99 per user per month for dashboard access only; setup, maintenance and custom services by quote), a "Custom services" header button in place of the GitHub button, and a private inquiry form that files each request as an issue in a private repository (`INQUIRY_REPO`, `INQUIRY_GITHUB_TOKEN`)
 - The Brain Console is a private, paid module; the open core keeps the API it reads from
 
