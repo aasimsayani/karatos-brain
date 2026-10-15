@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Vendor docs watch: every catalog entry lists its vendor's API changelog, and a daily workflow opens one issue per change with the changed lines as evidence (`npm run docs:watch`)
 - Connector test kit (`@karatos/connector-testkit`): synthetic fixture builders with a real-data guard, recorded-response replay with secret scrubbing, a runSync harness for full import, replay, resume and retry, webhook signing helpers and a write-gate check, plus a sample connector that uses every helper
 - Database: ingestion tables for every integration (connections by secret name, sync runs, webhook deliveries, file imports for CSV and PDF statements, entity links, an append-only write audit), indexes for reading data back by system and entity, and row-level security on the migration ledger. `PostgresIngestionLog` writes them and is a `WriteAuditLog`
 - Website: Custom services and pricing section (Brain Console at $99 per user per month for dashboard access only; setup, maintenance and custom services by quote), a "Custom services" header button in place of the GitHub button, and a private inquiry form that files each request as an issue in a private repository (`INQUIRY_REPO`, `INQUIRY_GITHUB_TOKEN`)

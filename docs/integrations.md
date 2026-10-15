@@ -160,7 +160,7 @@ Statements are customer data. They never go in a git repo, including private one
 
 ## Testing the integrations
 
-Every system we connect to changes over time, so each connector is tested at four levels as it is built. The unit and contract levels use the connector test kit below; the live and docs levels are still to come:
+Every system we connect to changes over time, so each connector is tested at four levels as it is built. The unit and contract levels use the connector test kit below, and the docs watch runs daily (see below); the live level applies as each connector is built:
 
 | Level | What it checks | When it runs |
 | --- | --- | --- |
@@ -184,6 +184,17 @@ A failure at the live or docs level opens an issue naming the integration, what 
 | `checkConnectorSync` | Runs the connector through a full import, a replay (everything must count as a duplicate), a crash after the first batch plus resume from the checkpoint, and a retried source outage. Every broken scenario is listed in one error |
 | `hmacSha256`, `timestampedSignature`, `tamper` | Signed webhook deliveries, and tampered ones, to test signature checks |
 | `assertWritesRefused` | Runs every write the connector declares through a read-only `WriteGate` and checks each is refused and audited |
+
+### Vendor docs watch
+
+Every integration in the catalog lists its vendor's public API changelog (`changelog` in `packages/core/src/integrations.ts`), or null when the vendor publishes none. The **Vendor docs watch** workflow runs daily:
+
+- It fetches each changelog and compares its readable text with the last run's copy. Scripts, styles and markup are ignored, so a site rebuild isn't a change.
+- A change opens one issue, labeled `vendor-docs`, with the removed and added lines as evidence and a short to-do list. If that vendor's issue is still open, a later change is added as a comment instead of a new issue.
+- A changelog that answers 404 or 410 opens one "changelog moved" issue so the URL gets fixed. Other failures are listed in the run summary and retried the next day.
+- The first run, or a changed URL, only records a baseline.
+
+Run it locally with `npm run build -w @karatos/core && npm run docs:watch -- --dry-run`, which prints what it would file.
 
 ## The connector contract
 
