@@ -4,6 +4,7 @@
 
 - Nightly sandbox run: every built connector runs a historical import, an incremental sync and a test webhook against its vendor's sandbox; a failure opens one issue naming the connector and step and closes it when the connector recovers, and connectors without sandbox credentials are skipped and listed (`npm run sandbox:run`). The GitHub issue tracker is shared with the docs watch
 - Vendor docs watch: every catalog entry lists its vendor's API changelog, and a daily workflow opens one issue per change with the changed lines as evidence (`npm run docs:watch`)
+- Database: ingestion tables for every integration (connections by secret name, sync runs, webhook deliveries, file imports for CSV and PDF statements, entity links, an append-only write audit), indexes for reading data back by system and entity, and row-level security on the migration ledger. `PostgresIngestionLog` writes them and is a `WriteAuditLog`
 - Website: Custom services and pricing section (Brain Console at $99 per user per month for dashboard access only; setup, maintenance and custom services by quote), a "Custom services" header button in place of the GitHub button, and a private inquiry form that files each request as an issue in a private repository (`INQUIRY_REPO`, `INQUIRY_GITHUB_TOKEN`)
 - The Brain Console is a private, paid module; the open core keeps the API it reads from
 
