@@ -13,7 +13,7 @@
   },
   "scripts": {
     "build": "npm run build --workspaces",
-    "typecheck": "npm run build -w @karatos/core -w @karatos/store-postgres -w @karatos/retail && npm run typecheck --workspaces && tsc -p tsconfig.json",
+    "typecheck": "npm run build -w @karatos/core -w @karatos/store-postgres -w @karatos/retail -w @karatos/connector-testkit && npm run typecheck --workspaces && tsc -p tsconfig.json",
     "test": "vitest run",
     "env:check": "node --import tsx scripts/env-check.ts",
     "supabase:check": "node --import tsx scripts/supabase-check.ts",
