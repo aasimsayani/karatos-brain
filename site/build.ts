@@ -208,7 +208,7 @@ section{padding:80px 0;border-top:1px solid var(--line);scroll-margin-top:64px}
 #inquiry input,#inquiry select,#inquiry textarea{width:100%;padding:11px 13px;border-radius:10px;border:1px solid var(--line);background:var(--bg);color:var(--ink);font:inherit}
 #inquiry .row{display:grid;grid-template-columns:1fr 1fr;gap:14px}
 @media (max-width:560px){#inquiry .row{grid-template-columns:1fr}}
-#inquiry .seats{max-width:260px}
+
 .interests{border:0;padding:0;margin:0;display:flex;flex-wrap:wrap;gap:10px 18px}
 .interests legend{font-size:14px;font-weight:500;margin-bottom:8px}
 .interests label{display:flex!important;align-items:center;gap:8px;font-weight:400}
@@ -223,6 +223,7 @@ section{padding:80px 0;border-top:1px solid var(--line);scroll-margin-top:64px}
 .campaign p{color:color-mix(in srgb,var(--bg) 78%,transparent);max-width:60ch;font-size:17px}
 .campaign .btn.primary{background:var(--gold);border-color:var(--gold);color:#16140f}
 .campaign .small{font-size:14px;margin-top:18px}
+.campaign .small a{color:var(--gold)}
 footer{padding:40px 0 56px;color:var(--muted);font-size:14px;border-top:1px solid var(--line)}
 footer .wrap{display:flex;flex-wrap:wrap;justify-content:space-between;gap:12px}
 </style>
@@ -349,6 +350,7 @@ ${cards}
         <label><input type="checkbox" name="interests" value="brain_console"> Brain Console</label>
         <label><input type="checkbox" name="interests" value="maintenance"> Maintenance</label>
         <label><input type="checkbox" name="interests" value="custom_services"> Custom services</label>
+        <label><input type="checkbox" name="interests" value="broken_system"> Reporting a broken system</label>
       </fieldset>
       <div class="row">
         <label>Your name<input name="name" autocomplete="name" maxlength="120" required></label>
@@ -358,7 +360,10 @@ ${cards}
         <label>Business<input name="business" autocomplete="organization" maxlength="160" required></label>
         <label>Kind of business<select name="businessType" required><option value="">Choose one</option><option value="retail">Retail store</option><option value="wholesale">Wholesaler or diamond dealer</option><option value="manufacturing">Manufacturer</option><option value="other">Other</option></select></label>
       </div>
-      <label class="seats">People who'd use the dashboard<input name="seats" type="number" min="1" max="10000" inputmode="numeric"></label>
+      <div class="row">
+        <label class="seats">People who'd use the dashboard<input name="seats" type="number" min="1" max="10000" inputmode="numeric"></label>
+        <label>System that isn't working, if any<input name="system" maxlength="160" placeholder="e.g. your POS, a memo spreadsheet"></label>
+      </div>
       <label>What do you need?<textarea name="message" rows="5" maxlength="4000" required placeholder="The systems you run, what isn't working, and what you'd like built."></textarea></label>
       <label class="hp" aria-hidden="true">Website<input name="website" tabindex="-1" autocomplete="off"></label>
       <div class="submit-row"><button class="btn primary" type="submit">Send</button><p id="inquiry-status" role="status" aria-live="polite"></p></div>
@@ -371,8 +376,8 @@ ${cards}
     <span class="eyebrow">Open call</span>
     <h2>Is a system in your jewelry business broken? Tell us.</h2>
     <p>The POS that won't export, the feed that lists a sold stone, the memo tracked on paper, the statements retyped every month. If something in your stack doesn't work, or doesn't talk to the rest, we want to hear about it and build around it.</p>
-    <div class="actions"><a class="btn primary" href="${REPORT_URL}">Tell us what's broken</a></div>
-    <p class="small">The form is public, so please leave out passwords, customer names and figures. A private form is on the way.</p>
+    <div class="actions"><a class="btn primary" href="${CONTACT_ANCHOR}" data-interest="broken_system">Tell us privately</a></div>
+    <p class="small">The private form goes only to our team, and we reply within a week. Happy to say it in public? <a href="${REPORT_URL}">Post it on GitHub</a> instead, leaving out passwords, customer names and figures.</p>
   </div>
 </div></section>
 </main>
@@ -407,7 +412,7 @@ ${cards}
     e.preventDefault();
     form.querySelectorAll('.invalid').forEach(function(el){el.classList.remove('invalid')});
     var data={interests:[].map.call(form.querySelectorAll('input[name=interests]:checked'),function(b){return b.value})};
-    ['name','email','business','businessType','seats','message','website'].forEach(function(k){data[k]=form.elements[k].value});
+    ['name','email','business','businessType','seats','system','message','website'].forEach(function(k){data[k]=form.elements[k].value});
     var button=form.querySelector('button');button.disabled=true;status.textContent='Sending...';
     fetch('/api/inquiry',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)})
       .then(function(r){return r.json().catch(function(){return {}}).then(function(b){return {status:r.status,body:b}})})

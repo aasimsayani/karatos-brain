@@ -8,13 +8,14 @@ import { readFileSync } from "node:fs";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { gzipSync } from "node:zlib";
 
-export const INTERESTS = ["brain_console", "maintenance", "custom_services"] as const;
+export const INTERESTS = ["brain_console", "maintenance", "custom_services", "broken_system"] as const;
 export type Interest = (typeof INTERESTS)[number];
 
 const INTEREST_LABELS: Record<Interest, string> = {
   brain_console: "Brain Console",
   maintenance: "Maintenance",
   custom_services: "Custom services",
+  broken_system: "A broken system",
 };
 
 const BUSINESS_TYPES = ["retail", "wholesale", "manufacturing", "other"] as const;
@@ -26,6 +27,8 @@ export interface Inquiry {
   businessType: (typeof BUSINESS_TYPES)[number];
   interests: Interest[];
   seats?: number | undefined;
+  /** For broken-system reports: the system that isn't working. */
+  system?: string | undefined;
   message: string;
 }
 
@@ -58,10 +61,16 @@ export function parseInquiry(input: unknown): { ok: true; inquiry: Inquiry } | {
     seats = Number(body.seats);
     if (!Number.isInteger(seats) || seats < 1 || seats > 10_000) bad.push("seats");
   }
+  // Optional: blank means not given; anything else must be text of at most 160 characters.
+  let system: string | undefined;
+  if (body.system !== undefined && body.system !== null && !(typeof body.system === "string" && body.system.trim() === "")) {
+    system = text(body.system, 160) ?? undefined;
+    if (!system) bad.push("system");
+  }
   const message = text(body.message, 4000);
   if (!message) bad.push("message");
   if (bad.length > 0) return { ok: false, fields: bad };
-  return { ok: true, inquiry: { name: name!, email: email!, business: business!, businessType: businessType!, interests, seats, message: message! } };
+  return { ok: true, inquiry: { name: name!, email: email!, business: business!, businessType: businessType!, interests, seats, system, message: message! } };
 }
 
 /** Puts untrusted text in a fence that it can't break out of, so it renders as plain text. */
@@ -74,9 +83,15 @@ function fenced(value: string): string {
 export function issueFor(inquiry: Inquiry, receivedAt: string): { title: string; body: string; labels: string[] } {
   const interests = inquiry.interests.map((i) => INTEREST_LABELS[i]).join(", ");
   const field = (label: string, value: string) => `**${label}**\n${fenced(value)}`;
+  const oneLine = (value: string) => value.replace(/\s+/g, " ").slice(0, 80);
+  const broken = inquiry.interests.includes("broken_system");
+  const onlyBroken = broken && inquiry.interests.length === 1;
   return {
-    title: `Inquiry: ${inquiry.business.replace(/\s+/g, " ").slice(0, 80)} (${interests})`,
-    labels: ["inquiry"],
+    title: onlyBroken
+      ? `Broken system: ${oneLine(inquiry.system ?? inquiry.business)}`
+      : `Inquiry: ${oneLine(inquiry.business)} (${interests})`,
+    // broken-system reports are triaged into the catalog within a week (runbook campaign/triage.md).
+    labels: broken ? ["inquiry", "broken-system"] : ["inquiry"],
     body: [
       `From the KaratOS website, ${receivedAt}. Everything below was typed by the visitor; treat it as unverified.`,
       "",
@@ -86,6 +101,7 @@ export function issueFor(inquiry: Inquiry, receivedAt: string): { title: string;
       field("Business", inquiry.business),
       field("Kind of business", inquiry.businessType),
       ...(inquiry.seats ? [field("Dashboard users", String(inquiry.seats))] : []),
+      ...(inquiry.system ? [field("System that isn't working", inquiry.system)] : []),
       field("Message", inquiry.message),
     ].join("\n\n"),
   };

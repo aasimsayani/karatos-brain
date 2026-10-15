@@ -190,3 +190,37 @@ export function selfServeIntegrations(): IntegrationSpec[] {
 export function integrationsFor(segment: BusinessSegment): IntegrationSpec[] {
   return INTEGRATIONS.filter((integration) => integration.segments.includes(segment));
 }
+
+/** How an instance stands with one catalog integration. Names settings, never their values. */
+export interface IntegrationStatus {
+  id: string;
+  name: string;
+  domain: IntegrationDomain;
+  departments: string[];
+  access: IntegrationAccess;
+  catalogStatus: IntegrationSpec["status"];
+  /** True when the integration needs settings and every one is set on this instance. */
+  configured: boolean;
+  /** Settings this instance still needs before the integration can connect. */
+  missingSettings: string[];
+}
+
+/** Each catalog integration with whether this instance has its settings, for the console and onboarding. */
+export function integrationStatuses(
+  env: Readonly<Record<string, string | undefined>>,
+  specs: readonly IntegrationSpec[] = INTEGRATIONS,
+): IntegrationStatus[] {
+  return specs.map((spec) => {
+    const missingSettings = spec.settings.filter((name) => !env[name]?.trim());
+    return {
+      id: spec.id,
+      name: spec.name,
+      domain: spec.domain,
+      departments: spec.departments,
+      access: spec.access,
+      catalogStatus: spec.status,
+      configured: spec.settings.length > 0 && missingSettings.length === 0,
+      missingSettings,
+    };
+  });
+}

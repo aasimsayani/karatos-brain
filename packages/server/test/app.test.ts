@@ -1,7 +1,7 @@
 import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { afterEach, describe, expect, it } from "vitest";
-import { BrainPipeline, InMemoryStore, type Reasoner } from "@karatos/core";
+import { BrainPipeline, InMemoryStore, integrationStatuses, type IntegrationStatus, type Reasoner } from "@karatos/core";
 import { createBrainApp, StaticDocumentationSource } from "../src/index.js";
 
 const ORG = "fuse-jewelry";
@@ -36,7 +36,12 @@ const echoReasoner: Reasoner = {
 let server: Server | undefined;
 afterEach(() => new Promise<void>((resolve) => (server ? server.close(() => resolve()) : resolve())));
 
-async function start(docIds: string[] = ["doc_arch"], maxBodyBytes?: number, reasoner: Reasoner = echoReasoner) {
+async function start(
+  docIds: string[] = ["doc_arch"],
+  maxBodyBytes?: number,
+  reasoner: Reasoner = echoReasoner,
+  integrations?: IntegrationStatus[],
+) {
   const memory = new InMemoryStore();
   const pipeline = new BrainPipeline({
     memory,
@@ -46,7 +51,14 @@ async function start(docIds: string[] = ["doc_arch"], maxBodyBytes?: number, rea
     documentation: new StaticDocumentationSource(docIds),
   });
   server = createServer(
-    createBrainApp({ pipeline, memory, organizationId: ORG, apiKey: KEY, ...(maxBodyBytes ? { maxBodyBytes } : {}) }),
+    createBrainApp({
+      pipeline,
+      memory,
+      organizationId: ORG,
+      apiKey: KEY,
+      ...(maxBodyBytes ? { maxBodyBytes } : {}),
+      ...(integrations ? { integrations } : {}),
+    }),
   );
   await new Promise<void>((resolve) => server!.listen(0, resolve));
   const base = `http://127.0.0.1:${(server!.address() as AddressInfo).port}`;
@@ -204,5 +216,25 @@ describe("Brain API: memory endpoints", () => {
     const res = await call("/v1/events", { method: "POST", body: JSON.stringify({ type: "Bad" }) });
     const body = (await res.json()) as { deadLetterId: string };
     expect(body.deadLetterId).toBe(memory.deadLetters[0]?.id);
+  });
+});
+
+describe("Brain API: integrations", () => {
+  it("lists catalog integrations with this instance's setup status, behind the API key", async () => {
+    const statuses = integrationStatuses({ STRIPE_SECRET_KEY: "stripe-key-value", STRIPE_WEBHOOK_SECRET: "stripe-hook-value", SHOPIFY_SHOP_DOMAIN: "demo.myshopify.com" });
+    const { call } = await start(undefined, undefined, undefined, statuses);
+    expect((await call("/v1/integrations", { auth: false })).status).toBe(401);
+    const response = await call("/v1/integrations");
+    expect(response.status).toBe(200);
+    const { integrations } = (await response.json()) as { integrations: IntegrationStatus[] };
+    expect(integrations).toHaveLength(statuses.length);
+    expect(integrations.find((i) => i.id === "stripe")).toMatchObject({ configured: true, missingSettings: [] });
+    expect(integrations.find((i) => i.id === "shopify")).toMatchObject({ configured: false, missingSettings: ["SHOPIFY_ADMIN_ACCESS_TOKEN"] });
+    expect(JSON.stringify(integrations)).not.toMatch(/stripe-key-value|stripe-hook-value|myshopify/);
+  });
+
+  it("returns an empty list when the instance wasn't given the catalog", async () => {
+    const { call } = await start();
+    expect(await (await call("/v1/integrations")).json()).toEqual({ integrations: [] });
   });
 });

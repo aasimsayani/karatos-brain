@@ -22,9 +22,15 @@ describe("KaratOS website", () => {
     for (const department of RETAIL_DEPARTMENTS) expect(html).toContain(escapeHtml(department.purpose));
   });
 
-  it("links the broken-systems campaign to the integration request form", () => {
-    expect(html).toContain(`href="${REPORT_URL}"`);
+  it("sends broken-system reports to the private form first, with the public form as the alternative", () => {
+    const campaign = html.slice(html.indexOf('<section id="broken"'), html.indexOf("</section>", html.indexOf('<section id="broken"')));
+    expect(campaign).toContain(`href="${CONTACT_ANCHOR}" data-interest="broken_system">Tell us privately</a>`);
+    expect(campaign).toContain(`href="${REPORT_URL}"`);
+    expect(campaign).not.toContain("on the way");
     expect(REPORT_URL).toContain("template=integration-request.yml");
+    expect(html).toContain('name="interests" value="broken_system"');
+    expect(html).toContain('<input name="system" maxlength="160"');
+    expect(html).toContain("'seats','system','message'");
   });
 
   it("loads web fonts without blocking the first paint", () => {
@@ -53,7 +59,8 @@ describe("KaratOS website", () => {
   it("offers the Brain Console at its list price and the other services by quote", () => {
     expect(html).toContain(`<strong>${CONSOLE_PRICE}</strong> per user per month`);
     expect(html.match(/<strong>By quote<\/strong>/g)?.length).toBe(2);
-    expect(html.split(`href="${CONTACT_ANCHOR}"`).length - 1).toBe(3);
+    // Three plans plus the broken-systems campaign.
+    expect(html.split(`href="${CONTACT_ANCHOR}"`).length - 1).toBe(4);
     // The console price covers dashboard access only; setup is a quoted service.
     expect(html).toContain("Setting up the instance and connecting your systems isn't included");
   });
@@ -66,7 +73,7 @@ describe("KaratOS website", () => {
 
   it("sends quote requests to the private form, with each plan's interest preselected", () => {
     expect(html).toContain('<form id="inquiry"');
-    for (const interest of ["brain_console", "maintenance", "custom_services"]) {
+    for (const interest of ["brain_console", "maintenance", "custom_services", "broken_system"]) {
       expect(html).toContain(`data-interest="${interest}"`);
       expect(html).toContain(`name="interests" value="${interest}"`);
     }

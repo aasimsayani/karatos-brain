@@ -30,7 +30,11 @@ Quote and Brain Console requests use a private form on the page. `site/server.ts
 | `INQUIRY_REPO` | `owner/name` of the private repository that receives inquiries |
 | `INQUIRY_GITHUB_TOKEN` | Fine-grained token with Issues read and write on that repository only |
 
-Without both, the form answers that it isn't connected yet and the rest of the site works normally.
+Without both, the form answers that it isn't connected yet and the rest of the site works normally. The repository needs the labels `inquiry` and `broken-system`.
+
+## Broken-systems campaign
+
+"Is a system in your jewelry business broken? Tell us." sends people to the same private form with "Reporting a broken system" ticked, plus an optional field naming the system. Those issues are titled `Broken system: <system>` and labelled `broken-system` as well as `inquiry`. The public [integration request form](../.github/ISSUE_TEMPLATE/integration-request.yml) stays as the alternative for people happy to post in the open. Each report is triaged within a week into a catalog change, a vote on an existing entry, or a partnership ask; the triage steps and outreach copy live in the private commercial runbook.
 
 ## Deploy
 
