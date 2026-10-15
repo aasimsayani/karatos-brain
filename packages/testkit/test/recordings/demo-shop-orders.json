@@ -1,0 +1,131 @@
+[
+  {
+    "request": {
+      "method": "GET",
+      "url": "https://demo-shop.example/api/orders?limit=2"
+    },
+    "response": {
+      "status": 200,
+      "body": {
+        "orders": [
+          {
+            "id": "1001",
+            "name": "#1001",
+            "email": "customer1@example.test",
+            "phone": "+1 212 555 0101",
+            "total": "250.00",
+            "currency": "USD",
+            "line_items": [
+              {
+                "sku": "SKU-TEST-0001",
+                "title": "14k gold band",
+                "quantity": 1
+              }
+            ],
+            "updated_at": "2026-01-01T10:00:00Z",
+            "created_at": "2026-01-01T09:00:00Z"
+          },
+          {
+            "id": "1002",
+            "name": "#1002",
+            "email": "customer2@example.test",
+            "phone": "+1 212 555 0102",
+            "total": "250.00",
+            "currency": "USD",
+            "line_items": [
+              {
+                "sku": "SKU-TEST-0002",
+                "title": "14k gold band",
+                "quantity": 1
+              }
+            ],
+            "updated_at": "2026-01-02T10:00:00Z",
+            "created_at": "2026-01-02T09:00:00Z"
+          }
+        ],
+        "next": "p2"
+      }
+    }
+  },
+  {
+    "request": {
+      "method": "GET",
+      "url": "https://demo-shop.example/api/orders?limit=2&page_info=p2"
+    },
+    "response": {
+      "status": 200,
+      "headers": {
+        "x-request-id": "rec-2"
+      },
+      "body": {
+        "orders": [
+          {
+            "id": "1003",
+            "name": "#1003",
+            "email": "customer3@example.test",
+            "phone": "+1 212 555 0103",
+            "total": "250.00",
+            "currency": "USD",
+            "line_items": [
+              {
+                "sku": "SKU-TEST-0003",
+                "title": "14k gold band",
+                "quantity": 1
+              }
+            ],
+            "updated_at": "2026-01-03T10:00:00Z",
+            "created_at": "2026-01-03T09:00:00Z"
+          },
+          {
+            "id": "1004",
+            "name": "#1004",
+            "email": "customer4@example.test",
+            "phone": "+1 212 555 0104",
+            "total": "250.00",
+            "currency": "USD",
+            "line_items": [
+              {
+                "sku": "SKU-TEST-0004",
+                "title": "14k gold band",
+                "quantity": 1
+              }
+            ],
+            "updated_at": "2026-01-04T10:00:00Z"
+          }
+        ],
+        "next": "p3"
+      }
+    }
+  },
+  {
+    "request": {
+      "method": "GET",
+      "url": "https://demo-shop.example/api/orders?limit=2&page_info=p3"
+    },
+    "response": {
+      "status": 200,
+      "body": {
+        "orders": [
+          {
+            "id": "1005",
+            "name": "#1005",
+            "email": "customer5@example.test",
+            "phone": "+1 212 555 0105",
+            "total": "250.00",
+            "currency": "USD",
+            "line_items": [
+              {
+                "sku": "SKU-TEST-0005",
+                "title": "14k gold band",
+                "quantity": 1
+              }
+            ],
+            "updated_at": "2026-01-05T10:00:00Z",
+            "created_at": "2026-01-05T09:00:00Z"
+          }
+        ],
+        "next": null
+      }
+    }
+  }
+]
