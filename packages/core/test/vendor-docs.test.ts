@@ -47,6 +47,10 @@ class MemoryTracker implements IssueTracker {
   async comment(number: number, body: string) {
     this.issues.find((i) => i.number === number)!.comments.push(body);
   }
+  async close(number: number, body: string) {
+    await this.comment(number, body);
+    this.issues.find((i) => i.number === number)!.open = false;
+  }
 }
 
 /** Serves the given pages in turn: a string is a 200 body, a number a status, an Error a network failure. */

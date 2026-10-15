@@ -20,6 +20,7 @@
     "db:migrate": "node --import tsx scripts/db-migrate.ts",
     "secrets:scan": "node scripts/secrets-scan.mjs",
     "docs:watch": "node --import tsx scripts/docs-watch.ts",
+    "sandbox:run": "node --import tsx scripts/sandbox-run.ts",
     "test:coverage": "vitest run --coverage",
     "secrets:plan": "node --import tsx scripts/secrets.ts plan",
     "secrets:setup": "node --import tsx scripts/secrets.ts setup"
