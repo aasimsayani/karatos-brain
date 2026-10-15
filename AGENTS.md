@@ -7,4 +7,4 @@ This repo is **public**. Treat everything you write here as published.
 - Architecture: read [docs/architecture/overview.md](docs/architecture/overview.md). No layer may be bypassed, and every recommendation carries provenance and a degraded flag.
 - Before pushing, run `npm run secrets:scan`, `npm run typecheck` and `npm run test:coverage`. Coverage must stay above the thresholds in `vitest.config.ts`.
 - Every behavior change needs a test. Database changes need a migration plus a test that runs it against PGlite.
-- Update `CHANGELOG.md` and the relevant doc in the same PR.
+- Add a changelog fragment, `changelog.d/<branch>.md`, and update the relevant doc in the same PR. Don't edit `CHANGELOG.md` directly; see [changelog.d/README.md](changelog.d/README.md).
