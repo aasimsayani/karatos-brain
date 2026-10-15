@@ -160,7 +160,7 @@ Statements are customer data. They never go in a git repo, including private one
 
 ## Testing the integrations
 
-Every system we connect to changes over time, so each connector is tested at four levels as it is built. The unit and contract levels use the connector test kit below; the live and docs levels are still to come:
+Every system we connect to changes over time, so each connector is tested at four levels as it is built. The unit and contract levels use the connector test kit below, and the docs watch runs daily (see below); the live level applies as each connector is built:
 
 | Level | What it checks | When it runs |
 | --- | --- | --- |
@@ -195,6 +195,17 @@ For paid and partner systems there's nothing to record yet, so the connector is 
 - its `assumptions`: anything the docs leave out that the mock had to guess, such as a default filter or a unit. Each one is checked on the first live run, then fixed or removed.
 
 A request for a path or method the docs don't list throws `UndocumentedRequestError`, so a connector can't come to depend on behavior nobody has seen documented. Data in mocks is synthetic. The first mock covers Stuller's invoice and metal market rate endpoints (API v2).
+
+### Vendor docs watch
+
+Every integration in the catalog lists its vendor's public API changelog (`changelog` in `packages/core/src/integrations.ts`), or null when the vendor publishes none. The **Vendor docs watch** workflow runs daily:
+
+- It fetches each changelog and compares its readable text with the last run's copy. Scripts, styles and markup are ignored, so a site rebuild isn't a change.
+- A change opens one issue, labeled `vendor-docs`, with the removed and added lines as evidence and a short to-do list. If that vendor's issue is still open, a later change is added as a comment instead of a new issue.
+- A changelog that answers 404 or 410 opens one "changelog moved" issue so the URL gets fixed. Other failures are listed in the run summary and retried the next day.
+- The first run, or a changed URL, only records a baseline.
+
+Run it locally with `npm run build -w @karatos/core && npm run docs:watch -- --dry-run`, which prints what it would file.
 
 ## The connector contract
 
