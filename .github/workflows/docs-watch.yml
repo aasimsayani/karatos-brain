@@ -1,0 +1,35 @@
+name: Vendor docs watch
+
+on:
+  schedule:
+    - cron: "17 12 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: docs-watch
+  cancel-in-progress: false
+
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build -w @karatos/core
+      # Snapshots from the last run. A cache miss just takes a new baseline.
+      - uses: actions/cache@v4
+        with:
+          path: .docs-watch
+          key: docs-watch-${{ github.run_id }}
+          restore-keys: docs-watch-
+      - run: npm run docs:watch
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
