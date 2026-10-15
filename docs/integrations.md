@@ -160,7 +160,7 @@ Statements are customer data. They never go in a git repo, including private one
 
 ## Testing the integrations
 
-Every system we connect to changes over time, so each connector is tested at four levels as it is built. The unit and contract levels use the connector test kit below, and the docs watch runs daily (see below); the live level applies as each connector is built:
+Every system we connect to changes over time, so each connector is tested at four levels as it is built. The unit and contract levels use the connector test kit below, the docs watch runs daily and the sandbox run nightly (see below):
 
 | Level | What it checks | When it runs |
 | --- | --- | --- |
@@ -206,6 +206,18 @@ Every integration in the catalog lists its vendor's public API changelog (`chang
 - The first run, or a changed URL, only records a baseline.
 
 Run it locally with `npm run build -w @karatos/core && npm run docs:watch -- --dry-run`, which prints what it would file.
+
+### Nightly sandbox run
+
+The **Nightly sandbox run** workflow runs every built connector against its vendor's own sandbox, into a throwaway in-memory store:
+
+1. **Historical import**, capped at 20 batches. It fails if any record fails validation (the vendor's payloads changed) or if fewer records arrive than the seeded sandbox holds.
+2. **Incremental sync** from where the import stopped.
+3. **Test webhook**, for vendors that can send one: the check asks the sandbox for a delivery, and the connector must turn it into valid events.
+
+A failure opens one issue, labeled `sandbox-run`, naming the connector and the step. The issue is closed automatically once the connector passes again, and a later failure opens a new one. A connector whose sandbox credentials aren't set is skipped and listed, never failed. The run summary also lists the sandbox-testable systems that aren't built yet.
+
+Each connector registers its check in `scripts/sandbox-checks.ts`. Sandbox credentials are test-only, named `SANDBOX_<INTEGRATION>_<WHAT>`, stored as GitHub Actions secrets and passed to the job in `.github/workflows/sandbox-run.yml`; a test fails if a check's credential isn't passed or isn't named that way. They are never a client's credentials. Run it locally with `npm run build -w @karatos/core && npm run sandbox:run -- --dry-run`.
 
 ## The connector contract
 
