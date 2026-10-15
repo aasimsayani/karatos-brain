@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Connector test kit: mocks built from vendor docs for systems we can't reach yet (`docMockFetch`, `checkDocMock`, `docMockWatchTargets`), each naming its doc pages, retrieval date, API version and assumptions; the first covers Stuller's invoice and metal market rate endpoints
 - Connector test kit (`@karatos/connector-testkit`): synthetic fixture builders with a real-data guard, recorded-response replay with secret scrubbing, a runSync harness for full import, replay, resume and retry, webhook signing helpers and a write-gate check, plus a sample connector that uses every helper
 - Website: Custom services and pricing section (Brain Console at $99 per user per month for dashboard access only; setup, maintenance and custom services by quote), a "Custom services" header button in place of the GitHub button, and a private inquiry form that files each request as an issue in a private repository (`INQUIRY_REPO`, `INQUIRY_GITHUB_TOKEN`)
 - The Brain Console is a private, paid module; the open core keeps the API it reads from

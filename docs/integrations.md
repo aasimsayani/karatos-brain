@@ -184,6 +184,17 @@ A failure at the live or docs level opens an issue naming the integration, what 
 | `checkConnectorSync` | Runs the connector through a full import, a replay (everything must count as a duplicate), a crash after the first batch plus resume from the checkpoint, and a retried source outage. Every broken scenario is listed in one error |
 | `hmacSha256`, `timestampedSignature`, `tamper` | Signed webhook deliveries, and tampered ones, to test signature checks |
 | `assertWritesRefused` | Runs every write the connector declares through a read-only `WriteGate` and checks each is refused and audited |
+| `docMockFetch`, `checkDocMock` | A `fetch` built from a vendor's published docs, for systems we can't reach yet (below) |
+
+### Mocks built from vendor docs
+
+For paid and partner systems there's nothing to record yet, so the connector is written against a mock built from the vendor's published API docs and verified live once access arrives. Each mock (`packages/testkit/src/mocks/`) says:
+
+- the doc pages it was built from, the day they were read and the API version, so `docMockWatchTargets()` can hand those pages to the vendor docs watch and a change flags the mock as possibly stale;
+- the auth the docs describe, answering 401 without it like the real API;
+- its `assumptions`: anything the docs leave out that the mock had to guess, such as a default filter or a unit. Each one is checked on the first live run, then fixed or removed.
+
+A request for a path or method the docs don't list throws `UndocumentedRequestError`, so a connector can't come to depend on behavior nobody has seen documented. Data in mocks is synthetic. The first mock covers Stuller's invoice and metal market rate endpoints (API v2).
 
 ## The connector contract
 
