@@ -23,7 +23,9 @@
     "sandbox:run": "node --import tsx scripts/sandbox-run.ts",
     "test:coverage": "vitest run --coverage",
     "secrets:plan": "node --import tsx scripts/secrets.ts plan",
-    "secrets:setup": "node --import tsx scripts/secrets.ts setup"
+    "secrets:setup": "node --import tsx scripts/secrets.ts setup",
+    "changelog:check": "node --import tsx scripts/changelog-cli.ts check",
+    "changelog:collect": "node --import tsx scripts/changelog-cli.ts collect"
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.5.8",

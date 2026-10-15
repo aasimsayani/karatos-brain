@@ -13,12 +13,19 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
       - run: npm ci
       - run: npm run secrets:scan
+      # Skipped until the base branch has the fragment check, so the PR that adds it can pass.
+      - if: github.event_name == 'pull_request'
+        run: |
+          if git cat-file -e "origin/${GITHUB_BASE_REF}:scripts/changelog-cli.ts" 2>/dev/null; then npm run changelog:check
+          else echo "base has no changelog check yet"; fi
       - run: npm run typecheck
       - run: npm run test:coverage
       - run: npm run build
