@@ -1,0 +1,1 @@
+- API: `GET /v1/integrations` lists every catalog integration with whether this instance has all its settings, by name only, for the Brain Console and onboarding. The instance API table in the deployment docs now lists every endpoint

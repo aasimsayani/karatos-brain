@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { INTEGRATIONS, integrationsFor, parseManifest, selfServeIntegrations } from "../src/index.js";
+import { INTEGRATIONS, integrationStatuses, integrationsFor, parseManifest, selfServeIntegrations } from "../src/index.js";
 
 const catalogDoc = readFileSync(new URL("../../../docs/integrations.md", import.meta.url), "utf8");
 const manifest = parseManifest(
@@ -60,3 +60,15 @@ describe("integration catalog", () => {
     }
   });
 });
+
+describe("integrationStatuses", () => {
+  it("says which integrations this instance has every setting for, by name only", () => {
+    const statuses = integrationStatuses({ STRIPE_SECRET_KEY: "stripe-test-value", STRIPE_WEBHOOK_SECRET: "  ", CHASE_IMPORT_MODE: "manual_csv", CHASE_MANUAL_IMPORT_DIR: "/imports" });
+    expect(statuses).toHaveLength(INTEGRATIONS.length);
+    expect(statuses.find((s) => s.id === "stripe")).toMatchObject({ configured: false, missingSettings: ["STRIPE_WEBHOOK_SECRET"] });
+    expect(statuses.find((s) => s.id === "chase")).toMatchObject({ configured: true, missingSettings: [], access: "file", catalogStatus: "planned" });
+    expect(statuses.find((s) => s.id === "bank_statements")).toMatchObject({ configured: false, missingSettings: [] });
+    expect(JSON.stringify(statuses)).not.toContain("stripe-test-value");
+  });
+});
+

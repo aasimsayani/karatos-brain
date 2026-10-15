@@ -1,6 +1,7 @@
 import { createServer } from "node:http";
 import { fileURLToPath } from "node:url";
 import pg from "pg";
+import { integrationStatuses } from "@karatos/core";
 import { loadMigrations, migrate, PostgresMemoryStore } from "@karatos/store-postgres";
 import { createBrainApp } from "./app.js";
 import { createInstancePipeline } from "./brain.js";
@@ -35,7 +36,13 @@ const pipeline = createInstancePipeline({
 });
 
 const server = createServer(
-  createBrainApp({ pipeline, memory, organizationId: config.ORGANIZATION_ID, apiKey: config.INSTANCE_API_KEY }),
+  createBrainApp({
+    pipeline,
+    memory,
+    organizationId: config.ORGANIZATION_ID,
+    apiKey: config.INSTANCE_API_KEY,
+    integrations: integrationStatuses(process.env),
+  }),
 );
 server.listen(config.PORT, () => {
   console.log(`${config.INSTANCE_NAME} (${config.ORGANIZATION_ID}) listening on :${config.PORT}`);

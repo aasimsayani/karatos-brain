@@ -43,6 +43,20 @@ describe("inquiry validation", () => {
     expect(parseInquiry(null)).toMatchObject({ ok: false });
   });
 
+  it("reads the broken system's name when given, and treats blank as not given", () => {
+    const parsed = parseInquiry({ ...valid, interests: ["broken_system"], system: "  Our POS  " });
+    expect(parsed.ok && parsed.inquiry.system).toBe("Our POS");
+    for (const blank of ["", "   ", null, undefined]) {
+      const p = parseInquiry({ ...valid, system: blank });
+      expect(p.ok && p.inquiry.system).toBeUndefined();
+    }
+  });
+
+  it("refuses a system name that isn't short text", () => {
+    expect(parseInquiry({ ...valid, system: "x".repeat(161) })).toEqual({ ok: false, fields: ["system"] });
+    expect(parseInquiry({ ...valid, system: 42 })).toEqual({ ok: false, fields: ["system"] });
+  });
+
   it("treats seats as optional", () => {
     const parsed = parseInquiry({ ...valid, seats: "" });
     expect(parsed.ok && parsed.inquiry.seats).toBeUndefined();
@@ -58,6 +72,26 @@ describe("inquiry issue", () => {
     expect(issue.labels).toEqual(["inquiry"]);
     expect(issue.body).toContain("````text\nhi @octocat ```\n# not a heading\n````");
     expect(issue.body).toContain("**Dashboard users**");
+    expect(issue.body).not.toContain("System that isn't working");
+  });
+
+  it("labels broken-system reports for triage and titles them by the system", () => {
+    const only = parseInquiry({ ...valid, interests: ["broken_system"], seats: "", system: "Memo spreadsheet ```" });
+    if (!only.ok) throw new Error("expected valid");
+    const issue = issueFor(only.inquiry, "2026-10-14T12:00:00.000Z");
+    expect(issue.title).toBe("Broken system: Memo spreadsheet ```");
+    expect(issue.labels).toEqual(["inquiry", "broken-system"]);
+    expect(issue.body).toContain("**System that isn't working**\n````text\nMemo spreadsheet ```\n````");
+
+    const noSystem = parseInquiry({ ...valid, interests: ["broken_system"] });
+    if (!noSystem.ok) throw new Error("expected valid");
+    expect(issueFor(noSystem.inquiry, "t").title).toBe("Broken system: Example Jewelers");
+
+    const mixed = parseInquiry({ ...valid, interests: ["broken_system", "custom_services"], system: "Our POS" });
+    if (!mixed.ok) throw new Error("expected valid");
+    const mixedIssue = issueFor(mixed.inquiry, "t");
+    expect(mixedIssue.title).toBe("Inquiry: Example Jewelers (Custom services, A broken system)");
+    expect(mixedIssue.labels).toEqual(["inquiry", "broken-system"]);
   });
 });
 
