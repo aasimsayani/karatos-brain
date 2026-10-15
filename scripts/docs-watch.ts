@@ -41,6 +41,7 @@ function dryRunTracker(): IssueTracker {
       return next++;
     },
     comment: async (issue, body) => console.log(`\n[dry run] would comment on #${issue}:\n${body}\n`),
+    close: async (issue, body) => console.log(`\n[dry run] would close #${issue}:\n${body}\n`),
   };
 }
 
