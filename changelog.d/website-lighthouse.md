@@ -1,0 +1,1 @@
+- Website: Lighthouse runs in CI on mobile and fails under 90 in any category; the page is served gzipped, fonts no longer block the first paint, and small gold and grey text meets WCAG AA contrast
