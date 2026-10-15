@@ -3,6 +3,7 @@
 ## Unreleased
 
 - API: `GET /v1/integrations` lists every catalog integration with whether this instance has all its settings, by name only, for the Brain Console and onboarding. The instance API table in the deployment docs now lists every endpoint
+- Database: ingestion tables for every integration (connections by secret name, sync runs, webhook deliveries, file imports for CSV and PDF statements, entity links, an append-only write audit), indexes for reading data back by system and entity, and row-level security on the migration ledger. `PostgresIngestionLog` writes them and is a `WriteAuditLog`
 - Website: Custom services and pricing section (Brain Console at $99 per user per month for dashboard access only; setup, maintenance and custom services by quote), a "Custom services" header button in place of the GitHub button, and a private inquiry form that files each request as an issue in a private repository (`INQUIRY_REPO`, `INQUIRY_GITHUB_TOKEN`)
 - The Brain Console is a private, paid module; the open core keeps the API it reads from
 
