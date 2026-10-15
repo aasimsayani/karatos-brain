@@ -1,0 +1,1 @@
+- Connector test kit: mocks built from vendor docs for systems we can't reach yet (`docMockFetch`, `checkDocMock`, `docMockWatchTargets`), each naming its doc pages, retrieval date, API version and assumptions; the first covers Stuller's invoice and metal market rate endpoints
