@@ -23,6 +23,23 @@ jobs:
       - run: npm run test:coverage
       - run: npm run build
 
+  website-lighthouse:
+    # Issue #80: the website scores 90+ in every Lighthouse category on mobile.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build -w @karatos/core && node --import tsx site/build.ts
+      - run: |
+          node site/server.ts &
+          for i in $(seq 1 20); do curl -fs http://127.0.0.1:8080/healthz && break; sleep 0.5; done
+          npx --yes lighthouse@12.8.2 http://127.0.0.1:8080/ --quiet --chrome-flags="--headless=new --no-sandbox" --output=json --output-path=lighthouse.json
+          node site/lighthouse.ts lighthouse.json
+
   instance-smoke-test:
     runs-on: ubuntu-latest
     services:

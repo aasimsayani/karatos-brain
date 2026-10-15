@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { INTEGRATIONS, selfServeIntegrations } from "../../packages/core/src/index.js";
 import { RETAIL_DEPARTMENTS } from "../../packages/retail/src/index.js";
-import { CONSOLE_PRICE, CONTACT_ANCHOR, REPORT_URL, buildingNow, escapeHtml, renderSite } from "../build.js";
+import { CONSOLE_PRICE, CONTACT_ANCHOR, FONTS_URL, REPORT_URL, buildingNow, escapeHtml, renderSite } from "../build.js";
 
 const html = renderSite();
 
@@ -31,6 +31,21 @@ describe("KaratOS website", () => {
     expect(html).toContain('name="interests" value="broken_system"');
     expect(html).toContain('<input name="system" maxlength="160"');
     expect(html).toContain("'seats','system','message'");
+  });
+
+  it("loads web fonts without blocking the first paint", () => {
+    expect(html).toContain(`<link href="${FONTS_URL}" rel="stylesheet" media="print" onload="this.media='all'">`);
+    expect(html).toContain(`<noscript><link href="${FONTS_URL}" rel="stylesheet"></noscript>`);
+    expect(html.match(/rel="stylesheet"/g)).toHaveLength(2);
+  });
+
+  it("keeps small gold and grey text at WCAG AA contrast", () => {
+    expect(html).toContain("--muted:#6b665b");
+    expect(html).toContain("--gold-text:#82632a");
+    for (const rule of [".eyebrow{", ".example .tag{", ".pill.gold{"]) {
+      const css = html.slice(html.indexOf(rule), html.indexOf("}", html.indexOf(rule)));
+      expect(css).toContain("color:var(--gold-text)");
+    }
   });
 
   it("names no client", () => {
