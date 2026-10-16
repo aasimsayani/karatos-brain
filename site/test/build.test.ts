@@ -11,9 +11,14 @@ describe("KaratOS website", () => {
     expect(missing).toEqual([]);
   });
 
-  it("marks exactly the self-serve integrations that are not deferred as being built now", () => {
+  it("marks built connectors, and exactly the planned self-serve integrations as being built now", () => {
     const building = buildingNow();
-    expect(building.length).toBe(selfServeIntegrations().filter((i) => i.status !== "deferred").length);
+    expect(building.length).toBe(selfServeIntegrations().filter((i) => i.status === "planned").length);
+    const built = INTEGRATIONS.filter((i) => i.status === "built");
+    expect(built.map((i) => i.id)).toContain("shopify");
+    expect(html.match(/pill gold">Connector built/g)?.length).toBe(built.length);
+    // Built connectors lead the directory.
+    expect(html.indexOf(escapeHtml(built[0]!.name))).toBeLessThan(html.indexOf(escapeHtml(building[0]!.name)));
     expect(html.match(/pill gold">Building now/g)?.length).toBe(building.length);
     expect(html).toContain(`<strong>${building.length}</strong><span>building now</span>`);
   });

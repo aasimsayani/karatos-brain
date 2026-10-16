@@ -19,6 +19,13 @@ describe("sandbox checks", () => {
     expect(credentialProblems(SANDBOX_CHECKS, WORKFLOW)).toEqual([]);
   });
 
+  it("build the Shopify connector from sandbox credentials only", () => {
+    const shopify = SANDBOX_CHECKS.find((c) => c.integration === "shopify")!;
+    expect(shopify.credentials).toEqual(["SANDBOX_SHOPIFY_SHOP_DOMAIN", "SANDBOX_SHOPIFY_ADMIN_ACCESS_TOKEN"]);
+    const connector = shopify.connector({ SANDBOX_SHOPIFY_SHOP_DOMAIN: "example-store.myshopify.com", SANDBOX_SHOPIFY_ADMIN_ACCESS_TOKEN: "shpat_test" });
+    expect(connector.source).toBe("shopify");
+  });
+
   it("catch a credential that isn't passed to the job or isn't a sandbox name", () => {
     const workflow = "          SANDBOX_SHOPIFY_ADMIN_TOKEN: ${{ secrets.SANDBOX_SHOPIFY_ADMIN_TOKEN }}\n";
     expect(credentialProblems([check(["SANDBOX_SHOPIFY_ADMIN_TOKEN"])], workflow)).toEqual([]);

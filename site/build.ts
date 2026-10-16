@@ -51,7 +51,7 @@ const ACCESS_LABELS: Record<IntegrationSpec["access"], string> = {
 
 /** Self-serve integrations that are not deferred: the ones being built now. */
 export function buildingNow(): IntegrationSpec[] {
-  return selfServeIntegrations().filter((i) => i.status !== "deferred");
+  return selfServeIntegrations().filter((i) => i.status === "planned");
 }
 
 export function escapeHtml(value: string): string {
@@ -60,6 +60,7 @@ export function escapeHtml(value: string): string {
 
 function statusOf(integration: IntegrationSpec, selfServe: Set<string>): { label: string; tone: string } {
   if (integration.status === "deferred") return { label: "Deferred", tone: "muted" };
+  if (integration.status === "built") return { label: "Connector built", tone: "gold" };
   if (selfServe.has(integration.id)) return { label: "Building now", tone: "gold" };
   return { label: "Planned", tone: "plain" };
 }
@@ -70,10 +71,9 @@ export function renderSite(): string {
     ...RETAIL_DEPARTMENTS.map((d) => ({ id: d.id, name: d.name, purpose: d.purpose, planned: false })),
     ...PLANNED_DEPARTMENTS.map((d) => ({ ...d, planned: true })),
   ];
-  // Systems we are building now come first, then the rest in catalog order.
-  const dataSources = INTEGRATIONS.filter((i) => i.departments.length > 0).sort(
-    (a, b) => Number(selfServe.has(b.id)) - Number(selfServe.has(a.id)),
-  );
+  // Built connectors come first, then systems we are building now, then the rest in catalog order.
+  const rank = (i: IntegrationSpec) => (i.status === "built" ? 2 : selfServe.has(i.id) ? 1 : 0);
+  const dataSources = INTEGRATIONS.filter((i) => i.departments.length > 0).sort((a, b) => rank(b) - rank(a));
   const deptName = new Map(departments.map((d) => [d.id, d.name]));
 
   const cards = dataSources

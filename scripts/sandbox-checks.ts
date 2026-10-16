@@ -1,4 +1,5 @@
 import type { SandboxCheck } from "@karatos/core";
+import { shopifyConnector } from "@karatos/connectors";
 
 /**
  * Every built connector registers a sandbox check here. Credentials are
@@ -6,7 +7,15 @@ import type { SandboxCheck } from "@karatos/core";
  * GitHub Actions secrets and listed in .github/workflows/sandbox-run.yml.
  * Never point a check at a client's account.
  */
-export const SANDBOX_CHECKS: SandboxCheck[] = [];
+export const SANDBOX_CHECKS: SandboxCheck[] = [
+  {
+    // A free Shopify development store with a custom app holding read scopes only.
+    integration: "shopify",
+    name: "Shopify",
+    credentials: ["SANDBOX_SHOPIFY_SHOP_DOMAIN", "SANDBOX_SHOPIFY_ADMIN_ACCESS_TOKEN"],
+    connector: (c) => shopifyConnector({ shopDomain: c.SANDBOX_SHOPIFY_SHOP_DOMAIN!, accessToken: c.SANDBOX_SHOPIFY_ADMIN_ACCESS_TOKEN! }),
+  },
+];
 
 /** Problems that would make the nightly run skip a check by mistake or touch a non-sandbox secret. */
 export function credentialProblems(checks: readonly SandboxCheck[], workflow: string): string[] {

@@ -24,10 +24,11 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: npm run build -w @karatos/core
+      - run: npm run build -w @karatos/core -w @karatos/connectors
       - run: npm run sandbox:run
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # Test-only sandbox credentials, one line per credential a check in
-          # scripts/sandbox-checks.ts declares, e.g.
-          # SANDBOX_SHOPIFY_ADMIN_TOKEN: ${{ secrets.SANDBOX_SHOPIFY_ADMIN_TOKEN }}
+          # scripts/sandbox-checks.ts declares. Never a client's account.
+          SANDBOX_SHOPIFY_SHOP_DOMAIN: ${{ secrets.SANDBOX_SHOPIFY_SHOP_DOMAIN }}
+          SANDBOX_SHOPIFY_ADMIN_ACCESS_TOKEN: ${{ secrets.SANDBOX_SHOPIFY_ADMIN_ACCESS_TOKEN }}

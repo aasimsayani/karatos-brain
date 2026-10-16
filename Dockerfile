@@ -7,6 +7,7 @@ COPY packages/store-postgres/package.json packages/store-postgres/
 COPY packages/retail/package.json packages/retail/
 COPY packages/server/package.json packages/server/
 COPY packages/testkit/package.json packages/testkit/
+COPY packages/connectors/package.json packages/connectors/
 RUN npm ci --ignore-scripts
 COPY packages packages
 RUN npm run build -w @karatos/core -w @karatos/store-postgres \
