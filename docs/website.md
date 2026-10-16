@@ -11,12 +11,12 @@ node site/server.ts                # serves it on :8080
 
 ## Lighthouse
 
-CI's `website-lighthouse` job builds the site, serves it, runs Lighthouse with its default mobile emulation and fails if performance, accessibility, best practices or SEO score under 90 (`site/lighthouse.ts`). To run it locally:
+CI's `website-lighthouse` job builds the site, serves it, runs Lighthouse three times with its default mobile emulation, and fails if the median score for performance, accessibility, best practices or SEO is under 90 (`site/lighthouse.ts`). The median keeps one slow run on a busy shared runner from failing the site. To run it locally:
 
 ```sh
 node site/server.ts &
 npx lighthouse@12.8.2 http://127.0.0.1:8080/ --chrome-flags="--headless=new" --output=json --output-path=lighthouse.json
-node site/lighthouse.ts lighthouse.json
+node site/lighthouse.ts lighthouse.json   # or several reports, judged on the median
 ```
 
 The page is served gzipped, web fonts load without blocking the first paint, and small gold or grey text uses the darker `--gold-text` and `--muted` colors so it stays at WCAG AA contrast.
