@@ -1,12 +1,12 @@
 # KaratOS Brain
 
-Brain A is an open-source operational intelligence layer for jewelry businesses. It turns the data a jewelry shop already has (orders, payments, inventory, customers, bank statements) into auditable events, and then into recommendations a human can trust, check and override.
+Brain A is an open-source operational intelligence layer for jewelry businesses. It reads the data a jewelry business already has (orders, payments, inventory, customers, bank statements), records it as auditable events, and turns those events into recommendations that a person checks, accepts or overrides.
 
-It is the shared "brain" behind the Fuse Jewelry and KaratOS agents. It is built in public so any jeweler can run the core, and so specialized modules can later be offered as private, paid add-ons.
+It is the shared "brain" behind the Fuse Jewelry and KaratOS agents. The core is built in public so any jeweler can run it. Specialized modules, such as the Brain Console, are private paid add-ons that read from the same open API.
 
 ## What it covers
 
-A jewelry business is many businesses under one roof: a showroom, a repair bench, a custom design studio, a gold buyer, an appraiser, a marketing team and a back office. Most stores run each of these in a different system, or on paper. Brain A treats each one as a **department**, gives it the same seven layers, and lets every department read what the others have learned.
+A jewelry business is many businesses under one roof: a showroom, a repair bench, a custom design studio, a gold buyer, an appraiser, a marketing team and a back office. Most stores run each one in a different system, or on paper. Brain A models each one as a **department**. Every department runs through the same seven layers and reads what the other departments have learned.
 
 ### Departments
 
@@ -27,11 +27,11 @@ Retail jewelry departments are built today. Manufacturing is next.
 | Compliance | Cash reporting, anti-money-laundering checks, secondhand-dealer rules | "$11,000 in cash came in for one sale. File IRS Form 8300 within 15 days." |
 | *Manufacturing (next)* | *Bench jobs, casting, setting, metal loss, labor cost* | *"Casting loss on 14k yellow is 4% this month, double the usual."* |
 
-Every recommendation carries a confidence score, the expected impact, and links to the exact events and signals behind it, so a person can check it before acting. Compliance items are reminders for the owner, not legal advice.
+Every recommendation carries a confidence score, its expected impact, and links to the exact events and signals behind it. Check those links before acting. Compliance items are reminders for the owner, not legal advice.
 
 ### Configuring departments per business
 
-Each business turns on only the departments it runs, with one setting:
+Turn on only the departments the business runs, with one setting:
 
 ```bash
 # A full-service retail store
@@ -44,11 +44,11 @@ ENABLED_DEPARTMENTS=sales,repairs,clienteling,compliance
 ENABLED_DEPARTMENTS=sales,inventory,marketing,finance
 ```
 
-A department added later starts with everything already in memory, so it is useful on day one. See the [departments guide](docs/departments/README.md) for every rule, threshold and event.
+A department turned on later reads everything already in memory, so it is useful on its first day. The [departments guide](docs/departments/README.md) lists every rule, threshold and event.
 
 ## What's possible when the systems are connected
 
-The value grows with each connection, because every source adds context to the others. Each customer, product and order becomes one record, no matter which system it came from.
+Each connected system adds context to the others, so the value grows with every connection. A customer, product or order becomes one record, whichever system it came from.
 
 | Connected | What becomes visible |
 | --- | --- |
@@ -58,26 +58,26 @@ The value grows with each connection, because every source adds context to the o
 | + bank statements | True margin after card fees, refunds and metal costs |
 | + email and messages | Why customers buy, and what they asked for that you didn't have |
 
-Some things only appear once departments share signals. These are built today:
+Some insights appear only when departments share signals. These are built today:
 
 - **Cash at the counter becomes compliance.** Sales records the cash, compliance tracks the Form 8300 deadline and watches for split payments, and finance checks that it reached the bank.
 - **A gold price move becomes a pricing review.** Metals sees the spot change, inventory values aged gold pieces at melt, and gold buying flags offers that are too close to melt.
 - **An anniversary becomes a sale.** Clienteling knows the date and the customer's wish list, and reaches out only to customers who agreed to marketing.
 - **Sell-through drives reorders.** Sales feeds inventory, which recommends reordering what moves and marking down what sits.
 
-These come next, as connectors and reasoners are added:
+These come next, as more connectors and reasoners are built:
 
 - **A repair pattern becomes a buying decision.** If a style keeps coming back for the same fix, flag the vendor and stop reordering it.
 - **A gold spike becomes a cash plan.** Heavy buying from the public plus a falling price becomes a finance alert.
-- **The owner's judgment teaches the system.** Every accept, reject or override is already stored with what happened next. Next, that history will tune which advice the system trusts.
+- **The owner's judgment teaches the system.** Every accept, reject or override is already stored with what happened next. That history will then tune which advice the system trusts.
 
 [Why Brain A gets more valuable over time](docs/vision/compounding-value.md) explains each of these mechanisms and the code behind it.
 
 ## How it works
 
-Every piece of data passes through seven layers, in order. No layer can be skipped.
+Every piece of data passes through seven layers, in order. No layer is skipped.
 
-1. **Event Ingestion:** raw source data becomes an immutable, validated event with an idempotency key.
+1. **Event Ingestion:** raw source data becomes an immutable, validated event with an idempotency key. Invalid input is dead-lettered with the failing field, never dropped.
 2. **Entity Normalization:** events map onto canonical entities: customer, product, order, payment and supplier.
 3. **Signal Extraction:** typed observations derived from entities, traceable back to their events.
 4. **Memory + State:** durable storage for events, entities, signals and decisions.
@@ -93,50 +93,105 @@ See [docs/architecture/overview.md](docs/architecture/overview.md) for details.
 | --- | --- |
 | Seven-layer pipeline, database, one instance per client | Built |
 | Retail departments (11) | Built |
-| Connectors: CSV, Shopify, Stripe | Next |
+| Instance HTTP API, including the integrations list for the Brain Console | Built |
+| Connector test kit, nightly sandbox runs, vendor docs watch | Built |
+| Shopify connector (orders, refunds, fulfillments, products, customers; read-only) | Built |
+| Connectors: inventory and POS, Stripe, bank statements (CSV and PDF), QuickBooks | Next |
 | Claude-powered reasoning | Planned |
 | Manufacturing departments | Planned |
-| Bank statement (PDF) intelligence, CRM, messaging | Later |
+| CRM and messaging | Later |
 
-See the [roadmap](docs/roadmap.md), [integrations](docs/integrations.md) and the [website](docs/website.md).
+The [roadmap](docs/roadmap.md) tracks each item, [integrations](docs/integrations.md) lists all 76 systems in the catalog, and [the website guide](docs/website.md) covers the public site.
 
 ## Quick start
 
+You need Node 22 or later.
+
 ```bash
-npm install
-npm test
+npm ci                       # install exactly what the lockfile pins
+npm test                     # every test runs offline, against embedded Postgres
 cp .env.example .env.local
 npm run secrets:setup        # generates keys, then asks for the rest one at a time
-npm run supabase:check
+npm run supabase:check       # explains a 401 or 404 before you migrate
 npm run db:migrate
 ```
 
+Run `npm run secrets:plan` to see which settings are still missing, without printing any value.
+
 ## One instance per client
 
-Each business runs its own instance: its own Supabase project, container, API key and private deploy repo, all on the same public image. See [docs/deployment/instances.md](docs/deployment/instances.md).
+Each business runs its own instance: its own Supabase project, container, API key and private deploy repo, all on the same public image. An instance serves exactly one organization and refuses events for any other. See [docs/deployment/instances.md](docs/deployment/instances.md).
 
-Your data stays yours. The database, the container and every credential sit in accounts the business owns, so once setup is done we have no access to any of it. We only come back in if the business signs up for maintenance and asks us to, for example to add integrations it needs. See [docs/open-core.md](docs/open-core.md#your-instance-your-data).
+Your data stays yours. The database, the container and every credential sit in accounts the business owns, so once setup is done we have no access to any of it. We come back in only if the business signs up for maintenance and asks us to, for example to add an integration. See [docs/open-core.md](docs/open-core.md#your-instance-your-data).
+
+The instance API:
+
+| Endpoint | Purpose |
+| --- | --- |
+| `GET /healthz` | Liveness check, no key needed |
+| `POST /v1/events` | Ingest one event; a replay with the same idempotency key is never stored twice |
+| `POST /v1/reason` | Run the reasoners and return recommendations |
+| `GET /v1/recommendations` | Latest recommendations, with provenance |
+| `POST /v1/recommendations/:id/feedback` | Record an accept, reject or override |
+| `GET /v1/entities/:kind/:id` | One canonical entity |
+| `GET /v1/integrations` | Each catalog integration and whether this instance has its settings, by name only |
+
+## Connectors
+
+Connectors are read-only by default. A connector may declare write actions, but `WriteGate` refuses every write that is not listed in `ENABLED_WRITES`, and it audits every attempt. We never request write scopes from a vendor.
+
+Every connector must:
+
+- Run a historical import, an incremental sync and webhooks through `runSync`, resume exactly from its checkpoint, and retry from that checkpoint.
+- Produce events in the shape of the department that owns them, and keep only what departments use. No email addresses, phone numbers or street addresses.
+- Ship tests built with `@karatos/connector-testkit`: synthetic fixtures, recorded responses with secrets scrubbed, a full import, replay, resume and retry run, and a check that the write gate refuses writes.
+- Pass the nightly sandbox run (`npm run sandbox:run`) against the vendor's free test account, once one is configured. A failure opens an issue naming the connector and the step.
+
+Systems we can't reach yet are tested against mocks built from the vendor's docs. The daily vendor docs watch (`npm run docs:watch`) checks each vendor's API changelog and every page a mock was built from, and opens an issue when one changes.
+
+The Shopify connector is the first one built. See [docs/integrations.md](docs/integrations.md#shopify) for what it reads and how to connect a store.
 
 ## Packages
 
 | Package | What it is |
 | --- | --- |
-| `@karatos/core` | Event envelope, layer contracts, pipeline, in-memory store, jewelry math (karat purity, melt value), config validation |
+| `@karatos/core` | Event envelope, layer contracts, pipeline, connector contract and `runSync`, write gate, integration catalog, in-memory store, jewelry math (karat purity, melt value), config validation |
 | `@karatos/retail` | Retail jewelry departments: sales, inventory, clienteling, repairs, custom orders, appraisals, buying, metals, marketing, finance, compliance. See [departments](docs/departments/README.md) |
-| `@karatos/store-postgres` | Postgres/Supabase `MemoryStore`, migration runner |
+| `@karatos/store-postgres` | Postgres/Supabase `MemoryStore`, ingestion log and write audit, migration runner |
+| `@karatos/connectors` | Built connectors, starting with Shopify |
+| `@karatos/connector-testkit` | Shared connector test helpers: fixtures, replay, the `runSync` harness, webhook signing, doc mocks |
 | `@karatos/server` | HTTP API for one client instance, shipped as the `ghcr.io/aasimsayani/karatos-brain` image |
 
-The database schema lives in [`supabase/migrations`](supabase/migrations). See the [Supabase setup runbook](docs/runbooks/supabase-setup.md).
+The database schema lives in [`supabase/migrations`](supabase/migrations). See the [Supabase setup runbook](docs/runbooks/supabase-setup.md). The public website lives in [`site/`](site).
 
 ## Open core
 
-The core is MIT-licensed and stays open. Some vertical modules may later ship under a commercial license. See [docs/open-core.md](docs/open-core.md).
+The core is MIT-licensed and stays open. The Brain Console and some vertical modules ship under a commercial license. See [docs/open-core.md](docs/open-core.md).
 
 ## Security
 
-This repository is public. Every secret an instance needs is described, without values, in [`secrets/manifest.json`](secrets/manifest.json). See [docs/secrets.md](docs/secrets.md). Values live only in `.env.local` or a host's secret store. CI runs `npm run secrets:scan` on every push. Never commit real customer data or bank statements.
+This repository is public. Treat everything you commit here as published.
 
-AI agents working in this repo should read [AGENTS.md](AGENTS.md).
+- Never commit a secret, customer data, a bank statement, or anything specific to one client. Client specifics belong in that client's private instance repo; values belong in `.env.local` or a host's secret store.
+- Every secret and setting an instance needs is described, without its value, in [`secrets/manifest.json`](secrets/manifest.json). Follow [docs/secrets.md](docs/secrets.md) to add one.
+- Use test-only sandbox accounts for connector tests, never a client's.
+- CI runs `npm run secrets:scan` on every push.
+
+## Contributing
+
+Before you push, run:
+
+```bash
+npm run secrets:scan
+npm run typecheck
+npm run test:coverage        # fails under 90% lines, functions and statements, or 85% branches
+```
+
+- Every behavior change needs a test. A database change needs a migration and a test that runs it against PGlite.
+- Add a changelog fragment, `changelog.d/<branch>.md`, and update the relevant doc in the same PR. Don't edit `CHANGELOG.md` directly; see [changelog.d/README.md](changelog.d/README.md).
+- After a PR merges, run `scripts/sync-open-prs.sh` to bring main into every other open PR. It merges rather than rebases, and pushes only after the checks pass.
+
+AI agents working in this repo must read [AGENTS.md](AGENTS.md) first.
 
 ## License
 
