@@ -30,6 +30,17 @@ describe("integration catalog", () => {
     }
   });
 
+  it("says what every built connector gives the business, and promises nothing for the rest", () => {
+    for (const integration of INTEGRATIONS) {
+      if (integration.status === "built") {
+        expect(integration.capabilities?.length ?? 0, integration.id).toBeGreaterThanOrEqual(2);
+        for (const line of integration.capabilities!) expect(line, integration.id).toMatch(/^[A-Z].{10,140}[^.]$/);
+      } else {
+        expect(integration.capabilities, integration.id).toBeUndefined();
+      }
+    }
+  });
+
   it("names at least one kind of business for every integration", () => {
     const missing = INTEGRATIONS.filter((i) => i.segments.length === 0).map((i) => i.id);
     expect(missing).toEqual([]);
