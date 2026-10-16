@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { CATEGORIES, checkReport } from "../lighthouse.js";
+import { CATEGORIES, checkReport, checkReports } from "../lighthouse.js";
 
 const report = (scores: Record<string, number | null>, formFactor = "mobile") => ({
   configSettings: { formFactor },
@@ -40,5 +40,25 @@ describe("checkReport", () => {
 
   it("takes a custom bar", () => {
     expect(checkReport(report({ performance: 0.8, accessibility: 0.8, "best-practices": 0.8, seo: 0.8 }), 80).scores.every((s) => s.ok)).toBe(true);
+  });
+});
+
+describe("checkReports", () => {
+  const all = (performance: number | null) => report({ performance, accessibility: 1, "best-practices": 0.96, seo: 1 });
+
+  it("judges each category on its median, so one noisy run doesn't fail the site", () => {
+    const { mobile, scores } = checkReports([all(1), all(0.87), all(0.99)]);
+    expect(mobile).toBe(true);
+    expect(scores[0]).toEqual({ id: "performance", score: 99, ok: true });
+    expect(checkReports([all(0.87), all(0.88), all(1)]).scores[0]).toEqual({ id: "performance", score: 88, ok: false });
+    expect(checkReports([all(0.89), all(0.92)]).scores[0]).toEqual({ id: "performance", score: 91, ok: true });
+  });
+
+  it("fails a category any run couldn't score, a desktop run, and no runs at all", () => {
+    expect(checkReports([all(1), all(null), all(1)]).scores[0]).toEqual({ id: "performance", score: null, ok: false });
+    expect(checkReports([all(1), report({ performance: 1, accessibility: 1, "best-practices": 1, seo: 1 }, "desktop")]).mobile).toBe(false);
+    const none = checkReports([]);
+    expect(none.mobile).toBe(false);
+    expect(none.scores.every((s) => !s.ok)).toBe(true);
   });
 });

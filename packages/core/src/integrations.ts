@@ -67,7 +67,8 @@ export interface IntegrationSpec {
    * vendor docs watch checks for changes. Null when none is published.
    */
   changelog: string | null;
-  status: "planned" | "deferred";
+  /** built: a connector exists and is tested; it is verified live on the first client account before sign-off. */
+  status: "planned" | "built" | "deferred";
   note?: string;
 }
 
@@ -75,7 +76,7 @@ const ALL: BusinessSegment[] = ["retail", "wholesale", "manufacturing"];
 
 export const INTEGRATIONS: IntegrationSpec[] = [
   // Brain A Integration Mapping sheet
-  { id: "shopify", name: "Shopify", domain: "ecommerce", segments: ["retail", "wholesale"], access: "public_api", testWith: "sandbox", departments: ["sales", "inventory", "marketing"], historicalImportYears: 5, webhooks: true, settings: ["SHOPIFY_SHOP_DOMAIN", "SHOPIFY_ADMIN_ACCESS_TOKEN"], changelog: "https://shopify.dev/changelog", status: "planned" },
+  { id: "shopify", name: "Shopify", domain: "ecommerce", segments: ["retail", "wholesale"], access: "public_api", testWith: "sandbox", departments: ["sales", "inventory", "marketing"], historicalImportYears: 5, webhooks: true, settings: ["SHOPIFY_SHOP_DOMAIN", "SHOPIFY_ADMIN_ACCESS_TOKEN"], changelog: "https://shopify.dev/changelog", status: "built", note: "Connector in @karatos/connectors: orders, refunds, fulfillments, products and customers, read-only" },
   { id: "inventory_pos", name: "Inventory and POS systems", domain: "ecommerce", segments: ["retail"], access: "file", testWith: "fixtures", departments: ["sales", "inventory", "marketing"], historicalImportYears: 5, webhooks: true, settings: [], changelog: null, status: "planned", note: "System-specific; CSV import first" },
   { id: "stripe", name: "Stripe", domain: "financial", segments: ["retail", "wholesale"], access: "public_api", testWith: "sandbox", departments: ["sales", "finance"], historicalImportYears: 5, webhooks: true, settings: ["STRIPE_SECRET_KEY", "STRIPE_WEBHOOK_SECRET"], changelog: "https://docs.stripe.com/changelog", status: "planned" },
   { id: "chase", name: "Chase business bank accounts and credit cards", domain: "financial", segments: ALL, access: "file", testWith: "fixtures", departments: ["finance", "compliance"], historicalImportYears: 6, webhooks: false, settings: ["CHASE_IMPORT_MODE", "CHASE_MANUAL_IMPORT_DIR"], changelog: null, status: "planned", note: "CSV exports, PDF statements or both, whichever the client prefers; 5-6 years of history" },
