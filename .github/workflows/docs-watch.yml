@@ -23,7 +23,7 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: npm run build -w @karatos/core
+      - run: npm run build -w @karatos/core -w @karatos/connector-testkit
       # Snapshots from the last run. A cache miss just takes a new baseline.
       - uses: actions/cache@v4
         with:

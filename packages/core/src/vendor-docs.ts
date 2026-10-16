@@ -10,9 +10,20 @@ import type { IssueTracker } from "./issue-tracker.js";
  */
 
 export interface VendorDocsTarget {
+  /** Snapshot and issue key: the integration id, or `id:page` for a doc-mock source page. */
   integration: string;
   name: string;
   url: string;
+  /**
+   * Set when the page is one a doc-derived mock was built from, rather than
+   * a changelog. A change then means the mock may no longer match the API.
+   */
+  mock?: {
+    /** Catalog id of the integration the mock stands in for. */
+    integration: string;
+    /** The day the mock last matched the page, as YYYY-MM-DD. */
+    retrievedOn: string;
+  };
 }
 
 /** Integrations with a public changelog to watch, and those without one. */
@@ -139,6 +150,24 @@ function evidence(diff: TextDiff): string {
 }
 
 function changeBody(target: VendorDocsTarget, diff: TextDiff, at: string): string {
+  if (target.mock) {
+    return [
+      changeMarker(target.integration),
+      `A page the ${target.name} doc mock was built from changed. Seen ${at} at ${target.url}`,
+      `The mock matches the version read on ${target.mock.retrievedOn}, so it may no longer match the real API.`,
+      "",
+      "Lines removed (-) and added (+):",
+      "",
+      evidence(diff),
+      "",
+      "**To do**",
+      `- [ ] Compare the change with the mock in \`packages/testkit/src/mocks/${target.mock.integration}.ts\``,
+      "- [ ] Update its routes, fixtures and assumptions, and its `retrievedOn` date",
+      "- [ ] If the connector is affected, open a fix PR with a test that reproduces the new behavior",
+      "",
+      "Opened by the daily vendor docs watch.",
+    ].join("\n");
+  }
   return [
     changeMarker(target.integration),
     `The ${target.name} API changelog changed. Seen ${at} at ${target.url}`,
@@ -176,12 +205,16 @@ async function watchOne(target: VendorDocsTarget, options: VendorDocsWatchOption
     const existing = await options.issues.findOpen(movedMarker(integration));
     if (existing) return { integration, status: "moved", issue: existing.number, detail: `HTTP ${response.status}` };
     const issue = await options.issues.open(
-      `Vendor changelog moved: ${target.name}`,
+      target.mock ? `Vendor docs page moved: ${target.name}` : `Vendor changelog moved: ${target.name}`,
       [
         movedMarker(integration),
-        `The ${target.name} API changelog at ${target.url} answered HTTP ${response.status} on ${at}.`,
+        target.mock
+          ? `A page the ${target.name} doc mock was built from, ${target.url}, answered HTTP ${response.status} on ${at}.`
+          : `The ${target.name} API changelog at ${target.url} answered HTTP ${response.status} on ${at}.`,
         "",
-        "Find the new changelog URL and update `changelog` for this integration in `packages/core/src/integrations.ts`. Until then, changes to this API go unnoticed.",
+        target.mock
+          ? `Find where the page moved and update the mock in \`packages/testkit/src/mocks/${target.mock.integration}.ts\`, checking the endpoint is still documented the same way. Until then, changes to that page go unnoticed.`
+          : "Find the new changelog URL and update `changelog` for this integration in `packages/core/src/integrations.ts`. Until then, changes to this API go unnoticed.",
         "",
         "Opened by the daily vendor docs watch.",
       ].join("\n"),

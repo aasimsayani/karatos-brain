@@ -216,6 +216,35 @@ describe("runVendorDocsWatch", () => {
     expect((await watch(sitePages(V2), store, issues, [TARGET]))[0]).toMatchObject({ status: "changed" });
   });
 
+  it("files a doc mock page's change and move against the mock, not the changelog", async () => {
+    const store = new MemoryStore();
+    const issues = new MemoryTracker();
+    const page: VendorDocsTarget = {
+      integration: "demo:docs-demo-example-api-items",
+      name: "Demo",
+      url: "https://docs.demo.example/api/items",
+      mock: { integration: "demo", retrievedOn: "2026-10-15" },
+    };
+    await watch(sitePages(V1), store, issues, [TARGET, page]);
+    await watch(sitePages(V2), store, issues, [page]);
+    expect(store.snapshots.has("demo:docs-demo-example-api-items")).toBe(true);
+    const [changed] = issues.issues;
+    expect(changed!.title).toBe("Vendor docs changed: Demo");
+    expect(changed!.body).toContain(changeMarker(page.integration));
+    expect(changed!.body).toContain("A page the Demo doc mock was built from changed.");
+    expect(changed!.body).toContain("The mock matches the version read on 2026-10-15");
+    expect(changed!.body).toContain("`packages/testkit/src/mocks/demo.ts`");
+    expect(changed!.body).toContain("+ Rate limits drop to 20 requests per second.");
+
+    await watch(sitePages(404), store, issues, [page]);
+    const moved = issues.issues[1]!;
+    expect(moved.title).toBe("Vendor docs page moved: Demo");
+    expect(moved.body).toContain(movedMarker(page.integration));
+    expect(moved.body).toContain("update the mock in `packages/testkit/src/mocks/demo.ts`");
+    // The changelog's own issues stay separate from the mock page's.
+    expect(await issues.findOpen(changeMarker("demo"))).toBeNull();
+  });
+
   it("uses the real clock when none is given", async () => {
     const outcomes = await runVendorDocsWatch({ targets: [TARGET], fetch: sitePages(V1), store: new MemoryStore(), issues: new MemoryTracker() });
     expect(outcomes[0]!.status).toBe("baseline");
