@@ -1,0 +1,1 @@
+- Vendor docs watch: also checks every page a doc-derived mock was built from, starting with Stuller's three API help pages. A change opens an issue naming the mock that may be stale and the day it last matched; a moved page opens a "docs page moved" issue

@@ -8,6 +8,7 @@ import {
   type DocsSnapshot,
   type SnapshotStore,
 } from "@karatos/core";
+import { allDocMocks, docMockVendorDocsTargets } from "@karatos/connector-testkit";
 
 // Daily vendor docs watch. Snapshots live in a directory the CI job caches
 // between runs; changes become issues in this repository.
@@ -18,17 +19,20 @@ import {
 const dryRun = process.argv.includes("--dry-run");
 const dir = process.env.DOCS_WATCH_DIR ?? ".docs-watch";
 
+// Mock source pages are keyed `integration:page`; keep file names portable.
+const snapshotFile = (key: string) => `${key.replace(/[^a-z0-9_-]+/gi, "__")}.json`;
+
 const store: SnapshotStore = {
   async get(integration) {
     try {
-      return JSON.parse(await readFile(join(dir, `${integration}.json`), "utf8")) as DocsSnapshot;
+      return JSON.parse(await readFile(join(dir, snapshotFile(integration)), "utf8")) as DocsSnapshot;
     } catch {
       return null;
     }
   },
   async put(snapshot) {
     await mkdir(dir, { recursive: true });
-    await writeFile(join(dir, `${snapshot.integration}.json`), JSON.stringify(snapshot));
+    await writeFile(join(dir, snapshotFile(snapshot.integration)), JSON.stringify(snapshot));
   },
 };
 
@@ -53,14 +57,17 @@ if (!dryRun && (!token || !repo)) {
 }
 const issues = dryRun ? dryRunTracker() : gitHubIssueTracker({ repo: repo!, token: token!, labels: ["vendor-docs", "integration"] });
 
-const { targets, unwatched } = vendorDocsTargets();
+const { targets: changelogs, unwatched } = vendorDocsTargets();
+// The pages each doc-derived mock was built from: a change means the mock may be out of date.
+const mockPages = docMockVendorDocsTargets(allDocMocks());
+const targets = [...changelogs, ...mockPages];
 const outcomes = await runVendorDocsWatch({ targets, fetch, store, issues });
 
 const rows = outcomes.map((o) => `| ${o.integration} | ${o.status} | ${o.issue ? `#${o.issue}` : ""} | ${o.detail ?? ""} |`);
 const summary = [
   `## Vendor docs watch`,
   "",
-  `${targets.length} changelogs checked. No public changelog for: ${unwatched.join(", ") || "none"}.`,
+  `${changelogs.length} changelogs and ${mockPages.length} doc mock pages checked. No public changelog for: ${unwatched.join(", ") || "none"}.`,
   "",
   "| Integration | Result | Issue | Detail |",
   "| --- | --- | --- | --- |",
