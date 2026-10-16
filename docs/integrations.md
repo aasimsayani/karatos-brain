@@ -239,6 +239,13 @@ Every connector implements `Connector` from `@karatos/core`:
 
 Connectors live in `@karatos/connectors` (`packages/connectors`). Each one is read-only, and the token or app it uses should hold read scopes only.
 
+When a connector is finished, do all of these in the same PR:
+
+1. Set its catalog entry's `status` to `"built"` and list its `capabilities`: what the business gets once it is connected, one plain sentence each. A test in `@karatos/connectors` fails if a connector there isn't marked built with capabilities.
+2. Check the website. It shows "Connector built" and the capabilities on the system's card, and names the connector in the hero, straight from the catalog, so no site edit is needed.
+3. Add a section below on what the connector reads and how to configure it.
+4. Write the customer setup guide in the private commercial runbook (`help/<id>.md`). Setup guides are not published yet.
+
 ### Shopify
 
 Reads the GraphQL Admin API (`https://<store>.myshopify.com/admin/api/<version>/graphql.json`). The version is pinned to `SHOPIFY_API_VERSION`, or to 2026-07, the version the connector was tested with. The client only sends queries, so a mutation is refused before it leaves the server.

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { INTEGRATIONS, selfServeIntegrations } from "../../packages/core/src/index.js";
 import { RETAIL_DEPARTMENTS } from "../../packages/retail/src/index.js";
-import { CONSOLE_PRICE, CONTACT_ANCHOR, FONTS_URL, REPORT_URL, buildingNow, escapeHtml, renderSite } from "../build.js";
+import { CONSOLE_PRICE, CONTACT_ANCHOR, FONTS_URL, REPORT_URL, buildingNow, earlyAccessNote, escapeHtml, renderSite } from "../build.js";
 
 const html = renderSite();
 
@@ -21,6 +21,18 @@ describe("KaratOS website", () => {
     expect(html.indexOf(escapeHtml(built[0]!.name))).toBeLessThan(html.indexOf(escapeHtml(building[0]!.name)));
     expect(html.match(/pill gold">Building now/g)?.length).toBe(building.length);
     expect(html).toContain(`<strong>${building.length}</strong><span>building now</span>`);
+  });
+
+  it("explains what each built connector gives the business, and names them in the hero", () => {
+    const built = INTEGRATIONS.filter((i) => i.status === "built");
+    for (const integration of built) {
+      const list = `<ul class="caps" aria-label="What you get with ${escapeHtml(integration.name)}">`;
+      expect(html).toContain(list);
+      for (const capability of integration.capabilities ?? []) expect(html).toContain(`<li>${escapeHtml(capability)}</li>`);
+      expect(earlyAccessNote()).toContain(integration.name);
+    }
+    expect(html.match(/<ul class="caps"/g)?.length).toBe(built.length);
+    expect(html).toContain(`<p class="note">${escapeHtml(earlyAccessNote())}</p>`);
   });
 
   it("shows every retail department and its purpose", () => {
