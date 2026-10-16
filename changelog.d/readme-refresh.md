@@ -1,0 +1,1 @@
+- README: brought up to date with the Shopify connector, the connector test kit, sandbox runs, the vendor docs watch, the instance API and the changelog fragments, and rewritten as direct instructions for setup, security, connectors and contributing. The roadmap marks the Shopify connector done
