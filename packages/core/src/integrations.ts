@@ -76,13 +76,26 @@ export interface IntegrationSpec {
   /** built: a connector exists and is tested; it is verified live on the first client account before sign-off. */
   status: "planned" | "built" | "deferred";
   note?: string;
+  /**
+   * What a business gets once this system is connected, one plain sentence
+   * each, written for the owner. Required for every built connector; the
+   * website shows them on the integration's card.
+   */
+  capabilities?: string[];
 }
 
 const ALL: BusinessSegment[] = ["retail", "wholesale", "manufacturing"];
 
 export const INTEGRATIONS: IntegrationSpec[] = [
   // Brain A Integration Mapping sheet
-  { id: "shopify", name: "Shopify", domain: "ecommerce", segments: ["retail", "wholesale"], access: "public_api", testWith: "sandbox", departments: ["sales", "inventory", "marketing"], historicalImportYears: 5, webhooks: true, settings: ["SHOPIFY_SHOP_DOMAIN"], signIn: [["SHOPIFY_CLIENT_ID", "SHOPIFY_CLIENT_SECRET"], ["SHOPIFY_ADMIN_ACCESS_TOKEN"]], changelog: "https://shopify.dev/changelog", status: "built", note: "Connector in @karatos/connectors: orders, refunds, fulfillments, products and customers, read-only" },
+  { id: "shopify", name: "Shopify", domain: "ecommerce", segments: ["retail", "wholesale"], access: "public_api", testWith: "sandbox", departments: ["sales", "inventory", "clienteling", "marketing"], historicalImportYears: 5, webhooks: true, settings: ["SHOPIFY_SHOP_DOMAIN"], signIn: [["SHOPIFY_CLIENT_ID", "SHOPIFY_CLIENT_SECRET"], ["SHOPIFY_ADMIN_ACCESS_TOKEN"]], changelog: "https://shopify.dev/changelog", status: "built", note: "Connector in @karatos/connectors: orders, refunds, fulfillments, products and customers, read-only",
+    capabilities: [
+      "Imports five years of orders, refunds and fulfillments, then keeps them current as orders change",
+      "Sales sees every online and Shopify POS sale and return, with how it was paid",
+      "Inventory sees every product and variant with its price and stock on hand",
+      "Clienteling sees each customer and whether they agreed to email marketing",
+      "Read-only: KaratOS never changes anything in your store",
+    ] },
   { id: "inventory_pos", name: "Inventory and POS systems", domain: "ecommerce", segments: ["retail"], access: "file", testWith: "fixtures", departments: ["sales", "inventory", "marketing"], historicalImportYears: 5, webhooks: true, settings: [], changelog: null, status: "planned", note: "System-specific; CSV import first" },
   { id: "stripe", name: "Stripe", domain: "financial", segments: ["retail", "wholesale"], access: "public_api", testWith: "sandbox", departments: ["sales", "finance"], historicalImportYears: 5, webhooks: true, settings: ["STRIPE_SECRET_KEY", "STRIPE_WEBHOOK_SECRET"], changelog: "https://docs.stripe.com/changelog", status: "planned" },
   { id: "chase", name: "Chase business bank accounts and credit cards", domain: "financial", segments: ALL, access: "file", testWith: "fixtures", departments: ["finance", "compliance"], historicalImportYears: 6, webhooks: false, settings: ["CHASE_IMPORT_MODE", "CHASE_MANUAL_IMPORT_DIR"], changelog: null, status: "planned", note: "CSV exports, PDF statements or both, whichever the client prefers; 5-6 years of history" },

@@ -54,6 +54,14 @@ export function buildingNow(): IntegrationSpec[] {
   return selfServeIntegrations().filter((i) => i.status === "planned");
 }
 
+/** The hero's early-access line, naming the connectors that are built. */
+export function earlyAccessNote(): string {
+  const built = INTEGRATIONS.filter((i) => i.status === "built").map((i) => i.name);
+  if (!built.length) return "Early access. The first integrations are being built and tested now.";
+  const names = built.length === 1 ? built[0]! : `${built.slice(0, -1).join(", ")} and ${built.at(-1)}`;
+  return `Early access. ${names} ${built.length === 1 ? "is" : "are"} connected today, and more integrations are being built and tested now.`;
+}
+
 export function escapeHtml(value: string): string {
   return value.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
 }
@@ -85,7 +93,11 @@ export function renderSite(): string {
   <div class="card-top"><span class="domain">${escapeHtml(DOMAIN_LABELS[i.domain])}</span><span class="pill ${status.tone}">${status.label}</span></div>
   <h3>${escapeHtml(i.name)}</h3>
   <p class="meta">${escapeHtml(ACCESS_LABELS[i.access])} · ${i.segments.map((s) => s[0]!.toUpperCase() + s.slice(1)).join(", ")}</p>
-  <p class="depts">${escapeHtml(depts.join(", "))}</p>
+  <p class="depts">${escapeHtml(depts.join(", "))}</p>${
+    i.status === "built" && i.capabilities?.length
+      ? `\n  <ul class="caps" aria-label="What you get with ${escapeHtml(i.name)}">${i.capabilities.map((c) => `<li>${escapeHtml(c)}</li>`).join("")}</ul>`
+      : ""
+  }
 </li>`;
     })
     .join("\n");
@@ -167,6 +179,8 @@ section{padding:80px 0;border-top:1px solid var(--line);scroll-margin-top:64px}
 .domain{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
 .meta{margin:0;font-size:14px;color:var(--ink-2)}
 .depts{margin:6px 0 0;font-size:13px;color:var(--muted)}
+.caps{margin:12px 0 0;padding:12px 0 0 18px;border-top:1px solid var(--line);font-size:14px;color:var(--ink-2)}
+.caps li{margin:0 0 4px}
 .pill{font-size:12px;font-weight:600;padding:3px 10px;border-radius:999px;border:1px solid var(--line);white-space:nowrap;font-family:Inter,sans-serif}
 .pill.gold{background:var(--gold-soft);color:var(--gold-text);border-color:transparent}
 .pill.muted{color:var(--muted)}
@@ -241,7 +255,7 @@ footer .wrap{display:flex;flex-wrap:wrap;justify-content:space-between;gap:12px}
   <h1>The operating brain for jewelry businesses.</h1>
   <p class="lede">KaratOS connects the systems your business already runs, from the POS and the books to diamond feeds and the repair bench, and turns them into a short list of things to act on today. Every suggestion shows the evidence behind it.</p>
   <div class="actions"><a class="btn primary" href="#services">Custom services</a><a class="btn ghost" href="#integrations">See the integrations</a></div>
-  <p class="note">Early access. The first integrations are being built and tested now.</p>
+  <p class="note">${escapeHtml(earlyAccessNote())}</p>
 </div>
 
 <section id="how"><div class="wrap">

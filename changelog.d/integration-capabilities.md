@@ -1,0 +1,1 @@
+- Website: each built connector's card now lists what the business gets once it is connected, from a new `capabilities` field in the catalog, and the hero names the connectors that are live. A test fails if a connector in `@karatos/connectors` isn't marked built with capabilities. Shopify now also lists the clienteling department, which its customer sync feeds
