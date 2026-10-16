@@ -1,3 +1,5 @@
+import { INTEGRATIONS, type VendorDocsTarget } from "@karatos/core";
+
 /**
  * Mocks built from a vendor's published API docs, for systems we can't reach
  * yet (paid accounts, partner programs). A connector is written and tested
@@ -202,4 +204,19 @@ export function docMockWatchTargets(mocks: readonly DocMock[]): DocWatchTarget[]
     }
   }
   return [...targets.values()];
+}
+
+/**
+ * The mocks' doc pages as vendor docs watch targets. Each page is keyed
+ * `integration:page`, so it gets its own snapshot and issue, apart from the
+ * vendor's changelog.
+ */
+export function docMockVendorDocsTargets(mocks: readonly DocMock[]): VendorDocsTarget[] {
+  const names = new Map(INTEGRATIONS.map((spec) => [spec.id, spec.name]));
+  return docMockWatchTargets(mocks).map((target) => ({
+    integration: target.id,
+    name: names.get(target.integration) ?? target.integration,
+    url: target.url,
+    mock: { integration: target.integration, retrievedOn: target.retrievedOn },
+  }));
 }

@@ -190,7 +190,7 @@ A failure at the live or docs level opens an issue naming the integration, what 
 
 For paid and partner systems there's nothing to record yet, so the connector is written against a mock built from the vendor's published API docs and verified live once access arrives. Each mock (`packages/testkit/src/mocks/`) says:
 
-- the doc pages it was built from, the day they were read and the API version, so `docMockWatchTargets()` can hand those pages to the vendor docs watch and a change flags the mock as possibly stale;
+- the doc pages it was built from, the day they were read and the API version, so the vendor docs watch checks those pages daily and a change flags the mock as possibly stale;
 - the auth the docs describe, answering 401 without it like the real API;
 - its `assumptions`: anything the docs leave out that the mock had to guess, such as a default filter or a unit. Each one is checked on the first live run, then fixed or removed.
 
@@ -204,8 +204,9 @@ Every integration in the catalog lists its vendor's public API changelog (`chang
 - A change opens one issue, labeled `vendor-docs`, with the removed and added lines as evidence and a short to-do list. If that vendor's issue is still open, a later change is added as a comment instead of a new issue.
 - A changelog that answers 404 or 410 opens one "changelog moved" issue so the URL gets fixed. Other failures are listed in the run summary and retried the next day.
 - The first run, or a changed URL, only records a baseline.
+- It also checks every page a doc-derived mock was built from (`docMockVendorDocsTargets(allDocMocks())`). Each page gets its own snapshot and issue, keyed `integration:page`. A change opens an issue saying which mock may be stale and the day it last matched. A page that answers 404 or 410 opens a "docs page moved" issue.
 
-Run it locally with `npm run build -w @karatos/core && npm run docs:watch -- --dry-run`, which prints what it would file.
+Run it locally with `npm run build -w @karatos/core -w @karatos/connector-testkit && npm run docs:watch -- --dry-run`, which prints what it would file.
 
 ### Nightly sandbox run
 
