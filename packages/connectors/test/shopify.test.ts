@@ -353,13 +353,26 @@ describe("Shopify client", () => {
       );
     });
 
-    it("runs a full sync signed in this way", async () => {
+    it("runs the full recorded sync signed in this way, with the granted token on every page", async () => {
       const shopify = fakeShopify();
-      const sync = shopifyConnector({ shopDomain: SHOP, clientId: ID, clientSecret: SECRET, fetch: shopify.fetch, now: NOW, sleep: async () => {} });
-      const { memory, pipeline } = testPipeline();
-      await runSync({ connector: sync, mode: "incremental", pipeline, memory, organizationId: TEST_ORG, sleep: async () => {} }).catch(() => undefined);
-      expect(shopify.calls[0]!.url).toBe(`https://${SHOP}/admin/oauth/access_token`);
-      expect(shopify.calls[1]!.token).toBe("granted-1");
+      const pages = graphqlReplay();
+      const tokens: (string | undefined)[] = [];
+      // Token requests go to the fake grant; GraphQL pages replay the recordings.
+      const fetch = (async (url: string | URL, init?: RequestInit) => {
+        if (String(url).endsWith("/admin/oauth/access_token")) return shopify.fetch(url, init);
+        tokens.push(((init?.headers ?? {}) as Record<string, string>)["x-shopify-access-token"]);
+        return pages(url, init);
+      }) as typeof globalThis.fetch;
+      const result = await checkConnectorSync({
+        makeConnector: () => shopifyConnector({ shopDomain: SHOP, clientId: ID, clientSecret: SECRET, fetch, now: NOW, sleep: async () => {} }),
+        expected: { ingested: 11, deadLettered: 1 },
+      });
+      expect(result.full.batches).toBe(4);
+      // Every page carried a granted token, and each connector reused its token instead of asking per page.
+      expect(tokens.every((t) => /^granted-\d+$/.test(t ?? ""))).toBe(true);
+      const grants = shopify.calls.filter((c) => c.url.endsWith("/admin/oauth/access_token")).length;
+      expect(grants).toBeGreaterThan(0);
+      expect(grants).toBeLessThan(tokens.length);
     });
   });
 
