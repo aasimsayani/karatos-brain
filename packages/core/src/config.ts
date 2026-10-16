@@ -17,6 +17,8 @@ export const ConfigSchema = z.object({
   ANTHROPIC_API_KEY: z.string().optional(),
   SHOPIFY_SHOP_DOMAIN: z.string().optional(),
   SHOPIFY_ADMIN_ACCESS_TOKEN: z.string().optional(),
+  SHOPIFY_CLIENT_ID: z.string().optional(),
+  SHOPIFY_CLIENT_SECRET: z.string().optional(),
   STRIPE_SECRET_KEY: z.string().optional(),
   HUBSPOT_ACCESS_TOKEN: z.string().optional(),
   SLACK_BOT_TOKEN: z.string().optional(),
@@ -34,6 +36,11 @@ export const OPTIONAL_INTEGRATIONS = {
   monday: ["MONDAY_API_TOKEN"],
 } as const satisfies Record<string, readonly (keyof Config)[]>;
 
+/** Other complete sets of keys that also configure an integration, such as a newer way to sign in. */
+export const ALTERNATIVE_INTEGRATION_KEYS: Partial<Record<keyof typeof OPTIONAL_INTEGRATIONS, readonly (keyof Config)[][]>> = {
+  shopify: [["SHOPIFY_SHOP_DOMAIN", "SHOPIFY_CLIENT_ID", "SHOPIFY_CLIENT_SECRET"]],
+};
+
 export type IntegrationName = keyof typeof OPTIONAL_INTEGRATIONS;
 
 export interface ConfigReport {
@@ -49,7 +56,9 @@ export function checkConfig(env: Record<string, string | undefined>): ConfigRepo
   const integrations = Object.fromEntries(
     Object.entries(OPTIONAL_INTEGRATIONS).map(([name, keys]) => [
       name,
-      keys.every((k) => cleaned[k] !== undefined) ? "configured" : "not_configured",
+      [keys, ...(ALTERNATIVE_INTEGRATION_KEYS[name as IntegrationName] ?? [])].some((set) => set.every((k) => cleaned[k] !== undefined))
+        ? "configured"
+        : "not_configured",
     ]),
   ) as ConfigReport["integrations"];
 

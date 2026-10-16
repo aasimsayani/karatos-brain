@@ -60,8 +60,14 @@ export interface IntegrationSpec {
   departments: string[];
   historicalImportYears: number;
   webhooks: boolean;
-  /** Names in secrets/manifest.json this integration needs. */
+  /** Names in secrets/manifest.json this integration always needs. */
   settings: string[];
+  /**
+   * Ways to sign in, when a system offers more than one. The integration is
+   * configured when `settings` and any one group are all set. The first
+   * group is the one to ask a new client for.
+   */
+  signIn?: string[][];
   /**
    * The vendor's public API changelog or release notes, which the daily
    * vendor docs watch checks for changes. Null when none is published.
@@ -76,7 +82,7 @@ const ALL: BusinessSegment[] = ["retail", "wholesale", "manufacturing"];
 
 export const INTEGRATIONS: IntegrationSpec[] = [
   // Brain A Integration Mapping sheet
-  { id: "shopify", name: "Shopify", domain: "ecommerce", segments: ["retail", "wholesale"], access: "public_api", testWith: "sandbox", departments: ["sales", "inventory", "marketing"], historicalImportYears: 5, webhooks: true, settings: ["SHOPIFY_SHOP_DOMAIN", "SHOPIFY_ADMIN_ACCESS_TOKEN"], changelog: "https://shopify.dev/changelog", status: "built", note: "Connector in @karatos/connectors: orders, refunds, fulfillments, products and customers, read-only" },
+  { id: "shopify", name: "Shopify", domain: "ecommerce", segments: ["retail", "wholesale"], access: "public_api", testWith: "sandbox", departments: ["sales", "inventory", "marketing"], historicalImportYears: 5, webhooks: true, settings: ["SHOPIFY_SHOP_DOMAIN"], signIn: [["SHOPIFY_CLIENT_ID", "SHOPIFY_CLIENT_SECRET"], ["SHOPIFY_ADMIN_ACCESS_TOKEN"]], changelog: "https://shopify.dev/changelog", status: "built", note: "Connector in @karatos/connectors: orders, refunds, fulfillments, products and customers, read-only" },
   { id: "inventory_pos", name: "Inventory and POS systems", domain: "ecommerce", segments: ["retail"], access: "file", testWith: "fixtures", departments: ["sales", "inventory", "marketing"], historicalImportYears: 5, webhooks: true, settings: [], changelog: null, status: "planned", note: "System-specific; CSV import first" },
   { id: "stripe", name: "Stripe", domain: "financial", segments: ["retail", "wholesale"], access: "public_api", testWith: "sandbox", departments: ["sales", "finance"], historicalImportYears: 5, webhooks: true, settings: ["STRIPE_SECRET_KEY", "STRIPE_WEBHOOK_SECRET"], changelog: "https://docs.stripe.com/changelog", status: "planned" },
   { id: "chase", name: "Chase business bank accounts and credit cards", domain: "financial", segments: ALL, access: "file", testWith: "fixtures", departments: ["finance", "compliance"], historicalImportYears: 6, webhooks: false, settings: ["CHASE_IMPORT_MODE", "CHASE_MANUAL_IMPORT_DIR"], changelog: null, status: "planned", note: "CSV exports, PDF statements or both, whichever the client prefers; 5-6 years of history" },
@@ -211,8 +217,12 @@ export function integrationStatuses(
   env: Readonly<Record<string, string | undefined>>,
   specs: readonly IntegrationSpec[] = INTEGRATIONS,
 ): IntegrationStatus[] {
+  const missing = (names: readonly string[]) => names.filter((name) => !env[name]?.trim());
   return specs.map((spec) => {
-    const missingSettings = spec.settings.filter((name) => !env[name]?.trim());
+    // With several ways to sign in, a complete one counts; otherwise ask for the first.
+    const groups = spec.signIn ?? [];
+    const signIn = groups.length === 0 ? [] : groups.some((g) => missing(g).length === 0) ? [] : missing(groups[0]!);
+    const missingSettings = [...missing(spec.settings), ...signIn];
     return {
       id: spec.id,
       name: spec.name,
@@ -220,7 +230,7 @@ export function integrationStatuses(
       departments: spec.departments,
       access: spec.access,
       catalogStatus: spec.status,
-      configured: spec.settings.length > 0 && missingSettings.length === 0,
+      configured: spec.settings.length + groups.length > 0 && missingSettings.length === 0,
       missingSettings,
     };
   });
