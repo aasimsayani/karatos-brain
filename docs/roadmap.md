@@ -43,7 +43,7 @@ This is a rebuild of the original Brain A work (v0.1.0 to v0.1.9, April 2026). T
 
 ## Phase 3: First connectors
 - [ ] CSV import (orders, products, bank transactions)
-- [ ] Shopify orders and products
+- [x] Shopify orders, refunds, fulfillments, products and customers (`@karatos/connectors`)
 - [ ] Stripe payments
 
 ## Phase 4: First reasoners
