@@ -1,5 +1,5 @@
 import type { SandboxCheck } from "@karatos/core";
-import { shopifyConnector } from "@karatos/connectors";
+import { shopifyConnector, stripeConnector } from "@karatos/connectors";
 
 /**
  * Every built connector registers a sandbox check here. Credentials are
@@ -14,6 +14,13 @@ export const SANDBOX_CHECKS: SandboxCheck[] = [
     name: "Shopify",
     credentials: ["SANDBOX_SHOPIFY_SHOP_DOMAIN", "SANDBOX_SHOPIFY_ADMIN_ACCESS_TOKEN"],
     connector: (c) => shopifyConnector({ shopDomain: c.SANDBOX_SHOPIFY_SHOP_DOMAIN!, accessToken: c.SANDBOX_SHOPIFY_ADMIN_ACCESS_TOKEN! }),
+  },
+  {
+    // A Stripe account in test mode, with a restricted key holding read permissions only.
+    integration: "stripe",
+    name: "Stripe",
+    credentials: ["SANDBOX_STRIPE_SECRET_KEY"],
+    connector: (c) => stripeConnector({ secretKey: c.SANDBOX_STRIPE_SECRET_KEY! }),
   },
 ];
 

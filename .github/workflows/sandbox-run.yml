@@ -32,3 +32,4 @@ jobs:
           # scripts/sandbox-checks.ts declares. Never a client's account.
           SANDBOX_SHOPIFY_SHOP_DOMAIN: ${{ secrets.SANDBOX_SHOPIFY_SHOP_DOMAIN }}
           SANDBOX_SHOPIFY_ADMIN_ACCESS_TOKEN: ${{ secrets.SANDBOX_SHOPIFY_ADMIN_ACCESS_TOKEN }}
+          SANDBOX_STRIPE_SECRET_KEY: ${{ secrets.SANDBOX_STRIPE_SECRET_KEY }}

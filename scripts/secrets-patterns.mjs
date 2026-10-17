@@ -3,6 +3,8 @@ export const SECRET_PATTERNS = [
   ["Anthropic key", /sk-ant-[A-Za-z0-9_-]{20,}/],
   ["OpenAI key", /sk-(proj-)?[A-Za-z0-9]{32,}/],
   ["Stripe live key", /(sk|rk)_live_[A-Za-z0-9]{16,}/],
+  // GitHub push protection refuses test keys too, so catch them before a push does.
+  ["Stripe test key", /(sk|rk)_test_[A-Za-z0-9]{16,}/],
   ["Shopify token", /shp(at|ca|pa|ss)_[A-Fa-f0-9]{32}/],
   ["Slack token", /xox[abpors]-[A-Za-z0-9-]{10,}/],
   ["GitHub token", /gh[pousr]_[A-Za-z0-9]{36,}/],
