@@ -1,0 +1,307 @@
+[
+  {
+    "request": {
+      "method": "GET",
+      "url": "https://api.stripe.com/v1/charges?created[gte]=1610236800&limit=100"
+    },
+    "response": {
+      "status": 200,
+      "body": {
+        "object": "list",
+        "url": "/v1/x",
+        "has_more": true,
+        "data": [
+          {
+            "id": "ch_test_1004",
+            "object": "charge",
+            "amount": 98000,
+            "amount_captured": 98000,
+            "amount_refunded": 0,
+            "currency": "usd",
+            "created": 1767700000,
+            "status": "succeeded",
+            "paid": true,
+            "captured": true,
+            "refunded": false,
+            "disputed": true,
+            "customer": "cus_test_2",
+            "balance_transaction": "txn_test_4",
+            "payment_intent": null,
+            "payment_method_details": {
+              "type": "affirm"
+            },
+            "description": "Synthetic test charge",
+            "metadata": {}
+          },
+          {
+            "id": "ch_test_1003",
+            "object": "charge",
+            "amount": 45000,
+            "amount_captured": 45000,
+            "amount_refunded": 20000,
+            "currency": "usd",
+            "created": 1767600000,
+            "status": "succeeded",
+            "paid": true,
+            "captured": true,
+            "refunded": false,
+            "disputed": false,
+            "customer": "cus_test_1",
+            "balance_transaction": "txn_test_3",
+            "payment_intent": "pi_test_3",
+            "payment_method_details": {
+              "type": "card",
+              "card": {
+                "brand": "visa"
+              }
+            },
+            "description": "Synthetic test charge",
+            "metadata": {}
+          }
+        ]
+      }
+    }
+  },
+  {
+    "request": {
+      "method": "GET",
+      "url": "https://api.stripe.com/v1/charges?created[gte]=1610236800&limit=100&starting_after=ch_test_1003"
+    },
+    "response": {
+      "status": 200,
+      "body": {
+        "object": "list",
+        "url": "/v1/x",
+        "has_more": false,
+        "data": [
+          {
+            "id": "ch_test_1002",
+            "object": "charge",
+            "amount": 15000,
+            "amount_captured": 0,
+            "amount_refunded": 0,
+            "currency": "usd",
+            "created": 0,
+            "status": "failed",
+            "paid": false,
+            "captured": false,
+            "refunded": false,
+            "disputed": false,
+            "customer": null,
+            "balance_transaction": null,
+            "payment_intent": null,
+            "payment_method_details": {
+              "type": "card",
+              "card": {
+                "brand": "visa"
+              }
+            },
+            "description": "Synthetic test charge",
+            "metadata": {}
+          },
+          {
+            "id": "ch_test_1001",
+            "object": "charge",
+            "amount": 125000,
+            "amount_captured": 125000,
+            "amount_refunded": 0,
+            "currency": "usd",
+            "created": 1767500000,
+            "status": "succeeded",
+            "paid": true,
+            "captured": true,
+            "refunded": false,
+            "disputed": false,
+            "customer": "cus_test_1",
+            "balance_transaction": "txn_test_1",
+            "payment_intent": "pi_test_1",
+            "payment_method_details": {
+              "type": "card_present",
+              "card": {
+                "brand": "mastercard"
+              }
+            },
+            "description": "Synthetic test charge",
+            "metadata": {}
+          }
+        ]
+      }
+    }
+  },
+  {
+    "request": {
+      "method": "GET",
+      "url": "https://api.stripe.com/v1/refunds?created[gte]=1610236800&limit=100"
+    },
+    "response": {
+      "status": 200,
+      "body": {
+        "object": "list",
+        "url": "/v1/x",
+        "has_more": false,
+        "data": [
+          {
+            "id": "re_test_1",
+            "object": "refund",
+            "amount": 20000,
+            "charge": "ch_test_1003",
+            "currency": "usd",
+            "created": 1767650000,
+            "status": "succeeded",
+            "reason": "requested_by_customer",
+            "metadata": {}
+          }
+        ]
+      }
+    }
+  },
+  {
+    "request": {
+      "method": "GET",
+      "url": "https://api.stripe.com/v1/disputes?created[gte]=1610236800&limit=100"
+    },
+    "response": {
+      "status": 200,
+      "body": {
+        "object": "list",
+        "url": "/v1/x",
+        "has_more": false,
+        "data": [
+          {
+            "id": "dp_test_1",
+            "object": "dispute",
+            "amount": 98000,
+            "charge": "ch_test_1004",
+            "currency": "usd",
+            "created": 1767750000,
+            "reason": "fraudulent",
+            "status": "needs_response",
+            "evidence_details": {
+              "due_by": 1768600000
+            }
+          }
+        ]
+      }
+    }
+  },
+  {
+    "request": {
+      "method": "GET",
+      "url": "https://api.stripe.com/v1/payouts?created[gte]=1610236800&limit=100"
+    },
+    "response": {
+      "status": 200,
+      "body": {
+        "object": "list",
+        "url": "/v1/x",
+        "has_more": false,
+        "data": [
+          {
+            "id": "po_test_1",
+            "object": "payout",
+            "amount": 146300,
+            "currency": "usd",
+            "created": 1767800000,
+            "arrival_date": 1767916800,
+            "status": "paid",
+            "method": "standard",
+            "type": "bank_account",
+            "destination": "ba_test_1"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "request": {
+      "method": "GET",
+      "url": "https://api.stripe.com/v1/balance_transactions?created[gte]=1610236800&limit=100"
+    },
+    "response": {
+      "status": 200,
+      "body": {
+        "object": "list",
+        "url": "/v1/x",
+        "has_more": false,
+        "data": [
+          {
+            "id": "txn_test_5",
+            "object": "balance_transaction",
+            "amount": -146300,
+            "fee": 0,
+            "net": -146300,
+            "currency": "usd",
+            "created": 1767800000,
+            "available_on": 1767800000,
+            "type": "payout",
+            "reporting_category": "payout",
+            "source": "po_test_1",
+            "status": "available"
+          },
+          {
+            "id": "txn_test_2",
+            "object": "balance_transaction",
+            "amount": -20000,
+            "fee": 0,
+            "net": -20000,
+            "currency": "usd",
+            "created": 1767650000,
+            "available_on": 1767650000,
+            "type": "refund",
+            "reporting_category": "refund",
+            "source": "re_test_1",
+            "status": "available"
+          },
+          {
+            "id": "txn_test_1",
+            "object": "balance_transaction",
+            "amount": 125000,
+            "fee": 3655,
+            "net": 121345,
+            "currency": "usd",
+            "created": 1767500000,
+            "available_on": 1767700000,
+            "type": "charge",
+            "reporting_category": "charge",
+            "source": "ch_test_1001",
+            "status": "available"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "request": {
+      "method": "GET",
+      "url": "https://api.stripe.com/v1/customers?created[gte]=1610236800&limit=100"
+    },
+    "response": {
+      "status": 200,
+      "body": {
+        "object": "list",
+        "url": "/v1/x",
+        "has_more": false,
+        "data": [
+          {
+            "id": "cus_test_2",
+            "object": "customer",
+            "name": null,
+            "created": 1767400000,
+            "email": null,
+            "phone": null,
+            "address": null
+          },
+          {
+            "id": "cus_test_1",
+            "object": "customer",
+            "name": "Test Customer One",
+            "created": 1767300000,
+            "email": null,
+            "phone": null,
+            "address": null
+          }
+        ]
+      }
+    }
+  }
+]
