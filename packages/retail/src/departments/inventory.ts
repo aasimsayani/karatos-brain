@@ -26,6 +26,12 @@ const InventoryAdjusted = z.object({
   reason: z.enum(["count", "damage", "theft", "sent_to_repair", "returned_to_vendor", "other"]),
 });
 
+/** What a stock count found on hand. Recorded for reconciliation; on-hand positions still come from receipts, sales and adjustments. */
+const InventoryCounted = z.object({
+  sku: z.string().min(1),
+  onHand: z.number().int().nonnegative(),
+});
+
 type Received = z.infer<typeof InventoryReceived>;
 
 const AGED_AFTER_DAYS = 270;
@@ -91,7 +97,7 @@ export const inventory: DepartmentModule = {
   id: "inventory",
   name: "Inventory and Merchandising",
   purpose: "What's in the cases and the safe, what sells, what sits, and when to reorder, mark down or remake.",
-  events: { "inventory.received": InventoryReceived, "inventory.adjusted": InventoryAdjusted },
+  events: { "inventory.received": InventoryReceived, "inventory.adjusted": InventoryAdjusted, "inventory.counted": InventoryCounted },
   normalizers: [
     entityFrom<Received>("inventory-products", "inventory.received", (p) => ({
       ref: { kind: "product", id: p.sku },

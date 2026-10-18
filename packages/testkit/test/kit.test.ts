@@ -2,6 +2,7 @@ import { mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
+import { z } from "zod";
 import type { Connector, SourceBatch, SyncContext } from "@karatos/core";
 import {
   REDACTED,
@@ -171,6 +172,15 @@ describe("checkConnectorSync", () => {
     expect(result.replay).toMatchObject({ ingested: 0, duplicates: 3 });
     expect(result.resume).toMatchObject({ ingested: 1, duplicates: 0, cursor: "c2" });
     expect(result.retry).toMatchObject({ ingested: 3, duplicates: 0 });
+  });
+
+  it("dead-letters what the payload schemas reject in every scenario", async () => {
+    const schemas = { "order.created": z.object({ n: z.number().max(2) }) };
+    const result = await checkConnectorSync({ makeConnector: () => pagedConnector(PAGES), payloadSchemas: schemas, expected: { ingested: 2, deadLettered: 1 } });
+    expect(result.full).toMatchObject({ ingested: 2, deadLettered: 1 });
+    expect(result.retry).toMatchObject({ ingested: 2, deadLettered: 1 });
+    // Without the schemas the same pages store all three, so the count above came from them.
+    await expect(checkConnectorSync({ makeConnector: () => pagedConnector(PAGES), expected: { ingested: 2, deadLettered: 1 } })).rejects.toThrow(SyncCheckError);
   });
 
   it("skips the resume scenario for a single-batch source and supports incremental mode", async () => {

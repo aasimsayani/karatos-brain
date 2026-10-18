@@ -2,6 +2,7 @@ import {
   BrainPipeline,
   InMemoryStore,
   runSync,
+  type BrainPipelineOptions,
   type Connector,
   type MemoryStore,
   type Normalizer,
@@ -14,12 +15,16 @@ export const TEST_ORG = "demo-store";
 
 const noSleep = async () => {};
 
-/** A fresh in-memory store and pipeline for one test. */
-export function testPipeline(normalizers: Normalizer[] = []): { memory: InMemoryStore; pipeline: BrainPipeline } {
+/** A fresh in-memory store and pipeline for one test. Pass department payload schemas to dead-letter what they reject. */
+export function testPipeline(
+  normalizers: Normalizer[] = [],
+  payloadSchemas?: BrainPipelineOptions["payloadSchemas"],
+): { memory: InMemoryStore; pipeline: BrainPipeline } {
   const memory = new InMemoryStore();
   const pipeline = new BrainPipeline({
     memory,
     normalizers,
+    ...(payloadSchemas ? { payloadSchemas } : {}),
     extractors: [],
     reasoners: [],
     documentation: { current: () => ({ documentIds: [], stale: false }) },
@@ -68,6 +73,8 @@ export interface SyncCheckOptions {
   makeConnector: () => Connector;
   mode?: "historical" | "incremental";
   normalizers?: Normalizer[];
+  /** Department payload schemas, so records they reject count as dead letters. */
+  payloadSchemas?: BrainPipelineOptions["payloadSchemas"];
   expected: { ingested: number; deadLettered?: number };
 }
 
@@ -100,7 +107,7 @@ export async function checkConnectorSync(options: SyncCheckOptions): Promise<Syn
     runSync({ connector, mode, pipeline, memory, organizationId: TEST_ORG, attempts, sleep: noSleep });
 
   // 1. Full import.
-  const a = testPipeline(options.normalizers);
+  const a = testPipeline(options.normalizers, options.payloadSchemas);
   const full = await sync(options.makeConnector(), a.memory, a.pipeline);
   if (full.ingested !== options.expected.ingested) {
     failures.push(`full import ingested ${full.ingested}, expected ${options.expected.ingested}`);
@@ -123,7 +130,7 @@ export async function checkConnectorSync(options: SyncCheckOptions): Promise<Syn
   // 3. Crash after the first batch, then resume from the checkpoint.
   let resume: SyncReport | null = null;
   if (full.batches >= 2) {
-    const b = testPipeline(options.normalizers);
+    const b = testPipeline(options.normalizers, options.payloadSchemas);
     const crashing = withFailures(options.makeConnector(), { beforeBatch: 1, times: 1 });
     const crashed = await sync(crashing, b.memory, b.pipeline, 1).then(
       () => false,
@@ -144,7 +151,7 @@ export async function checkConnectorSync(options: SyncCheckOptions): Promise<Syn
   }
 
   // 4. A transient source failure is retried without losing or doubling data.
-  const c = testPipeline(options.normalizers);
+  const c = testPipeline(options.normalizers, options.payloadSchemas);
   const retry = await sync(withFailures(options.makeConnector(), { beforeBatch: 0, times: 1 }), c.memory, c.pipeline);
   if (retry.ingested !== full.ingested || retry.duplicates !== 0) {
     failures.push(`retry ingested ${retry.ingested} with ${retry.duplicates} duplicates, expected ${full.ingested} and 0`);

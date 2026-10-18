@@ -4,7 +4,9 @@ import { INTEGRATIONS } from "@karatos/core";
 import { describe, expect, it } from "vitest";
 
 const src = fileURLToPath(new URL("../src/", import.meta.url));
-const connectorDirs = readdirSync(src).filter((name) => statSync(src + name).isDirectory());
+/** Shared code for several connectors, not a connector itself. */
+const SHARED_DIRS = ["files"];
+const connectorDirs = readdirSync(src).filter((name) => statSync(src + name).isDirectory() && !SHARED_DIRS.includes(name));
 
 describe("built connectors and the catalog", () => {
   // The website, README and Console read the catalog, so a finished connector must be marked there.
@@ -16,6 +18,10 @@ describe("built connectors and the catalog", () => {
       expect(entry!.status, id).toBe("built");
       expect(entry!.capabilities?.length ?? 0, id).toBeGreaterThan(0);
     }
+  });
+
+  it("keeps shared code out of the connector list", () => {
+    for (const dir of SHARED_DIRS) expect(INTEGRATIONS.some((i) => i.id === dir), dir).toBe(false);
   });
 
   it("has a connector here for every integration the catalog calls built", () => {
