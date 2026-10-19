@@ -283,11 +283,97 @@ describe("Shopify client", () => {
 
   it("checks its settings before sending anything", () => {
     expect(() => shopifyClient({ shopDomain: "example-store.com", accessToken: TOKEN })).toThrow(ShopifyConfigError);
-    expect(() => shopifyClient({ shopDomain: SHOP, accessToken: "" })).toThrow("SHOPIFY_ADMIN_ACCESS_TOKEN is empty");
+    expect(() => shopifyClient({ shopDomain: SHOP, accessToken: "" })).toThrow("set SHOPIFY_CLIENT_ID and SHOPIFY_CLIENT_SECRET, or SHOPIFY_ADMIN_ACCESS_TOKEN");
+    expect(() => shopifyClient({ shopDomain: SHOP, clientId: "id" })).toThrow("set both SHOPIFY_CLIENT_ID and SHOPIFY_CLIENT_SECRET");
+    expect(() => shopifyClient({ shopDomain: SHOP, clientSecret: "secret", accessToken: TOKEN })).toThrow("set both");
     expect(() => shopifyClient({ shopDomain: SHOP, accessToken: TOKEN, apiVersion: "latest" })).toThrow("SHOPIFY_API_VERSION must look like 2026-07");
     expect(shopifyClient({ shopDomain: " Example-Store.myshopify.com ", accessToken: TOKEN, apiVersion: "2026-10" }).endpoint).toBe(
       "https://example-store.myshopify.com/admin/api/2026-10/graphql.json",
     );
+  });
+
+  describe("signing in with a Dev Dashboard app", () => {
+    const ID = "test-client-id";
+    const SECRET = "test-client-secret";
+    // A fake Shopify: the token endpoint grants numbered tokens, GraphQL answers 401 for a revoked one.
+    function fakeShopify(grant: (n: number) => { status: number; body: unknown } = (n) => ({ status: 200, body: { access_token: `granted-${n}`, scope: "read_orders", expires_in: 86399 } })) {
+      const calls: { url: string; token?: string; body: string }[] = [];
+      const revoked = new Set<string>();
+      let grants = 0;
+      const fetch = (async (url: string | URL, init?: RequestInit) => {
+        const headers = (init?.headers ?? {}) as Record<string, string>;
+        calls.push({ url: String(url), body: String(init?.body ?? ""), ...(headers["x-shopify-access-token"] ? { token: headers["x-shopify-access-token"] } : {}) });
+        if (String(url).endsWith("/admin/oauth/access_token")) {
+          const answer = grant(++grants);
+          return new Response(JSON.stringify(answer.body), { status: answer.status });
+        }
+        if (revoked.has(headers["x-shopify-access-token"]!)) return new Response(JSON.stringify({ errors: "[API] Invalid API key or access token" }), { status: 401 });
+        return new Response(JSON.stringify({ data: { shop: { name: "Example" } } }), { status: 200 });
+      }) as typeof globalThis.fetch;
+      return { fetch, calls, revoked };
+    }
+
+    it("exchanges the client ID and secret for a token, reuses it, and renews it before it expires", async () => {
+      const shopify = fakeShopify();
+      let now = 0;
+      const client = shopifyClient({ shopDomain: SHOP, clientId: ID, clientSecret: SECRET, fetch: shopify.fetch, clock: () => now });
+      await client.query("query { shop { name } }", {});
+      await client.query("query { shop { name } }", {});
+      expect(shopify.calls.map((c) => c.url)).toEqual([`https://${SHOP}/admin/oauth/access_token`, client.endpoint, client.endpoint]);
+      expect(new URLSearchParams(shopify.calls[0]!.body).get("grant_type")).toBe("client_credentials");
+      expect(new URLSearchParams(shopify.calls[0]!.body).get("client_id")).toBe(ID);
+      expect(shopify.calls[0]!.token).toBeUndefined();
+      expect(shopify.calls.slice(1).map((c) => c.token)).toEqual(["granted-1", "granted-1"]);
+      // Renewed five minutes before the 24 hours run out.
+      now = (86_399 - 299) * 1000;
+      await client.query("query { shop { name } }", {});
+      expect(shopify.calls.at(-1)!.token).toBe("granted-2");
+    });
+
+    it("asks for a new token once when Shopify revokes the current one", async () => {
+      const shopify = fakeShopify();
+      const client = shopifyClient({ shopDomain: SHOP, clientId: ID, clientSecret: SECRET, fetch: shopify.fetch });
+      await client.query("query { shop { name } }", {});
+      shopify.revoked.add("granted-1");
+      await expect(client.query("query { shop { name } }", {})).resolves.toEqual({ shop: { name: "Example" } });
+      expect(shopify.calls.at(-1)!.token).toBe("granted-2");
+      shopify.revoked.add("granted-2").add("granted-3");
+      await expect(client.query("query { shop { name } }", {})).rejects.toMatchObject({ status: 401 });
+    });
+
+    it("explains a refused grant without echoing the secret", async () => {
+      const refused = fakeShopify(() => ({ status: 400, body: { error: "shop_not_permitted", error_description: "x" } }));
+      const client = shopifyClient({ shopDomain: SHOP, clientId: ID, clientSecret: SECRET, fetch: refused.fetch });
+      const error = await client.query("query { shop { name } }", {}).catch((e: unknown) => e);
+      expect(error).toMatchObject({ name: "ShopifyApiError", status: 400, code: "shop_not_permitted" });
+      expect(String((error as Error).message)).not.toContain(SECRET);
+      const garbled = fakeShopify(() => ({ status: 200, body: {} }));
+      await expect(shopifyClient({ shopDomain: SHOP, clientId: ID, clientSecret: SECRET, fetch: garbled.fetch }).query("query { a }", {})).rejects.toThrow(
+        "Shopify refused the client credentials grant (HTTP 200)",
+      );
+    });
+
+    it("runs the full recorded sync signed in this way, with the granted token on every page", async () => {
+      const shopify = fakeShopify();
+      const pages = graphqlReplay();
+      const tokens: (string | undefined)[] = [];
+      // Token requests go to the fake grant; GraphQL pages replay the recordings.
+      const fetch = (async (url: string | URL, init?: RequestInit) => {
+        if (String(url).endsWith("/admin/oauth/access_token")) return shopify.fetch(url, init);
+        tokens.push(((init?.headers ?? {}) as Record<string, string>)["x-shopify-access-token"]);
+        return pages(url, init);
+      }) as typeof globalThis.fetch;
+      const result = await checkConnectorSync({
+        makeConnector: () => shopifyConnector({ shopDomain: SHOP, clientId: ID, clientSecret: SECRET, fetch, now: NOW, sleep: async () => {} }),
+        expected: { ingested: 11, deadLettered: 1 },
+      });
+      expect(result.full.batches).toBe(4);
+      // Every page carried a granted token, and each connector reused its token instead of asking per page.
+      expect(tokens.every((t) => /^granted-\d+$/.test(t ?? ""))).toBe(true);
+      const grants = shopify.calls.filter((c) => c.url.endsWith("/admin/oauth/access_token")).length;
+      expect(grants).toBeGreaterThan(0);
+      expect(grants).toBeLessThan(tokens.length);
+    });
   });
 
   it("only sends queries", async () => {

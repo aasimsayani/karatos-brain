@@ -15,14 +15,14 @@ describe("integration catalog", () => {
 
   it("documents every setting each integration needs in the secrets manifest", () => {
     const documented = new Set(manifest.entries.map((e) => e.name));
-    const missing = INTEGRATIONS.flatMap((i) => i.settings.filter((s) => !documented.has(s)).map((s) => `${i.id}:${s}`));
+    const missing = INTEGRATIONS.flatMap((i) => [...i.settings, ...(i.signIn ?? []).flat()].filter((s) => !documented.has(s)).map((s) => `${i.id}:${s}`));
     expect(missing).toEqual([]);
   });
 
   it("marks each integration's own secrets as needed only once it is enabled", () => {
     const byName = new Map(manifest.entries.map((e) => [e.name, e]));
     for (const integration of INTEGRATIONS) {
-      for (const setting of integration.settings) {
+      for (const setting of [...integration.settings, ...(integration.signIn ?? []).flat()]) {
         const entry = byName.get(setting)!;
         const scoped = entry.requiredFor.includes(`integration:${integration.id}`) || entry.requiredFor.includes("instance");
         expect(scoped, `${setting} should be required for integration:${integration.id}`).toBe(true);
@@ -80,6 +80,16 @@ describe("integrationStatuses", () => {
     expect(statuses.find((s) => s.id === "chase")).toMatchObject({ configured: true, missingSettings: [], access: "file", catalogStatus: "planned" });
     expect(statuses.find((s) => s.id === "bank_statements")).toMatchObject({ configured: false, missingSettings: [] });
     expect(JSON.stringify(statuses)).not.toContain("stripe-test-value");
+  });
+
+  it("counts any one complete way to sign in, and asks for the first when none is", () => {
+    const shopify = (env: Record<string, string>) => integrationStatuses(env).find((s) => s.id === "shopify")!;
+    const domain = { SHOPIFY_SHOP_DOMAIN: "example-store.myshopify.com" };
+    expect(shopify({})).toMatchObject({ configured: false, missingSettings: ["SHOPIFY_SHOP_DOMAIN", "SHOPIFY_CLIENT_ID", "SHOPIFY_CLIENT_SECRET"] });
+    expect(shopify({ ...domain, SHOPIFY_CLIENT_ID: "id" })).toMatchObject({ configured: false, missingSettings: ["SHOPIFY_CLIENT_SECRET"] });
+    expect(shopify({ ...domain, SHOPIFY_CLIENT_ID: "id", SHOPIFY_CLIENT_SECRET: "secret" })).toMatchObject({ configured: true, missingSettings: [] });
+    expect(shopify({ ...domain, SHOPIFY_ADMIN_ACCESS_TOKEN: "token" })).toMatchObject({ configured: true, missingSettings: [] });
+    expect(shopify({ SHOPIFY_ADMIN_ACCESS_TOKEN: "token" })).toMatchObject({ configured: false, missingSettings: ["SHOPIFY_SHOP_DOMAIN"] });
   });
 });
 
