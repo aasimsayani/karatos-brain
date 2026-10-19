@@ -106,6 +106,17 @@ function rawGet(url: string, headers: Record<string, string>): Promise<{ headers
   });
 }
 
+/** Sends the path exactly as written, without the URL parser tidying away "..". */
+function rawStatus(url: string): Promise<number | undefined> {
+  const { origin } = new URL(url);
+  return new Promise((resolve, reject) => {
+    get(origin, { path: url.slice(origin.length) }, (res) => {
+      res.resume();
+      res.on("end", () => resolve(res.statusCode));
+    }).on("error", reject);
+  });
+}
+
 describe("site server", () => {
   it("gzips the page for browsers that accept it, and only them", async () => {
     const { base } = await start();
@@ -130,6 +141,29 @@ describe("site server", () => {
     expect(await page.text()).toBe("<h1>KaratOS</h1>");
     expect((await fetch(`${base}/healthz`)).status).toBe(200);
     expect((await fetch(`${base}/.env`)).status).toBe(404);
+  });
+
+  it("serves only the site's own font files, cached, and nothing else under /fonts/", async () => {
+    const woff2 = Buffer.from("wOF2-test-bytes");
+    const { base } = await start({ fonts: { "plex-sans-400.woff2": woff2 } });
+    const font = await fetch(`${base}/fonts/plex-sans-400.woff2`);
+    expect(font.status).toBe(200);
+    expect(font.headers.get("content-type")).toBe("font/woff2");
+    expect(font.headers.get("cache-control")).toBe("public, max-age=2592000");
+    expect(font.headers.get("x-content-type-options")).toBe("nosniff");
+    expect(Buffer.from(await font.arrayBuffer()).equals(woff2)).toBe(true);
+    for (const path of ["/fonts/missing.woff2", "/fonts/", "/fonts/constructor", "/fonts/__proto__", "/fonts/toString", "/fonts/plex-sans-400.woff2/x"]) {
+      expect(await rawStatus(base + path), path).toBe(404);
+    }
+    expect(await rawStatus(`${base}/fonts/../server.ts`)).toBe(404);
+    expect(await rawStatus(`${base}/fonts/../plex-sans-400.woff2`)).toBe(404);
+    expect(await rawStatus(`${base}/fonts/%2e%2e%2fserver.ts`)).toBe(404);
+    expect((await fetch(`${base}/fonts/plex-sans-400.woff2`, { method: "POST" })).status).toBe(404);
+  });
+
+  it("serves no fonts when none are given", async () => {
+    const { base } = await start();
+    expect((await fetch(`${base}/fonts/plex-sans-400.woff2`)).status).toBe(404);
   });
 
   it("files a valid inquiry as an issue in the private repo", async () => {

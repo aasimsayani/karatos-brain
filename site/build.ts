@@ -3,7 +3,8 @@
  * department list come straight from the code, so the site never drifts from
  * what the engine actually supports.
  */
-import { mkdirSync, writeFileSync } from "node:fs";
+import { copyFileSync, mkdirSync, writeFileSync } from "node:fs";
+import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import { INTEGRATIONS, selfServeIntegrations, type IntegrationSpec } from "../packages/core/src/index.js";
 import { RETAIL_DEPARTMENTS } from "../packages/retail/src/index.js";
@@ -15,9 +16,25 @@ export const REPO_URL = "https://github.com/aasimsayani/karatos-brain";
 export const CONTACT_ANCHOR = "#contact";
 export const CORE_PRICE = "$299";
 export const MANAGED_PRICE = "$599";
-/** Loaded without blocking the first paint; the system font shows until it arrives. */
-export const FONTS_URL =
-  "https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600&family=Inter:wght@400;500;600&display=swap";
+/**
+ * IBM Plex, served from the site itself: IBM drew it as a nod to its own
+ * early typewriter and terminal faces. Sans carries the words, Mono the
+ * labels and figures. Self-hosting means no third-party request and no late
+ * swap from a different font. Latin subset only; OFL-licensed (@fontsource).
+ */
+export const FONTS = [
+  { file: "plex-sans-400.woff2", pkg: "@fontsource/ibm-plex-sans/files/ibm-plex-sans-latin-400-normal.woff2", family: "IBM Plex Sans", weight: 400, preload: true },
+  { file: "plex-sans-500.woff2", pkg: "@fontsource/ibm-plex-sans/files/ibm-plex-sans-latin-500-normal.woff2", family: "IBM Plex Sans", weight: 500, preload: false },
+  { file: "plex-sans-600.woff2", pkg: "@fontsource/ibm-plex-sans/files/ibm-plex-sans-latin-600-normal.woff2", family: "IBM Plex Sans", weight: 600, preload: true },
+  { file: "plex-mono-500.woff2", pkg: "@fontsource/ibm-plex-mono/files/ibm-plex-mono-latin-500-normal.woff2", family: "IBM Plex Mono", weight: 500, preload: false },
+] as const;
+
+const fontFaces = FONTS.map(
+  (f) => `@font-face{font-family:'${f.family}';font-style:normal;font-weight:${f.weight};font-display:swap;src:url(/fonts/${f.file}) format('woff2')}`,
+).join("\n");
+const fontPreloads = FONTS.filter((f) => f.preload)
+  .map((f) => `<link rel="preload" href="/fonts/${f.file}" as="font" type="font/woff2" crossorigin>`)
+  .join("\n");
 
 const PLANNED_DEPARTMENTS = [
   { id: "manufacturing", name: "Manufacturing", purpose: "Casting, bench time and job costs, from wax to finished piece." },
@@ -118,22 +135,20 @@ export function renderSite(): string {
 <title>KaratOS</title>
 <meta name="description" content="KaratOS connects the systems a jewelry business already runs and turns them into a short list of things to act on, each with the evidence behind it.">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath d='M16 3 28 12 16 29 4 12Z' fill='%23c9a45c'/%3E%3C/svg%3E">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="${FONTS_URL}" rel="stylesheet" media="print" onload="this.media='all'">
-<noscript><link href="${FONTS_URL}" rel="stylesheet"></noscript>
+${fontPreloads}
 <style>
+${fontFaces}
 /* --gold-text and --gold-on-ink keep gold lettering at 4.5:1 or better (WCAG AA) on light surfaces and on the inverted campaign panel. */
-:root{--bg:#faf8f4;--surface:#ffffff;--ink:#16140f;--ink-2:#4a463d;--muted:#6b665b;--line:#e7e2d8;--gold:#a8833d;--gold-text:#82632a;--gold-on-ink:#d4b06a;--gold-soft:#f4ecdc;--radius:14px}
-@media (prefers-color-scheme:dark){:root{--bg:#121110;--surface:#1b1a17;--ink:#f3efe6;--ink-2:#c8c1b3;--muted:#948d80;--line:#2e2b26;--gold:#d4b06a;--gold-text:#d4b06a;--gold-on-ink:#82632a;--gold-soft:#2a2418}}
+:root{--bg:#faf8f4;--surface:#ffffff;--ink:#16140f;--ink-2:#4a463d;--muted:#6b665b;--line:#e7e2d8;--gold:#a8833d;--gold-text:#82632a;--gold-on-ink:#d4b06a;--gold-soft:#f4ecdc;--radius:14px;--sans:'IBM Plex Sans',system-ui,-apple-system,'Segoe UI',sans-serif;--mono:'IBM Plex Mono',ui-monospace,'SF Mono',Menlo,Consolas,monospace}
+@media (prefers-color-scheme:dark){:root{--bg:#121110;--surface:#1b1a17;--ink:#f3efe6;--ink-2:#c8c1b3;--muted:#948d80;--line:#2e2b26;--gold:#d4b06a;--gold-text:#d4b06a;--gold-on-ink:#82632a;--gold-soft:#2a2418}body{-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}}
 *{box-sizing:border-box}
 html{scroll-behavior:smooth}
-body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.6 Inter,system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+body{margin:0;background:var(--bg);color:var(--ink);font:17px/1.6 var(--sans);text-rendering:optimizeLegibility;font-kerning:normal;font-variant-ligatures:common-ligatures}
 a{color:inherit}
 .wrap{max-width:1120px;margin:0 auto;padding:0 20px}
 header.nav{position:sticky;top:0;z-index:10;background:color-mix(in srgb,var(--bg) 88%,transparent);backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
 .nav .wrap{display:flex;align-items:center;justify-content:space-between;height:64px;gap:16px}
-.brand{display:flex;align-items:center;gap:10px;font-family:Fraunces,serif;font-weight:600;font-size:20px;text-decoration:none}
+.brand{display:flex;align-items:center;gap:10px;font-weight:600;font-size:20px;letter-spacing:-.01em;text-decoration:none}
 .brand svg{width:22px;height:22px}
 .nav nav{display:flex;gap:22px;font-size:14px;color:var(--ink-2)}
 .nav nav a{text-decoration:none}
@@ -144,9 +159,9 @@ header.nav{position:sticky;top:0;z-index:10;background:color-mix(in srgb,var(--b
 .btn.primary{background:var(--ink);color:var(--bg)}
 .btn.ghost{background:transparent;color:var(--ink)}
 .btn.small{padding:9px 16px;font-size:14px}
-.hero{padding:96px 0 72px}
-.eyebrow{display:inline-block;font-size:13px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--gold-text);margin-bottom:18px}
-h1,h2{font-family:Fraunces,serif;font-weight:600;letter-spacing:-.02em;line-height:1.08;margin:0}
+.hero{padding-top:96px;padding-bottom:72px}
+.eyebrow{display:inline-block;font-family:var(--mono);font-size:13px;font-weight:500;letter-spacing:.06em;text-transform:uppercase;color:var(--gold-text);margin-bottom:18px}
+h1,h2{font-weight:600;letter-spacing:-.015em;line-height:1.1;margin:0;text-wrap:balance}
 h1{font-size:clamp(40px,7vw,76px);max-width:14ch}
 h2{font-size:clamp(30px,4.5vw,46px);max-width:20ch}
 .lede{font-size:clamp(17px,2.2vw,20px);color:var(--ink-2);max-width:60ch;margin:24px 0 32px}
@@ -156,19 +171,19 @@ section{padding:80px 0;border-top:1px solid var(--line);scroll-margin-top:64px}
 .section-intro{color:var(--ink-2);max-width:62ch;margin:16px 0 40px;font-size:17px}
 .steps{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;list-style:none;padding:0;margin:0;counter-reset:step}
 .steps li{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:28px;counter-increment:step}
-.steps li::before{content:counter(step,decimal-leading-zero);font-family:Fraunces,serif;color:var(--gold);font-size:28px;display:block;margin-bottom:12px}
+.steps li::before{content:counter(step,decimal-leading-zero);font-family:var(--mono);font-weight:500;color:var(--gold);font-size:28px;display:block;margin-bottom:12px}
 .steps h3,.dept h3,.card h3{margin:0 0 8px;font-size:18px}
 .steps p,.dept p{margin:0;color:var(--ink-2)}
 @media (max-width:860px){.steps{grid-template-columns:1fr}}
 .example{margin-top:28px;background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--gold);border-radius:var(--radius);padding:24px 28px;max-width:720px}
-.example .tag{font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--gold-text)}
+.example .tag{font-family:var(--mono);font-size:12px;font-weight:500;text-transform:uppercase;letter-spacing:.06em;color:var(--gold-text)}
 .example p{margin:8px 0 0}
 .example .why{color:var(--muted);font-size:14px}
 .depts-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:16px;list-style:none;padding:0;margin:0}
 .dept{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:22px}
 .dept.planned{background:transparent;border-style:dashed}
 .stats{display:flex;flex-wrap:wrap;gap:32px;margin:0 0 28px}
-.stat strong{display:block;font-family:Fraunces,serif;font-size:40px;line-height:1}
+.stat strong{display:block;font-family:var(--mono);font-weight:500;font-size:40px;line-height:1;letter-spacing:-.02em}
 .stat span{color:var(--muted);font-size:14px}
 .filters{display:grid;grid-template-columns:2fr 1fr 1fr;gap:12px;margin-bottom:20px}
 .filters input,.filters select{width:100%;padding:12px 14px;border-radius:10px;border:1px solid var(--line);background:var(--surface);color:var(--ink);font:inherit}
@@ -177,12 +192,12 @@ section{padding:80px 0;border-top:1px solid var(--line);scroll-margin-top:64px}
 .card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:18px 20px}
 .card[hidden]{display:none}
 .card-top{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:10px}
-.domain{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+.domain{font-family:var(--mono);font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
 .meta{margin:0;font-size:14px;color:var(--ink-2)}
 .depts{margin:6px 0 0;font-size:13px;color:var(--muted)}
 .caps{margin:12px 0 0;padding:12px 0 0 18px;border-top:1px solid var(--line);font-size:14px;color:var(--ink-2)}
 .caps li{margin:0 0 4px}
-.pill{font-size:12px;font-weight:600;padding:3px 10px;border-radius:999px;border:1px solid var(--line);white-space:nowrap;font-family:Inter,sans-serif}
+.pill{font-size:12px;font-weight:600;padding:3px 10px;border-radius:999px;border:1px solid var(--line);white-space:nowrap;font-family:var(--sans)}
 .pill.gold{background:var(--gold-soft);color:var(--gold-text);border-color:transparent}
 .pill.muted{color:var(--muted)}
 .empty{color:var(--muted);padding:24px 0}
@@ -198,7 +213,7 @@ section{padding:80px 0;border-top:1px solid var(--line);scroll-margin-top:64px}
 .cp-row{border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin-bottom:10px}
 .cp-row.act{border-left:4px solid var(--gold)}
 .cp-row p{margin:4px 0 0;font-size:15px}
-.cp-dept{font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted)}
+.cp-dept{font-family:var(--mono);font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted)}
 .cp-note{margin:6px 0 0;font-size:13px;color:var(--muted)}
 .why-console h3{margin:0 0 12px;font-size:20px}
 .why-console ul{margin:0;padding-left:18px;color:var(--ink-2)}
@@ -210,13 +225,13 @@ section{padding:80px 0;border-top:1px solid var(--line);scroll-margin-top:64px}
 .plan.featured{border-color:var(--gold);box-shadow:0 0 0 1px var(--gold)}
 .plan h3{margin:0;font-size:20px}
 .plan .price{margin:0;color:var(--muted)}
-.plan .price strong{font-family:Fraunces,serif;font-size:34px;color:var(--ink);font-weight:600;margin-right:4px}
+.plan .price strong{font-family:var(--mono);font-size:34px;letter-spacing:-.02em;color:var(--ink);font-weight:500;margin-right:4px}
 .plan p{margin:0 0 14px;color:var(--ink-2)}
 .plan .btn{margin-top:auto;align-self:flex-start}
 .plan .fine{font-size:13px;color:var(--muted)}
 .contact{display:grid;grid-template-columns:1fr 2fr;gap:28px;margin-top:40px;background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:28px;scroll-margin-top:72px}
 @media (max-width:860px){.contact{grid-template-columns:1fr}}
-.contact h3{margin:0 0 8px;font-size:22px;font-family:Fraunces,serif}
+.contact h3{margin:0 0 8px;font-size:22px}
 .contact-intro p{margin:0;color:var(--ink-2)}
 #inquiry{display:grid;gap:14px}
 #inquiry label{display:grid;gap:6px;font-size:14px;font-weight:500}
@@ -453,5 +468,9 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const out = new URL("./dist/", import.meta.url);
   mkdirSync(out, { recursive: true });
   writeFileSync(new URL("index.html", out), renderSite());
+  const fonts = new URL("fonts/", out);
+  mkdirSync(fonts, { recursive: true });
+  const require = createRequire(import.meta.url);
+  for (const f of FONTS) copyFileSync(require.resolve(f.pkg), new URL(f.file, fonts));
   console.log(`wrote ${fileURLToPath(new URL("index.html", out))}`);
 }

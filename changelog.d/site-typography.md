@@ -1,0 +1,1 @@
+- Website: type is now set in IBM Plex (Sans for words, Mono for labels, prices and figures), served from the site itself instead of Google Fonts, so text renders crisply with no late font swap and no third-party requests. The hero also keeps its side margin on phones.
