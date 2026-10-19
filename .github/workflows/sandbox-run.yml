@@ -31,5 +31,6 @@ jobs:
           # Test-only sandbox credentials, one line per credential a check in
           # scripts/sandbox-checks.ts declares. Never a client's account.
           SANDBOX_SHOPIFY_SHOP_DOMAIN: ${{ secrets.SANDBOX_SHOPIFY_SHOP_DOMAIN }}
-          SANDBOX_SHOPIFY_ADMIN_ACCESS_TOKEN: ${{ secrets.SANDBOX_SHOPIFY_ADMIN_ACCESS_TOKEN }}
+          SANDBOX_SHOPIFY_CLIENT_ID: ${{ secrets.SANDBOX_SHOPIFY_CLIENT_ID }}
+          SANDBOX_SHOPIFY_CLIENT_SECRET: ${{ secrets.SANDBOX_SHOPIFY_CLIENT_SECRET }}
           SANDBOX_STRIPE_SECRET_KEY: ${{ secrets.SANDBOX_STRIPE_SECRET_KEY }}
