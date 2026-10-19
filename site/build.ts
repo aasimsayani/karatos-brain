@@ -13,7 +13,8 @@ export const REPORT_URL =
 export const REPO_URL = "https://github.com/aasimsayani/karatos-brain";
 /** Quote and Brain Console requests go to the private form on the page. */
 export const CONTACT_ANCHOR = "#contact";
-export const CONSOLE_PRICE = "$99";
+export const CORE_PRICE = "$299";
+export const MANAGED_PRICE = "$599";
 /** Loaded without blocking the first paint; the system font shows until it arrives. */
 export const FONTS_URL =
   "https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600&family=Inter:wght@400;500;600&display=swap";
@@ -302,18 +303,18 @@ ${cards}
 
 <section id="your-data"><div class="wrap">
   <h2>Your instance. Your data.</h2>
-  <p class="section-intro">KaratOS runs as a private instance in accounts your business owns. We set it up, hand it over, and step away.</p>
+  <p class="section-intro">KaratOS runs as a private instance for your business alone. On Core it lives in accounts you own; on Managed we run it for you, still walled off from every other client.</p>
   <div class="pillars">
-    <div><h3>No one else sees it</h3><p>Once setup is done we have no access. Sales, customers, statements and margins never leave your own accounts.</p></div>
+    <div><h3>No one else sees it</h3><p>On Core, once setup is done we have no access. On Managed, we reach your instance only to keep it running. Either way, your sales, customers, statements and margins stay in your instance.</p></div>
     <div><h3>Nothing shared by default</h3><p>Your data is never used to price, benchmark or advise another business unless you both opt in.</p></div>
-    <div><h3>You decide when we come back</h3><p>Maintenance is optional. Sign up and we keep your instance current and add the integrations you need. Don't, and it keeps running on its own.</p></div>
+    <div><h3>You choose who runs it</h3><p>Have the bandwidth? Keep it in your own accounts on Core. Rather not? Managed means we host it, keep it current and fix connections when a vendor changes something.</p></div>
   </div>
 </div></section>
 
 <section id="services"><div class="wrap">
   <span class="eyebrow">Custom services</span>
   <h2>We build it, connect it and keep it running.</h2>
-  <p class="section-intro">Start with the Brain Console on its own, or have us connect the systems you run, build the ones nobody else will, and look after your instance.</p>
+  <p class="section-intro">One price per store, with the Brain Console and every standard connection included. Run it in your own accounts, or have us run it for you.</p>
   <div class="services">
     <div class="console-preview" aria-label="Brain Console preview">
       <div class="cp-head"><span>Brain Console</span><span class="pill gold">3 need you today</span></div>
@@ -328,28 +329,29 @@ ${cards}
         <li><strong>One list for the whole business.</strong> Sales, repairs, buying, metals and the books in one place, ranked by what needs you first.</li>
         <li><strong>The evidence, every time.</strong> Each suggestion shows the sales, tickets and statements it came from, and says when its data is out of date.</li>
         <li><strong>Gets sharper as you use it.</strong> What you accept, snooze and dismiss tunes what it shows tomorrow.</li>
-        <li><strong>Private by design.</strong> It runs on your own instance. We can't see your numbers unless you sign up for maintenance.</li>
+        <li><strong>Private by design.</strong> It runs on your own instance. On Core we can't see your numbers at all.</li>
       </ul>
     </div>
   </div>
   <ul class="plans">
+    <li class="plan">
+      <h3>Core</h3>
+      <p class="price"><strong>${CORE_PRICE}</strong> per store per month</p>
+      <p>The Brain Console with 3 seats, every standard connection and every retail department, running in accounts your business owns.</p>
+      <p class="fine">One-time setup fee. Extra seats $49 a month.</p>
+      <a class="btn ghost" href="${CONTACT_ANCHOR}" data-interest="brain_console">Start on Core</a>
+    </li>
     <li class="plan featured">
-      <h3>Brain Console</h3>
-      <p class="price"><strong>${CONSOLE_PRICE}</strong> per user per month</p>
-      <p>Access to the dashboard itself, for each person on your team. It runs on a KaratOS instance you already have.</p>
-      <p class="fine">Setting up the instance and connecting your systems isn't included; we quote that as a custom service.</p>
-      <a class="btn primary" href="${CONTACT_ANCHOR}" data-interest="brain_console">Get the Brain Console</a>
+      <h3>Managed</h3>
+      <p class="price"><strong>${MANAGED_PRICE}</strong> per store per month</p>
+      <p>Everything in Core with 5 seats, and we host it, watch every sync, keep it current and fix connections when a vendor changes something. Includes Dashboard Studio.</p>
+      <p class="fine">One-time setup fee. Extra seats $49 a month.</p>
+      <a class="btn primary" href="${CONTACT_ANCHOR}" data-interest="maintenance">Go Managed</a>
     </li>
     <li class="plan">
-      <h3>Maintenance</h3>
+      <h3>Multi-store and custom</h3>
       <p class="price"><strong>By quote</strong></p>
-      <p>We keep your instance current, watch every sync, fix connections when a vendor changes something and add integrations as your stack grows.</p>
-      <a class="btn ghost" href="${CONTACT_ANCHOR}" data-interest="maintenance">Ask for a quote</a>
-    </li>
-    <li class="plan">
-      <h3>Custom services</h3>
-      <p class="price"><strong>By quote</strong></p>
-      <p>Setting up your private instance, connecting your systems, integrations no one else builds, custom workflows and reports, and moving years of history out of old systems.</p>
+      <p>Several locations or a wholesale business, partner systems, integrations no one else builds, and moving years of history out of old systems.</p>
       <a class="btn ghost" href="${CONTACT_ANCHOR}" data-interest="custom_services">Ask for a quote</a>
     </li>
   </ul>
@@ -361,8 +363,8 @@ ${cards}
     </div>
     <form id="inquiry" novalidate>
       <fieldset class="interests"><legend>Interested in</legend>
-        <label><input type="checkbox" name="interests" value="brain_console"> Brain Console</label>
-        <label><input type="checkbox" name="interests" value="maintenance"> Maintenance</label>
+        <label><input type="checkbox" name="interests" value="brain_console"> Core plan</label>
+        <label><input type="checkbox" name="interests" value="maintenance"> Managed plan</label>
         <label><input type="checkbox" name="interests" value="custom_services"> Custom services</label>
         <label><input type="checkbox" name="interests" value="broken_system"> Reporting a broken system</label>
       </fieldset>

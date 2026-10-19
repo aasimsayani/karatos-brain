@@ -12,8 +12,8 @@ export const INTERESTS = ["brain_console", "maintenance", "custom_services", "br
 export type Interest = (typeof INTERESTS)[number];
 
 const INTEREST_LABELS: Record<Interest, string> = {
-  brain_console: "Brain Console",
-  maintenance: "Maintenance",
+  brain_console: "Core plan",
+  maintenance: "Managed plan",
   custom_services: "Custom services",
   broken_system: "A broken system",
 };

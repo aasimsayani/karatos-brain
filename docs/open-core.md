@@ -21,15 +21,15 @@ These are decided case by case, not committed:
 
 ## Your instance, your data
 
-Every business runs a private instance in accounts it owns: its own Supabase project, its own host and its own credentials. That matters for three reasons:
+Every business runs a private instance: its own database, its own host and its own credentials, never shared with another client. On Core it sits in accounts the business owns; on Managed we run it for them. That matters for three reasons:
 
-- **No one else can see the data.** Once setup is finished, we hand over and have no access. Sales, customers, statements and margins never leave the business's own accounts.
+- **No one else can see the data.** On Core, once setup is finished, we hand over and have no access. On Managed, we reach it only to keep it running. Sales, customers, statements and margins never leave that business's instance.
 - **Nothing is shared by default.** One client's data is never used to price, benchmark or advise another, unless both opt in to a shared feature.
-- **The business decides when we come back.** A maintenance plan is optional. Clients who sign up give us access to keep the instance updated and to add integrations based on their needs; clients who don't keep running the public image on their own.
+- **The business decides who runs it.** On Core, the instance lives in the business's own accounts and we have no access once setup is done. On Managed, we host it, still isolated from every other client, and reach it only to keep it updated and add integrations. Clients can move between the two, and anyone can keep running the public image on their own.
 
 ## The Brain Console is paid
 
-The Brain Console, the owner's daily dashboard, is a private module. Its code lives in a private repository and runs only for clients who pay for it: $99 per user per month for access to the dashboard itself. Setting up an instance and connecting systems is a separate service, quoted per client, as are maintenance and custom integrations.
+The Brain Console, the owner's daily dashboard, is a private module. Its code lives in a private repository and runs only for clients on a paid plan, priced per store: Core at $299 a month runs in accounts the business owns, and Managed at $599 a month is hosted and maintained by us. Each plan includes console seats and the standard connectors; setup is a one-time fee, and multi-store, wholesale and custom integrations are quoted.
 
 The open core keeps everything the console reads from: the recommendations and feedback API, provenance and the degraded flag. Anyone can build their own interface on that API; the Brain Console is ours.
 

@@ -122,7 +122,7 @@ Run `npm run secrets:plan` to see which settings are still missing, without prin
 
 Each business runs its own instance: its own Supabase project, container, API key and private deploy repo, all on the same public image. An instance serves exactly one organization and refuses events for any other. See [docs/deployment/instances.md](docs/deployment/instances.md).
 
-Your data stays yours. The database, the container and every credential sit in accounts the business owns, so once setup is done we have no access to any of it. We come back in only if the business signs up for maintenance and asks us to, for example to add an integration. See [docs/open-core.md](docs/open-core.md#your-instance-your-data).
+Your data stays yours. On the Core plan, the database, the container and every credential sit in accounts the business owns, so once setup is done we have no access to any of it. On the Managed plan we host the instance for the business, still isolated from every other client, and reach it only to keep it running and add integrations. See [docs/open-core.md](docs/open-core.md#your-instance-your-data).
 
 The instance API:
 

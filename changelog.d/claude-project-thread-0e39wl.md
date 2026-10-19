@@ -1,0 +1,1 @@
+- Website and docs: KaratOS is priced per store. Core ($299 a month, in the business's own accounts) and Managed ($599 a month, hosted by us) replace the $99 per user per month Brain Console price; multi-store and custom work stays by quote. The inquiry form's interests now read Core plan and Managed plan
