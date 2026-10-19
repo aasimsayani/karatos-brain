@@ -69,7 +69,7 @@ describe("inquiry issue", () => {
     const parsed = parseInquiry({ ...valid, message: "hi @octocat ```\n# not a heading" });
     if (!parsed.ok) throw new Error("expected valid");
     const issue = issueFor(parsed.inquiry, "2026-10-09T12:00:00.000Z");
-    expect(issue.title).toBe("Inquiry: Example Jewelers (Brain Console, Custom services)");
+    expect(issue.title).toBe("Inquiry: Example Jewelers (Core plan, Custom services)");
     expect(issue.labels).toEqual(["inquiry"]);
     expect(issue.body).toContain("````text\nhi @octocat ```\n# not a heading\n````");
     expect(issue.body).toContain("**Dashboard users**");

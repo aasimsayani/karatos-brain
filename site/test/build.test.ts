@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { INTEGRATIONS, selfServeIntegrations } from "../../packages/core/src/index.js";
 import { RETAIL_DEPARTMENTS } from "../../packages/retail/src/index.js";
-import { CONSOLE_PRICE, CONTACT_ANCHOR, FONTS_URL, REPORT_URL, buildingNow, earlyAccessNote, escapeHtml, renderSite } from "../build.js";
+import { CONTACT_ANCHOR, CORE_PRICE, FONTS_URL, MANAGED_PRICE, REPORT_URL, buildingNow, earlyAccessNote, escapeHtml, renderSite } from "../build.js";
 
 const html = renderSite();
 
@@ -73,13 +73,16 @@ describe("KaratOS website", () => {
     expect(escapeHtml(`<a href="x">Tom's & co</a>`)).toBe("&lt;a href=&quot;x&quot;&gt;Tom&#39;s &amp; co&lt;/a&gt;");
   });
 
-  it("offers the Brain Console at its list price and the other services by quote", () => {
-    expect(html).toContain(`<strong>${CONSOLE_PRICE}</strong> per user per month`);
-    expect(html.match(/<strong>By quote<\/strong>/g)?.length).toBe(2);
+  it("prices Core and Managed per store and quotes multi-store and custom work", () => {
+    expect(html).toContain(`<strong>${CORE_PRICE}</strong> per store per month`);
+    expect(html).toContain(`<strong>${MANAGED_PRICE}</strong> per store per month`);
+    expect(html).not.toContain("per user per month");
+    expect(html.match(/<strong>By quote<\/strong>/g)?.length).toBe(1);
     // Three plans plus the broken-systems campaign.
     expect(html.split(`href="${CONTACT_ANCHOR}"`).length - 1).toBe(4);
-    // The console price covers dashboard access only; setup is a quoted service.
-    expect(html).toContain("Setting up the instance and connecting your systems isn't included");
+    // Managed is the featured plan.
+    const featured = html.slice(html.indexOf('<li class="plan featured">'));
+    expect(featured.slice(0, featured.indexOf("</li>"))).toContain("<h3>Managed</h3>");
   });
 
   it("leads the header with Custom services instead of a GitHub button", () => {
