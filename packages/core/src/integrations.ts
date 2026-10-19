@@ -96,7 +96,13 @@ export const INTEGRATIONS: IntegrationSpec[] = [
       "Clienteling sees each customer and whether they agreed to email marketing",
       "Read-only: KaratOS never changes anything in your store",
     ] },
-  { id: "inventory_pos", name: "Inventory and POS systems", domain: "ecommerce", segments: ["retail"], access: "file", testWith: "fixtures", departments: ["sales", "inventory", "marketing"], historicalImportYears: 5, webhooks: true, settings: [], changelog: null, status: "planned", note: "System-specific; CSV import first" },
+  { id: "inventory_pos", name: "Inventory and POS systems", domain: "ecommerce", segments: ["retail"], access: "file", testWith: "fixtures", departments: ["sales", "inventory", "clienteling", "marketing"], historicalImportYears: 5, webhooks: false, settings: ["POS_IMPORT_DIR"], changelog: null, status: "built", note: "CSV exports from any POS, read through a column-mapping profile", capabilities: [
+      "Imports item lists, stock counts, customer lists and sales from any POS that exports CSV",
+      "Reads each system's own column names through a mapping profile, with a generic profile built in",
+      "Groups sale lines into receipts and turns negative lines into returns",
+      "Picks up new and changed export files on every sync, without counting a row twice",
+      "Read-only: KaratOS only reads the export files and never changes anything in your POS",
+    ] },
   { id: "stripe", name: "Stripe", domain: "financial", segments: ["retail", "wholesale"], access: "public_api", testWith: "sandbox", departments: ["sales", "finance", "clienteling"], historicalImportYears: 5, webhooks: true, settings: ["STRIPE_SECRET_KEY", "STRIPE_WEBHOOK_SECRET"], changelog: "https://docs.stripe.com/changelog", status: "built", note: "Connector in @karatos/connectors: charges, refunds, disputes, payouts, balance transactions and customers, read-only",
     capabilities: [
       "Imports five years of charges, refunds, disputes and payouts, then keeps them current from Stripe's events",
