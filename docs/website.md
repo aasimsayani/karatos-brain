@@ -21,6 +21,8 @@ node site/lighthouse.ts lighthouse.json   # or several reports, judged on the me
 
 Type is set in IBM Plex: Sans for words, Mono for labels, prices and figures. The four font files (latin subset, OFL) are copied from `@fontsource` into `site/dist/fonts/` at build time and served by the site itself under `/fonts/`, so the page makes no third-party requests and never swaps from one typeface to another. The two weights the first screen uses are preloaded. The server only serves file names it loaded from that folder at start-up, and returns 404 for anything else under `/fonts/`.
 
+Spacing comes from one scale (`--space-1` to `--space-5`: 8, 16, 24, 32 and 48px). Every section and the hero are padded `--section` (64px on phones up to 96px) top and bottom, each section's heading, intro and content sit 16px and 48px apart, and any spacing written in pixels stays on a 4px grid. A test enforces all three.
+
 The page is served gzipped, and small gold or grey text uses the darker `--gold-text` and `--muted` colors so it stays at WCAG AA contrast.
 
 ## Inquiry form
