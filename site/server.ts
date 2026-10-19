@@ -4,7 +4,7 @@
  * posted publicly. Runs with plain `node site/server.ts` (type stripping), so
  * it has no dependencies and uses only erasable TypeScript.
  */
-import { readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { gzipSync } from "node:zlib";
 
@@ -117,6 +117,8 @@ export interface ServerOptions {
   now?: () => Date;
   /** Inquiries allowed per address per hour. */
   rateLimit?: number;
+  /** The site's own font files by file name, served under /fonts/. Nothing else there is served. */
+  fonts?: Readonly<Record<string, Buffer>>;
 }
 
 const SECURITY_HEADERS = {
@@ -160,6 +162,7 @@ export function createSiteHandler(options: ServerOptions) {
   const recent = new Map<string, number[]>();
   // The page never changes while the server runs, so compress it once.
   const gzippedHtml = gzipSync(options.html);
+  const fonts = options.fonts ?? {};
 
   async function handleInquiry(req: IncomingMessage, res: ServerResponse): Promise<void> {
     if (!options.token || !options.repo) return json(res, 503, { error: "not_configured" });
@@ -201,9 +204,14 @@ export function createSiteHandler(options: ServerOptions) {
   }
 
   return async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> {
-    const path = (req.url ?? "/").split("?")[0];
+    const path = (req.url ?? "/").split("?")[0] ?? "/";
     if (req.method === "POST" && path === "/api/inquiry") return handleInquiry(req, res);
     if (req.method === "GET" && path === "/healthz") return json(res, 200, { ok: true });
+    if ((req.method === "GET" || req.method === "HEAD") && path.startsWith("/fonts/")) {
+      const name = path.slice("/fonts/".length);
+      const font = Object.hasOwn(fonts, name) ? fonts[name] : undefined;
+      if (font) return send(res, 200, font, "font/woff2", { "Cache-Control": "public, max-age=2592000" });
+    }
     if ((req.method === "GET" || req.method === "HEAD") && (path === "/" || path === "/index.html")) {
       return acceptsGzip(req)
         ? send(res, 200, gzippedHtml, "text/html; charset=utf-8", { "Content-Encoding": "gzip", Vary: "Accept-Encoding" })
@@ -215,8 +223,13 @@ export function createSiteHandler(options: ServerOptions) {
 
 if (process.argv[1] && import.meta.url === new URL(`file://${process.argv[1]}`).href) {
   const html = readFileSync(new URL("./dist/index.html", import.meta.url), "utf8");
+  const fontDir = new URL("./dist/fonts/", import.meta.url);
+  const fonts = Object.fromEntries(
+    (existsSync(fontDir) ? readdirSync(fontDir) : []).filter((f) => f.endsWith(".woff2")).map((f) => [f, readFileSync(new URL(f, fontDir))]),
+  );
   const handler = createSiteHandler({
     html,
+    fonts,
     token: process.env.INQUIRY_GITHUB_TOKEN,
     repo: process.env.INQUIRY_REPO,
   });

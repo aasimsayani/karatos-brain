@@ -19,7 +19,9 @@ npx lighthouse@12.8.2 http://127.0.0.1:8080/ --chrome-flags="--headless=new" --o
 node site/lighthouse.ts lighthouse.json   # or several reports, judged on the median
 ```
 
-The page is served gzipped, web fonts load without blocking the first paint, and small gold or grey text uses the darker `--gold-text` and `--muted` colors so it stays at WCAG AA contrast.
+Type is set in IBM Plex: Sans for words, Mono for labels, prices and figures. The four font files (latin subset, OFL) are copied from `@fontsource` into `site/dist/fonts/` at build time and served by the site itself under `/fonts/`, so the page makes no third-party requests and never swaps from one typeface to another. The two weights the first screen uses are preloaded. The server only serves file names it loaded from that folder at start-up, and returns 404 for anything else under `/fonts/`.
+
+The page is served gzipped, and small gold or grey text uses the darker `--gold-text` and `--muted` colors so it stays at WCAG AA contrast.
 
 ## Inquiry form
 

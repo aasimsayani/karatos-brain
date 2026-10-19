@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { INTEGRATIONS, selfServeIntegrations } from "../../packages/core/src/index.js";
 import { RETAIL_DEPARTMENTS } from "../../packages/retail/src/index.js";
-import { CONTACT_ANCHOR, CORE_PRICE, FONTS_URL, MANAGED_PRICE, REPORT_URL, buildingNow, earlyAccessNote, escapeHtml, renderSite } from "../build.js";
+import { CONTACT_ANCHOR, CORE_PRICE, FONTS, MANAGED_PRICE, REPORT_URL, buildingNow, earlyAccessNote, escapeHtml, renderSite } from "../build.js";
 
 const html = renderSite();
 
@@ -50,10 +50,39 @@ describe("KaratOS website", () => {
     expect(html).toContain("'seats','system','message'");
   });
 
-  it("loads web fonts without blocking the first paint", () => {
-    expect(html).toContain(`<link href="${FONTS_URL}" rel="stylesheet" media="print" onload="this.media='all'">`);
-    expect(html).toContain(`<noscript><link href="${FONTS_URL}" rel="stylesheet"></noscript>`);
-    expect(html.match(/rel="stylesheet"/g)).toHaveLength(2);
+  it("sets type in self-hosted IBM Plex, with no third-party font requests", () => {
+    expect(html).not.toMatch(/fonts\.googleapis|fonts\.gstatic|rel="stylesheet"/);
+    expect(html).not.toMatch(/Fraunces|Inter,/);
+    for (const f of FONTS) {
+      expect(html).toContain(`@font-face{font-family:'${f.family}';font-style:normal;font-weight:${f.weight};font-display:swap;src:url(/fonts/${f.file}) format('woff2')}`);
+      expect(html.includes(`<link rel="preload" href="/fonts/${f.file}" as="font" type="font/woff2" crossorigin>`)).toBe(f.preload);
+    }
+    // The first screen's body and heading weights; preloading more would delay the first paint.
+    expect([...html.matchAll(/rel="preload" href="\/fonts\/([^"]+)"/g)].map((m) => m[1])).toEqual(["plex-sans-400.woff2", "plex-sans-600.woff2"]);
+    // Every weight the page asks for has a face, so no browser fakes a bold.
+    const weights = new Set([...html.matchAll(/font-weight:(\d{3})/g)].map((m) => Number(m[1])));
+    const sansWeights = new Set(FONTS.filter((f) => f.family === "IBM Plex Sans").map((f) => f.weight));
+    expect([...weights].filter((w) => !sansWeights.has(w as 400))).toEqual([]);
+    const body = html.slice(html.indexOf("body{margin:0"), html.indexOf("}", html.indexOf("body{margin:0")));
+    expect(body).toContain("font:17px/1.6 var(--sans)");
+    expect(html).toContain("--sans:'IBM Plex Sans',system-ui");
+    expect(html).toContain("--mono:'IBM Plex Mono',ui-monospace");
+  });
+
+  it("keeps the hero inside the page gutter on phones", () => {
+    // The hero shares an element with .wrap; a padding shorthand there would zero the side gutter.
+    expect(html).toContain('<div class="wrap hero">');
+    expect(html).toContain(".hero{padding-top:96px;padding-bottom:72px}");
+  });
+
+  it("only uses Mono at a weight it ships", () => {
+    const monoWeights = FONTS.filter((f) => f.family === "IBM Plex Mono").map((f) => `font-weight:${f.weight}`);
+    const rules = html.match(/[^{}]+\{[^{}]*font-family:var\(--mono\)[^{}]*\}/g) ?? [];
+    expect(rules.length).toBeGreaterThan(4);
+    for (const rule of rules) {
+      const w = rule.match(/font-weight:\d{3}/)?.[0];
+      if (w) expect(monoWeights, rule).toContain(w);
+    }
   });
 
   it("keeps small gold and grey text at WCAG AA contrast", () => {
