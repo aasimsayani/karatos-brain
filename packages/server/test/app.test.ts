@@ -229,7 +229,7 @@ describe("Brain API: integrations", () => {
     const { integrations } = (await response.json()) as { integrations: IntegrationStatus[] };
     expect(integrations).toHaveLength(statuses.length);
     expect(integrations.find((i) => i.id === "stripe")).toMatchObject({ configured: true, missingSettings: [] });
-    expect(integrations.find((i) => i.id === "shopify")).toMatchObject({ configured: false, missingSettings: ["SHOPIFY_ADMIN_ACCESS_TOKEN"] });
+    expect(integrations.find((i) => i.id === "shopify")).toMatchObject({ configured: false, missingSettings: ["SHOPIFY_CLIENT_ID", "SHOPIFY_CLIENT_SECRET"] });
     expect(JSON.stringify(integrations)).not.toMatch(/stripe-key-value|stripe-hook-value|myshopify/);
   });
 

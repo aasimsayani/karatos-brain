@@ -19,6 +19,9 @@ describe("checkConfig", () => {
     expect(partial.integrations.shopify).toBe("not_configured");
     const full = checkConfig({ ...base, SHOPIFY_SHOP_DOMAIN: "fuse.myshopify.com", SHOPIFY_ADMIN_ACCESS_TOKEN: "x" });
     expect(full.integrations.shopify).toBe("configured");
+    const devDashboard = checkConfig({ ...base, SHOPIFY_SHOP_DOMAIN: "fuse.myshopify.com", SHOPIFY_CLIENT_ID: "id", SHOPIFY_CLIENT_SECRET: "secret" });
+    expect(devDashboard.integrations.shopify).toBe("configured");
+    expect(checkConfig({ ...base, SHOPIFY_SHOP_DOMAIN: "fuse.myshopify.com", SHOPIFY_CLIENT_ID: "id" }).integrations.shopify).toBe("not_configured");
   });
 
   it("reports missing required settings without echoing values", () => {
