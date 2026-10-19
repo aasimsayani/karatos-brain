@@ -1,8 +1,10 @@
 import { readFile } from "node:fs/promises";
 import type { Connector, SourceBatch, SyncContext, WriteAction } from "@karatos/core";
 import { CsvError, parseCsv } from "../files/csv.js";
-import { sha256, type FileSource, type SourceFile } from "../files/source.js";
-import { columnReader, REQUIRED_COLUMNS, ROW_EVENTS, type PosEvent } from "./normalize.js";
+import { importFiles, parseFileCursor, type FileCursor } from "../files/import.js";
+import type { FileSource, SourceFile } from "../files/source.js";
+import { columnReader, MissingColumnsError } from "../files/columns.js";
+import { REQUIRED_COLUMNS, ROW_EVENTS, type PosEvent } from "./normalize.js";
 import { FILE_KINDS, GENERIC_POS_PROFILE, parsePosProfile, PosProfileError, type FileKind, type PosProfile } from "./profile.js";
 
 /**
@@ -17,12 +19,8 @@ import { FILE_KINDS, GENERIC_POS_PROFILE, parsePosProfile, PosProfileError, type
 /** None: an export folder can't be written back to the POS. */
 export const INVENTORY_POS_WRITES: WriteAction[] = [];
 
-export interface PosCursor {
-  /** Files fully read, by name, with the SHA-256 of the content that was read. */
-  done: Record<string, string>;
-  /** The file being read, and how many of its events are stored. */
-  current: { name: string; hash: string; next: number } | null;
-}
+/** Where a POS import stands; see importFiles. */
+export type PosCursor = FileCursor;
 
 export interface InventoryPosOptions {
   source: FileSource;
@@ -45,21 +43,7 @@ export class PosFileError extends Error {
   }
 }
 
-export function parsePosCursor(raw: string | null): PosCursor | null {
-  if (raw === null) return null;
-  const c = JSON.parse(raw) as PosCursor;
-  const hash = (h: unknown) => typeof h === "string" && /^[0-9a-f]{64}$/.test(h);
-  if (
-    !c ||
-    typeof c.done !== "object" ||
-    c.done === null ||
-    !Object.values(c.done).every(hash) ||
-    (c.current !== null && (typeof c.current?.name !== "string" || !hash(c.current.hash) || !Number.isInteger(c.current.next) || c.current.next < 0))
-  ) {
-    throw new Error("POS import checkpoint is not in the expected shape");
-  }
-  return c;
-}
+export const parsePosCursor = (raw: string | null): PosCursor | null => parseFileCursor(raw, "POS import");
 
 /** The file kind a name matches under this profile, by the profile's patterns in FILE_KINDS order. */
 export function fileKind(name: string, profile: PosProfile): FileKind | null {
@@ -98,7 +82,7 @@ export function inventoryPosConnector(options: InventoryPosOptions): Connector {
       since.setUTCFullYear(since.getUTCFullYear() - historyYears);
       return ROW_EVENTS[kind](table.rows, get, { profile, file, receivedAt: now().toISOString(), since: since.toISOString() });
     } catch (error) {
-      if (error instanceof CsvError || error instanceof PosProfileError) throw new PosFileError(file.name, error.message);
+      if (error instanceof CsvError || error instanceof MissingColumnsError) throw new PosFileError(file.name, error.message);
       throw error;
     }
   }
@@ -109,26 +93,12 @@ export function inventoryPosConnector(options: InventoryPosOptions): Connector {
       .map((file) => ({ file, kind: fileKind(file.name, profile) }))
       .filter((f): f is { file: SourceFile; kind: FileKind } => f.kind !== null)
       .sort((a, b) => FILE_KINDS.indexOf(a.kind) - FILE_KINDS.indexOf(b.kind) || (a.file.name < b.file.name ? -1 : 1));
-    // Forget files that are no longer in the folder, so the checkpoint doesn't grow forever.
-    const names = new Set(files.map((f) => f.file.name));
-    const done = Object.fromEntries(Object.entries(saved?.done ?? {}).filter(([name]) => names.has(name)));
-
-    for (const { file, kind } of files) {
-      const text = await options.source.read(file.name);
-      const hash = sha256(text);
-      if (done[file.name] === hash) continue;
-      const events = eventsOf(file, kind, text);
-      // An interrupted file resumes where it stopped, unless it changed since.
-      let next = saved?.current?.name === file.name && saved.current.hash === hash ? Math.min(saved.current.next, events.length) : 0;
-      do {
-        const end = Math.min(next + batchSize, events.length);
-        const finished = end === events.length;
-        if (finished) done[file.name] = hash;
-        const cursor: PosCursor = { done: { ...done }, current: finished ? null : { name: file.name, hash, next: end } };
-        yield { events: events.slice(next, end), cursor: JSON.stringify(cursor) };
-        next = end;
-      } while (next < events.length);
-    }
+    yield* importFiles(
+      files.map(({ file, kind }) => ({ name: file.name, read: () => options.source.read(file.name), file, kind })),
+      saved,
+      (f, text) => eventsOf(f.file, f.kind, text),
+      batchSize,
+    );
   }
 
   return {

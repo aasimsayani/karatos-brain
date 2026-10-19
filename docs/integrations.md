@@ -102,7 +102,7 @@ Used by: R is retail, W is wholesale, M is manufacturing. Test with says how we 
 | --- | --- | --- | --- | --- | --- |
 | Stripe | R, W | Public API | Free sandbox | Yes | Built (Connector in @karatos/connectors: charges, refunds, disputes, payouts, balance transactions and customers, read-only) |
 | Chase business bank accounts and credit cards | R, W, M | File export | Sample files | No | Planned (CSV exports, PDF statements or both, whichever the client prefers; 5-6 years of history) |
-| Bank and credit card statements (any bank) | R, W, M | File export | Sample files | No | Planned (CSV, PDF or both, whichever the client prefers) |
+| Bank and credit card statements (any bank) | R, W, M | File export | Sample files | No | Built (Connector in @karatos/connectors: CSV exports from any bank, read-only; PDF statements next) |
 | QuickBooks Online | R, W, M | Public API | Free sandbox | Yes | Planned |
 | Xero | R, W, M | Public API | Free sandbox | Yes | Planned |
 | Plaid | R, W, M | Public API | Free sandbox | Yes | Planned (Bank feeds beyond Chase) |
@@ -154,7 +154,7 @@ Every department reads from more than one system, and a test keeps it that way. 
 
 ## Bank and card statements
 
-Clients send statements whichever way suits them: CSV exports, PDF statements, or both (for example CSV for recent activity and PDFs for older years). `CHASE_IMPORT_MODE` takes `manual_csv`, `manual_pdf` or `manual_csv_and_pdf`, and other banks follow the same pattern. Both formats go through the same pipeline, and the statement connector must match transactions by account, date, amount and description so one that appears in both a CSV and a PDF is stored once.
+Clients send statements whichever way suits them: CSV exports, PDF statements, or both (for example CSV for recent activity and PDFs for older years). `CHASE_IMPORT_MODE` takes `manual_csv`, `manual_pdf` or `manual_csv_and_pdf`, and other banks follow the same pattern. Both formats go through the same pipeline. A transaction is keyed by account, date, amount and how many identical ones came before it that day, not by its description, because banks shorten and pad descriptions differently in CSV and PDF. So one that appears in both formats, or in two overlapping exports, is stored once. The connector is under "Bank and credit card statements" in [Built connectors](#built-connectors).
 
 Statements are customer data. They never go in a git repo, including private ones.
 
@@ -334,6 +334,37 @@ Money reads `$1,250.00`, `1250.5` and `(25.00)` without floating point. Metal an
 A value that can't be read is left null, so the department schema dead-letters the row with the raw event kept, and every event carries `sourceRow` (`file.csv:12`) to find it. Only mapped columns are read: email addresses, phone numbers and street addresses in an export are never stored.
 
 **Testing.** The tests use synthetic exports only. The CSV reader in `packages/connectors/src/files` (RFC 4180 quoting, CRLF, byte-order marks) and its money, date and flag parsers are shared with the bank statement connector.
+
+### Bank and credit card statements
+
+Reads bank and credit card activity exported as CSV, one folder per account. PDF statements are next, through the same keys, so a transaction in both formats is stored once.
+
+| Setting | What it is |
+| --- | --- |
+| `BANK_STATEMENTS_IMPORT_DIR` | The folder of exports, outside any git repo. Inside it, one subfolder per account named for its type and last four digits: `checking-1234`, `savings-2345`, `card-5678`. A name containing `card` or `credit` is read as a credit card. Other folders are skipped |
+| `BANK_STATEMENTS_PROFILES` | Optional. `generic`, or the path to a JSON file in the client's private instance repo mapping account folders to parsing profiles, with `"*"` for the rest |
+
+**Parsing profiles.** A profile names the date and description columns, either one signed amount column or separate debit and credit columns, and optionally balance and check number. It also gives the delimiter, the date order, the bank's UTC offset, how the amount column is signed (`money_in_positive`, or `money_out_positive` for card exports that show purchases as positive), and the client's own category rules: regular expressions tested against the description, in order. The generic profile reads Date (or Posting Date, Transaction Date, Posted Date), Description (or Memo, Details, Payee), Amount or Debit and Credit (or Withdrawals and Deposits), Balance and Check Number. Rules naming a client's payees belong in their instance repo.
+
+**What it reads.** Each CSV in an account's folder, in name order, accounts in name order. Title lines above the header are skipped: the header is the first line with every required column. Rows with no date or no amount (opening balances, totals) are skipped, and rows older than six years too. The checkpoint and resume work as for the POS connector: a file is read again only when its content changes.
+
+**Events.** Each row becomes `bank.transaction_imported` in the finance department's shape, with money into the account positive. The key is `bank:<account>:<date>:<amount cents>:<n>`, where `n` counts identical transactions earlier that day in the same file, so two $20 payments on one day are both kept and an overlapping export stores neither twice. The payload adds `accountKind`, `balanceCents` and `checkNumber` when present, and `sourceRow` (`checking-1234/jan.csv:12`). A date or amount that can't be read is dead-lettered with the row kept.
+
+**Categories.** After the profile's own rules:
+
+| Category | Built-in rule |
+| --- | --- |
+| `card_settlement` | Money into a bank account from a processor: Stripe, Square, Shopify, PayPal, Clover, Heartland, Worldpay, Authorize.net, or "bankcard", "merchant" or "settlement" |
+| `other` | Transfers between the business's own accounts and card payments, in either direction |
+| `payroll` | Money out to Gusto, ADP, Paychex, Rippling, or described as payroll or wages |
+| `fee` | Fees, service and maintenance charges, overdrafts, NSF, interest and finance charges |
+| `other` | Mobile, remote and check deposits, ACH, wires, Zelle, refunds and interest paid in |
+| `cash_deposit` | Other money into a bank account described as cash, a branch, teller, night or counter deposit, or starting "DEPOSIT". A client who deposits checks at the branch needs a profile rule |
+| `vendor_payment` | Money out by check, ACH, wire, bill pay, Zelle, debit card or POS purchase, and every other charge on a credit card |
+
+Anything else is `other`. The finance department compares `cash_deposit` transactions with cash sales.
+
+**Testing.** Synthetic statements only: a title block above the header, debit and credit columns, opening balance and total rows, identical same-day payments, an overlapping export in another layout, and unreadable rows. Statements are customer data and never go in a repo.
 
 ## Writing back: built, turned off
 

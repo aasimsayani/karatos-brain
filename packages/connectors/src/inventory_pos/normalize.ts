@@ -1,8 +1,9 @@
 import { createHash } from "node:crypto";
+import { squash, type ColumnGetter } from "../files/columns.js";
 import type { CsvRow } from "../files/csv.js";
 import type { SourceFile } from "../files/source.js";
 import { parseDate, parseDecimal, parseFlag, parseInteger, parseMoney } from "../files/values.js";
-import { PosProfileError, type FileKind, type PosProfile } from "./profile.js";
+import type { FileKind, PosProfile } from "./profile.js";
 
 /**
  * Turns rows of POS exports into Brain A events, following the retail
@@ -32,33 +33,7 @@ export interface RowContext {
   since: string;
 }
 
-type Columns = Record<string, string | string[] | undefined>;
-type Getter = (row: CsvRow, field: string) => string | undefined;
-
-const squash = (h: string) => h.trim().toLowerCase().replace(/\s+/g, " ");
-
-/**
- * Finds each mapped column in a file's headers. Throws PosProfileError
- * naming the file and the missing columns when a required one is absent,
- * because every row would be wrong.
- */
-export function columnReader(headers: string[], columns: Columns, required: string[], fileName: string): Getter {
-  const byName = new Map(headers.map((h) => [squash(h), h]));
-  const found: Record<string, string> = {};
-  const missing: string[] = [];
-  for (const [field, spec] of Object.entries(columns)) {
-    if (spec === undefined) continue;
-    const names = Array.isArray(spec) ? spec : [spec];
-    const header = names.map((n) => byName.get(squash(n))).find((h) => h !== undefined);
-    if (header !== undefined) found[field] = header;
-    else if (required.includes(field)) missing.push(names.join(" or "));
-  }
-  if (missing.length) throw new PosProfileError(`${fileName} has no column for ${missing.join(", ")}`);
-  return (row, field) => {
-    const header = found[field];
-    return header === undefined ? undefined : row.values[header];
-  };
-}
+type Getter = ColumnGetter;
 
 const short = (text: string) => createHash("sha256").update(text).digest("hex").slice(0, 12);
 const present = (v: string | undefined): v is string => v !== undefined && v.trim() !== "";
