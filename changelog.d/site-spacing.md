@@ -1,0 +1,1 @@
+- Website: even vertical rhythm. Spacing now comes from one 8px scale, every section and the hero have the same padding top and bottom (64px on phones, 96px on wide screens), headings, intros and content sit the same distance apart in every section, and the pricing cards line up their fine print and buttons.

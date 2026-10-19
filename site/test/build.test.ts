@@ -69,10 +69,32 @@ describe("KaratOS website", () => {
     expect(html).toContain("--mono:'IBM Plex Mono',ui-monospace");
   });
 
+  it("spaces the page on one 8px scale, with every section and the hero padded the same", () => {
+    const css = html.slice(html.indexOf("<style>"), html.indexOf("</style>"));
+    expect(css).toContain("--space-1:8px;--space-2:16px;--space-3:24px;--space-4:32px;--space-5:48px;--section:clamp(64px,9vw,96px);");
+    expect(css).toContain(".hero{padding-top:var(--section);padding-bottom:var(--section)}");
+    expect(css).toContain("section{padding:var(--section) 0;");
+    expect(css).toContain("footer{padding:var(--space-5) 0;");
+    // Heading, intro and content keep the same rhythm in every section.
+    expect(css).toContain(".section-intro{color:var(--ink-2);max-width:62ch;margin:var(--space-2) 0 var(--space-5);");
+    expect(css).toContain("margin-bottom:var(--space-2);line-height:1.4}");
+    // Any spacing written in pixels stays on a 4px grid, so nothing sits a few pixels off.
+    const offGrid = [...css.matchAll(/(?:^|[;{])((?:padding|margin|gap)(?:-[a-z]+)?):([^;}]+)/g)]
+      .flatMap((m) => [...m[2]!.matchAll(/(\d+)px/g)].map((n) => ({ rule: `${m[1]}:${m[2]}`, px: Number(n[1]) })))
+      .filter((v) => v.px % 4 !== 0)
+      .map((v) => v.rule);
+    expect(offGrid).toEqual([]);
+  });
+
+  it("lines up the plans' fine print and buttons across cards", () => {
+    expect(html).toContain(".plan .price+p{flex:1}");
+    expect(html).toContain(".plan .btn{margin-top:var(--space-2);align-self:flex-start}");
+  });
+
   it("keeps the hero inside the page gutter on phones", () => {
     // The hero shares an element with .wrap; a padding shorthand there would zero the side gutter.
     expect(html).toContain('<div class="wrap hero">');
-    expect(html).toContain(".hero{padding-top:96px;padding-bottom:72px}");
+    expect(html).not.toMatch(/\.hero\{padding:/);
   });
 
   it("only uses Mono at a weight it ships", () => {
