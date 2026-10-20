@@ -11,7 +11,7 @@ COPY packages/connectors/package.json packages/connectors/
 RUN npm ci --ignore-scripts
 COPY packages packages
 RUN npm run build -w @karatos/core -w @karatos/store-postgres \
- && npm run build -w @karatos/retail \
+ && npm run build -w @karatos/retail -w @karatos/connectors \
  && npm run build -w @karatos/server \
  && npm prune --omit=dev
 
@@ -26,6 +26,8 @@ COPY --from=build /app/packages/store-postgres/package.json packages/store-postg
 COPY --from=build /app/packages/store-postgres/dist packages/store-postgres/dist
 COPY --from=build /app/packages/retail/package.json packages/retail/
 COPY --from=build /app/packages/retail/dist packages/retail/dist
+COPY --from=build /app/packages/connectors/package.json packages/connectors/
+COPY --from=build /app/packages/connectors/dist packages/connectors/dist
 COPY --from=build /app/packages/server/package.json packages/server/
 COPY --from=build /app/packages/server/dist packages/server/dist
 COPY supabase/migrations supabase/migrations

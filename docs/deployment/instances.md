@@ -39,7 +39,7 @@ Isolation is layered. A request needs the right API key. Every event is pinned t
    ```
    The tool generates the keys it can (API key, webhook secret) and walks you through the rest one at a time, with where to find each value. See [secrets](../secrets.md).
 4. **Create the tables:** `npm run db:migrate`. The instance also does this on start when `MIGRATE_ON_START=true`.
-5. **Deploy the image** to your host with the same settings in its secret store, and check `GET /healthz`.
+5. **Deploy the image** to your host with the same settings in its secret store, and check `GET /healthz`. The log names any listed integration it can't sync yet and what it is missing; see [syncing on a schedule](../integrations.md#syncing-on-a-schedule).
 6. **Hand out the API key** only to that client's agents and connectors.
 
 ## Calling an instance

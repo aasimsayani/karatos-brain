@@ -1,8 +1,9 @@
 import { z } from "zod";
-import { invalidWriteEntries } from "@karatos/core";
+import { INTEGRATIONS, invalidWriteEntries } from "@karatos/core";
 import { RETAIL_DEPARTMENTS } from "@karatos/retail";
 
 const DEPARTMENT_IDS = RETAIL_DEPARTMENTS.map((d) => d.id);
+const INTEGRATION_IDS = INTEGRATIONS.map((i) => i.id);
 
 const commaList = z
   .string()
@@ -44,6 +45,12 @@ export const InstanceConfigSchema = z.object({
   ENABLED_WRITES: commaList.refine((entries) => invalidWriteEntries(entries).length === 0, {
     message: "use integration:action or integration:*, e.g. shopify:adjust_inventory",
   }),
+  /** Comma-separated catalog ids of the integrations this instance uses, e.g. shopify,stripe. Built connectors among them are synced. */
+  ENABLED_INTEGRATIONS: commaList.refine((ids) => ids.every((id) => INTEGRATION_IDS.includes(id)), {
+    message: "use catalog integration ids, e.g. shopify,stripe,inventory_pos,bank_statements",
+  }),
+  /** Minutes between the end of one sync round and the start of the next. */
+  SYNC_INTERVAL_MINUTES: z.coerce.number().int().min(5).max(1440).default(60),
 });
 
 export type InstanceConfig = z.infer<typeof InstanceConfigSchema>;
