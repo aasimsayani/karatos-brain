@@ -70,7 +70,9 @@ describe("checkPullRequest", () => {
       "CHANGELOG.md is edited directly; put the entry in changelog.d/dependabot-x.md instead",
       "no changelog entry; add changelog.d/dependabot-x.md",
     ]);
-    expect(problemsOf(() => checkPullRequest("dependabot/x", [{ status: "M", path: "evil/package.json.ts" }], {}))).toHaveLength(1);
+    for (const path of ["evil/package.json.ts", "site/package-data.json", "docs/Dockerfile.md", ".github/workflows/../../src/a.yml"]) {
+      expect(problemsOf(() => checkPullRequest("dependabot/x", [{ status: "M", path }], {}))).toHaveLength(1);
+    }
   });
 
   it("lets release branches fold fragments into CHANGELOG.md", () => {
