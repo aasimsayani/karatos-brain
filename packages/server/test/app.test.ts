@@ -87,7 +87,7 @@ describe("Brain API", () => {
 
   it("accepts only the exact key, whatever its length", async () => {
     const { call } = await start();
-    for (const auth of [KEY.slice(0, -1), KEY + "k", KEY.toUpperCase(), ` ${KEY}`, "x".repeat(40), "k".repeat(400)]) {
+    for (const auth of [KEY.slice(0, -1), KEY + "k", KEY.toUpperCase(), ` ${KEY}`, "x".repeat(40), "k".repeat(400), "k".repeat(5_000)]) {
       expect((await call("/v1/recommendations", { auth })).status, auth.length.toString()).toBe(401);
     }
     expect((await call("/v1/recommendations")).status).toBe(200);

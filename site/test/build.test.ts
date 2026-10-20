@@ -118,11 +118,11 @@ describe("KaratOS website", () => {
   });
 
   it("runs under the strict content policy: one inline script and style, no inline handlers or style attributes", () => {
-    expect(html.match(/<script>/g)).toHaveLength(1);
-    expect(html.match(/<style>/g)).toHaveLength(1);
-    expect(html).not.toMatch(/<script[^>]+src=/);
-    expect(html).not.toMatch(/\son[a-z]+="/);
-    expect(html).not.toMatch(/\sstyle="/);
+    // Any casing or attributes count: exactly one bare <script> and one bare <style>, nothing else.
+    expect(html.match(/<script\b[^>]*>/gi)).toEqual(["<script>"]);
+    expect(html.match(/<style\b[^>]*>/gi)).toEqual(["<style>"]);
+    expect(html).not.toMatch(/\son[a-z]+\s*=/i);
+    expect(html).not.toMatch(/\sstyle\s*=/i);
     expect(html).not.toMatch(/javascript:/i);
     const csp = contentSecurityPolicy(html);
     expect(csp).toMatch(/script-src 'self' 'sha256-[A-Za-z0-9+/]+=*'$|script-src 'self' 'sha256-[A-Za-z0-9+/]+=*';/);

@@ -1,4 +1,4 @@
-import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
+import { timingSafeEqual } from "node:crypto";
 import type { IncomingMessage, RequestListener, ServerResponse } from "node:http";
 import { z } from "zod";
 import { DeadLetteredError, type BrainPipeline, type IntegrationStatus, type MemoryStore } from "@karatos/core";
@@ -42,16 +42,27 @@ function send(res: ServerResponse, status: number, body: unknown): void {
   res.end(json);
 }
 
-// A fresh random key per process: the MACs are only ever compared to each other, never stored.
-const COMPARE_KEY = randomBytes(32);
-const mac = (value: string) => createHmac("sha256", COMPARE_KEY).update(value, "utf8").digest();
+/** Longest bearer token compared; anything longer is refused outright. Instance keys are 64 characters. */
+const MAX_KEY_BYTES = 512;
+
+/** Zero-pads to a fixed width so the comparison takes the same time whatever the token's length. */
+function padded(bytes: Buffer): Buffer {
+  const out = Buffer.alloc(MAX_KEY_BYTES);
+  bytes.copy(out);
+  return out;
+}
 
 function authorized(req: IncomingMessage, apiKey: string): boolean {
   const header = req.headers.authorization ?? "";
   const match = /^Bearer (.+)$/.exec(header);
   if (!match?.[1]) return false;
-  // Comparing fixed-length MACs keeps the check constant-time without revealing the key's length.
-  return timingSafeEqual(mac(match[1]), mac(apiKey));
+  const given = Buffer.from(match[1], "utf8");
+  const expected = Buffer.from(apiKey, "utf8");
+  if (given.length > MAX_KEY_BYTES || expected.length > MAX_KEY_BYTES) return false;
+  // Compare fixed-width buffers in constant time first, so timing never reveals the key's length or contents;
+  // the length check then rejects a token that only matched because of the padding.
+  const same = timingSafeEqual(padded(given), padded(expected));
+  return same && given.length === expected.length;
 }
 
 async function readJson(req: IncomingMessage, limit: number): Promise<unknown> {

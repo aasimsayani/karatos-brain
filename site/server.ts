@@ -141,7 +141,7 @@ const hashOf = (text: string) => `'sha256-${createHash("sha256").update(text, "u
  * fonts, and send only to its own form endpoint. Nothing may frame it.
  */
 export function contentSecurityPolicy(html: string): string {
-  const inline = (tag: string) => [...html.matchAll(new RegExp(`<${tag}>([\\s\\S]*?)</${tag}>`, "g"))].map((m) => hashOf(m[1]!));
+  const inline = (tag: string) => [...html.matchAll(new RegExp(`<${tag}>([\\s\\S]*?)</${tag}\\s*>`, "gi"))].map((m) => hashOf(m[1]!));
   const sources = (hashes: string[]) => ["'self'", ...hashes].join(" ");
   return [
     "default-src 'none'",

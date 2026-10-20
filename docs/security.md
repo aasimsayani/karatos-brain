@@ -26,7 +26,7 @@ Guards: `npm run secrets:scan` runs in CI on every push and fails on anything sh
 
 ### Someone reaches an instance's API
 
-- Every route except `/healthz` needs `Authorization: Bearer <INSTANCE_API_KEY>`. The key is compared as HMAC-SHA-256 values (under a random per-process key) with `timingSafeEqual`, so neither its contents nor its length leak through timing.
+- Every route except `/healthz` needs `Authorization: Bearer <INSTANCE_API_KEY>`. The key is compared with `timingSafeEqual` over fixed-width zero-padded buffers, then by length, so neither its contents nor its length leak through timing.
 - Every request is pinned to the instance's one organization. An event naming another organization is refused, so one client's instance can't write into another's data.
 - Request bodies are capped (1 MB by default) and must be JSON.
 - Responses carry `Cache-Control: no-store`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: no-referrer`, a `default-src 'none'` content policy that also forbids framing, and HSTS, so business data isn't cached by a proxy or browser, sniffed as another type, or framed.
