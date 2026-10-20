@@ -1,5 +1,5 @@
 # Brain A instance image. One running container serves one client.
-FROM node:22-alpine AS build
+FROM node:26-alpine AS build
 WORKDIR /app
 COPY package.json package-lock.json tsconfig.base.json ./
 COPY packages/core/package.json packages/core/
@@ -15,7 +15,7 @@ RUN npm run build -w @karatos/core -w @karatos/store-postgres \
  && npm run build -w @karatos/server \
  && npm prune --omit=dev
 
-FROM node:22-alpine
+FROM node:26-alpine
 ENV NODE_ENV=production
 WORKDIR /app
 COPY --from=build /app/node_modules node_modules
