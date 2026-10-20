@@ -1,4 +1,4 @@
-import { createHash, timingSafeEqual } from "node:crypto";
+import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import type { IncomingMessage, RequestListener, ServerResponse } from "node:http";
 import { z } from "zod";
 import { DeadLetteredError, type BrainPipeline, type IntegrationStatus, type MemoryStore } from "@karatos/core";
@@ -42,14 +42,16 @@ function send(res: ServerResponse, status: number, body: unknown): void {
   res.end(json);
 }
 
-const digest = (value: string) => createHash("sha256").update(value, "utf8").digest();
+// A fresh random key per process: the MACs are only ever compared to each other, never stored.
+const COMPARE_KEY = randomBytes(32);
+const mac = (value: string) => createHmac("sha256", COMPARE_KEY).update(value, "utf8").digest();
 
 function authorized(req: IncomingMessage, apiKey: string): boolean {
   const header = req.headers.authorization ?? "";
   const match = /^Bearer (.+)$/.exec(header);
   if (!match?.[1]) return false;
-  // Comparing fixed-length digests keeps the check constant-time without revealing the key's length.
-  return timingSafeEqual(digest(match[1]), digest(apiKey));
+  // Comparing fixed-length MACs keeps the check constant-time without revealing the key's length.
+  return timingSafeEqual(mac(match[1]), mac(apiKey));
 }
 
 async function readJson(req: IncomingMessage, limit: number): Promise<unknown> {
