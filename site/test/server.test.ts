@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { createServer, get, type Server } from "node:http";
 import { gunzipSync } from "node:zlib";
 import type { AddressInfo } from "node:net";
@@ -29,7 +30,7 @@ async function start(options: Partial<ServerOptions> = {}) {
   const base = `http://127.0.0.1:${(server!.address() as AddressInfo).port}`;
   const post = (body: unknown, headers: Record<string, string> = {}) =>
     fetch(`${base}/api/inquiry`, { method: "POST", headers: { "Content-Type": "application/json", ...headers }, body: typeof body === "string" ? body : JSON.stringify(body) });
-  return { base, calls, post };
+  return { base, calls, post, handler };
 }
 
 describe("inquiry validation", () => {
@@ -194,11 +195,76 @@ describe("site server", () => {
 
   it("limits each address per hour", async () => {
     const { post } = await start({ rateLimit: 2 });
-    const headers = { "X-Forwarded-For": "203.0.113.9, 10.0.0.1" };
+    const headers = { "X-Forwarded-For": "203.0.113.9" };
     expect((await post(valid, headers)).status).toBe(202);
     expect((await post(valid, headers)).status).toBe(202);
     expect((await post(valid, headers)).status).toBe(429);
     expect((await post(valid, { "X-Forwarded-For": "203.0.113.10" })).status).toBe(202);
+  });
+
+  it("can't be dodged by inventing forwarded addresses, because only the proxy's own entry counts", async () => {
+    const { post } = await start({ rateLimit: 2 });
+    // Railway's proxy appends the real address; whatever the sender wrote before it is ignored.
+    for (const invented of ["1.1.1.1", "2.2.2.2"]) {
+      expect((await post(valid, { "X-Forwarded-For": `${invented}, 203.0.113.9` })).status).toBe(202);
+    }
+    expect((await post(valid, { "X-Forwarded-For": "3.3.3.3, 203.0.113.9" })).status).toBe(429);
+  });
+
+  it("forgets addresses that have gone quiet once it tracks too many", async () => {
+    let clock = Date.parse("2026-10-20T10:00:00Z");
+    const { post, handler } = await start({ rateLimit: 1, now: () => new Date(clock) });
+    for (let i = 0; i < 5_000; i++) {
+      const res = await post(valid, { "X-Forwarded-For": `10.${(i >> 16) & 255}.${(i >> 8) & 255}.${i & 255}` });
+      expect(res.status).toBe(202);
+    }
+    expect((await post(valid, { "X-Forwarded-For": "10.0.0.0" })).status).toBe(429);
+    expect(handler.trackedAddresses()).toBe(5_000);
+    clock += 3_600_001;
+    // The next inquiry sweeps every stale address, leaving only its own.
+    expect((await post(valid, { "X-Forwarded-For": "203.0.113.50" })).status).toBe(202);
+    expect(handler.trackedAddresses()).toBe(1);
+    expect((await post(valid, { "X-Forwarded-For": "10.0.0.0" })).status).toBe(202);
+  }, 60_000);
+
+  it("refuses inquiries a browser says came from another site", async () => {
+    const { post, calls, base } = await start();
+    const host = new URL(base).host;
+    expect((await post(valid, { Origin: "https://evil.example" })).status).toBe(403);
+    expect((await post(valid, { Origin: "not a url" })).status).toBe(403);
+    expect((await post(valid, { "Sec-Fetch-Site": "cross-site" })).status).toBe(403);
+    expect(calls).toHaveLength(0);
+    expect((await post(valid, { Origin: `http://${host}`, "Sec-Fetch-Site": "same-origin" })).status).toBe(202);
+    expect((await post(valid)).status).toBe(202);
+  });
+
+  it("sends strict security headers on every response", async () => {
+    const page = '<html><head><style>body{margin:0}</style></head><body><script>console.log(1)</script></body></html>';
+    const { base } = await start({ html: page, fonts: { "f.woff2": Buffer.from("x") } });
+    const hash = (text: string) => `'sha256-${createHash("sha256").update(text).digest("base64")}'`;
+    for (const path of ["/", "/healthz", "/fonts/f.woff2", "/missing"]) {
+      const res = await fetch(base + path);
+      expect(res.headers.get("strict-transport-security"), path).toBe("max-age=31536000; includeSubDomains");
+      expect(res.headers.get("x-frame-options")).toBe("DENY");
+      expect(res.headers.get("x-content-type-options")).toBe("nosniff");
+      expect(res.headers.get("cross-origin-opener-policy")).toBe("same-origin");
+      expect(res.headers.get("cross-origin-resource-policy")).toBe("same-origin");
+      expect(res.headers.get("permissions-policy")).toContain("camera=()");
+      const csp = res.headers.get("content-security-policy")!;
+      expect(csp).toContain("default-src 'none'");
+      expect(csp).toContain(`script-src 'self' ${hash("console.log(1)")}`);
+      expect(csp).toContain(`style-src 'self' ${hash("body{margin:0}")}`);
+      for (const directive of ["frame-ancestors 'none'", "base-uri 'none'", "form-action 'self'", "connect-src 'self'", "font-src 'self'"]) expect(csp).toContain(directive);
+      expect(csp).not.toContain("unsafe-inline");
+      expect(csp).not.toContain("unsafe-eval");
+    }
+  });
+
+  it("sends the same headers on inquiry errors", async () => {
+    const failed = await (await start({ token: "fails" })).post(valid);
+    expect(failed.status).toBe(502);
+    expect(failed.headers.get("content-security-policy")).toContain("default-src 'none'");
+    expect(failed.headers.get("strict-transport-security")).toBe("max-age=31536000; includeSubDomains");
   });
 
   it("says when the form isn't configured or GitHub fails", async () => {

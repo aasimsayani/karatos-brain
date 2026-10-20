@@ -4,6 +4,7 @@
  * posted publicly. Runs with plain `node site/server.ts` (type stripping), so
  * it has no dependencies and uses only erasable TypeScript.
  */
+import { createHash } from "node:crypto";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { gzipSync } from "node:zlib";
@@ -121,14 +122,49 @@ export interface ServerOptions {
   fonts?: Readonly<Record<string, Buffer>>;
 }
 
-const SECURITY_HEADERS = {
+const BASE_HEADERS = {
   "X-Content-Type-Options": "nosniff",
   "Referrer-Policy": "strict-origin-when-cross-origin",
   "X-Frame-Options": "DENY",
+  // Browsers only honor this over HTTPS, which is all Railway serves publicly.
+  "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
+  "Cross-Origin-Opener-Policy": "same-origin",
+  "Cross-Origin-Resource-Policy": "same-origin",
+  "Permissions-Policy": "camera=(), microphone=(), geolocation=(), payment=(), usb=()",
 };
 
-function send(res: ServerResponse, status: number, body: string | Buffer, type: string, headers: Record<string, string> = {}): void {
-  res.writeHead(status, { "Content-Type": type, ...SECURITY_HEADERS, ...headers });
+const hashOf = (text: string) => `'sha256-${createHash("sha256").update(text, "utf8").digest("base64")}'`;
+
+/**
+ * A policy that lets the page run only its own inline script and style
+ * (pinned by hash, so an injected tag would be refused), load only its own
+ * fonts, and send only to its own form endpoint. Nothing may frame it.
+ */
+export function contentSecurityPolicy(html: string): string {
+  const inline = (tag: string) => [...html.matchAll(new RegExp(`<${tag}>([\\s\\S]*?)</${tag}\\s*>`, "gi"))].map((m) => hashOf(m[1]!));
+  const sources = (hashes: string[]) => ["'self'", ...hashes].join(" ");
+  return [
+    "default-src 'none'",
+    `script-src ${sources(inline("script"))}`,
+    `style-src ${sources(inline("style"))}`,
+    "font-src 'self'",
+    "img-src 'self' data:",
+    "connect-src 'self'",
+    "form-action 'self'",
+    "base-uri 'none'",
+    "frame-ancestors 'none'",
+  ].join("; ");
+}
+
+/** Every response carries these; the policy is pinned to the page being served. */
+export function securityHeaders(html: string): Record<string, string> {
+  return { ...BASE_HEADERS, "Content-Security-Policy": contentSecurityPolicy(html) };
+}
+
+const FALLBACK_HEADERS = securityHeaders("");
+
+function sendWith(res: ServerResponse, status: number, body: string | Buffer, type: string, headers: Record<string, string> = {}, security = FALLBACK_HEADERS): void {
+  res.writeHead(status, { "Content-Type": type, ...security, ...headers });
   res.end(body);
 }
 
@@ -136,7 +172,7 @@ function acceptsGzip(req: IncomingMessage): boolean {
   return /(^|,)\s*gzip\s*(;\s*q=(?!0(\.0+)?\s*(,|$))[\d.]+)?\s*(,|$)/i.test(String(req.headers["accept-encoding"] ?? ""));
 }
 
-const json = (res: ServerResponse, status: number, body: unknown) => send(res, status, JSON.stringify(body), "application/json");
+const json = (res: ServerResponse, status: number, body: unknown) => sendWith(res, status, JSON.stringify(body), "application/json");
 
 async function readBody(req: IncomingMessage): Promise<string | null> {
   let size = 0;
@@ -149,11 +185,32 @@ async function readBody(req: IncomingMessage): Promise<string | null> {
   return Buffer.concat(chunks).toString("utf8");
 }
 
-function clientAddress(req: IncomingMessage): string {
+/**
+ * The visitor's address as Railway's proxy saw it: the last X-Forwarded-For
+ * entry, which the proxy appends. Earlier entries come from the visitor and
+ * could be anything, so trusting the first would let one sender dodge the
+ * rate limit by inventing addresses.
+ */
+export function clientAddress(req: IncomingMessage): string {
   const forwarded = req.headers["x-forwarded-for"];
-  const first = (Array.isArray(forwarded) ? forwarded[0] : forwarded)?.split(",")[0]?.trim();
-  return first || req.socket.remoteAddress || "unknown";
+  const last = (Array.isArray(forwarded) ? forwarded.join(",") : forwarded)?.split(",").at(-1)?.trim();
+  return last || req.socket.remoteAddress || "unknown";
 }
+
+/** True when a browser says the request came from another site. Requests without either header (not from a browser page) pass. */
+export function crossSite(req: IncomingMessage): boolean {
+  if (req.headers["sec-fetch-site"] === "cross-site") return true;
+  const origin = req.headers.origin;
+  if (!origin) return false;
+  try {
+    return new URL(origin).host !== req.headers.host;
+  } catch {
+    return true;
+  }
+}
+
+/** Addresses tracked by the rate limiter before stale ones are swept. */
+const MAX_TRACKED = 5_000;
 
 export function createSiteHandler(options: ServerOptions) {
   const doFetch = options.fetch ?? fetch;
@@ -162,12 +219,20 @@ export function createSiteHandler(options: ServerOptions) {
   const recent = new Map<string, number[]>();
   // The page never changes while the server runs, so compress it once.
   const gzippedHtml = gzipSync(options.html);
+  const security = securityHeaders(options.html);
+  const send = (res: ServerResponse, status: number, body: string | Buffer, type: string, headers: Record<string, string> = {}) =>
+    sendWith(res, status, body, type, headers, security);
+  const json = (res: ServerResponse, status: number, body: unknown) => send(res, status, JSON.stringify(body), "application/json");
   const fonts = options.fonts ?? {};
 
   async function handleInquiry(req: IncomingMessage, res: ServerResponse): Promise<void> {
+    if (crossSite(req)) return json(res, 403, { error: "cross_site" });
     if (!options.token || !options.repo) return json(res, 503, { error: "not_configured" });
     const address = clientAddress(req);
     const hourAgo = now().getTime() - 3_600_000;
+    if (recent.size >= MAX_TRACKED) {
+      for (const [key, stamps] of recent) if (!stamps.some((t) => t > hourAgo)) recent.delete(key);
+    }
     const times = (recent.get(address) ?? []).filter((t) => t > hourAgo);
     if (times.length >= limit) return json(res, 429, { error: "too_many" });
 
@@ -203,7 +268,7 @@ export function createSiteHandler(options: ServerOptions) {
     return json(res, 202, { ok: true });
   }
 
-  return async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> {
+  async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> {
     const path = (req.url ?? "/").split("?")[0] ?? "/";
     if (req.method === "POST" && path === "/api/inquiry") return handleInquiry(req, res);
     if (req.method === "GET" && path === "/healthz") return json(res, 200, { ok: true });
@@ -218,7 +283,10 @@ export function createSiteHandler(options: ServerOptions) {
         : send(res, 200, options.html, "text/html; charset=utf-8", { Vary: "Accept-Encoding" });
     }
     return send(res, 404, "Not found", "text/plain; charset=utf-8");
-  };
+  }
+
+  /** How many addresses the rate limiter is holding; lets tests see the sweep work. */
+  return Object.assign(handle, { trackedAddresses: () => recent.size });
 }
 
 if (process.argv[1] && import.meta.url === new URL(`file://${process.argv[1]}`).href) {
