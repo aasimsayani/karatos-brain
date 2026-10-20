@@ -1,0 +1,28 @@
+# Weekly update PRs for npm packages, GitHub Actions (kept pinned to commit
+# SHAs) and the Docker base images. Security updates arrive as soon as an
+# advisory is published, outside this schedule.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    groups:
+      dev-dependencies:
+        dependency-type: development
+        update-types: [minor, patch]
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    groups:
+      actions:
+        patterns: ["*"]
+  - package-ecosystem: docker
+    directories: [/, /site]
+    schedule:
+      interval: weekly
+      day: monday

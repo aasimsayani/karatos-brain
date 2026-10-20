@@ -248,6 +248,7 @@ section{padding:var(--section) 0;border-top:1px solid var(--line);scroll-margin-
 .hp{position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden}
 .submit-row{display:flex;align-items:center;gap:16px;flex-wrap:wrap}
 #inquiry-status{margin:0;font-size:14px;color:var(--ink-2)}
+#broken{border-top:0}
 .campaign{background:var(--ink);color:var(--bg);border-radius:24px;padding:clamp(32px,6vw,64px);border:0}
 .campaign h2{max-width:22ch}
 .campaign .eyebrow{color:var(--gold-on-ink)}
@@ -403,7 +404,7 @@ ${cards}
   </div>
 </div></section>
 
-<section id="broken" style="border-top:0"><div class="wrap">
+<section id="broken"><div class="wrap">
   <div class="campaign">
     <span class="eyebrow">Open call</span>
     <h2>Is a system in your jewelry business broken? Tell us.</h2>

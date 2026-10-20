@@ -24,19 +24,45 @@ class HttpError extends Error {
   }
 }
 
+/**
+ * Responses carry a client's business data, so nothing may cache them, sniff
+ * them as another type, frame them or send them on as a referrer.
+ */
+export const API_SECURITY_HEADERS = {
+  "cache-control": "no-store",
+  "x-content-type-options": "nosniff",
+  "referrer-policy": "no-referrer",
+  "content-security-policy": "default-src 'none'; frame-ancestors 'none'",
+  "strict-transport-security": "max-age=31536000; includeSubDomains",
+};
+
 function send(res: ServerResponse, status: number, body: unknown): void {
   const json = JSON.stringify(body);
-  res.writeHead(status, { "content-type": "application/json", "content-length": Buffer.byteLength(json) });
+  res.writeHead(status, { ...API_SECURITY_HEADERS, "content-type": "application/json", "content-length": Buffer.byteLength(json) });
   res.end(json);
+}
+
+/** Longest bearer token compared; anything longer is refused outright. Instance keys are 64 characters. */
+const MAX_KEY_BYTES = 512;
+
+/** Zero-pads to a fixed width so the comparison takes the same time whatever the token's length. */
+function padded(bytes: Buffer): Buffer {
+  const out = Buffer.alloc(MAX_KEY_BYTES);
+  bytes.copy(out);
+  return out;
 }
 
 function authorized(req: IncomingMessage, apiKey: string): boolean {
   const header = req.headers.authorization ?? "";
   const match = /^Bearer (.+)$/.exec(header);
   if (!match?.[1]) return false;
-  const given = Buffer.from(match[1]);
-  const expected = Buffer.from(apiKey);
-  return given.length === expected.length && timingSafeEqual(given, expected);
+  const given = Buffer.from(match[1], "utf8");
+  const expected = Buffer.from(apiKey, "utf8");
+  if (given.length > MAX_KEY_BYTES || expected.length > MAX_KEY_BYTES) return false;
+  // Compare fixed-width buffers in constant time first, so timing never reveals the key's length or contents;
+  // the length check then rejects a token that only matched because of the padding.
+  const same = timingSafeEqual(padded(given), padded(expected));
+  return same && given.length === expected.length;
 }
 
 async function readJson(req: IncomingMessage, limit: number): Promise<unknown> {
