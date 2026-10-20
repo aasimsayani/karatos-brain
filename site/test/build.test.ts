@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { contentSecurityPolicy } from "../server.js";
 import { INTEGRATIONS, selfServeIntegrations } from "../../packages/core/src/index.js";
 import { RETAIL_DEPARTMENTS } from "../../packages/retail/src/index.js";
 import { CONTACT_ANCHOR, CORE_PRICE, FONTS, MANAGED_PRICE, REPORT_URL, buildingNow, earlyAccessNote, escapeHtml, renderSite } from "../build.js";
@@ -114,6 +115,17 @@ describe("KaratOS website", () => {
       const css = html.slice(html.indexOf(rule), html.indexOf("}", html.indexOf(rule)));
       expect(css).toContain("color:var(--gold-text)");
     }
+  });
+
+  it("runs under the strict content policy: one inline script and style, no inline handlers or style attributes", () => {
+    expect(html.match(/<script>/g)).toHaveLength(1);
+    expect(html.match(/<style>/g)).toHaveLength(1);
+    expect(html).not.toMatch(/<script[^>]+src=/);
+    expect(html).not.toMatch(/\son[a-z]+="/);
+    expect(html).not.toMatch(/\sstyle="/);
+    expect(html).not.toMatch(/javascript:/i);
+    const csp = contentSecurityPolicy(html);
+    expect(csp).toMatch(/script-src 'self' 'sha256-[A-Za-z0-9+/]+=*'$|script-src 'self' 'sha256-[A-Za-z0-9+/]+=*';/);
   });
 
   it("names no client", () => {

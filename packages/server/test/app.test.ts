@@ -85,6 +85,25 @@ describe("Brain API", () => {
     expect(memory.events).toHaveLength(0);
   });
 
+  it("accepts only the exact key, whatever its length", async () => {
+    const { call } = await start();
+    for (const auth of [KEY.slice(0, -1), KEY + "k", KEY.toUpperCase(), ` ${KEY}`, "x".repeat(40), "k".repeat(400)]) {
+      expect((await call("/v1/recommendations", { auth })).status, auth.length.toString()).toBe(401);
+    }
+    expect((await call("/v1/recommendations")).status).toBe(200);
+  });
+
+  it("marks every response uncacheable, unframeable and not to be sniffed", async () => {
+    const { call } = await start();
+    for (const res of [await call("/healthz", { auth: false }), await call("/v1/recommendations"), await call("/v1/recommendations", { auth: false }), await call("/nope")]) {
+      expect(res.headers.get("cache-control")).toBe("no-store");
+      expect(res.headers.get("x-content-type-options")).toBe("nosniff");
+      expect(res.headers.get("referrer-policy")).toBe("no-referrer");
+      expect(res.headers.get("content-security-policy")).toBe("default-src 'none'; frame-ancestors 'none'");
+      expect(res.headers.get("strict-transport-security")).toBe("max-age=31536000; includeSubDomains");
+    }
+  });
+
   it("stamps events with the instance organization", async () => {
     const { call, memory } = await start();
     const res = await call("/v1/events", { method: "POST", body: JSON.stringify(event) });

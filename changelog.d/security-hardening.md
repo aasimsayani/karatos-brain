@@ -1,0 +1,5 @@
+- Security policy (`SECURITY.md`) and a written security model (`docs/security.md`) covering the public and private repos, the instance API, the website and CI, with the test that guards each control
+- Website: strict Content-Security-Policy (inline script and style allowed only by hash), HSTS, cross-origin opener and resource policies and a Permissions-Policy on every response. The inquiry form now refuses posts a browser marks as cross-site
+- Website: the inquiry rate limit now keys on the address Railway's proxy adds (the last `X-Forwarded-For` entry). It used the first entry, which a sender could change on every request to get past the limit. Stale addresses are swept so the limiter can't grow without bound
+- Instance API: responses are marked `no-store`, `nosniff`, `no-referrer`, unframeable and HTTPS-only, and the API key is compared as SHA-256 digests so its length no longer leaks through timing
+- CI: every GitHub Action is pinned to a commit SHA, checkouts no longer keep the job token on disk, Dependabot updates npm packages, actions and Docker images weekly, and CodeQL scans every PR. A test enforces the pinning and token rules

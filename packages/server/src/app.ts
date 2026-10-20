@@ -1,4 +1,4 @@
-import { timingSafeEqual } from "node:crypto";
+import { createHash, timingSafeEqual } from "node:crypto";
 import type { IncomingMessage, RequestListener, ServerResponse } from "node:http";
 import { z } from "zod";
 import { DeadLetteredError, type BrainPipeline, type IntegrationStatus, type MemoryStore } from "@karatos/core";
@@ -24,19 +24,32 @@ class HttpError extends Error {
   }
 }
 
+/**
+ * Responses carry a client's business data, so nothing may cache them, sniff
+ * them as another type, frame them or send them on as a referrer.
+ */
+export const API_SECURITY_HEADERS = {
+  "cache-control": "no-store",
+  "x-content-type-options": "nosniff",
+  "referrer-policy": "no-referrer",
+  "content-security-policy": "default-src 'none'; frame-ancestors 'none'",
+  "strict-transport-security": "max-age=31536000; includeSubDomains",
+};
+
 function send(res: ServerResponse, status: number, body: unknown): void {
   const json = JSON.stringify(body);
-  res.writeHead(status, { "content-type": "application/json", "content-length": Buffer.byteLength(json) });
+  res.writeHead(status, { ...API_SECURITY_HEADERS, "content-type": "application/json", "content-length": Buffer.byteLength(json) });
   res.end(json);
 }
+
+const digest = (value: string) => createHash("sha256").update(value, "utf8").digest();
 
 function authorized(req: IncomingMessage, apiKey: string): boolean {
   const header = req.headers.authorization ?? "";
   const match = /^Bearer (.+)$/.exec(header);
   if (!match?.[1]) return false;
-  const given = Buffer.from(match[1]);
-  const expected = Buffer.from(apiKey);
-  return given.length === expected.length && timingSafeEqual(given, expected);
+  // Comparing fixed-length digests keeps the check constant-time without revealing the key's length.
+  return timingSafeEqual(digest(match[1]), digest(apiKey));
 }
 
 async function readJson(req: IncomingMessage, limit: number): Promise<unknown> {

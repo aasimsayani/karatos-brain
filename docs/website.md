@@ -23,6 +23,8 @@ Type is set in IBM Plex: Sans for words, Mono for labels, prices and figures. Th
 
 Spacing comes from one scale (`--space-1` to `--space-5`: 8, 16, 24, 32 and 48px). Every section and the hero are padded `--section` (64px on phones up to 96px) top and bottom, each section's heading, intro and content sit 16px and 48px apart, and any spacing written in pixels stays on a 4px grid. A test enforces all three.
 
+Every response carries a strict `Content-Security-Policy` (the page's inline script and style are allowed only by hash), HSTS, `X-Frame-Options: DENY`, `nosniff` and same-origin opener and resource policies; [docs/security.md](security.md) lists them all. Keep the page free of inline `style=""` attributes and `on…=""` handlers, which the policy would block; a test checks.
+
 The page is served gzipped, and small gold or grey text uses the darker `--gold-text` and `--muted` colors so it stays at WCAG AA contrast.
 
 ## Inquiry form

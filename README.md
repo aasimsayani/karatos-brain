@@ -176,6 +176,7 @@ This repository is public. Treat everything you commit here as published.
 - Every secret and setting an instance needs is described, without its value, in [`secrets/manifest.json`](secrets/manifest.json). Follow [docs/secrets.md](docs/secrets.md) to add one.
 - Use test-only sandbox accounts for connector tests, never a client's.
 - CI runs `npm run secrets:scan` on every push.
+- How the code, the instance API, the website and CI are protected, and what each guard is for, is in [docs/security.md](docs/security.md). Report a vulnerability privately as [SECURITY.md](SECURITY.md) describes.
 
 ## Contributing
 
@@ -187,6 +188,7 @@ npm run typecheck
 npm run test:coverage        # fails under 90% lines, functions and statements, or 85% branches
 ```
 
+- Every behavior change needs a test, and every security control needs one that fails if the control is removed. The break-it check on each PR includes security mutations; see [docs/security.md](docs/security.md#the-break-it-check).
 - Every behavior change needs a test. A database change needs a migration and a test that runs it against PGlite.
 - Add a changelog fragment, `changelog.d/<branch>.md`, and update the relevant doc in the same PR. Don't edit `CHANGELOG.md` directly; see [changelog.d/README.md](changelog.d/README.md).
 - After a PR merges, run `scripts/sync-open-prs.sh` to bring main into every other open PR. It merges rather than rebases, and pushes only after the checks pass.
