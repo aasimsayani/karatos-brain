@@ -4,13 +4,15 @@ import type { Connector, SourceBatch, SyncContext, WriteAction } from "@karatos/
 import { MissingColumnsError } from "../files/columns.js";
 import { CsvError } from "../files/csv.js";
 import { importFiles, parseFileCursor, type FileCursor, type ImportFile } from "../files/import.js";
+import { PdfError, pdfLines } from "../files/pdf.js";
 import { directorySource, type FileSource } from "../files/source.js";
-import { csvStatementLines, statementEvents, type AccountKind, type BankEvent } from "./normalize.js";
+import { csvStatementLines, statementEvents, type AccountKind, type BankEvent, type StatementLine } from "./normalize.js";
+import { PdfLayoutError, pdfStatementLines } from "./pdf.js";
 import { GENERIC_BANK_PROFILE, type BankProfile } from "./profile.js";
 
 /**
- * Imports bank and credit card statements exported as CSV, one folder per
- * account. Each sync reads the files that are new or changed since the last
+ * Imports bank and credit card statements, as CSV exports or PDF
+ * statements, one folder per account. Each sync reads the files that are new or changed since the last
  * one (see importFiles), so the historical import and incremental syncs work
  * the same way, and overlapping exports store each transaction once.
  * Statements are customer data: the folder lives outside every git repo.
@@ -51,6 +53,8 @@ export class StatementFileError extends Error {
 
 const ACCOUNT_ID = /^[a-z][a-z0-9_]*-\d{4}$/;
 
+const isPdf = (name: string) => /\.pdf$/i.test(name);
+
 export const parseBankStatementCursor = (raw: string | null): BankStatementCursor | null => parseFileCursor(raw, "Bank statement import");
 
 /** Card accounts are named for it: `card-5678`, `credit_card-5678`, `amex_card-1001`. */
@@ -80,16 +84,21 @@ export function bankStatementsConnector(options: BankStatementOptions): Connecto
     ids.add(account.id);
   }
 
-  function eventsOf(account: StatementAccountSource, fileName: string, text: string): BankEvent[] {
+  /** PDFs are read as bytes and carried as latin1 text, which round-trips every byte, so the shared read loop can hash them. */
+  async function eventsOf(account: StatementAccountSource, fileName: string, content: string): Promise<BankEvent[]> {
     const profile = account.profile ?? GENERIC_BANK_PROFILE;
     const where = `${account.id}/${fileName}`;
     try {
       const since = new Date(now());
       since.setUTCFullYear(since.getUTCFullYear() - historyYears);
-      const lines = csvStatementLines(text, profile, where);
+      const lines: StatementLine[] = isPdf(fileName)
+        ? pdfStatementLines(await pdfLines(Buffer.from(content, "latin1")), profile, where)
+        : csvStatementLines(content, profile, where);
       return statementEvents(lines, { account, profile, fileName: where, receivedAt: now().toISOString(), since: since.toISOString() });
     } catch (error) {
-      if (error instanceof CsvError || error instanceof MissingColumnsError) throw new StatementFileError(where, error.message);
+      if (error instanceof CsvError || error instanceof MissingColumnsError || error instanceof PdfError || error instanceof PdfLayoutError) {
+        throw new StatementFileError(where, error.message.replace(`${where}: `, ""));
+      }
       throw error;
     }
   }
@@ -98,9 +107,10 @@ export function bankStatementsConnector(options: BankStatementOptions): Connecto
     const saved = parseBankStatementCursor(context.cursor);
     const files: (ImportFile & { account: StatementAccountSource; fileName: string })[] = [];
     for (const account of [...options.accounts].sort((a, b) => (a.id < b.id ? -1 : 1))) {
-      const listed = (await account.source.list()).filter((f) => /\.csv$/i.test(f.name)).sort((a, b) => (a.name < b.name ? -1 : 1));
+      const listed = (await account.source.list()).filter((f) => /\.(csv|pdf)$/i.test(f.name)).sort((a, b) => (a.name < b.name ? -1 : 1));
       for (const f of listed) {
-        files.push({ name: `${account.id}/${f.name}`, read: () => account.source.read(f.name), account, fileName: f.name });
+        const read = isPdf(f.name) ? async () => Buffer.from(await account.source.readBytes(f.name)).toString("latin1") : () => account.source.read(f.name);
+        files.push({ name: `${account.id}/${f.name}`, read, account, fileName: f.name });
       }
     }
     yield* importFiles(files, saved, (f, text) => eventsOf(f.account, f.fileName, text), batchSize);
