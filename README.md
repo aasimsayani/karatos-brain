@@ -29,13 +29,13 @@ This section updates itself as work lands: it is generated from [docs/milestones
 <!-- progress:start -->
 <!-- Generated from docs/milestones.json and the integration catalog by npm run progress:write. Edit those, not this block. -->
 
-**Overall: 39% complete**, 15 of 38 roadmap items done. 4 of the 75 systems in the integration catalog are connected.
+**Overall: 42% complete**, 16 of 38 roadmap items done. 4 of the 75 systems in the integration catalog are connected.
 
 | Milestone | What it gives a jeweler | Progress | Target |
 | --- | --- | --- | --- |
 | Foundation | Every record is validated, stored once and traceable to its source. | ██████████ 100% | Done |
 | Retail departments | Eleven departments that turn store data into daily recommendations. | ███████░░░ 67% | Dec 2026 |
-| Core integrations | Connects what most jewelers already run: online store, POS, payments, bank and books. | ██████░░░░ 57% | Nov 2026 |
+| Core integrations | Connects what most jewelers already run: online store, POS, payments, bank and books. | ███████░░░ 71% | Nov 2026 |
 | Client instances | Each business gets its own isolated instance, in accounts it owns. | ████████░░ 75% | Dec 2026 |
 | AI reasoning | Claude explains each recommendation in plain language and learns from the owner's decisions. | ░░░░░░░░░░ 0% | Jan 2027 |
 | Self-serve AI dashboards | Owners ask a question and get a dashboard, without a developer. | ███░░░░░░░ 33% | Mar 2027 |
@@ -45,7 +45,7 @@ This section updates itself as work lands: it is generated from [docs/milestones
 
 ### Up next
 
-- **Core integrations** (target Nov 2026): Bank and card statements from PDFs; Chase business bank accounts and credit cards; QuickBooks Online
+- **Core integrations** (target Nov 2026): Chase business bank accounts and credit cards; QuickBooks Online
 - **Retail departments** (target Dec 2026): Tune thresholds against a live store's data
 - **Client instances** (target Dec 2026): First live client instance
 <!-- progress:end -->

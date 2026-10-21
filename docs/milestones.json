@@ -34,7 +34,7 @@
         { "integration": "inventory_pos" },
         { "integration": "stripe" },
         { "integration": "bank_statements", "name": "Bank and card statements from CSV exports" },
-        { "name": "Bank and card statements from PDFs", "done": false },
+        { "name": "Bank and card statements from PDFs", "done": true },
         { "integration": "chase" },
         { "integration": "quickbooks" }
       ]
