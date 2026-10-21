@@ -490,7 +490,7 @@ describe("Inventory and POS connector", () => {
   it("reads files in kind order, then by name, so receipts come before the sales that use them", async () => {
     const read: string[] = [];
     const base = memoryFileSource({ "sales-b.csv": "Sale ID,Date,SKU,Quantity,Unit Price\n", "sales-a.csv": "Sale ID,Date,SKU,Quantity,Unit Price\n", "items.csv": "SKU,Title,Cost,Retail Price\n", "customers.csv": "Customer ID,Name\n", "stock.csv": "SKU,On Hand\n" });
-    const source = { list: base.list, read: async (name: string) => (read.push(name), base.read(name)) };
+    const source = { list: base.list, read: async (name: string) => (read.push(name), base.read(name)), readBytes: base.readBytes };
     await collect(connector(source).historicalImport({ organizationId: TEST_ORG, cursor: null }));
     expect(read).toEqual(["items.csv", "stock.csv", "customers.csv", "sales-a.csv", "sales-b.csv"]);
   });
@@ -505,7 +505,7 @@ describe("Inventory and POS connector", () => {
   });
 
   it("passes other failures through unchanged, for runSync to retry", async () => {
-    const source = { list: async () => [{ name: "sales.csv", modifiedAt: FILE_TIME }], read: async () => Promise.reject(new Error("disk unplugged")) };
+    const source = { list: async () => [{ name: "sales.csv", modifiedAt: FILE_TIME }], read: async () => Promise.reject(new Error("disk unplugged")), readBytes: async () => new Uint8Array() };
     await expect(collect(connector(source).historicalImport({ organizationId: TEST_ORG, cursor: null }))).rejects.toThrow(/^disk unplugged$/);
   });
 

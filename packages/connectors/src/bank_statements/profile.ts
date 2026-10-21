@@ -16,6 +16,28 @@ const optional = Column.optional();
 export const BANK_CATEGORIES = ["cash_deposit", "card_settlement", "vendor_payment", "payroll", "fee", "other"] as const;
 export type BankCategory = (typeof BANK_CATEGORIES)[number];
 
+const Pattern = z.string().min(1);
+
+/** How a PDF statement is laid out. Every pattern is a regular expression, matched case-insensitively against one line. */
+export const PdfLayoutSchema = z.object({
+  /**
+   * A transaction line, with named groups: `date`, `description`, and
+   * `amount`, or `debit` and `credit`; optionally `balance`. Columns are
+   * separated by two or more spaces in the text read from the PDF.
+   */
+  transaction: Pattern,
+  /** Finds the statement's closing date, as a group named `end`, for dates written without a year. */
+  period: Pattern.optional(),
+  /** Section headings, in order of precedence. A heading sets how the amounts below it are signed until the next one. */
+  sections: z
+    .array(z.object({ match: Pattern, amounts: z.enum(["money_in", "money_out", "signed", "skip"]) }))
+    .default([]),
+  /** Lines that look like transactions but aren't, such as opening and closing balances. */
+  ignore: z.array(Pattern).default([]),
+});
+
+export type PdfLayout = z.output<typeof PdfLayoutSchema>;
+
 export const BankProfileSchema = z.object({
   /** Short lowercase name for messages and docs. Keys don't include it, so a CSV and a PDF profile for one bank store the same transaction once. */
   id: z.string().regex(/^[a-z0-9_]{2,40}$/),
@@ -41,6 +63,8 @@ export const BankProfileSchema = z.object({
     }),
   /** How the amount column is signed. Card exports often show purchases as positive. */
   amounts: z.enum(["money_in_positive", "money_out_positive"]).default("money_in_positive"),
+  /** How this bank's PDF statements are laid out. The generic layout when absent. */
+  pdf: PdfLayoutSchema.optional(),
   /** Regular expressions tested against the description, case-insensitive, in order, before the built-in rules. */
   categories: z.array(z.object({ match: z.string().min(1), category: z.enum(BANK_CATEGORIES) })).default([]),
 });
@@ -62,13 +86,28 @@ export function parseBankProfile(input: unknown): BankProfile {
     const where = result.error.issues.map((i) => `${i.path.join(".") || "profile"}: ${i.message}`).join("; ");
     throw new BankProfileError(`bank statement profile is not valid: ${where}`);
   }
-  result.data.categories.forEach((rule, i) => {
+  const patterns: [string, string][] = result.data.categories.map((rule, i) => [`categories.${i}.match`, rule.match]);
+  const pdf = result.data.pdf;
+  if (pdf) {
+    patterns.push(["pdf.transaction", pdf.transaction]);
+    if (pdf.period) patterns.push(["pdf.period", pdf.period]);
+    pdf.sections.forEach((section, i) => patterns.push([`pdf.sections.${i}.match`, section.match]));
+    pdf.ignore.forEach((pattern, i) => patterns.push([`pdf.ignore.${i}`, pattern]));
+  }
+  for (const [where, pattern] of patterns) {
     try {
-      new RegExp(rule.match, "i");
+      new RegExp(pattern, "i");
     } catch {
-      throw new BankProfileError(`bank statement profile: categories.${i}.match is not a valid pattern`);
+      throw new BankProfileError(`bank statement profile: ${where} is not a valid pattern`);
     }
-  });
+  }
+  if (pdf) {
+    const groups = new Set([...pdf.transaction.matchAll(/\(\?<([A-Za-z]+)>/g)].map((m) => m[1]));
+    const missing = ["date", "description"].filter((g) => !groups.has(g));
+    if (!groups.has("amount") && !(groups.has("debit") && groups.has("credit"))) missing.push("amount (or debit and credit)");
+    if (missing.length) throw new BankProfileError(`bank statement profile: pdf.transaction needs named groups for ${missing.join(", ")}`);
+    if (pdf.period && !/\(\?<end>/.test(pdf.period)) throw new BankProfileError("bank statement profile: pdf.period needs a named group end");
+  }
   return result.data;
 }
 
@@ -85,6 +124,28 @@ export const GENERIC_BANK_PROFILE: BankProfile = parseBankProfile({
     balance: ["Balance", "Running Balance"],
     checkNumber: ["Check Number", "Check or Slip #", "Check #"],
   },
+});
+
+const MONEY = String.raw`[-−]?\(?\$?\d{1,3}(?:,\d{3})*\.\d{2}\)?-?`;
+
+/**
+ * Reads the common statement layout: a date (with or without the year), the
+ * description, then the amount, and sometimes a running balance, under
+ * section headings that say which way the money moved.
+ */
+export const GENERIC_PDF_LAYOUT: PdfLayout = PdfLayoutSchema.parse({
+  transaction: String.raw`^(?<date>\d{1,2}/\d{1,2}(?:/\d{2,4})?)\s+(?<description>\S.*?)\s{2,}(?<amount>${MONEY})(?:\s{2,}(?<balance>${MONEY}))?$`,
+  period: String.raw`(?:\bthrough|\bthru|\bto|\bclosing date:?|\bending date:?|\bstatement date:?|-|–)\s*(?<end>\d{1,2}/\d{1,2}/\d{2,4})`,
+  sections: [
+    { match: String.raw`^(?:daily (?:ending )?balance|balance summary|account summary|summary of accounts?)\b`, amounts: "skip" },
+    { match: String.raw`^(?:deposits(?: and (?:other )?(?:additions|credits))?|(?:electronic |other )?deposits|additions|other credits|credits|payments,? (?:and|&) (?:other )?credits)\b`, amounts: "money_in" },
+    {
+      match: String.raw`^(?:(?:electronic |other |atm (?:and|&) debit card )?withdrawals|subtractions|debits|checks(?: paid)?|(?:service )?fees(?: charged)?|(?:card )?purchases(?: and adjustments)?|cash advances|interest charged)\b`,
+      amounts: "money_out",
+    },
+    { match: String.raw`^(?:transaction (?:history|detail)|account activity|transactions)\b`, amounts: "signed" },
+  ],
+  ignore: [String.raw`\b(?:beginning|ending|opening|closing|previous|new) balance\b`, String.raw`^total\b`, String.raw`\btotal (?:deposits|withdrawals|fees|checks|purchases)\b`],
 });
 
 /**
