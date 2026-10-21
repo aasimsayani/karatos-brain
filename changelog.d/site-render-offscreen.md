@@ -1,0 +1,1 @@
+- Website: sections below the first screen, including the integrations catalog, now render only as they scroll near view. On Lighthouse's mobile run this takes total blocking time from about 400 ms to 0 and performance from about 90 to 100, so the speed check no longer fails at random as the catalog grows.
