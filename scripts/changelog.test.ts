@@ -52,6 +52,29 @@ describe("checkPullRequest", () => {
     ]);
   });
 
+  it("lets Dependabot bump dependency files without a fragment, but nothing else", () => {
+    const bump = [
+      { status: "M", path: "package.json" },
+      { status: "M", path: "package-lock.json" },
+      { status: "M", path: "packages/server/package.json" },
+      { status: "M", path: "site/Dockerfile" },
+      { status: "M", path: "Dockerfile" },
+      { status: "M", path: ".github/workflows/ci.yml" },
+    ];
+    expect(problemsOf(() => checkPullRequest("dependabot/npm_and_yarn/zod-4.6.7", bump, {}))).toEqual([]);
+    const missing = ["no changelog entry; add changelog.d/dependabot-npm_and_yarn-zod-4.6.7.md"];
+    expect(problemsOf(() => checkPullRequest("dependabot/npm_and_yarn/zod-4.6.7", [...bump, { status: "M", path: "packages/server/src/app.ts" }], {}))).toEqual(missing);
+    expect(problemsOf(() => checkPullRequest("dependabot/npm_and_yarn/zod-4.6.7", [], {}))).toEqual(missing);
+    expect(problemsOf(() => checkPullRequest("feature/zod", bump, {}))).toEqual(["no changelog entry; add changelog.d/feature-zod.md"]);
+    expect(problemsOf(() => checkPullRequest("dependabot/x", [{ status: "M", path: "CHANGELOG.md" }], {}))).toEqual([
+      "CHANGELOG.md is edited directly; put the entry in changelog.d/dependabot-x.md instead",
+      "no changelog entry; add changelog.d/dependabot-x.md",
+    ]);
+    for (const path of ["evil/package.json.ts", "site/package-data.json", "docs/Dockerfile.md", ".github/workflows/../../src/a.yml"]) {
+      expect(problemsOf(() => checkPullRequest("dependabot/x", [{ status: "M", path }], {}))).toHaveLength(1);
+    }
+  });
+
   it("lets release branches fold fragments into CHANGELOG.md", () => {
     expect(problemsOf(() => checkPullRequest("release/0.6.0", [{ status: "M", path: "CHANGELOG.md" }, { status: "D", path: "changelog.d/a.md" }], {}))).toEqual([]);
   });
