@@ -220,6 +220,11 @@ describe("QuickBooks client", () => {
     }
   });
 
+  it("routes the mock by exact host, so a look-alike sign-in host is refused", async () => {
+    const mock = quickBooksDocMock(company());
+    await expect(mock.fetch("https://oauth.platform.intuit.com.example.test/oauth2/v1/tokens/bearer", { method: "POST" })).rejects.toThrow(/not in the vendor's docs/);
+  });
+
   it("refuses answers that aren't a query or CDC response", async () => {
     const mock = quickBooksDocMock(company());
     const odd: typeof globalThis.fetch = async (input, init) => (String(input).startsWith(QUICKBOOKS_TOKEN_URL) ? mock.fetch(input as string, init) : new Response("[]", { status: 200 }));

@@ -274,9 +274,10 @@ export function quickBooksDocMock(data: QuickBooksMockData): QuickBooksMock {
   const calls: { method: string; url: string }[] = [];
   const fetch = Object.assign(
     async (input: string | URL | Request, init?: RequestInit) => {
-      const url = input instanceof Request ? input.url : String(input);
-      const response = await (url.startsWith(OAUTH) ? oauthFetch : apiFetch)(input, init);
-      calls.push(...(url.startsWith(OAUTH) ? oauthFetch.calls : apiFetch.calls).slice(-1));
+      // Routed by exact origin, so a look-alike host such as oauth.platform.intuit.com.example.test goes to the API mock and is refused there.
+      const toOauth = new URL(input instanceof Request ? input.url : String(input)).origin === OAUTH;
+      const response = await (toOauth ? oauthFetch : apiFetch)(input, init);
+      calls.push(...(toOauth ? oauthFetch.calls : apiFetch.calls).slice(-1));
       return response;
     },
     { calls },
