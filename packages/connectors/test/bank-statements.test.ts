@@ -61,7 +61,7 @@ const CARD = [
 
 function accounts(extra: Record<string, string> = {}): StatementAccountSource[] {
   return [
-    { id: "checking-1234", kind: "bank", source: memoryFileSource({ "activity-2026-01.csv": CHECKING, "activity-2019.csv": OLD, "statement-2026-01.pdf": "%PDF-1.7", ...extra }) },
+    { id: "checking-1234", kind: "bank", source: memoryFileSource({ "activity-2026-01.csv": CHECKING, "activity-2019.csv": OLD, ...extra }) },
     { id: "card-5678", kind: "credit_card", source: memoryFileSource({ "card-2026-01.csv": CARD }) },
   ];
 }
@@ -354,7 +354,7 @@ describe("bank statements connector", () => {
     expect((error as Error).message).toMatch(/^checking-1234\/x\.csv: checking-1234\/x\.csv has no column for Date/);
     const malformed = bankStatementsConnector({ accounts: [{ id: "checking-1234", kind: "bank", source: memoryFileSource({ "x.csv": 'Date,Description,Amount\n"01/02/2026,X,1' }) }], now: NOW });
     await expect(collect(malformed.historicalImport({ organizationId: TEST_ORG, cursor: null }))).rejects.toThrow("checking-1234/x.csv: CSV line 2: a quoted field is never closed");
-    const broken: StatementAccountSource = { id: "checking-1234", kind: "bank", source: { list: async () => [{ name: "x.csv", modifiedAt: RECEIVED }], read: async () => Promise.reject(new Error("disk unplugged")) } };
+    const broken: StatementAccountSource = { id: "checking-1234", kind: "bank", source: { list: async () => [{ name: "x.csv", modifiedAt: RECEIVED }], read: async () => Promise.reject(new Error("disk unplugged")), readBytes: async () => Promise.reject(new Error("disk unplugged")) } };
     await expect(collect(bankStatementsConnector({ accounts: [broken] }).historicalImport({ organizationId: TEST_ORG, cursor: null }))).rejects.toThrow(/^disk unplugged$/);
   });
 

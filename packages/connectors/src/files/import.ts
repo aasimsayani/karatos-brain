@@ -43,7 +43,7 @@ export function parseFileCursor(raw: string | null, label: string): FileCursor |
 export async function* importFiles<F extends ImportFile, E>(
   files: F[],
   saved: FileCursor | null,
-  eventsOf: (file: F, text: string) => E[],
+  eventsOf: (file: F, text: string) => E[] | Promise<E[]>,
   batchSize: number,
 ): AsyncIterable<SourceBatch> {
   const names = new Set(files.map((f) => f.name));
@@ -53,7 +53,7 @@ export async function* importFiles<F extends ImportFile, E>(
     const text = await file.read();
     const hash = sha256(text);
     if (done[file.name] === hash) continue;
-    const events = eventsOf(file, text);
+    const events = await eventsOf(file, text);
     // An interrupted file resumes where it stopped, unless it changed since.
     let next = saved?.current?.name === file.name && saved.current.hash === hash ? Math.min(saved.current.next, events.length) : 0;
     do {
