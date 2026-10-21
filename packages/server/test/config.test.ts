@@ -11,7 +11,7 @@ const valid = {
 describe("loadInstanceConfig", () => {
   it("applies defaults", () => {
     const config = loadInstanceConfig(valid);
-    expect(config).toMatchObject({ PORT: 8080, MIGRATE_ON_START: true, DOC_REGISTRY_IDS: [], ENABLED_DEPARTMENTS: [], ENABLED_WRITES: [] });
+    expect(config).toMatchObject({ PORT: 8080, MIGRATE_ON_START: true, DOC_REGISTRY_IDS: [], ENABLED_DEPARTMENTS: [], ENABLED_WRITES: [], ENABLED_INTEGRATIONS: [], SYNC_INTERVAL_MINUTES: 60 });
   });
 
   it("parses the documentation registry list", () => {
@@ -47,5 +47,17 @@ describe("loadInstanceConfig", () => {
       "stripe:*",
     ]);
     expect(() => loadInstanceConfig({ ...valid, ENABLED_WRITES: "shopify" })).toThrow(/ENABLED_WRITES: use integration:action/);
+  });
+
+  it("reads the enabled integrations and rejects ids outside the catalog", () => {
+    expect(loadInstanceConfig({ ...valid, ENABLED_INTEGRATIONS: "shopify, stripe,inventory_pos" }).ENABLED_INTEGRATIONS).toEqual(["shopify", "stripe", "inventory_pos"]);
+    expect(() => loadInstanceConfig({ ...valid, ENABLED_INTEGRATIONS: "shopify,constructor" })).toThrow(/ENABLED_INTEGRATIONS: use catalog integration ids/);
+  });
+
+  it("keeps the sync interval between 5 minutes and a day", () => {
+    expect(loadInstanceConfig({ ...valid, SYNC_INTERVAL_MINUTES: "15" }).SYNC_INTERVAL_MINUTES).toBe(15);
+    expect(loadInstanceConfig({ ...valid, SYNC_INTERVAL_MINUTES: "5" }).SYNC_INTERVAL_MINUTES).toBe(5);
+    expect(loadInstanceConfig({ ...valid, SYNC_INTERVAL_MINUTES: "1440" }).SYNC_INTERVAL_MINUTES).toBe(1440);
+    for (const bad of ["4", "1441", "1.5", "soon"]) expect(() => loadInstanceConfig({ ...valid, SYNC_INTERVAL_MINUTES: bad })).toThrow(/SYNC_INTERVAL_MINUTES/);
   });
 });
