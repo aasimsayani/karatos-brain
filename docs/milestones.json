@@ -1,0 +1,115 @@
+{
+  "$comment": "Source of truth for the README's progress section. Edit here, then run npm run progress:write. An item with an integration id is done once that catalog entry is built. Targets are estimates; move them as plans change.",
+  "milestones": [
+    {
+      "id": "foundation",
+      "name": "Foundation",
+      "value": "Every record is validated, stored once and traceable to its source.",
+      "target": "2026-04",
+      "items": [
+        { "name": "Seven-layer pipeline with idempotent ingestion and dead letters", "done": true },
+        { "name": "Database with row-level security and migrations", "done": true },
+        { "name": "Secret scanning, CI and the break-it check on every change", "done": true },
+        { "name": "Identity resolution and documentation drift checks", "done": true }
+      ]
+    },
+    {
+      "id": "departments",
+      "name": "Retail departments",
+      "value": "Eleven departments that turn store data into daily recommendations.",
+      "target": "2026-12",
+      "items": [
+        { "name": "Sales, inventory, clienteling, repairs, custom orders, appraisals, buying, metals, marketing, finance and compliance", "done": true },
+        { "name": "Turn departments on per business", "done": true },
+        { "name": "Tune thresholds against a live store's data", "done": false }
+      ]
+    },
+    {
+      "id": "core_integrations",
+      "name": "Core integrations",
+      "value": "Connects what most jewelers already run: online store, POS, payments, bank and books.",
+      "target": "2026-11",
+      "items": [
+        { "integration": "shopify" },
+        { "integration": "inventory_pos" },
+        { "integration": "stripe" },
+        { "integration": "bank_statements", "name": "Bank and card statements from CSV exports" },
+        { "name": "Bank and card statements from PDFs", "done": true },
+        { "integration": "chase" },
+        { "integration": "quickbooks" }
+      ]
+    },
+    {
+      "id": "instances",
+      "name": "Client instances",
+      "value": "Each business gets its own isolated instance, in accounts it owns.",
+      "target": "2026-12",
+      "items": [
+        { "name": "Instance API locked to one organization", "done": true },
+        { "name": "Published container image with a real-database smoke test", "done": true },
+        { "name": "Guided secrets setup that never prints a value", "done": true },
+        { "name": "First live client instance", "done": false }
+      ]
+    },
+    {
+      "id": "ai_reasoning",
+      "name": "AI reasoning",
+      "value": "Claude explains each recommendation in plain language and learns from the owner's decisions.",
+      "target": "2027-01",
+      "items": [
+        { "name": "Claude-powered reasoner with provenance and confidence", "done": false },
+        { "name": "Owner feedback tunes future recommendations", "done": false },
+        { "name": "Semantic search over the business's documents", "done": false }
+      ]
+    },
+    {
+      "id": "dashboards",
+      "name": "Self-serve AI dashboards",
+      "value": "Owners ask a question and get a dashboard, without a developer.",
+      "target": "2027-03",
+      "items": [
+        { "name": "Integrations list in the instance API for the Brain Console", "done": true },
+        { "name": "Dashboards built from a plain-language question", "done": false },
+        { "name": "Saved dashboards that refresh on every sync", "done": false }
+      ]
+    },
+    {
+      "id": "hosting",
+      "name": "Self-hosted and managed plans",
+      "value": "Run it yourself for free, or let us host it on the premium plan.",
+      "target": "2027-03",
+      "items": [
+        { "name": "Self-hosting guide for one instance per business", "done": true },
+        { "name": "One-command self-hosted install", "done": false },
+        { "name": "Managed hosting plan with upgrades and backups", "done": false }
+      ]
+    },
+    {
+      "id": "catalog_wave_2",
+      "name": "Integrations, next wave",
+      "value": "Jewelry POS, CRM, messaging, marketing and diamond feeds join the catalog.",
+      "target": "2027-06",
+      "items": [
+        { "integration": "square" },
+        { "integration": "lightspeed" },
+        { "integration": "clover" },
+        { "integration": "woocommerce" },
+        { "integration": "hubspot" },
+        { "integration": "klaviyo" },
+        { "integration": "gmail" },
+        { "integration": "xero" },
+        { "integration": "rapnet" }
+      ]
+    },
+    {
+      "id": "manufacturing",
+      "name": "Manufacturing departments",
+      "value": "Bench, casting and setting work tracked with metal loss and labor cost per piece.",
+      "target": "2027-06",
+      "items": [
+        { "name": "Bench jobs, casting, stone setting, finishing and quality control", "done": false },
+        { "name": "Production planning, metal loss and labor cost per piece", "done": false }
+      ]
+    }
+  ]
+}

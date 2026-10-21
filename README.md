@@ -1,12 +1,60 @@
 # KaratOS Brain
 
-Brain A is an open-source operational intelligence layer for jewelry businesses. It reads the data a jewelry business already has (orders, payments, inventory, customers, bank statements), records it as auditable events, and turns those events into recommendations that a person checks, accepts or overrides.
+**The operating brain for jewelry businesses.** KaratOS reads the systems a jeweler already uses, connects what each one knows, and tells the owner what to do today, with the evidence behind every suggestion.
 
-It is the shared "brain" behind the Fuse Jewelry and KaratOS agents. The core is built in public so any jeweler can run it. Specialized modules, such as the Brain Console, are private paid add-ons that read from the same open API.
+## Why it matters
+
+A jewelry store is a showroom, a repair bench, a custom studio, a gold buyer, an appraiser and a back office under one roof. Each runs on a different system, or on paper, so the owner decides by feel and money leaks in the gaps between them:
+
+- **Inventory sits.** Pieces stay in the case for a year while gold moves, and nobody reprices or remakes them.
+- **Promises slip.** Repairs and custom orders run past the date the customer was given.
+- **Cash drifts.** Sales, deposits and card fees never get matched, so true margin is a guess.
+- **Deadlines hide.** A $10,000 cash sale needs an IRS Form 8300 within 15 days, and nobody is tracking it.
+- **Customers go quiet.** Anniversaries and wish lists live in a notebook instead of a reminder.
+
+KaratOS closes those gaps. Every sale, repair, payment and bank line becomes one auditable record, and eleven departments read those records to suggest the next action: reprice these pieces, call this customer, reconcile this drawer, file this form. The owner accepts, rejects or adjusts each one, and that choice is kept so the advice gets better.
+
+## What a jeweler gets
+
+- **One picture of the business.** A customer, product or order is one record, whichever system it came from.
+- **A short list of what to do today**, each item with its confidence, its expected impact, and links to the exact records behind it.
+- **Value that grows with each connection.** POS alone shows what sells. Add the online store, the bank and the books, and it shows true margin, cross-channel demand and cash that never reached the bank.
+- **Your data stays yours.** Each business runs its own isolated instance. Self-host it for free, or let us host it on the managed plan.
+- **Read-only by default.** KaratOS reads from your systems and never changes them unless you turn a specific action on.
+
+## Progress
+
+This section updates itself as work lands: it is generated from [docs/milestones.json](docs/milestones.json) and the [integration catalog](docs/integrations.md), and a test fails if it falls behind. Targets are estimates and move as priorities change.
+
+<!-- progress:start -->
+<!-- Generated from docs/milestones.json and the integration catalog by npm run progress:write. Edit those, not this block. -->
+
+**Overall: 45% complete**, 17 of 38 roadmap items done. 5 of the 75 systems in the integration catalog are connected.
+
+| Milestone | What it gives a jeweler | Progress | Target |
+| --- | --- | --- | --- |
+| Foundation | Every record is validated, stored once and traceable to its source. | ██████████ 100% | Done |
+| Retail departments | Eleven departments that turn store data into daily recommendations. | ███████░░░ 67% | Dec 2026 |
+| Core integrations | Connects what most jewelers already run: online store, POS, payments, bank and books. | █████████░ 86% | Nov 2026 |
+| Client instances | Each business gets its own isolated instance, in accounts it owns. | ████████░░ 75% | Dec 2026 |
+| AI reasoning | Claude explains each recommendation in plain language and learns from the owner's decisions. | ░░░░░░░░░░ 0% | Jan 2027 |
+| Self-serve AI dashboards | Owners ask a question and get a dashboard, without a developer. | ███░░░░░░░ 33% | Mar 2027 |
+| Self-hosted and managed plans | Run it yourself for free, or let us host it on the premium plan. | ███░░░░░░░ 33% | Mar 2027 |
+| Integrations, next wave | Jewelry POS, CRM, messaging, marketing and diamond feeds join the catalog. | ░░░░░░░░░░ 0% | Jun 2027 |
+| Manufacturing departments | Bench, casting and setting work tracked with metal loss and labor cost per piece. | ░░░░░░░░░░ 0% | Jun 2027 |
+
+### Up next
+
+- **Core integrations** (target Nov 2026): QuickBooks Online
+- **Retail departments** (target Dec 2026): Tune thresholds against a live store's data
+- **Client instances** (target Dec 2026): First live client instance
+<!-- progress:end -->
+
+The [roadmap](docs/roadmap.md) has the detail behind each milestone, and the [changelog](CHANGELOG.md) lists what shipped.
 
 ## What it covers
 
-A jewelry business is many businesses under one roof: a showroom, a repair bench, a custom design studio, a gold buyer, an appraiser, a marketing team and a back office. Most stores run each one in a different system, or on paper. Brain A models each one as a **department**. Every department runs through the same seven layers and reads what the other departments have learned.
+Brain A, the engine inside KaratOS, models each part of the business as a **department**. Every department runs through the same seven layers and reads what the other departments have learned.
 
 ### Departments
 
@@ -87,21 +135,7 @@ Every piece of data passes through seven layers, in order. No layer is skipped.
 
 See [docs/architecture/overview.md](docs/architecture/overview.md) for details.
 
-## Status
-
-| Area | State |
-| --- | --- |
-| Seven-layer pipeline, database, one instance per client | Built |
-| Retail departments (11) | Built |
-| Instance HTTP API, including the integrations list for the Brain Console | Built |
-| Connector test kit, nightly sandbox runs, vendor docs watch | Built |
-| Shopify connector (orders, refunds, fulfillments, products, customers; read-only) | Built |
-| Connectors: inventory and POS, Stripe, bank statements (CSV and PDF), QuickBooks | Next |
-| Claude-powered reasoning | Planned |
-| Manufacturing departments | Planned |
-| CRM and messaging | Later |
-
-The [roadmap](docs/roadmap.md) tracks each item, [integrations](docs/integrations.md) lists all 76 systems in the catalog, and [the website guide](docs/website.md) covers the public site.
+[Integrations](docs/integrations.md) lists all the systems in the catalog, and [the website guide](docs/website.md) covers the public site.
 
 ## Quick start
 
@@ -191,7 +225,8 @@ npm run test:coverage        # fails under 90% lines, functions and statements, 
 - Every behavior change needs a test, and every security control needs one that fails if the control is removed. The break-it check on each PR includes security mutations; see [docs/security.md](docs/security.md#the-break-it-check).
 - Every behavior change needs a test. A database change needs a migration and a test that runs it against PGlite.
 - Add a changelog fragment, `changelog.d/<branch>.md`, and update the relevant doc in the same PR. Don't edit `CHANGELOG.md` directly; see [changelog.d/README.md](changelog.d/README.md).
-- After a PR merges, run `scripts/sync-open-prs.sh` to bring main into every other open PR. It merges rather than rebases, and pushes only after the checks pass.
+- When a change finishes a roadmap item, mark it done in [docs/milestones.json](docs/milestones.json) and run `npm run progress:write`. Items tied to an integration update on their own once the catalog marks it built.
+- After a PR merges, run `scripts/sync-open-prs.sh` to bring main into every other open PR. It merges rather than rebases, regenerates the progress section, and pushes only after the checks pass.
 
 AI agents working in this repo must read [AGENTS.md](AGENTS.md) first.
 
