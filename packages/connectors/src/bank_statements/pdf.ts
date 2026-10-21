@@ -43,8 +43,13 @@ interface Closing {
   day: number;
 }
 
+const MONTHS = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
+const SPELLED = /^([A-Za-z]{3,9})\.?\s+(\d{1,2}),?\s+(\d{4})$/;
+
 function closingDate(text: string, profile: BankProfile): Closing | null {
-  const iso = parseDate(text, profile.dateOrder);
+  const spelled = SPELLED.exec(text.trim());
+  const month = spelled ? MONTHS.indexOf(spelled[1]!.slice(0, 3).toLowerCase()) + 1 : 0;
+  const iso = spelled ? (month ? parseDate(`${spelled[3]}-${month}-${spelled[2]}`, "ymd") : null) : parseDate(text, profile.dateOrder);
   if (!iso) return null;
   return { year: Number(iso.slice(0, 4)), month: Number(iso.slice(5, 7)), day: Number(iso.slice(8, 10)) };
 }
@@ -77,7 +82,7 @@ export const MAX_PDF_LINE = 500;
 
 export function pdfStatementLines(lines: readonly PdfLine[], profile: BankProfile, fileName: string): StatementLine[] {
   const layout = profile.pdf ?? GENERIC_PDF_LAYOUT;
-  const transaction = new RegExp(layout.transaction, "i");
+  const transactions = (typeof layout.transaction === "string" ? [layout.transaction] : layout.transaction).map((t) => new RegExp(t, "i"));
   const period = layout.period ? new RegExp(layout.period, "i") : null;
   const sections = layout.sections.map((s) => ({ match: new RegExp(s.match, "i"), amounts: s.amounts }));
   const ignore = layout.ignore.map((p) => new RegExp(p, "i"));
@@ -110,7 +115,8 @@ export function pdfStatementLines(lines: readonly PdfLine[], profile: BankProfil
     }
     if (mode === "skip" || ignore.some((p) => p.test(text))) continue;
     const sourceRow = `${fileName}:p${line.page}:${line.line}`;
-    const groups = transaction.exec(text)?.groups;
+    let groups: Record<string, string | undefined> | undefined;
+    for (const t of transactions) if ((groups = t.exec(text)?.groups)) break;
     if (!groups) {
       // A dated line with money on it, inside a transactions section, that the layout can't read is kept for a person to look at.
       if (headings > 0 && DATE_FIRST.test(text) && MONEY_ANYWHERE.test(text)) {
@@ -131,8 +137,10 @@ export function pdfStatementLines(lines: readonly PdfLine[], profile: BankProfil
       sourceRow,
       occurredAt: (dated && parseDate(dated, profile.dateOrder, profile.utcOffset)) ?? undefined,
       amountCents,
-      description: (groups.description ?? "").trim().replace(/\s+/g, " "),
+      // A check line may carry only its number; naming it lets the built-in rules see a check.
+      description: (groups.description ?? "").trim().replace(/\s+/g, " ") || (groups.checkNumber?.trim() ? `CHECK ${groups.checkNumber.trim()}` : ""),
       ...(groups.balance !== undefined ? { balanceCents: money(groups.balance) } : {}),
+      ...(groups.checkNumber?.trim() ? { checkNumber: groups.checkNumber.trim() } : {}),
     });
   }
   if (out.length === 0 && headings === 0) {

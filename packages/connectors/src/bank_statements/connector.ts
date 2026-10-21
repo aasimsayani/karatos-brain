@@ -32,8 +32,12 @@ export interface StatementAccountSource {
   profile?: BankProfile;
 }
 
+export type StatementFormat = "csv" | "pdf";
+
 export interface BankStatementOptions {
   accounts: StatementAccountSource[];
+  /** Which files to read. Both by default. */
+  formats?: readonly StatementFormat[];
   /** Rows dated earlier than this many years ago are skipped. */
   historyYears?: number;
   /** Events per batch; each batch is one checkpoint. */
@@ -76,6 +80,9 @@ export function bankStatementsConnector(options: BankStatementOptions): Connecto
   const now = options.now ?? (() => new Date());
   const historyYears = options.historyYears ?? 6;
   const batchSize = options.batchSize ?? 250;
+  const formats = new Set(options.formats ?? ["csv", "pdf"]);
+  if (formats.size === 0 || [...formats].some((f) => f !== "csv" && f !== "pdf")) throw new Error("formats must list csv, pdf or both");
+  const wanted = (name: string) => [...formats].some((f) => name.toLowerCase().endsWith(`.${f}`));
   if (!Number.isInteger(batchSize) || batchSize < 1) throw new Error("batchSize must be a positive whole number");
   const ids = new Set<string>();
   for (const account of options.accounts) {
@@ -107,7 +114,7 @@ export function bankStatementsConnector(options: BankStatementOptions): Connecto
     const saved = parseBankStatementCursor(context.cursor);
     const files: (ImportFile & { account: StatementAccountSource; fileName: string })[] = [];
     for (const account of [...options.accounts].sort((a, b) => (a.id < b.id ? -1 : 1))) {
-      const listed = (await account.source.list()).filter((f) => /\.(csv|pdf)$/i.test(f.name)).sort((a, b) => (a.name < b.name ? -1 : 1));
+      const listed = (await account.source.list()).filter((f) => wanted(f.name)).sort((a, b) => (a.name < b.name ? -1 : 1));
       for (const f of listed) {
         const read = isPdf(f.name) ? async () => Buffer.from(await account.source.readBytes(f.name)).toString("latin1") : () => account.source.read(f.name);
         files.push({ name: `${account.id}/${f.name}`, read, account, fileName: f.name });

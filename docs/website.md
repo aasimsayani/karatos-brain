@@ -11,7 +11,7 @@ node site/server.ts                # serves it on :8080
 
 ## Lighthouse
 
-CI's `website-lighthouse` job builds the site, serves it, runs Lighthouse three times with its default mobile emulation, and fails if the median score for performance, accessibility, best practices or SEO is under 90 (`site/lighthouse.ts`). The median keeps one slow run on a busy shared runner from failing the site. To run it locally:
+CI's `website-lighthouse` job builds the site, serves it, runs Lighthouse three times with its default mobile emulation, and fails if the median score for performance, accessibility, best practices or SEO is under 90 (`site/lighthouse.ts`). The median keeps one slow run on a busy shared runner from failing the site. A run where Chrome itself fails is retried once, and a run that fails twice counts as unscored. When the job fails, its annotations say why: the server didn't start, or which category missed the bar, with every run's score. To run it locally:
 
 ```sh
 node site/server.ts &

@@ -1,0 +1,1 @@
+- A failed website Lighthouse check now says why in its annotations: the site server didn't start, or which category missed the bar, with every run's score. A Lighthouse run that crashes is retried once and otherwise counts as unscored, instead of ending the job with a bare exit code.
