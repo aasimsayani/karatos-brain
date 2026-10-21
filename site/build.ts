@@ -168,6 +168,8 @@ h2{font-size:clamp(30px,4.5vw,46px);max-width:20ch}
 .actions{display:flex;flex-wrap:wrap;gap:var(--space-2)}
 .note{margin:var(--space-3) 0 0;font-size:14px;color:var(--muted)}
 section{padding:var(--section) 0;border-top:1px solid var(--line);scroll-margin-top:64px}
+/* Below-the-fold sections skip layout and paint until they near the viewport: the integrations catalog alone is hundreds of elements. */
+section{content-visibility:auto;contain-intrinsic-size:auto 900px}
 .section-intro{color:var(--ink-2);max-width:62ch;margin:var(--space-2) 0 var(--space-5);font-size:17px}
 .steps{display:grid;grid-template-columns:repeat(3,1fr);gap:var(--space-3);list-style:none;padding:0;margin:0;counter-reset:step}
 .steps li{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:var(--space-3);counter-increment:step}
