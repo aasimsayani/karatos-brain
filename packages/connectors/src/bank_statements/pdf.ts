@@ -68,6 +68,13 @@ function signed(cents: number | null, mode: Mode, profile: BankProfile): number 
   return profile.amounts === "money_out_positive" && cents !== 0 ? -cents : cents;
 }
 
+/**
+ * No statement prints a line this long. Longer ones are never matched against
+ * the layout's patterns, which can backtrack for seconds on a crafted line of
+ * thousands of spaces; a dated one is kept, cut short, for a person to look at.
+ */
+export const MAX_PDF_LINE = 500;
+
 export function pdfStatementLines(lines: readonly PdfLine[], profile: BankProfile, fileName: string): StatementLine[] {
   const layout = profile.pdf ?? GENERIC_PDF_LAYOUT;
   const transaction = new RegExp(layout.transaction, "i");
@@ -78,6 +85,7 @@ export function pdfStatementLines(lines: readonly PdfLine[], profile: BankProfil
   let closing: Closing | null = null;
   if (period) {
     for (const line of lines) {
+      if (line.text.length > MAX_PDF_LINE) continue;
       const end = period.exec(line.text)?.groups?.end;
       if (end && (closing = closingDate(end, profile))) break;
     }
@@ -88,6 +96,12 @@ export function pdfStatementLines(lines: readonly PdfLine[], profile: BankProfil
   let headings = 0;
   for (const line of lines) {
     const text = line.text.trim();
+    if (text.length > MAX_PDF_LINE) {
+      if (headings > 0 && mode !== "skip" && DATE_FIRST.test(text)) {
+        out.push({ sourceRow: `${fileName}:p${line.page}:${line.line}`, occurredAt: undefined, amountCents: null, description: text.slice(0, 120).replace(/\s+/g, " ") });
+      }
+      continue;
+    }
     const section = sections.find((s) => s.match.test(text));
     if (section) {
       mode = section.amounts;
