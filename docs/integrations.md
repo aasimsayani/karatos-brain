@@ -235,6 +235,17 @@ Every connector implements `Connector` from `@karatos/core`:
 - Replays are counted as duplicates and stored once.
 - Every record is stamped with the instance's organization and the connector's source.
 
+## Syncing on a schedule
+
+An instance syncs each connector it has turned on, on its own. List the connectors in `ENABLED_INTEGRATIONS` (catalog ids, e.g. `shopify,stripe,inventory_pos,bank_statements`) and give each one its settings below. On start the instance logs one line for every listed integration it can't sync, naming the missing settings but never their values, e.g. `sync stripe skipped: missing STRIPE_SECRET_KEY`.
+
+- The first round starts when the instance does. The next one starts `SYNC_INTERVAL_MINUTES` after the last one finished (default 60, allowed 5 to 1440), so rounds never overlap.
+- Connectors run one at a time. One failing, for a bad key, an unreadable profile or a vendor outage, is logged and the others still run.
+- Each connector runs its historical import until it has finished once, then syncs incrementally from its own checkpoint. A failed import resumes on the next round rather than being skipped.
+- Each connector is rebuilt every round, so a new file in an import folder, a changed profile or a rotated key is picked up without a restart.
+- Each round logs one line per connector: how many records were new, duplicates or dead-lettered.
+- Syncing only reads. Writes still go through `WriteGate` and `ENABLED_WRITES`.
+
 ## Built connectors
 
 Connectors live in `@karatos/connectors` (`packages/connectors`). Each one is read-only, and the token or app it uses should hold read scopes only.
