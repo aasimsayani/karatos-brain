@@ -13,7 +13,7 @@ COPY packages packages
 RUN npm run build -w @karatos/core -w @karatos/store-postgres \
  && npm run build -w @karatos/retail -w @karatos/connectors \
  && npm run build -w @karatos/server \
- && npm prune --omit=dev
+ && npm prune --omit=dev --omit=optional
 
 FROM node:26-alpine
 ENV NODE_ENV=production

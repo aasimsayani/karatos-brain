@@ -111,10 +111,10 @@ export const INTEGRATIONS: IntegrationSpec[] = [
       "Read-only: KaratOS signs in with a restricted key that can't move money",
     ] },
   { id: "chase", name: "Chase business bank accounts and credit cards", domain: "financial", segments: ALL, access: "file", testWith: "fixtures", departments: ["finance", "compliance"], historicalImportYears: 6, webhooks: false, settings: ["CHASE_IMPORT_MODE", "CHASE_MANUAL_IMPORT_DIR"], changelog: null, status: "planned", note: "CSV exports, PDF statements or both, whichever the client prefers; 5-6 years of history" },
-  { id: "bank_statements", name: "Bank and credit card statements (any bank)", domain: "financial", segments: ALL, access: "file", testWith: "fixtures", departments: ["finance", "compliance"], historicalImportYears: 6, webhooks: false, settings: ["BANK_STATEMENTS_IMPORT_DIR"], changelog: null, status: "built", note: "CSV exports from any bank now; PDF statements next", capabilities: [
-      "Imports six years of bank and credit card transactions from any bank's CSV exports",
+  { id: "bank_statements", name: "Bank and credit card statements (any bank)", domain: "financial", segments: ALL, access: "file", testWith: "fixtures", departments: ["finance", "compliance"], historicalImportYears: 6, webhooks: false, settings: ["BANK_STATEMENTS_IMPORT_DIR"], changelog: null, status: "built", note: "CSV exports and PDF statements from any bank", capabilities: [
+      "Imports six years of bank and credit card transactions from any bank's CSV exports or PDF statements",
       "Sorts each transaction into cash deposits, card settlements, vendor payments, payroll and fees",
-      "Stores a transaction once even when overlapping exports both include it",
+      "Stores a transaction once even when overlapping exports, or a CSV export and a PDF statement, both include it",
       "Lets finance check cash sales against cash deposits",
       "Read-only: KaratOS only reads the statements and never touches your accounts",
     ] },
