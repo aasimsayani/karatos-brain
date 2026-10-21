@@ -50,7 +50,7 @@ server.listen(config.PORT, () => {
 });
 
 // Each turned-on connector that has its settings syncs on a schedule. Skipped ones are named with what they're missing, never with values.
-const { connectors, skipped } = scheduledConnectors(config.ENABLED_INTEGRATIONS, process.env);
+const { connectors, skipped } = scheduledConnectors(config.ENABLED_INTEGRATIONS, process.env, { memory, organizationId: config.ORGANIZATION_ID });
 for (const { id, reason } of skipped) console.log(`sync ${id} skipped: ${reason}`);
 const sync = createSyncRunner({
   connectors,

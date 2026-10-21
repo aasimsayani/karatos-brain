@@ -1,10 +1,13 @@
 import type { BrainPipeline, Connector, MemoryStore, SyncReport } from "@karatos/core";
 import { runSync } from "@karatos/core";
+import { sealedTokenStore } from "./token-store.js";
 import {
   accountsFromDirectory,
   bankStatementsConnector,
   directorySource,
   inventoryPosConnector,
+  memoryTokenStore,
+  quickBooksConnector,
   resolveBankProfiles,
   resolvePosProfile,
   shopifyConnector,
@@ -36,8 +39,14 @@ export const HISTORICAL_COMPLETE = "historical_complete";
 
 const set = (env: Env, name: string) => (env[name]?.trim() ? env[name]!.trim() : undefined);
 
+/** Where connectors that keep state of their own, like a rotating refresh token, keep it. */
+export interface ConnectorStore {
+  memory: MemoryStore;
+  organizationId: string;
+}
+
 /** How each built connector is made from an instance's settings. Settings named here are the ones it can't run without. */
-const FACTORIES: Record<string, { needs: (env: Env) => string[]; make: (env: Env) => Promise<Connector> }> = {
+const FACTORIES: Record<string, { needs: (env: Env) => string[]; make: (env: Env, store?: ConnectorStore) => Promise<Connector> }> = {
   shopify: {
     needs: (env) => [
       ...(set(env, "SHOPIFY_SHOP_DOMAIN") ? [] : ["SHOPIFY_SHOP_DOMAIN"]),
@@ -67,6 +76,21 @@ const FACTORIES: Record<string, { needs: (env: Env) => string[]; make: (env: Env
     make: async (env) =>
       inventoryPosConnector({ source: directorySource(set(env, "POS_IMPORT_DIR")!), profile: await resolvePosProfile(env.POS_MAPPING_PROFILE) }),
   },
+  quickbooks: {
+    needs: (env) => ["QUICKBOOKS_CLIENT_ID", "QUICKBOOKS_CLIENT_SECRET", "QUICKBOOKS_REALM_ID", "QUICKBOOKS_REFRESH_TOKEN", "QUICKBOOKS_ENVIRONMENT"].filter((name) => !set(env, name)),
+    make: async (env, store) => {
+      const seed = set(env, "QUICKBOOKS_REFRESH_TOKEN")!;
+      const clientSecret = set(env, "QUICKBOOKS_CLIENT_SECRET")!;
+      return quickBooksConnector({
+        clientId: set(env, "QUICKBOOKS_CLIENT_ID")!,
+        clientSecret,
+        realmId: set(env, "QUICKBOOKS_REALM_ID")!,
+        environment: set(env, "QUICKBOOKS_ENVIRONMENT")!,
+        // Intuit rotates the refresh token daily; the newest is kept, encrypted, in the instance's database.
+        tokens: store ? sealedTokenStore({ ...store, source: "quickbooks", seed, keyMaterial: clientSecret }) : memoryTokenStore(seed),
+      });
+    },
+  },
   bank_statements: {
     needs: (env) => (set(env, "BANK_STATEMENTS_IMPORT_DIR") ? [] : ["BANK_STATEMENTS_IMPORT_DIR"]),
     make: async (env) => {
@@ -84,7 +108,7 @@ export const SYNCABLE_INTEGRATIONS = Object.keys(FACTORIES);
  * a connector and the settings it needs. Everything else is reported with a
  * reason, naming missing settings but never their values.
  */
-export function scheduledConnectors(enabled: readonly string[], env: Env): { connectors: ScheduledConnector[]; skipped: SkippedIntegration[] } {
+export function scheduledConnectors(enabled: readonly string[], env: Env, store?: ConnectorStore): { connectors: ScheduledConnector[]; skipped: SkippedIntegration[] } {
   const connectors: ScheduledConnector[] = [];
   const skipped: SkippedIntegration[] = [];
   for (const id of new Set(enabled)) {
@@ -95,7 +119,7 @@ export function scheduledConnectors(enabled: readonly string[], env: Env): { con
     }
     const missing = factory.needs(env);
     if (missing.length) skipped.push({ id, reason: `missing ${missing.join(", ")}` });
-    else connectors.push({ id, make: () => factory.make(env) });
+    else connectors.push({ id, make: () => factory.make(env, store) });
   }
   return { connectors, skipped };
 }

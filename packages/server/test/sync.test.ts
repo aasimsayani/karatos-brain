@@ -90,6 +90,9 @@ describe("scheduledConnectors", () => {
       { id: "bank_statements", reason: "missing BANK_STATEMENTS_IMPORT_DIR" },
     ]);
     expect(JSON.stringify(skipped)).not.toContain(secret);
+    expect(scheduledConnectors(["quickbooks"], { QUICKBOOKS_CLIENT_ID: "id", QUICKBOOKS_REFRESH_TOKEN: secret }).skipped).toEqual([
+      { id: "quickbooks", reason: "missing QUICKBOOKS_CLIENT_SECRET, QUICKBOOKS_REALM_ID, QUICKBOOKS_ENVIRONMENT" },
+    ]);
   });
 
   it("syncs nothing unless an integration is turned on, even when its settings are present", () => {
@@ -112,10 +115,15 @@ describe("scheduledConnectors", () => {
       STRIPE_API_VERSION: "2026-09-30.clover",
       POS_IMPORT_DIR: pos,
       BANK_STATEMENTS_IMPORT_DIR: bank,
+      QUICKBOOKS_CLIENT_ID: "client-id",
+      QUICKBOOKS_CLIENT_SECRET: "client-secret-value",
+      QUICKBOOKS_REALM_ID: "9341450000",
+      QUICKBOOKS_REFRESH_TOKEN: "refresh-value",
+      QUICKBOOKS_ENVIRONMENT: "sandbox",
     };
     const { connectors } = scheduledConnectors(SYNCABLE_INTEGRATIONS, env);
     const built = await Promise.all(connectors.map((c) => c.make()));
-    expect(built.map((c) => c.source).sort()).toEqual(["bank_statements", "inventory_pos", "shopify", "stripe"]);
+    expect(built.map((c) => c.source).sort()).toEqual(["bank_statements", "inventory_pos", "quickbooks", "shopify", "stripe"]);
     const token = await scheduledConnectors(["shopify"], { SHOPIFY_SHOP_DOMAIN: "demo.myshopify.com", SHOPIFY_ADMIN_ACCESS_TOKEN: "t" }).connectors[0]!.make();
     expect(token.source).toBe("shopify");
     for (const connector of built) expect(connector).not.toHaveProperty("write");

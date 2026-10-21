@@ -155,16 +155,21 @@ describe("docMockWatchTargets", () => {
       "https://api.stuller.com/help",
       "https://api.stuller.com/Help/Api/GET-namespace-v2.Invoice-Rest",
       "https://api.stuller.com/Help/Api/GET-namespace-v2.Products-MetalMarketRates",
+      "https://developer.intuit.com/app/developer/qbo/docs/develop/authentication-and-authorization/oauth-2.0",
+      "https://developer.intuit.com/app/developer/qbo/docs/api/accounting/all-entities/account",
+      "https://developer.intuit.com/app/developer/qbo/docs/learn/explore-the-quickbooks-online-api/data-queries",
+      "https://developer.intuit.com/app/developer/qbo/docs/api/accounting/all-entities/changedatacapture",
     ]);
   });
 });
 
 describe("built-in doc mocks", () => {
-  it("each stands in for a catalog system we can't reach on our own, and lists its assumptions", () => {
+  it("each stands in for a catalog system we can't reach on our own yet, and lists its assumptions", () => {
     for (const mock of allDocMocks()) {
       const spec = INTEGRATIONS.find((i) => i.id === mock.integration);
       expect(spec, mock.integration).toBeDefined();
-      expect(["paid_account", "partner"]).toContain(spec!.testWith);
+      // A free sandbox counts until an account is set up for it; its recordings then replace the mock.
+      expect(["paid_account", "partner", "sandbox"]).toContain(spec!.testWith);
       expect(mock.source.version ?? "", mock.integration).not.toBe("");
       expect(mock.assumptions.length, mock.integration).toBeGreaterThan(0);
     }
@@ -233,14 +238,14 @@ describe("Stuller doc mock", () => {
 describe("docMockVendorDocsTargets", () => {
   it("gives each mock page its own watch key, named after the catalog entry", () => {
     const targets = docMockVendorDocsTargets(allDocMocks());
-    expect(targets).toHaveLength(3);
+    expect(targets).toHaveLength(7);
     expect(targets[0]).toEqual({
       integration: "stuller:api-stuller-com-help",
       name: "Stuller",
       url: "https://api.stuller.com/help",
       mock: { integration: "stuller", retrievedOn: "2026-10-15" },
     });
-    expect(new Set(targets.map((t) => t.integration)).size).toBe(3);
+    expect(new Set(targets.map((t) => t.integration)).size).toBe(7);
   });
 
   it("falls back to the integration id for a mock outside the catalog", () => {
