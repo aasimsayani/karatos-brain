@@ -1,0 +1,1 @@
+- Build: the shared TypeScript config names the Node types itself, so the packages and both Docker images build under TypeScript 7 as well as 5.9, where newer compilers no longer load `@types/node` on their own
