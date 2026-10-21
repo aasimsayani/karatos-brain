@@ -64,7 +64,8 @@ export function linesOf(pieces: PdfPiece[]): string[] {
         text += piece.text;
         end = piece.x + piece.width;
       }
-      return text.replace(/[ \t]+$/, "").replace(/^\s+/, "").replace(/(\S) (?= \S)/g, "$1 ");
+      // trim(), not a whitespace regex: a crafted PDF can hand over a long run of tabs, and an anchored [ \t]+$ is quadratic on it.
+      return text.trim().replace(/(\S) (?= \S)/g, "$1 ");
     })
     .filter((t) => t !== "");
 }

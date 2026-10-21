@@ -6,6 +6,7 @@ import {
   BankProfileError,
   GENERIC_BANK_PROFILE,
   GENERIC_PDF_LAYOUT,
+  MAX_PDF_LINE,
   PdfError,
   PdfLayoutError,
   StatementFileError,
@@ -107,6 +108,14 @@ describe("PDF text lines", () => {
     expect(linesOf([{ x: 10, y: 5, width: 0, height: 10, text: "" }, piece(30, "A", 5)])).toEqual(["A"]);
   });
 
+  it("trims a long run of tabs or spaces in linear time", () => {
+    const piece = (x: number, text: string) => ({ x, y: 700, width: text.length * 6, height: 10, text });
+    const started = performance.now();
+    expect(linesOf([piece(50, `A${"\t".repeat(200_000)}x`), piece(50, " \t".repeat(100_000))])).toHaveLength(1);
+    expect(linesOf([piece(50, `${" ".repeat(10)}A${"\t ".repeat(100_000)}`)])).toEqual(["A"]);
+    expect(performance.now() - started).toBeLessThan(1_000);
+  });
+
   it("refuses files over the size or page limit, and anything that isn't a PDF", async () => {
     await expect(pdfLines(CHECKING_PDF, { maxBytes: 100 })).rejects.toThrow(new PdfError("is larger than 0 MB"));
     await expect(pdfLines(CHECKING_PDF, { maxPages: 1 })).rejects.toThrow("has 2 pages, more than the 1 allowed");
@@ -159,6 +168,21 @@ describe("PDF statement lines", () => {
     ]);
     const outPositive = parseBankProfile({ ...GENERIC_BANK_PROFILE, amounts: "money_out_positive" });
     expect(pdfStatementLines(lines("01/03/2026  PURCHASE  25.00"), outPositive, "f.pdf")[0]!.amountCents).toBe(-2_500);
+  });
+
+  it("never runs the layout's patterns on a line longer than any statement prints", () => {
+    const long = `01/02/2026 A${" ".repeat(20_000)}x`;
+    const started = performance.now();
+    const read = pdfStatementLines(lines(`Statement period 12/16/2025 through 01/15/2026${" ".repeat(20_000)}x`, "Deposits", long, "01/03/2026  DEPOSIT  5.00", "Daily balance", long), GENERIC_BANK_PROFILE, "f.pdf");
+    expect(performance.now() - started).toBeLessThan(1_000);
+    expect(read).toEqual([
+      { sourceRow: "f.pdf:p1:3", occurredAt: undefined, amountCents: null, description: "01/02/2026 A " },
+      { sourceRow: "f.pdf:p1:4", occurredAt: "2026-01-03T00:00:00.000Z", amountCents: 500, description: "DEPOSIT" },
+    ]);
+    expect(MAX_PDF_LINE).toBe(500);
+    // A profile's own period pattern doesn't run on an over-long line either, so its closing date isn't used.
+    expect(pdfStatementLines(lines(`${"x".repeat(MAX_PDF_LINE)} through 01/15/2026`, "Deposits", "01/03  DEPOSIT  5.00"), GENERIC_BANK_PROFILE, "f.pdf")[0]!.occurredAt).toBeUndefined();
+    expect(pdfStatementLines(lines("Deposits", `01/02/2026  ${"A".repeat(MAX_PDF_LINE - 18)}  5.00`), GENERIC_BANK_PROFILE, "f.pdf")[0]!.amountCents).toBe(500);
   });
 
   it("dead-letters a dated line with no year when the closing date can't be found", () => {
