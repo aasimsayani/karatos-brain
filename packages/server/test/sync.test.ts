@@ -89,6 +89,8 @@ describe("scheduledConnectors", () => {
       { id: "inventory_pos", reason: "missing POS_IMPORT_DIR" },
       { id: "bank_statements", reason: "missing BANK_STATEMENTS_IMPORT_DIR" },
     ]);
+    expect(scheduledConnectors(["chase"], { CHASE_IMPORT_MODE: "manual_pdf" }).skipped).toEqual([{ id: "chase", reason: "missing CHASE_MANUAL_IMPORT_DIR" }]);
+    expect(scheduledConnectors(["chase"], { CHASE_MANUAL_IMPORT_DIR: "/data/chase" }).skipped).toEqual([{ id: "chase", reason: "missing CHASE_IMPORT_MODE" }]);
     expect(JSON.stringify(skipped)).not.toContain(secret);
   });
 
@@ -103,6 +105,7 @@ describe("scheduledConnectors", () => {
   it("builds each built connector from the instance's settings", async () => {
     const pos = await mkdtemp(join(tmpdir(), "sync-pos-"));
     const bank = await mkdtemp(join(tmpdir(), "sync-bank-"));
+    const chase = await mkdtemp(join(tmpdir(), "sync-chase-"));
     const env = {
       SHOPIFY_SHOP_DOMAIN: "demo.myshopify.com",
       SHOPIFY_CLIENT_ID: "id",
@@ -112,10 +115,12 @@ describe("scheduledConnectors", () => {
       STRIPE_API_VERSION: "2026-09-30.clover",
       POS_IMPORT_DIR: pos,
       BANK_STATEMENTS_IMPORT_DIR: bank,
+      CHASE_IMPORT_MODE: "manual_csv_and_pdf",
+      CHASE_MANUAL_IMPORT_DIR: chase,
     };
     const { connectors } = scheduledConnectors(SYNCABLE_INTEGRATIONS, env);
     const built = await Promise.all(connectors.map((c) => c.make()));
-    expect(built.map((c) => c.source).sort()).toEqual(["bank_statements", "inventory_pos", "shopify", "stripe"]);
+    expect(built.map((c) => c.source).sort()).toEqual(["bank_statements", "chase", "inventory_pos", "shopify", "stripe"]);
     const token = await scheduledConnectors(["shopify"], { SHOPIFY_SHOP_DOMAIN: "demo.myshopify.com", SHOPIFY_ADMIN_ACCESS_TOKEN: "t" }).connectors[0]!.make();
     expect(token.source).toBe("shopify");
     for (const connector of built) expect(connector).not.toHaveProperty("write");

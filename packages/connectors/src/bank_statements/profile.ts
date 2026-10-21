@@ -1,4 +1,3 @@
-import { readFile } from "node:fs/promises";
 import { z } from "zod";
 
 /**
@@ -22,11 +21,13 @@ const Pattern = z.string().min(1);
 export const PdfLayoutSchema = z.object({
   /**
    * A transaction line, with named groups: `date`, `description`, and
-   * `amount`, or `debit` and `credit`; optionally `balance`. Columns are
-   * separated by two or more spaces in the text read from the PDF.
+   * `amount`, or `debit` and `credit`; optionally `balance` and
+   * `checkNumber`. Columns are separated by two or more spaces in the text
+   * read from the PDF. A list of patterns is tried in order, for statements
+   * that lay out checks differently from other lines.
    */
-  transaction: Pattern,
-  /** Finds the statement's closing date, as a group named `end`, for dates written without a year. */
+  transaction: z.union([Pattern, z.array(Pattern).min(1)]),
+  /** Finds the statement's closing date, as a group named `end` (`01/15/2026` or `January 15, 2026`), for dates written without a year. */
   period: Pattern.optional(),
   /** Section headings, in order of precedence. A heading sets how the amounts below it are signed until the next one. */
   sections: z
@@ -88,8 +89,9 @@ export function parseBankProfile(input: unknown): BankProfile {
   }
   const patterns: [string, string][] = result.data.categories.map((rule, i) => [`categories.${i}.match`, rule.match]);
   const pdf = result.data.pdf;
+  const transactions = pdf ? (typeof pdf.transaction === "string" ? [["pdf.transaction", pdf.transaction]] : pdf.transaction.map((t, i) => [`pdf.transaction.${i}`, t])) : [];
   if (pdf) {
-    patterns.push(["pdf.transaction", pdf.transaction]);
+    patterns.push(...(transactions as [string, string][]));
     if (pdf.period) patterns.push(["pdf.period", pdf.period]);
     pdf.sections.forEach((section, i) => patterns.push([`pdf.sections.${i}.match`, section.match]));
     pdf.ignore.forEach((pattern, i) => patterns.push([`pdf.ignore.${i}`, pattern]));
@@ -101,13 +103,13 @@ export function parseBankProfile(input: unknown): BankProfile {
       throw new BankProfileError(`bank statement profile: ${where} is not a valid pattern`);
     }
   }
-  if (pdf) {
-    const groups = new Set([...pdf.transaction.matchAll(/\(\?<([A-Za-z]+)>/g)].map((m) => m[1]));
+  for (const [where, pattern] of transactions as [string, string][]) {
+    const groups = new Set([...pattern.matchAll(/\(\?<([A-Za-z]+)>/g)].map((m) => m[1]));
     const missing = ["date", "description"].filter((g) => !groups.has(g));
     if (!groups.has("amount") && !(groups.has("debit") && groups.has("credit"))) missing.push("amount (or debit and credit)");
-    if (missing.length) throw new BankProfileError(`bank statement profile: pdf.transaction needs named groups for ${missing.join(", ")}`);
-    if (pdf.period && !/\(\?<end>/.test(pdf.period)) throw new BankProfileError("bank statement profile: pdf.period needs a named group end");
+    if (missing.length) throw new BankProfileError(`bank statement profile: ${where} needs named groups for ${missing.join(", ")}`);
   }
+  if (pdf?.period && !/\(\?<end>/.test(pdf.period)) throw new BankProfileError("bank statement profile: pdf.period needs a named group end");
   return result.data;
 }
 
@@ -147,28 +149,3 @@ export const GENERIC_PDF_LAYOUT: PdfLayout = PdfLayoutSchema.parse({
   ],
   ignore: [String.raw`\b(?:beginning|ending|opening|closing|previous|new) balance\b`, String.raw`^total\b`, String.raw`\btotal (?:deposits|withdrawals|fees|checks|purchases)\b`],
 });
-
-/**
- * The profiles the BANK_STATEMENTS_PROFILES setting names: "generic", or a
- * path to a JSON file in the client's private instance repo mapping each
- * account folder to a profile (with "*" for the rest). Returns a lookup by
- * folder name.
- */
-export async function resolveBankProfiles(
-  setting: string | undefined,
-  read: (path: string) => Promise<string> = (p) => readFile(p, "utf8"),
-): Promise<(account: string) => BankProfile> {
-  const value = setting?.trim() ?? "";
-  if (value === "" || value === "generic") return () => GENERIC_BANK_PROFILE;
-  let json: unknown;
-  try {
-    json = JSON.parse(await read(value));
-  } catch (error) {
-    throw new BankProfileError(`BANK_STATEMENTS_PROFILES: could not read a JSON file (${error instanceof Error ? error.name : "error"})`);
-  }
-  if (typeof json !== "object" || json === null || Array.isArray(json)) {
-    throw new BankProfileError("BANK_STATEMENTS_PROFILES: the file must map account folders to profiles");
-  }
-  const profiles = new Map(Object.entries(json).map(([folder, profile]) => [folder, parseBankProfile(profile)]));
-  return (account) => profiles.get(account) ?? profiles.get("*") ?? GENERIC_BANK_PROFILE;
-}
