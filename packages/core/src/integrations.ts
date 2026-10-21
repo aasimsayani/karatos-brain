@@ -179,7 +179,13 @@ export const INTEGRATIONS: IntegrationSpec[] = [
   { id: "twilio", name: "Twilio", domain: "communication", segments: ["retail", "wholesale"], access: "public_api", testWith: "sandbox", departments: ["clienteling", "repairs", "marketing"], historicalImportYears: 5, webhooks: true, settings: [], changelog: "https://www.twilio.com/en-us/changelog", status: "planned" },
 
   // Accounting, payments, financing and credit
-  { id: "quickbooks", name: "QuickBooks Online", domain: "financial", segments: ALL, access: "public_api", testWith: "sandbox", departments: ["finance", "compliance"], historicalImportYears: 6, webhooks: true, settings: [], changelog: null, status: "planned", note: "Intuit's changelog (release notes) page needs JavaScript, so the docs watch can't read it; the nightly sandbox run catches API changes" },
+  { id: "quickbooks", name: "QuickBooks Online", domain: "financial", segments: ALL, access: "public_api", testWith: "sandbox", departments: ["finance", "compliance"], historicalImportYears: 6, webhooks: true, settings: ["QUICKBOOKS_CLIENT_ID", "QUICKBOOKS_CLIENT_SECRET", "QUICKBOOKS_REALM_ID", "QUICKBOOKS_REFRESH_TOKEN", "QUICKBOOKS_ENVIRONMENT"], changelog: null, status: "built", note: "Read-only, though Intuit has no read-only scope. Intuit's changelog (release notes) page needs JavaScript, so the docs watch reads the pages the mock was built from instead, and the nightly sandbox run catches API changes", capabilities: [
+      "Imports six years of invoices, bills, payments and journal entries, with the chart of accounts, customers and vendors",
+      "Keeps every change after that within the sync interval, and notices records deleted in QuickBooks",
+      "Lines invoices up with the payments applied to them, so finance can see what's still owed",
+      "Keeps customer and vendor names without their emails, phone numbers, addresses or tax IDs",
+      "Read-only: KaratOS only reads your books, even though QuickBooks' connection would allow changes",
+    ] },
   { id: "xero", name: "Xero", domain: "financial", segments: ALL, access: "public_api", testWith: "sandbox", departments: ["finance", "compliance"], historicalImportYears: 6, webhooks: true, settings: [], changelog: "https://developer.xero.com/changelog", status: "planned" },
   { id: "plaid", name: "Plaid", domain: "financial", segments: ALL, access: "public_api", testWith: "sandbox", departments: ["finance", "compliance"], historicalImportYears: 2, webhooks: true, settings: [], changelog: "https://plaid.com/docs/changelog/", status: "planned", note: "Bank feeds beyond Chase" },
   { id: "authorize_net", name: "Authorize.net", domain: "financial", segments: ["retail", "wholesale"], access: "public_api", testWith: "sandbox", departments: ["sales", "finance"], historicalImportYears: 5, webhooks: true, settings: [], changelog: "https://developer.authorize.net/api/changes/", status: "planned" },
