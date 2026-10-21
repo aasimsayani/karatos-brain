@@ -138,7 +138,7 @@ The instance API:
 
 ## Connectors
 
-Connectors are read-only by default. A connector may declare write actions, but `WriteGate` refuses every write that is not listed in `ENABLED_WRITES`, and it audits every attempt. We never request write scopes from a vendor.
+An instance syncs every connector listed in `ENABLED_INTEGRATIONS` on a schedule, history first and then incrementally ([how](docs/integrations.md#syncing-on-a-schedule)). Connectors are read-only by default. A connector may declare write actions, but `WriteGate` refuses every write that is not listed in `ENABLED_WRITES`, and it audits every attempt. We never request write scopes from a vendor.
 
 Every connector must:
 

@@ -47,10 +47,15 @@ export interface ChangedFile {
   path: string;
 }
 
+/** Files a Dependabot update may change: package manifests, the lockfile, Dockerfiles and workflow files. */
+const DEPENDENCY_FILE = /^(?:(?:[\w.-]+\/)*package(?:-lock)?\.json|(?:[\w.-]+\/)*Dockerfile|\.github\/workflows\/[\w.-]+\.ya?ml)$/;
+
 /**
  * Checks a PR's changes: it adds or edits a fragment, every fragment it
  * touches parses, and it leaves CHANGELOG.md alone. Release branches
- * (`release/...`) are the exception: they fold the fragments in.
+ * (`release/...`) are the exception: they fold the fragments in. Dependabot
+ * branches (`dependabot/...`) that only change dependency files need no
+ * fragment, since a version bump is not a change anyone reads about.
  */
 export function checkPullRequest(branch: string, changed: readonly ChangedFile[], fragments: Readonly<Record<string, string>>): void {
   const problems: string[] = [];
@@ -59,7 +64,8 @@ export function checkPullRequest(branch: string, changed: readonly ChangedFile[]
     problems.push(`${CHANGELOG} is edited directly; put the entry in ${FRAGMENT_DIR}/${safeName(branch)}.md instead`);
   }
   const touched = changed.filter((f) => !f.status.startsWith("D") && fragmentName(f.path));
-  if (!release && !touched.length) problems.push(`no changelog entry; add ${FRAGMENT_DIR}/${safeName(branch)}.md`);
+  const dependencyBump = branch.startsWith("dependabot/") && changed.length > 0 && changed.every((f) => DEPENDENCY_FILE.test(f.path));
+  if (!release && !dependencyBump && !touched.length) problems.push(`no changelog entry; add ${FRAGMENT_DIR}/${safeName(branch)}.md`);
   for (const file of touched) {
     const name = fragmentName(file.path)!;
     try {

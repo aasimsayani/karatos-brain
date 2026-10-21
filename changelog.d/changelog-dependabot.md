@@ -1,0 +1,1 @@
+- Changelog check: Dependabot PRs that only bump dependency files (package manifests, the lockfile, Dockerfiles, workflow files) no longer need a changelog fragment, so their CI can pass. Any other file they touch still needs one, and `CHANGELOG.md` stays off-limits
