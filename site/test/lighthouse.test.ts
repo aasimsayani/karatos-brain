@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { CATEGORIES, checkReport, checkReports } from "../lighthouse.js";
+import { CATEGORIES, checkReport, checkReports, failureAnnotations } from "../lighthouse.js";
 
 const report = (scores: Record<string, number | null>, formFactor = "mobile") => ({
   configSettings: { formFactor },
@@ -60,5 +60,35 @@ describe("checkReports", () => {
     const none = checkReports([]);
     expect(none.mobile).toBe(false);
     expect(none.scores.every((s) => !s.ok)).toBe(true);
+  });
+});
+
+describe("failureAnnotations", () => {
+  const all = (performance: number) => report({ performance, accessibility: 1, "best-practices": 0.96, seo: 1 });
+
+  it("says nothing when every category passes", () => {
+    expect(failureAnnotations([all(1), all(0.95), all(0.9)])).toEqual([]);
+  });
+
+  it("names each failing category with its median and every run's score", () => {
+    const slow = (p: number) => report({ performance: p, accessibility: 1, "best-practices": 1, seo: 1 });
+    expect(failureAnnotations([slow(0.85), slow(0.87), slow(0.95)])).toEqual([
+      "::error title=Lighthouse performance::performance scored 87 against a bar of 90 (runs: 85, 87, 95)",
+    ]);
+  });
+
+  it("reports a crashed run as unscored and flags the missing report", () => {
+    const lines = failureAnnotations([all(1), null, all(1)]);
+    expect(lines).toHaveLength(CATEGORIES.length + 1);
+    expect(lines[0]).toBe("::error title=Lighthouse performance::performance scored not scored against a bar of 90 (runs: 100, not scored, 100)");
+    expect(lines.at(-1)).toBe("::error title=Lighthouse::a report is missing or is not a mobile run");
+  });
+
+  it("names a custom bar", () => {
+    expect(failureAnnotations([all(0.96)], 97)[0]).toBe("::error title=Lighthouse performance::performance scored 96 against a bar of 97 (runs: 96)");
+  });
+
+  it("covers no runs at all", () => {
+    expect(failureAnnotations([])[0]).toContain("(runs: none)");
   });
 });

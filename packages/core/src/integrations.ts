@@ -110,7 +110,13 @@ export const INTEGRATIONS: IntegrationSpec[] = [
       "Sales sees each payment's method and status, and every refund and dispute",
       "Read-only: KaratOS signs in with a restricted key that can't move money",
     ] },
-  { id: "chase", name: "Chase business bank accounts and credit cards", domain: "financial", segments: ALL, access: "file", testWith: "fixtures", departments: ["finance", "compliance"], historicalImportYears: 6, webhooks: false, settings: ["CHASE_IMPORT_MODE", "CHASE_MANUAL_IMPORT_DIR"], changelog: null, status: "planned", note: "CSV exports, PDF statements or both, whichever the client prefers; 5-6 years of history" },
+  { id: "chase", name: "Chase business bank accounts and credit cards", domain: "financial", segments: ALL, access: "file", testWith: "fixtures", departments: ["finance", "compliance"], historicalImportYears: 6, webhooks: false, settings: ["CHASE_IMPORT_MODE", "CHASE_MANUAL_IMPORT_DIR"], changelog: null, status: "built", note: "CSV activity downloads, PDF statements or both, read with Chase's own layouts", capabilities: [
+      "Imports six years of Chase business checking, savings and credit card activity from CSV downloads, PDF statements or both",
+      "Reads Chase's own statement layout, including checks paid by number, deposits, card and electronic withdrawals, and fees",
+      "Stores a transaction once even when a CSV download and a PDF statement both include it",
+      "Sorts each transaction into cash deposits, card settlements, vendor payments, payroll and fees for finance",
+      "Read-only: KaratOS only reads the statements you download and never connects to your Chase account",
+    ] },
   { id: "bank_statements", name: "Bank and credit card statements (any bank)", domain: "financial", segments: ALL, access: "file", testWith: "fixtures", departments: ["finance", "compliance"], historicalImportYears: 6, webhooks: false, settings: ["BANK_STATEMENTS_IMPORT_DIR"], changelog: null, status: "built", note: "CSV exports and PDF statements from any bank", capabilities: [
       "Imports six years of bank and credit card transactions from any bank's CSV exports or PDF statements",
       "Sorts each transaction into cash deposits, card settlements, vendor payments, payroll and fees",
