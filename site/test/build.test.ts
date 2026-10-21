@@ -98,6 +98,12 @@ describe("KaratOS website", () => {
     expect(html).not.toMatch(/\.hero\{padding:/);
   });
 
+  it("leaves off-screen sections unrendered until they near the viewport, so the growing catalog doesn't block the first paint", () => {
+    expect(html).toContain("section{content-visibility:auto;contain-intrinsic-size:auto 900px}");
+    // The hero is not a section, so the first screen always renders straight away.
+    expect(html).not.toMatch(/<section[^>]*class="[^"]*hero/);
+  });
+
   it("only uses Mono at a weight it ships", () => {
     const monoWeights = FONTS.filter((f) => f.family === "IBM Plex Mono").map((f) => `font-weight:${f.weight}`);
     const rules = html.match(/[^{}]+\{[^{}]*font-family:var\(--mono\)[^{}]*\}/g) ?? [];
