@@ -25,7 +25,9 @@
     "secrets:plan": "node --import tsx scripts/secrets.ts plan",
     "secrets:setup": "node --import tsx scripts/secrets.ts setup",
     "changelog:check": "node --import tsx scripts/changelog-cli.ts check",
-    "changelog:collect": "node --import tsx scripts/changelog-cli.ts collect"
+    "changelog:collect": "node --import tsx scripts/changelog-cli.ts collect",
+    "progress:write": "node --import tsx scripts/progress-cli.ts write",
+    "progress:check": "node --import tsx scripts/progress-cli.ts check"
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.5.10",

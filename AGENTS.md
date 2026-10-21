@@ -8,3 +8,4 @@ This repo is **public**. Treat everything you write here as published.
 - Before pushing, run `npm run secrets:scan`, `npm run typecheck` and `npm run test:coverage`. Coverage must stay above the thresholds in `vitest.config.ts`.
 - Every behavior change needs a test. Database changes need a migration plus a test that runs it against PGlite.
 - Add a changelog fragment, `changelog.d/<branch>.md`, and update the relevant doc in the same PR. Don't edit `CHANGELOG.md` directly; see [changelog.d/README.md](changelog.d/README.md).
+- When a change finishes a roadmap item, mark it done in `docs/milestones.json` and run `npm run progress:write` so the README's Progress section stays current.

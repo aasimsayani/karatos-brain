@@ -1,5 +1,7 @@
 # Roadmap
 
+The README's [Progress](../README.md#progress) section is the live summary: it is generated from [milestones.json](milestones.json) and the integration catalog. When a change finishes a milestone item, mark it done there and run `npm run progress:write`; an item tied to an integration flips on its own when that catalog entry is marked built. This page keeps the detailed history.
+
 This is a rebuild of the original Brain A work (v0.1.0 to v0.1.9, April 2026). The original design docs live in the Fuse Jewelry Google Drive under "BrainA".
 
 ## Phase 1: Foundation (this release)
@@ -42,15 +44,20 @@ This is a rebuild of the original Brain A work (v0.1.0 to v0.1.9, April 2026). T
 - [ ] Production planning, metal loss and labor cost per piece
 
 ## Phase 3: First connectors
-- [ ] CSV import (orders, products, bank transactions)
+- [x] CSV import from any POS (items, stock counts, customers, sales)
 - [x] Shopify orders, refunds, fulfillments, products and customers (`@karatos/connectors`)
-- [ ] Stripe payments
+- [x] Stripe charges, refunds, disputes, payouts and customers
+- [x] Bank and card statements from CSV exports
+- [ ] Bank and card statements from PDFs
+- [ ] Chase business accounts and cards
+- [ ] QuickBooks Online
 
 ## Phase 4: First reasoners
 - [ ] Claude-powered reasoner with provenance and confidence
 - [ ] Feedback loop into future reasoning
 
 ## Later
-- Bank-statement PDF intelligence (5 to 6 years of Chase statements)
+- Self-serve AI dashboards in the Brain Console
+- One-command self-hosted install, and a managed hosting plan
 - HubSpot, Slack, Monday.com
 - Meta, WhatsApp and Instagram, once the Facebook account is recovered

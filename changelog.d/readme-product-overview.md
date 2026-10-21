@@ -1,0 +1,3 @@
+- The README now opens with what KaratOS does for a jeweler and why it matters, followed by a Progress section showing each milestone's completion, its target month and what's up next.
+- The Progress section is generated from `docs/milestones.json` and the integration catalog (`npm run progress:write`), and a test fails when it falls behind. Milestone items tied to an integration complete on their own when the catalog marks it built.
+- `scripts/sync-open-prs.sh` reinstalls dependencies after merging, and regenerates the README progress section, settling conflicts inside it.
