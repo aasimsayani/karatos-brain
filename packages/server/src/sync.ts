@@ -3,6 +3,9 @@ import { runSync } from "@karatos/core";
 import {
   accountsFromDirectory,
   bankStatementsConnector,
+  chaseAccountsFromDirectory,
+  chaseConnector,
+  chaseFormats,
   directorySource,
   inventoryPosConnector,
   resolveBankProfiles,
@@ -73,6 +76,11 @@ const FACTORIES: Record<string, { needs: (env: Env) => string[]; make: (env: Env
       const profileFor = await resolveBankProfiles(env.BANK_STATEMENTS_PROFILES);
       return bankStatementsConnector({ accounts: await accountsFromDirectory(set(env, "BANK_STATEMENTS_IMPORT_DIR")!, profileFor) });
     },
+  },
+  chase: {
+    needs: (env) => ["CHASE_IMPORT_MODE", "CHASE_MANUAL_IMPORT_DIR"].filter((name) => !set(env, name)),
+    make: async (env) =>
+      chaseConnector({ accounts: await chaseAccountsFromDirectory(set(env, "CHASE_MANUAL_IMPORT_DIR")!), formats: chaseFormats(env.CHASE_IMPORT_MODE) }),
   },
 };
 
