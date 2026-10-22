@@ -29,7 +29,7 @@ This section updates itself as work lands: it is generated from [docs/milestones
 <!-- progress:start -->
 <!-- Generated from docs/milestones.json and the integration catalog by npm run progress:write. Edit those, not this block. -->
 
-**Overall: 50% complete**, 19 of 38 roadmap items done. 7 of the 75 systems in the integration catalog are connected.
+**Overall: 53% complete**, 20 of 38 roadmap items done. 8 of the 75 systems in the integration catalog are connected.
 
 | Milestone | What it gives a jeweler | Progress | Target |
 | --- | --- | --- | --- |
@@ -40,7 +40,7 @@ This section updates itself as work lands: it is generated from [docs/milestones
 | AI reasoning | Claude explains each recommendation in plain language and learns from the owner's decisions. | ░░░░░░░░░░ 0% | Jan 2027 |
 | Self-serve AI dashboards | Owners ask a question and get a dashboard, without a developer. | ███░░░░░░░ 33% | Mar 2027 |
 | Self-hosted and managed plans | Run it yourself for free, or let us host it on the premium plan. | ███░░░░░░░ 33% | Mar 2027 |
-| Integrations, next wave | Jewelry POS, CRM, messaging, marketing and diamond feeds join the catalog. | █░░░░░░░░░ 11% | Jun 2027 |
+| Integrations, next wave | Jewelry POS, CRM, messaging, marketing and diamond feeds join the catalog. | ██░░░░░░░░ 22% | Jun 2027 |
 | Manufacturing departments | Bench, casting and setting work tracked with metal loss and labor cost per piece. | ░░░░░░░░░░ 0% | Jun 2027 |
 
 ### Up next
