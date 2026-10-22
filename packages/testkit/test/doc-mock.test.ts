@@ -159,6 +159,15 @@ describe("docMockWatchTargets", () => {
       "https://developer.intuit.com/app/developer/qbo/docs/api/accounting/all-entities/account",
       "https://developer.intuit.com/app/developer/qbo/docs/learn/explore-the-quickbooks-online-api/data-queries",
       "https://developer.intuit.com/app/developer/qbo/docs/api/accounting/all-entities/changedatacapture",
+      "https://dev.wix.com/docs/api-reference/business-solutions/e-commerce/orders/orders/search-orders",
+      "https://dev.wix.com/docs/build-apps/develop-your-app/access/authentication/authenticate-using-oauth",
+      "https://dev.wix.com/docs/api-reference/app-management/app-instance/get-app-instance",
+      "https://dev.wix.com/docs/api-reference/business-solutions/stores/catalog-versioning/get-catalog-version",
+      "https://dev.wix.com/docs/api-reference/business-solutions/stores/catalog-v3/products-v3/query-products",
+      "https://dev.wix.com/docs/api-reference/business-solutions/stores/catalog-v3/read-only-variants-v3/query-variants",
+      "https://dev.wix.com/docs/api-reference/business-solutions/stores/catalog-v3/inventory-items-v3/query-inventory-items",
+      "https://dev.wix.com/docs/api-reference/business-solutions/stores/catalog-v1/catalog/query-products",
+      "https://dev.wix.com/docs/api-reference/crm/members-contacts/contacts/contacts-v5/query-contacts",
     ]);
   });
 });
@@ -238,14 +247,14 @@ describe("Stuller doc mock", () => {
 describe("docMockVendorDocsTargets", () => {
   it("gives each mock page its own watch key, named after the catalog entry", () => {
     const targets = docMockVendorDocsTargets(allDocMocks());
-    expect(targets).toHaveLength(7);
+    expect(targets).toHaveLength(16);
     expect(targets[0]).toEqual({
       integration: "stuller:api-stuller-com-help",
       name: "Stuller",
       url: "https://api.stuller.com/help",
       mock: { integration: "stuller", retrievedOn: "2026-10-15" },
     });
-    expect(new Set(targets.map((t) => t.integration)).size).toBe(7);
+    expect(new Set(targets.map((t) => t.integration)).size).toBe(16);
   });
 
   it("falls back to the integration id for a mock outside the catalog", () => {

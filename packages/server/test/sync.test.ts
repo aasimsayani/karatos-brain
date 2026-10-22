@@ -92,6 +92,7 @@ describe("scheduledConnectors", () => {
     expect(scheduledConnectors(["chase"], { CHASE_IMPORT_MODE: "manual_pdf" }).skipped).toEqual([{ id: "chase", reason: "missing CHASE_MANUAL_IMPORT_DIR" }]);
     expect(scheduledConnectors(["chase"], { CHASE_MANUAL_IMPORT_DIR: "/data/chase" }).skipped).toEqual([{ id: "chase", reason: "missing CHASE_IMPORT_MODE" }]);
     expect(JSON.stringify(skipped)).not.toContain(secret);
+    expect(scheduledConnectors(["wix"], { WIX_APP_ID: "id", WIX_APP_SECRET: secret }).skipped).toEqual([{ id: "wix", reason: "missing WIX_INSTANCE_ID, CUSTOMER_REF_KEY" }]);
     expect(scheduledConnectors(["quickbooks"], { QUICKBOOKS_CLIENT_ID: "id", QUICKBOOKS_REFRESH_TOKEN: secret }).skipped).toEqual([
       { id: "quickbooks", reason: "missing QUICKBOOKS_CLIENT_SECRET, QUICKBOOKS_REALM_ID, QUICKBOOKS_ENVIRONMENT" },
     ]);
@@ -125,10 +126,14 @@ describe("scheduledConnectors", () => {
       QUICKBOOKS_REALM_ID: "9341450000",
       QUICKBOOKS_REFRESH_TOKEN: "refresh-value",
       QUICKBOOKS_ENVIRONMENT: "sandbox",
+      WIX_APP_ID: "abcd0001-abcd-4abc-8def-abcdef000001",
+      WIX_APP_SECRET: ["app", "secret", "0".repeat(24)].join("-"),
+      WIX_INSTANCE_ID: "cafe0001-cafe-4abc-8def-abcdef000001",
+      CUSTOMER_REF_KEY: "0".repeat(64),
     };
     const { connectors } = scheduledConnectors(SYNCABLE_INTEGRATIONS, env);
     const built = await Promise.all(connectors.map((c) => c.make()));
-    expect(built.map((c) => c.source).sort()).toEqual(["bank_statements", "chase", "inventory_pos", "quickbooks", "shopify", "stripe"]);
+    expect(built.map((c) => c.source).sort()).toEqual(["bank_statements", "chase", "inventory_pos", "quickbooks", "shopify", "stripe", "wix"]);
     const token = await scheduledConnectors(["shopify"], { SHOPIFY_SHOP_DOMAIN: "demo.myshopify.com", SHOPIFY_ADMIN_ACCESS_TOKEN: "t" }).connectors[0]!.make();
     expect(token.source).toBe("shopify");
     for (const connector of built) expect(connector).not.toHaveProperty("write");

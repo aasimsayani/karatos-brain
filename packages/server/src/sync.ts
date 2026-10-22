@@ -15,6 +15,7 @@ import {
   resolvePosProfile,
   shopifyConnector,
   stripeConnector,
+  wixConnector,
 } from "@karatos/connectors";
 
 /**
@@ -93,6 +94,16 @@ const FACTORIES: Record<string, { needs: (env: Env) => string[]; make: (env: Env
         tokens: store ? sealedTokenStore({ ...store, source: "quickbooks", seed, keyMaterial: clientSecret }) : memoryTokenStore(seed),
       });
     },
+  },
+  wix: {
+    needs: (env) => ["WIX_APP_ID", "WIX_APP_SECRET", "WIX_INSTANCE_ID", "CUSTOMER_REF_KEY"].filter((name) => !set(env, name)),
+    make: async (env) =>
+      wixConnector({
+        appId: set(env, "WIX_APP_ID")!,
+        appSecret: set(env, "WIX_APP_SECRET")!,
+        instanceId: set(env, "WIX_INSTANCE_ID")!,
+        customerKey: set(env, "CUSTOMER_REF_KEY")!,
+      }),
   },
   bank_statements: {
     needs: (env) => (set(env, "BANK_STATEMENTS_IMPORT_DIR") ? [] : ["BANK_STATEMENTS_IMPORT_DIR"]),

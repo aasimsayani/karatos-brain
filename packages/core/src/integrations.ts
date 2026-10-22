@@ -145,7 +145,14 @@ export const INTEGRATIONS: IntegrationSpec[] = [
   // E-commerce
   { id: "woocommerce", name: "WooCommerce", domain: "ecommerce", segments: ["retail"], access: "public_api", testWith: "sandbox", departments: ["sales", "inventory", "marketing"], historicalImportYears: 5, webhooks: true, settings: [], changelog: "https://developer.woocommerce.com/changelog/", status: "planned" },
   { id: "bigcommerce", name: "BigCommerce", domain: "ecommerce", segments: ["retail", "wholesale"], access: "public_api", testWith: "sandbox", departments: ["sales", "inventory", "marketing"], historicalImportYears: 5, webhooks: true, settings: [], changelog: "https://docs.bigcommerce.com/developer/changelog", status: "planned" },
-  { id: "wix", name: "Wix", domain: "ecommerce", segments: ["retail"], access: "public_api", testWith: "sandbox", departments: ["sales", "inventory", "marketing"], historicalImportYears: 5, webhooks: true, settings: [], changelog: "https://dev.wix.com/docs/changelog", status: "planned" },
+  { id: "wix", name: "Wix", domain: "ecommerce", segments: ["retail"], access: "public_api", testWith: "sandbox", departments: ["sales", "inventory", "clienteling", "marketing"], historicalImportYears: 5, webhooks: true, settings: ["WIX_APP_ID", "WIX_APP_SECRET", "WIX_INSTANCE_ID", "WIX_WEBHOOK_PUBLIC_KEY", "CUSTOMER_REF_KEY"], changelog: "https://dev.wix.com/docs/changelog", status: "built", note: "A self-managed Wix app holding read permissions only; the connector checks the permissions the site granted and stops on any Manage permission, and sends only eight listed read requests. Webhooks need the app (an API key gets none). Sales, products and stock use the same events as Shopify, Square and Clover", capabilities: [
+      "Imports five years of orders and the whole catalog, stock and contact list, then keeps them current",
+      "Sales sees every Wix sale and refunded item with its SKUs, the same way as Shopify sales",
+      "Inventory sees each product and variant with its price, and the stock Wix counts for it",
+      "Works with both Wix Stores catalogs, the older V1 and the current V3",
+      "Links a customer's orders and profile without keeping their name, email address, phone number or address",
+      "Read-only: KaratOS checks its Wix app holds read permissions only and won't run otherwise",
+    ] },
   { id: "punchmark", name: "Punchmark", domain: "ecommerce", segments: ["retail"], access: "partner", testWith: "partner", departments: ["sales", "inventory", "marketing"], historicalImportYears: 5, webhooks: false, settings: [], changelog: null, status: "planned" },
 
   // Diamond and gem trading networks

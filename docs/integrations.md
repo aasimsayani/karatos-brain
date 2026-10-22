@@ -41,7 +41,7 @@ Used by: R is retail, W is wholesale, M is manufacturing. Test with says how we 
 | Valigara | R, W, M | Unknown | Unknown | No | Planned |
 | WooCommerce | R | Public API | Free sandbox | Yes | Planned |
 | BigCommerce | R, W | Public API | Free sandbox | Yes | Planned |
-| Wix | R | Public API | Free sandbox | Yes | Planned |
+| Wix | R | Public API | Free sandbox | Yes | Built (Connector in @karatos/connectors: orders, products with variants, stock and contacts, read-only) |
 | Punchmark | R | Partner | Partner | No | Planned |
 | Etsy | R, M | Public API | Unknown | No | Planned |
 | eBay | R, W | Public API | Free sandbox | Yes | Planned (Estate and pre-owned pieces) |
@@ -194,7 +194,7 @@ For paid and partner systems there's nothing to record yet, so the connector is 
 - the auth the docs describe, answering 401 without it like the real API;
 - its `assumptions`: anything the docs leave out that the mock had to guess, such as a default filter or a unit. Each one is checked on the first live run, then fixed or removed.
 
-A request for a path or method the docs don't list throws `UndocumentedRequestError`, so a connector can't come to depend on behavior nobody has seen documented. Data in mocks is synthetic. The mocks cover Stuller's invoice and metal market rate endpoints (API v2), and QuickBooks Online's query and change data capture endpoints with Intuit's token refresh (minor version 75). QuickBooks has a free sandbox, so its mock is a stand-in until an Intuit developer account is set up for the nightly run.
+A request for a path or method the docs don't list throws `UndocumentedRequestError`, so a connector can't come to depend on behavior nobody has seen documented. Data in mocks is synthetic. The mocks cover Stuller's invoice and metal market rate endpoints (API v2), QuickBooks Online's query and change data capture endpoints with Intuit's token refresh (minor version 75), and a Wix site's read endpoints (eCommerce orders, Catalog V3 and V1, Contacts V5) with the app token, its permissions and cursor paging. QuickBooks and Wix can be tested for free, so their mocks are stand-ins until a developer account or dev site is set up for the nightly run.
 
 ### Vendor docs watch
 
@@ -327,6 +327,94 @@ Reads the QuickBooks Online Accounting API, pinned to minor version 75 (Intuit r
 **Webhooks.** QuickBooks sends CloudEvents (Intuit moved every app to them by 31 July 2026), and a notification names what changed without the record itself. `verifyQuickBooksWebhook` checks `intuit-signature`, the base64 HMAC-SHA256 of the raw body keyed with the verifier token, and `quickBooksWebhookChanges` lists the changes for this company. A notification is a prompt to sync, not data, so a replayed one finds nothing new. The instance doesn't take webhooks yet; the scheduled sync picks every change up.
 
 **Testing.** Until an Intuit developer account exists, the tests run against a mock built from Intuit's docs (`packages/testkit/src/mocks/quickbooks.ts`), which rotates refresh tokens, refuses the old one, answers 401 without a valid access token, and parses only the queries the docs describe. Its assumptions are listed in the mock and checked on the first sandbox run. For the nightly run, create a free Intuit developer account and sandbox company, connect it to the app with its Development keys, and add `SANDBOX_QUICKBOOKS_CLIENT_ID`, `SANDBOX_QUICKBOOKS_CLIENT_SECRET`, `SANDBOX_QUICKBOOKS_REALM_ID` and `SANDBOX_QUICKBOOKS_REFRESH_TOKEN` as GitHub Actions secrets. The nightly run can't save the token Intuit rotates to, so when it fails with `invalid_grant`, reconnect the sandbox company and update that secret.
+
+### Wix
+
+Reads one Wix site through the Wix REST APIs (`https://www.wixapis.com`), signed in as a self-managed Wix app installed on the site. Many Wix reads are POST requests (`.../query`, `.../search`), so the method says nothing about whether a request changes data. Read-only is enforced in the client instead: it sends only eight exact method and path pairs, each with its own body keys, and anything else is stopped before a request is made:
+
+| Request | What for |
+| --- | --- |
+| `GET /apps/v1/instance` | The permissions the site owner granted the app (checked before the first read) |
+| `GET /stores/v3/provision/version` | Which Wix Stores catalog the site runs |
+| `POST /stores/v3/products/query` | Catalog V3 products |
+| `POST /stores/v3/products/query-variants` | Their variants, SKUs and prices |
+| `POST /stores/v3/inventory-items/query` | Catalog V3 stock, per variant and location |
+| `POST /stores/v1/products/query` | Catalog V1 products, with their variants and stock |
+| `POST /ecom/v1/orders/search` | eCommerce orders |
+| `POST /contacts/v5/contacts/query` | Contacts |
+
+The token comes from `POST /oauth2/token`. The writes it may do later (update inventory, update products) are declared and stay behind the write gate.
+
+| Setting | What it is |
+| --- | --- |
+| `WIX_APP_ID`, `WIX_APP_SECRET` | The app's ID and secret key, from Develop > OAuth in the app's dashboard |
+| `WIX_INSTANCE_ID` | The app's instance ID on the client's site, one per site |
+| `CUSTOMER_REF_KEY` | Keys the customer references (below). Generated by `npm run secrets:setup`; never rotated |
+| `WIX_WEBHOOK_PUBLIC_KEY` | Optional. The app's public key (PEM), for when webhooks are turned on |
+
+**Why an app, not an API key.** Wix API keys get their permissions when they are made, and Wix documents no way to read them back, so a key with Manage permissions couldn't be caught. API keys also get no webhooks. An app's granted permissions can be read (Get App Instance lists them), and only apps receive webhooks. So the connector uses an app with the OAuth client credentials grant: app ID, app secret and the site's instance ID give an access token that lasts four hours, sent bare in the `Authorization` header (no `Bearer`). It is renewed five minutes early, or once when Wix answers 401.
+
+**The app's permissions.** Before the first read of each run, the connector reads `instance.permissions` and stops if any permission isn't a read: anything naming Manage, Write, Edit, Create, Delete, Update, Modify, Remove, Send, Charge or Refund, anything without Read, and anything it can't parse. The one exception is Manage Your App (`SCOPE.DC.MANAGE-YOUR-APP`). Wix needs it for that very call, and it reaches only the app's own install. If Wix doesn't list the permissions, or answers for a different instance, the connector stops too. The app needs these read permissions:
+
+- Read Orders (`SCOPE.DC-STORES.READ-ORDERS`);
+- Read Products and Read Inventory for Catalog V3 (`SCOPE.STORES.PRODUCT_READ`, `SCOPE.STORES.INVENTORY_ITEM_READ`, and `SCOPE.STORES.PRODUCT_READ_ADMIN` to include hidden products);
+- Read Catalog Version (`SCOPE.STORES.CATALOG_READ_LIMITED`);
+- Read Products for Catalog V1 (`SCOPE.DC-STORES.READ-PRODUCTS`);
+- Read Contacts (`SCOPE.DC-CONTACTS.READ-CONTACTS`).
+
+**What it reads.** Wix Stores runs one of two catalogs, which aren't compatible, and a site moves from V1 to V3 once. Each pass first asks which one the site has, then reads, in order:
+
+1. Products: for V3, products and their read-only variants (by product ID); for V1, products with their variants and stock.
+2. V3 inventory items.
+3. Orders.
+4. Contacts.
+
+A site without Wix Stores gives orders and contacts only. The historical import reads the whole catalog, all stock and every contact, and five years of orders by when they last changed. Search Orders leaves out pending and rejected orders unless they are named, so the filter names every status. Each stream is filtered with `updatedDate` `$gte` (V1: `lastUpdated`) and sorted oldest change first. V3, eCommerce and contacts page with Wix's cursor: the first request carries the filter and sort, and later ones carry only the cursor, as Wix documents. The checkpoint keeps the cursor, so a crash resumes at the next page. If Wix no longer takes a saved cursor, the stream starts again from the newest change it had read. V1 pages by offset, so after each page the next request starts at the newest change on it, and only a page of products changed at the same instant is paged by offset. Incremental passes start five minutes before the newest change the last pass saw, per stream; with no checkpoint they look back 48 hours.
+
+**Events.** The same types and shapes as the Shopify, Square, Clover, WooCommerce and BigCommerce connectors:
+
+- Orders give `order.updated` (Shopify's shape), with Wix point of sale orders as `store` and everything else as `online`.
+- An order gives `sale.completed` once it is paid, partly refunded or refunded. Wix orders carry no payment method, so the payment is `other`.
+- Wix records refunds on the order as each line's running `refundQuantity`, with no dates. Each refunded unit becomes its own `sale.returned`, keyed by order, line and unit, at the line's price after tax. A later refund adds only its new units.
+- Products give `product.updated` with each variant's SKU and price; V1 variants also carry their stock.
+- `inventory.counted` is sent for each V3 inventory item, or V1 variant, whose quantity Wix tracks. A negative count is dead-lettered.
+- Contacts give `customer.profile_updated`, with marketing consent on only when the main email's subscription is `SUBSCRIBED`.
+
+A line without a SKU becomes `wix-variant-<id>`, `wix-product-<id>` or `wix-line-<order>-<line>`. Each event is keyed by record and by when it changed. A sale is keyed by its order alone, and a product by its variants too, so a replay is a duplicate.
+
+**Privacy.** A contact becomes `wix:customer:<hmac>`: an HMAC-SHA256 of the app instance and the contact's ID, keyed with `CUSTOMER_REF_KEY`. Square, Clover, WooCommerce, BigCommerce and custom forms use the same key. One buyer's orders and profile link up, and two sites never share references. The profile's name is a label made from that reference. Nothing else is kept: no names, email addresses, phone numbers, billing, shipping or recipient addresses, buyer notes, custom fields, order activities, extended fields or labels.
+
+**Rate limits.** Wix allows about 200 requests a minute per app instance. On 429 the client waits, with exponential backoff and jitter or `Retry-After` up to a minute, three times. It then hands the error to `runSync`, and the next run resumes from the checkpoint.
+
+**Webhooks.** Wix sends webhooks to apps only. Each delivery's body is a JWT signed RS256 with the app's key pair. `verifyWixWebhook` checks the token against the app's public key (`WIX_WEBHOOK_PUBLIC_KEY`), in this order:
+
+1. its shape and size;
+2. that its algorithm is RS256, never `none` or an HMAC, which would let the public key sign;
+3. the signature;
+4. `exp`, `nbf` and `iat` when present, with a minute of leeway;
+5. `iss` when present;
+6. that the event is for this site's app instance.
+
+Wix retries a delivery for up to about 47 hours and may send one event more than once. `WixReplayGuard` handles each event ID once within 49 hours. An event older than 48 hours gives no events, since the sync reads it instead. The event keys are the sync's own, so a replay stores nothing twice even after a restart. Order, contact and V3 inventory item events become events. Product events carry no variants (V3) or only the changed fields (V1), and deletions carry only an ID, so they are a prompt to sync. The instance doesn't take webhooks yet; the scheduled sync picks every change up.
+
+**Testing.** Until a Wix dev site is set up, the tests run against a mock built from Wix's docs (`packages/testkit/src/mocks/wix.ts`). The mock:
+
+- checks the app token and each endpoint's permission;
+- caps page sizes as documented;
+- pages with keyset cursors and answers 400 to a cursor request that carries a filter or sort;
+- leaves out pending and rejected orders by default;
+- answers V3 endpoints only on a V3 site, and the V1 endpoint only on a V1 site.
+
+Its assumptions are listed in the mock and checked on the first sandbox run. For the nightly run:
+
+1. Create a free Wix dev site with Wix Stores and some synthetic products, orders and contacts.
+2. Create a self-managed app holding only the read permissions above, and install it on the site.
+3. Add `SANDBOX_WIX_APP_ID`, `SANDBOX_WIX_APP_SECRET` and `SANDBOX_WIX_INSTANCE_ID` as GitHub Actions secrets.
+
+**Known gaps.**
+
+- Refund dates and amounts come from the order, not from Wix's order transactions, which aren't read. A refund's time is the order's last change when it was first seen, and a partial refund of a line is split evenly across its units.
+- V3 variant prices and V1 product changes reach `product.updated` only when the product's own date moves.
 
 ### Inventory and POS systems
 
