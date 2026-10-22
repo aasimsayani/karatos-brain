@@ -5,4 +5,5 @@ export * from "./inventory_pos/index.js";
 export * from "./bank_statements/index.js";
 export * from "./chase/index.js";
 export * from "./quickbooks/index.js";
+export * from "./plaid/index.js";
 export * from "./xero/index.js";
