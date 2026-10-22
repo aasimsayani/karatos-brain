@@ -7,11 +7,14 @@ import {
   chaseAccountsFromDirectory,
   chaseConnector,
   chaseFormats,
+  customFormsConnector,
   directorySource,
   inventoryPosConnector,
   memoryTokenStore,
   quickBooksConnector,
+  parseTypeformFormIds,
   resolveBankProfiles,
+  resolveFormProfile,
   resolvePosProfile,
   shopifyConnector,
   stripeConnector,
@@ -93,6 +96,17 @@ const FACTORIES: Record<string, { needs: (env: Env) => string[]; make: (env: Env
         tokens: store ? sealedTokenStore({ ...store, source: "quickbooks", seed, keyMaterial: clientSecret }) : memoryTokenStore(seed),
       });
     },
+  },
+  custom_forms: {
+    // Typeform is read on a schedule; signed website submissions arrive by webhook only, so they need no sync.
+    needs: (env) => ["TYPEFORM_ACCESS_TOKEN", "TYPEFORM_FORM_IDS", "CUSTOMER_REF_KEY"].filter((name) => !set(env, name)),
+    make: async (env) =>
+      customFormsConnector({
+        forms: parseTypeformFormIds(set(env, "TYPEFORM_FORM_IDS")),
+        customerKey: set(env, "CUSTOMER_REF_KEY")!,
+        profile: await resolveFormProfile(env.FORMS_MAPPING_PROFILE),
+        typeform: { accessToken: set(env, "TYPEFORM_ACCESS_TOKEN")!, ...(set(env, "TYPEFORM_API_HOST") ? { host: set(env, "TYPEFORM_API_HOST")! } : {}) },
+      }),
   },
   bank_statements: {
     needs: (env) => (set(env, "BANK_STATEMENTS_IMPORT_DIR") ? [] : ["BANK_STATEMENTS_IMPORT_DIR"]),

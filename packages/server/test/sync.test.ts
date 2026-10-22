@@ -95,6 +95,10 @@ describe("scheduledConnectors", () => {
     expect(scheduledConnectors(["quickbooks"], { QUICKBOOKS_CLIENT_ID: "id", QUICKBOOKS_REFRESH_TOKEN: secret }).skipped).toEqual([
       { id: "quickbooks", reason: "missing QUICKBOOKS_CLIENT_SECRET, QUICKBOOKS_REALM_ID, QUICKBOOKS_ENVIRONMENT" },
     ]);
+    // Signed website submissions come by webhook only, so the schedule needs Typeform's settings and the reference key.
+    expect(scheduledConnectors(["custom_forms"], { TYPEFORM_ACCESS_TOKEN: secret, WEBHOOK_SIGNING_SECRET: secret }).skipped).toEqual([
+      { id: "custom_forms", reason: "missing TYPEFORM_FORM_IDS, CUSTOMER_REF_KEY" },
+    ]);
   });
 
   it("syncs nothing unless an integration is turned on, even when its settings are present", () => {
@@ -125,10 +129,14 @@ describe("scheduledConnectors", () => {
       QUICKBOOKS_REALM_ID: "9341450000",
       QUICKBOOKS_REFRESH_TOKEN: "refresh-value",
       QUICKBOOKS_ENVIRONMENT: "sandbox",
+      TYPEFORM_ACCESS_TOKEN: "typeform-token-value",
+      TYPEFORM_FORM_IDS: "TestForm1, TestForm2",
+      TYPEFORM_API_HOST: "api.eu.typeform.com",
+      CUSTOMER_REF_KEY: "0".repeat(64),
     };
     const { connectors } = scheduledConnectors(SYNCABLE_INTEGRATIONS, env);
     const built = await Promise.all(connectors.map((c) => c.make()));
-    expect(built.map((c) => c.source).sort()).toEqual(["bank_statements", "chase", "inventory_pos", "quickbooks", "shopify", "stripe"]);
+    expect(built.map((c) => c.source).sort()).toEqual(["bank_statements", "chase", "custom_forms", "inventory_pos", "quickbooks", "shopify", "stripe"]);
     const token = await scheduledConnectors(["shopify"], { SHOPIFY_SHOP_DOMAIN: "demo.myshopify.com", SHOPIFY_ADMIN_ACCESS_TOKEN: "t" }).connectors[0]!.make();
     expect(token.source).toBe("shopify");
     for (const connector of built) expect(connector).not.toHaveProperty("write");

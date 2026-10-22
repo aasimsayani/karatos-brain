@@ -1,5 +1,6 @@
 import type { SandboxCheck } from "@karatos/core";
-import { memoryTokenStore, quickBooksConnector, shopifyConnector, stripeConnector } from "@karatos/connectors";
+import { randomBytes } from "node:crypto";
+import { customFormsConnector, memoryTokenStore, quickBooksConnector, shopifyConnector, stripeConnector } from "@karatos/connectors";
 
 /**
  * Every built connector registers a sandbox check here. Credentials are
@@ -37,6 +38,19 @@ export const SANDBOX_CHECKS: SandboxCheck[] = [
         realmId: c.SANDBOX_QUICKBOOKS_REALM_ID!,
         environment: "sandbox",
         tokens: memoryTokenStore(c.SANDBOX_QUICKBOOKS_REFRESH_TOKEN!),
+      }),
+  },
+  {
+    // A free Typeform account with one test form filled in with made-up answers, and a personal token holding
+    // forms:read and responses:read only. Each run makes its own customer reference key, as nothing it stores is kept.
+    integration: "custom_forms",
+    name: "Custom forms (Typeform)",
+    credentials: ["SANDBOX_CUSTOM_FORMS_TYPEFORM_TOKEN", "SANDBOX_CUSTOM_FORMS_TYPEFORM_FORM_ID"],
+    connector: (c) =>
+      customFormsConnector({
+        forms: [c.SANDBOX_CUSTOM_FORMS_TYPEFORM_FORM_ID!],
+        customerKey: randomBytes(32).toString("hex"),
+        typeform: { accessToken: c.SANDBOX_CUSTOM_FORMS_TYPEFORM_TOKEN! },
       }),
   },
 ];
