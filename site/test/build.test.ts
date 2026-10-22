@@ -1,10 +1,15 @@
+import { createHash } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import { contentSecurityPolicy } from "../server.js";
 import { INTEGRATIONS, selfServeIntegrations } from "../../packages/core/src/index.js";
 import { RETAIL_DEPARTMENTS } from "../../packages/retail/src/index.js";
-import { CONTACT_ANCHOR, CORE_PRICE, FONTS, MANAGED_PRICE, REPORT_URL, buildingNow, earlyAccessNote, escapeHtml, renderSite } from "../build.js";
+import { CONTACT_ANCHOR, CORE_PRICE, DOMAIN_LABELS, FONTS, MANAGED_PRICE, PLAYS, REPORT_URL, WRITE_RULES, buildingNow, domainLabel, earlyAccessNote, escapeHtml, renderSite } from "../build.js";
 
 const html = renderSite();
+const sectionOf = (id: string) => {
+  const start = html.indexOf(`<section id="${id}"`);
+  return start < 0 ? "" : html.slice(start, html.indexOf("</section>", start));
+};
 
 describe("KaratOS website", () => {
   it("lists every data integration from the catalog", () => {
@@ -132,6 +137,105 @@ describe("KaratOS website", () => {
     expect(html).not.toMatch(/javascript:/i);
     const csp = contentSecurityPolicy(html);
     expect(csp).toMatch(/script-src 'self' 'sha256-[A-Za-z0-9+/]+=*'$|script-src 'self' 'sha256-[A-Za-z0-9+/]+=*';/);
+  });
+
+  it("shows systems working together: 4 to 6 illustrative plays, each combining 3 or 4 catalog systems into one result", () => {
+    const together = sectionOf("together");
+    expect(together).toContain('<span class="eyebrow">Systems that work together</span>');
+    expect(together).toContain("<h2>One system knows a little. Together they know what to do.</h2>");
+    expect(PLAYS.length).toBeGreaterThanOrEqual(4);
+    expect(PLAYS.length).toBeLessThanOrEqual(6);
+    const cards = together.split('<li class="play">').slice(1);
+    expect(cards).toHaveLength(PLAYS.length);
+    const byId = new Map(INTEGRATIONS.map((i) => [i.id, i]));
+    PLAYS.forEach((play, n) => {
+      const card = cards[n]!;
+      expect(card).toContain('<span class="tag">Illustrative</span>');
+      expect(card).toContain(`<h3>${escapeHtml(play.title)}</h3>`);
+      expect(play.systems.length).toBeGreaterThanOrEqual(3);
+      expect(play.systems.length).toBeLessThanOrEqual(4);
+      expect(new Set(play.systems).size).toBe(play.systems.length);
+      const named = [...card.matchAll(/<ul class="play-systems"[^>]*>(.*?)<\/ul>/g)][0]![1]!;
+      expect(named).toBe(play.systems.map((id) => `<li>${escapeHtml(byId.get(id)!.name)}</li>`).join(""));
+      expect(card.match(/<p class="play-action">/g)).toHaveLength(1);
+      expect(card).toContain(`<strong>Result:</strong> ${escapeHtml(play.action)}`);
+    });
+    expect(together.match(/<span class="tag">Illustrative<\/span>/g)).toHaveLength(PLAYS.length);
+  });
+
+  it("names only systems that are in the integrations catalog", () => {
+    const ids = new Set(INTEGRATIONS.map((i) => i.id));
+    expect(PLAYS.flatMap((p) => p.systems).filter((id) => !ids.has(id))).toEqual([]);
+    // The build stops rather than publish a play naming a system we don't have.
+    expect(() => renderSite([{ title: "Made up", systems: ["shopify", "not_a_system", "stripe"], action: "Nothing." }])).toThrow(/not_a_system/);
+  });
+
+  it("explains careful write-back in plain language, with every safeguard named", () => {
+    const writeBack = sectionOf("write-back");
+    expect(writeBack).toContain("<h2>Reads freely. Writes carefully.</h2>");
+    const text = writeBack.replace(/<[^>]+>/g, " ").replace(/&#39;/g, "'").replace(/\s+/g, " ");
+    for (const claim of [
+      "Every connection starts read-only",
+      "Writing back is off until your business turns it on, per system and per action",
+      "prefers a draft or a new note over changing a record",
+      "it never deletes",
+      "A person approves each write",
+      "re-checks the record right before writing",
+      "Capped per day",
+      "reads the record back to confirm it landed",
+      "Every write can be undone",
+      "all writes to that system stop until a person checks",
+      "Your systems stay the source of truth",
+      "rather than becoming another database to pay for",
+    ]) expect(text, claim).toContain(claim);
+    expect(writeBack.match(/<li><h3>/g)).toHaveLength(WRITE_RULES.length);
+    expect(text.toLowerCase()).not.toMatch(/refuse|delete records|deletes records/);
+  });
+
+  it("points the hero, steps and nav at many connected systems and careful write-back", () => {
+    const hero = html.slice(html.indexOf('<div class="wrap hero">'), html.indexOf("</div>", html.indexOf('<div class="wrap hero">')));
+    expect(hero).toContain("For jewelers, watch dealers, wholesalers and manufacturers");
+    expect(hero).toContain("connects the many systems");
+    expect(hero).toContain("writes back carefully");
+    const how = sectionOf("how");
+    const mapped = INTEGRATIONS.filter((i) => i.departments.length > 0).length;
+    expect(how).toContain(`from ${mapped} systems on our map`);
+    expect(how).toContain("<h3>Connect everything, read-only</h3>");
+    expect(how).toContain("<h3>Act, and write back carefully</h3>");
+    const nav = html.slice(html.indexOf("<nav>"), html.indexOf("</nav>"));
+    expect(nav).toContain('<a href="#together">Systems together</a>');
+    expect(nav).toContain('<a href="#write-back">Write-back</a>');
+    // Every nav link lands on a section that exists.
+    for (const [, id] of nav.matchAll(/href="#([^"]+)"/g)) expect(html).toContain(`id="${id}"`);
+  });
+
+  it("labels every catalog domain in plain language", () => {
+    for (const integration of INTEGRATIONS) expect(DOMAIN_LABELS[integration.domain], integration.domain).toBeTruthy();
+    expect(domainLabel("pos")).toBe("Point of sale");
+    expect(domainLabel("future")).toBe("Future");
+  });
+
+  it("serves the page under exactly the strict policy, with the inline script and style allowed only by hash", () => {
+    const hash = (tag: string) => {
+      const m = html.match(new RegExp(`<${tag}>([\\s\\S]*?)</${tag}>`))!;
+      return `'sha256-${createHash("sha256").update(m[1]!, "utf8").digest("base64")}'`;
+    };
+    expect(contentSecurityPolicy(html)).toBe(
+      [
+        "default-src 'none'",
+        `script-src 'self' ${hash("script")}`,
+        `style-src 'self' ${hash("style")}`,
+        "font-src 'self'",
+        "img-src 'self' data:",
+        "connect-src 'self'",
+        "form-action 'self'",
+        "base-uri 'none'",
+        "frame-ancestors 'none'",
+      ].join("; "),
+    );
+    // No external scripts, styles, images or frames: the page loads only from itself.
+    expect(html).not.toMatch(/<(script|img|iframe)\b[^>]*\ssrc=/i);
+    expect(html).not.toMatch(/<link\b[^>]*href="https?:/i);
   });
 
   it("names no client", () => {
