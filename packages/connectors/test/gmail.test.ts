@@ -28,6 +28,7 @@ import {
   GmailApiError,
   GmailConfigError,
   gmailAddresses,
+  GMAIL_HEADER_MAX,
   gmailClient,
   gmailConnector,
   gmailNormalizer,
@@ -108,6 +109,10 @@ describe("Gmail client", () => {
     const base = options(gmailDocMock(mailbox()));
     expect(() => gmailClient({ ...base, clientSecret: " " })).toThrow(new GmailConfigError("set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET"));
     expect(() => gmailClient({ ...base, userId: "owner at store" })).toThrow('GMAIL_USER must be "me" or the mailbox\'s address');
+    const started = performance.now();
+    expect(() => gmailClient({ ...base, userId: "!@!." + "!.".repeat(50_000) })).toThrow("GMAIL_USER");
+    expect(performance.now() - started).toBeLessThan(500);
+    expect(() => gmailClient({ ...base, userId: "owner@store.test" })).not.toThrow();
     expect(() => gmailClient({ ...base, userId: "me/../other" })).toThrow(GmailConfigError);
     expect(() => gmailClient({ ...base, userId: " owner@store.test " })).not.toThrow();
   });
@@ -429,6 +434,15 @@ describe("Gmail normalization", () => {
     expect(gmailAddresses("undisclosed-recipients:;")).toEqual([]);
     expect(gmailAddresses("not an address, <broken@>, @no.test, plain@nodot")).toEqual([]);
     expect(gmailAddresses("")).toEqual([]);
+  });
+
+  it("parses hostile address headers in linear time and cuts very long ones", () => {
+    const hostile = ['"' + '\\"'.repeat(50_000), "!@!." + "!.".repeat(50_000), "(".repeat(50_000) + "a@b.test", "<".repeat(50_000)];
+    const started = performance.now();
+    for (const h of hostile) gmailAddresses(h);
+    expect(performance.now() - started).toBeLessThan(500);
+    expect(gmailAddresses("x".repeat(GMAIL_HEADER_MAX) + ", late@one.test")).toEqual([]);
+    expect(gmailAddresses("early@one.test, " + "x".repeat(GMAIL_HEADER_MAX))).toEqual(["early@one.test"]);
   });
 
   it("counts every recipient once but keeps at most 50 per header", () => {

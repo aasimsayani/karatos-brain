@@ -101,7 +101,7 @@ export interface GmailClient {
   read(request: GmailRead): Promise<Record<string, unknown> | null>;
 }
 
-const USER = /^(me|[^\s@/?#%]+@[^\s@/?#%]+\.[^\s@/?#%]+)$/;
+const USER = /^(me|[^\s@/?#%]{1,64}@[^\s@/?#%.]{1,63}(?:\.[^\s@/?#%.]{1,63}){1,8})$/;
 const ID = /^[A-Za-z0-9_-]{1,64}$/;
 const TOKEN = /^[A-Za-z0-9_.~-]{1,1024}$/;
 const HISTORY_ID = /^\d{1,20}$/;

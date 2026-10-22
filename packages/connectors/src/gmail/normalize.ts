@@ -76,6 +76,8 @@ const CONSUMER_FAMILY = /^(yahoo|ymail|hotmail|outlook|live|msn|aol|gmx|yandex)\
 const SKIPPED_LABELS = new Set(["DRAFT", "SPAM"]);
 /** Addresses kept per header, so a mailing to hundreds can't make one event huge. The counts stay exact. */
 const MAX_ADDRESSES = 50;
+/** Longer address headers are cut here before parsing; a real one is far shorter. */
+export const GMAIL_HEADER_MAX = 16_384;
 const ADDRESS = /^[^\s@<>()",;:[\]\\]+@([a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+)$/;
 const ID = /^[A-Za-z0-9_-]{1,64}$/;
 const LABEL_ID = /^[A-Za-z0-9_-]{1,100}$/;
@@ -94,23 +96,33 @@ export function isConsumerDomain(domain: string): boolean {
  * groups (`Team: a@b, c@d;`). Anything that isn't an address is skipped.
  */
 export function gmailAddresses(header: string): string[] {
+  // Each part keeps only what lies outside quoted names and comments, built in
+  // one pass so a hostile header can't make the parse slow.
   const parts: string[] = [];
   let current = "";
   let quoted = false;
   let angle = 0;
   let comment = 0;
-  for (let i = 0; i < header.length; i++) {
-    const c = header[i]!;
-    if (c === "\\" && quoted) {
-      current += c + (header[++i] ?? "");
+  const text = header.slice(0, GMAIL_HEADER_MAX);
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i]!;
+    if (quoted) {
+      if (c === "\\") i++;
+      else if (c === '"') quoted = false;
       continue;
     }
-    if (c === '"' && !angle && !comment) quoted = !quoted;
-    else if (!quoted && c === "(") comment++;
-    else if (!quoted && c === ")" && comment) comment--;
-    else if (!quoted && !comment && c === "<") angle++;
-    else if (!quoted && !comment && c === ">" && angle) angle--;
-    if (!quoted && !angle && !comment && (c === "," || c === ";")) {
+    if (comment) {
+      if (c === "(") comment++;
+      else if (c === ")") comment--;
+      continue;
+    }
+    if (c === '"' && !angle) quoted = true;
+    else if (c === "(") comment++;
+    else if (c === "<") angle++;
+    else if (c === ">" && angle) angle--;
+    // Display names and comments are dropped here, so an address-like name can't stand in for the address.
+    if (c === '"' || c === "(") continue;
+    if (!angle && (c === "," || c === ";")) {
       parts.push(current);
       current = "";
     } else {
@@ -120,12 +132,12 @@ export function gmailAddresses(header: string): string[] {
   parts.push(current);
   const out: string[] = [];
   for (const part of parts) {
-    // Display names and comments go first, so an address-like name can't stand in for the address.
-    const unquoted = part.replace(/"(?:[^"\\]|\\.)*"/g, "").replace(/\([^()]*\)/g, "");
-    const inAngles = /<([^<>]*)>/.exec(unquoted);
+    const open = part.indexOf("<");
+    const close = open < 0 ? -1 : part.indexOf(">", open + 1);
     // A group's name ends at its colon: "Team: a@b" leaves a@b.
-    const bare = unquoted.replace(/^[^@]*:/, "").trim();
-    const candidate = (inAngles ? inAngles[1]! : bare).trim().toLowerCase();
+    const colon = part.indexOf(":");
+    const bare = (colon >= 0 && !part.slice(0, colon).includes("@") ? part.slice(colon + 1) : part).trim();
+    const candidate = (close > open ? part.slice(open + 1, close) : bare).trim().toLowerCase();
     if (ADDRESS.test(candidate)) out.push(candidate);
   }
   return out;
