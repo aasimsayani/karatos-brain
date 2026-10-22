@@ -1,0 +1,1 @@
+- The README's Progress section counts QuickBooks Online as built. #149 and #155 merged within seconds of each other, so main had the connector but an older copy of the generated section, which failed the progress test.
