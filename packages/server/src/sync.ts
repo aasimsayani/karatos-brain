@@ -16,6 +16,7 @@ import {
   resolvePosProfile,
   shopifyConnector,
   stripeConnector,
+  xeroConnector,
 } from "@karatos/connectors";
 
 /**
@@ -106,6 +107,20 @@ const FACTORIES: Record<string, { needs: (env: Env) => string[]; make: (env: Env
         // The first incremental pass carries on from the Plaid cursor the historical import ended on.
         ...(store ? { historicalCheckpoint: () => store.memory.getCheckpoint(store.organizationId, "plaid", "historical") } : {}),
       }),
+  },
+  xero: {
+    needs: (env) => ["XERO_CLIENT_ID", "XERO_CLIENT_SECRET", "XERO_TENANT_ID", "XERO_REFRESH_TOKEN"].filter((name) => !set(env, name)),
+    make: async (env, store) => {
+      const seed = set(env, "XERO_REFRESH_TOKEN")!;
+      const clientSecret = set(env, "XERO_CLIENT_SECRET")!;
+      return xeroConnector({
+        clientId: set(env, "XERO_CLIENT_ID")!,
+        clientSecret,
+        tenantId: set(env, "XERO_TENANT_ID")!,
+        // Xero retires the refresh token on every refresh; the newest is kept, encrypted, in the instance's database.
+        tokens: store ? sealedTokenStore({ ...store, source: "xero", seed, keyMaterial: clientSecret }) : memoryTokenStore(seed),
+      });
+    },
   },
   bank_statements: {
     needs: (env) => (set(env, "BANK_STATEMENTS_IMPORT_DIR") ? [] : ["BANK_STATEMENTS_IMPORT_DIR"]),

@@ -98,6 +98,7 @@ describe("scheduledConnectors", () => {
     expect(scheduledConnectors(["plaid"], { PLAID_CLIENT_ID: "id", PLAID_ACCESS_TOKEN: secret }).skipped).toEqual([
       { id: "plaid", reason: "missing PLAID_SECRET, PLAID_ENVIRONMENT" },
     ]);
+    expect(scheduledConnectors(["xero"], { XERO_CLIENT_SECRET: secret, XERO_REFRESH_TOKEN: secret }).skipped).toEqual([{ id: "xero", reason: "missing XERO_CLIENT_ID, XERO_TENANT_ID" }]);
   });
 
   it("syncs nothing unless an integration is turned on, even when its settings are present", () => {
@@ -132,10 +133,14 @@ describe("scheduledConnectors", () => {
       PLAID_SECRET: "plaid-secret-value",
       PLAID_ACCESS_TOKEN: ["access", "sandbox", "0".repeat(8)].join("-"),
       PLAID_ENVIRONMENT: "sandbox",
+      XERO_CLIENT_ID: "client-id",
+      XERO_CLIENT_SECRET: "client-secret-value",
+      XERO_TENANT_ID: "00000000-0000-4000-8000-00000000a0a0",
+      XERO_REFRESH_TOKEN: "refresh-value",
     };
     const { connectors } = scheduledConnectors(SYNCABLE_INTEGRATIONS, env);
     const built = await Promise.all(connectors.map((c) => c.make()));
-    expect(built.map((c) => c.source).sort()).toEqual(["bank_statements", "chase", "inventory_pos", "plaid", "quickbooks", "shopify", "stripe"]);
+    expect(built.map((c) => c.source).sort()).toEqual(["bank_statements", "chase", "inventory_pos", "plaid", "quickbooks", "shopify", "stripe", "xero"]);
     const token = await scheduledConnectors(["shopify"], { SHOPIFY_SHOP_DOMAIN: "demo.myshopify.com", SHOPIFY_ADMIN_ACCESS_TOKEN: "t" }).connectors[0]!.make();
     expect(token.source).toBe("shopify");
     for (const connector of built) expect(connector).not.toHaveProperty("write");

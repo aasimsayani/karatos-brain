@@ -186,7 +186,13 @@ export const INTEGRATIONS: IntegrationSpec[] = [
       "Keeps customer and vendor names without their emails, phone numbers, addresses or tax IDs",
       "Read-only: KaratOS only reads your books, even though QuickBooks' connection would allow changes",
     ] },
-  { id: "xero", name: "Xero", domain: "financial", segments: ALL, access: "public_api", testWith: "sandbox", departments: ["finance", "compliance"], historicalImportYears: 6, webhooks: true, settings: [], changelog: "https://developer.xero.com/changelog", status: "planned" },
+  { id: "xero", name: "Xero", domain: "financial", segments: ALL, access: "public_api", testWith: "sandbox", departments: ["finance", "compliance"], historicalImportYears: 6, webhooks: true, settings: ["XERO_CLIENT_ID", "XERO_CLIENT_SECRET", "XERO_TENANT_ID", "XERO_REFRESH_TOKEN"], changelog: "https://developer.xero.com/changelog", status: "built", note: "Read-only scopes only; the connector refuses a connection holding any other. The docs watch follows Xero's changelog, and the nightly run against the Demo Company catches API changes", capabilities: [
+      "Imports six years of invoices, bills, credit notes, payments, bank transactions and manual journals, with the chart of accounts and contacts",
+      "Keeps every change after that within the sync interval, including invoices and bills voided or deleted in Xero",
+      "Lines invoices and bills up with the payments applied to them, so finance can see what's still owed",
+      "Keeps contact names without their emails, phone numbers, addresses or tax numbers",
+      "Read-only: the connection is granted read scopes only, and KaratOS stops if one could ever change your books",
+    ] },
   { id: "plaid", name: "Plaid", domain: "financial", segments: ALL, access: "public_api", testWith: "sandbox", departments: ["finance", "compliance"], historicalImportYears: 2, webhooks: true, settings: ["PLAID_CLIENT_ID", "PLAID_SECRET", "PLAID_ACCESS_TOKEN", "PLAID_ENVIRONMENT"], changelog: "https://plaid.com/docs/changelog/", status: "built", note: "Bank feeds beyond Chase: accounts, balances and transactions from one linked bank, read-only", capabilities: [
       "Imports up to two years of bank and card transactions from a bank linked through Plaid",
       "Keeps every new, changed and removed transaction after that within the sync interval",
