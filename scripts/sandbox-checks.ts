@@ -1,5 +1,5 @@
 import type { SandboxCheck } from "@karatos/core";
-import { memoryTokenStore, quickBooksConnector, shopifyConnector, stripeConnector } from "@karatos/connectors";
+import { memoryTokenStore, mondayConnector, quickBooksConnector, shopifyConnector, stripeConnector } from "@karatos/connectors";
 
 /**
  * Every built connector registers a sandbox check here. Credentials are
@@ -38,6 +38,14 @@ export const SANDBOX_CHECKS: SandboxCheck[] = [
         environment: "sandbox",
         tokens: memoryTokenStore(c.SANDBOX_QUICKBOOKS_REFRESH_TOKEN!),
       }),
+  },
+  {
+    // A free monday.com developer account with a few test boards, read with a monday app's OAuth token
+    // granted boards:read and updates:read only, so monday.com itself refuses any change.
+    integration: "monday",
+    name: "Monday.com",
+    credentials: ["SANDBOX_MONDAY_API_TOKEN"],
+    connector: (c) => mondayConnector({ token: c.SANDBOX_MONDAY_API_TOKEN!, scopes: ["boards:read", "updates:read"] }),
   },
 ];
 

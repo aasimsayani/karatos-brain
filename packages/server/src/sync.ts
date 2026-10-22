@@ -10,6 +10,9 @@ import {
   directorySource,
   inventoryPosConnector,
   memoryTokenStore,
+  mondayConnector,
+  parseMondayAllowedColumns,
+  parseMondayScopes,
   quickBooksConnector,
   resolveBankProfiles,
   resolvePosProfile,
@@ -91,6 +94,18 @@ const FACTORIES: Record<string, { needs: (env: Env) => string[]; make: (env: Env
         environment: set(env, "QUICKBOOKS_ENVIRONMENT")!,
         // Intuit rotates the refresh token daily; the newest is kept, encrypted, in the instance's database.
         tokens: store ? sealedTokenStore({ ...store, source: "quickbooks", seed, keyMaterial: clientSecret }) : memoryTokenStore(seed),
+      });
+    },
+  },
+  monday: {
+    needs: (env) => (set(env, "MONDAY_API_TOKEN") ? [] : ["MONDAY_API_TOKEN"]),
+    make: async (env) => {
+      const scopes = parseMondayScopes(set(env, "MONDAY_OAUTH_SCOPES"));
+      return mondayConnector({
+        token: set(env, "MONDAY_API_TOKEN")!,
+        // Given for a monday app's OAuth token, so one holding a write scope is refused; a personal token has none to give.
+        ...(scopes ? { scopes } : {}),
+        allowedColumns: parseMondayAllowedColumns(set(env, "MONDAY_ALLOWED_COLUMNS")),
       });
     },
   },

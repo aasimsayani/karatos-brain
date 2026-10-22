@@ -75,7 +75,7 @@ Used by: R is retail, W is wholesale, M is manufacturing. Test with says how we 
 | Integration | Used by | Access | Test with | Webhooks | Status |
 | --- | --- | --- | --- | --- | --- |
 | HubSpot | R, W | Public API | Free sandbox | Yes | Planned |
-| Monday.com | R, W, M | Public API | Free sandbox | Yes | Planned |
+| Monday.com | R, W, M | Public API | Free sandbox | Yes | Built (Connector in @karatos/connectors: boards, items with their safe column values, deletions and archives, and who commented when, read-only) |
 | Custom forms | R | Public API | Sample files | Yes | Planned |
 | Gmail | R, W, M | Public API | Free sandbox | Yes | Planned |
 | Google Workspace and Drive | R, W, M | Public API | Free sandbox | Yes | Planned |
@@ -424,6 +424,40 @@ Chase business checking, savings and credit cards, from the CSV activity downloa
 The profiles were written from Chase's published download format and statement layout. Before sign-off, check them against one of the client's own statements and confirm the event count matches the statement's transaction count.
 
 **Testing.** `packages/connectors/test/chase.test.ts` writes a synthetic two-page checking statement, a card statement and matching CSV downloads. It checks that each format reads the same transactions with the same keys, that each import mode reads only its own files, and that account folders get the right profile. No real statement goes in a repo.
+
+### Monday.com
+
+Reads monday.com's GraphQL API (`https://api.monday.com/v2`), pinned to API version 2026-07 with the `API-Version` header, so a new current version can't change answers under the connector. Retail, wholesale and manufacturing businesses track custom orders, repairs and production on monday.com boards; the connector brings every board the token can see into the brain as neutral work-tracking events.
+
+| Setting | What it is |
+| --- | --- |
+| `MONDAY_API_TOKEN` | A monday app's OAuth token (safer) or a personal API token. It goes in the `Authorization` header as monday.com shows, with no `Bearer`, and nowhere else |
+| `MONDAY_OAUTH_SCOPES` | Optional. For an OAuth token, the scopes it was granted, such as `boards:read updates:read`. The connector refuses to run if any could change data |
+| `MONDAY_ALLOWED_COLUMNS` | Optional. Comma-separated `board:column` pairs whose display text may be kept although the column's type can hold personal data |
+| `MONDAY_WEBHOOK_SIGNING_SECRET` | Optional. The monday app's Signing Secret, for when webhooks are turned on |
+
+**Read-only.** The client sends only seven named read queries built in code (boards, the first and next pages of a board's items, with or without display text, a board's activity log, and updates), and every variable is checked before anything is sent: one board id at a time, page sizes within monday.com's limits, cursors and times in their own shapes, and the items filter only as one of the connector's own last-updated windows. A caller can't pass GraphQL text, and a mutation can never be sent. Which token to use matters:
+
+- A **monday app's OAuth token** granted only `boards:read` and `updates:read` is limited by monday.com itself, so nothing can be changed whatever the code does. The token is opaque and doesn't say its scopes, so set `MONDAY_OAUTH_SCOPES` to the scope field from the token response; the connector refuses a token listed with any scope that isn't `:read`. These tokens don't expire until the app is uninstalled. monday.com's newer OAuth 2.1 flow, with expiring tokens and refresh tokens, isn't supported yet.
+- A **personal API token** carries every permission its user has in the monday.com UI and can't be limited. The allowlist above is then all that keeps the connector read-only, so use the token of a user with no more access than the boards to sync.
+
+The writes it may do later (`create_item`, `update_item`) are declared and stay behind the write gate.
+
+**What it reads.** Boards are read 25 at a time with `state: all`, so archived and deleted boards arrive as `work.board_updated` with their state, columns (id, type and title) and groups. Items are read from every board that isn't deleted, 500 a page with `items_page` and then `next_items_page`. The historical import reads each board whole and keeps items updated in the last five years, then every update created in that time, 100 a page. `items_page` returns active items only, so items archived or deleted before the import aren't read. Only classic boards are listed (monday.com's default for `boards`), and subitems aren't read yet.
+
+**Incremental syncs.** monday.com can't filter items by an exact time, only by periods such as today and yesterday in the token user's time zone (`__last_updated__` with `compare_attribute: "UPDATED_AT"`). Each pass asks for the smallest pair that surely covers everything since the previous pass started, less five minutes of overlap: today and yesterday up to 22 hours back, this and last week up to nearly seven days, this and last month up to nearly 28 days, and the whole board after that. It then keeps only items updated since then. Each board's activity log for the same span gives `work.item_deleted` for `delete_pulse` and `archive_pulse` events, and updates are read by creation day, a day wider each side because monday.com doesn't say which time zone it reads them in. With no checkpoint the first pass looks back 48 hours.
+
+**Cursors.** `items_page` cursors expire 60 minutes after the first request. The checkpoint keeps the board and when its cursor was issued; a pass resumed more than 55 minutes later, or told the cursor expired, reads that board again from its start, and the items already stored are duplicates. A board whose cursor expires twice in one run stops the sync, which resumes from the checkpoint.
+
+**Rate limits.** monday.com meters complexity points per minute (10M shared for a personal token, 5M each for reads and writes with an app token, 1M on free and trial accounts), calls per minute and per day (1,000 a day on the free, Basic and Standard plans), and requests at once. A complexity, minute, concurrency or IP limit is waited out for the `retry_in_seconds` monday.com sends, or its `Retry-After`, at most a minute and three times. The daily limit stops the sync with a message, and the next run resumes from its checkpoint. A pass costs one call per page of boards, one per page of items and one per activity log page on each board, and one per 100 updates, so on the free plan keep the sync interval long enough for the number of boards.
+
+**Events.** `work.board_updated`, `work.item_updated` (board, group, state, created and updated times, creator and column values by column id and type), `work.item_deleted` (with `reason` `deleted` or `archived`) and `work.comment_updated`. Departments map a board's columns onto their own stages and dates. Each item is keyed by item id and `updated_at`, so each version is stored once and a replay is a duplicate.
+
+**Personal data.** Column values are kept only for types that hold no free text: status (label, index, done), date (the day), numbers, checkbox, dropdown labels, timeline (two days) and people (user and team ids, never names). Text, long text, email, phone, location, file, link and every other type are dropped, and the item queries don't even ask for their text unless a column on that board is in `MONDAY_ALLOWED_COLUMNS`; then only that column's display text is kept, cut to 500 characters. Item names are never read, since they often hold a customer's name. Updates keep their id, item, creator and times; their words are never asked for. The activity log's data is read for the item id only.
+
+**Webhooks.** `mondayWebhookChallenge` answers the challenge monday.com sends when a webhook is created. `verifyMondayWebhook` checks the JWT monday.com puts in the `Authorization` header of deliveries for webhooks a monday app creates: HS256 only, signed with the app's Signing Secret, compared in constant time, with an `exp` that hasn't passed (30 seconds' leeway), so a captured delivery can't be replayed later, and `aud` when one is given. Anything but ok must be answered 401. Webhooks set up another way may arrive unsigned. `mondayWebhookChanges` lists the board, item and kind of change. A delivery is a prompt to sync, not data. The instance doesn't take webhooks yet; the scheduled sync picks every change up.
+
+**Testing.** The tests run against a mock built from monday.com's docs (`packages/testkit/src/mocks/monday.ts`), which answers 401 without the right token, checks the API version, reads each request's operation and answers only the connector's named read queries with their documented argument types, refuses and counts every mutation, returns only the fields a query selects, filters by the last-updated periods, pages boards, items, activity logs and updates, expires items cursors after 60 minutes and sends rate limits. Its assumptions are listed in the mock and checked on the first live run. For the nightly run, create a free monday.com developer account with a few test boards, create a monday app there with only the `boards:read` and `updates:read` scopes, install it and add its OAuth token as the `SANDBOX_MONDAY_API_TOKEN` GitHub Actions secret.
 
 ## Writing back: built, turned off
 
