@@ -95,6 +95,10 @@ describe("scheduledConnectors", () => {
     expect(scheduledConnectors(["quickbooks"], { QUICKBOOKS_CLIENT_ID: "id", QUICKBOOKS_REFRESH_TOKEN: secret }).skipped).toEqual([
       { id: "quickbooks", reason: "missing QUICKBOOKS_CLIENT_SECRET, QUICKBOOKS_REALM_ID, QUICKBOOKS_ENVIRONMENT" },
     ]);
+    expect(scheduledConnectors(["square"], { SQUARE_APPLICATION_ID: "app", SQUARE_REFRESH_TOKEN: secret }).skipped).toEqual([
+      { id: "square", reason: "missing CUSTOMER_REF_KEY, SQUARE_APPLICATION_ID, SQUARE_APPLICATION_SECRET, SQUARE_REFRESH_TOKEN" },
+    ]);
+    expect(scheduledConnectors(["square"], { SQUARE_ACCESS_TOKEN: secret }).skipped).toEqual([{ id: "square", reason: "missing CUSTOMER_REF_KEY" }]);
   });
 
   it("syncs nothing unless an integration is turned on, even when its settings are present", () => {
@@ -125,10 +129,17 @@ describe("scheduledConnectors", () => {
       QUICKBOOKS_REALM_ID: "9341450000",
       QUICKBOOKS_REFRESH_TOKEN: "refresh-value",
       QUICKBOOKS_ENVIRONMENT: "sandbox",
+      CUSTOMER_REF_KEY: "0".repeat(64),
+      SQUARE_ENVIRONMENT: "sandbox",
+      SQUARE_APPLICATION_ID: "sandbox-app-id",
+      SQUARE_APPLICATION_SECRET: "app-secret-value",
+      SQUARE_REFRESH_TOKEN: "refresh-value",
     };
     const { connectors } = scheduledConnectors(SYNCABLE_INTEGRATIONS, env);
     const built = await Promise.all(connectors.map((c) => c.make()));
-    expect(built.map((c) => c.source).sort()).toEqual(["bank_statements", "chase", "inventory_pos", "quickbooks", "shopify", "stripe"]);
+    expect(built.map((c) => c.source).sort()).toEqual(["bank_statements", "chase", "inventory_pos", "quickbooks", "shopify", "square", "stripe"]);
+    const square = await scheduledConnectors(["square"], { CUSTOMER_REF_KEY: "0".repeat(64), SQUARE_ACCESS_TOKEN: "t" }).connectors[0]!.make();
+    expect(square.source).toBe("square");
     const token = await scheduledConnectors(["shopify"], { SHOPIFY_SHOP_DOMAIN: "demo.myshopify.com", SHOPIFY_ADMIN_ACCESS_TOKEN: "t" }).connectors[0]!.make();
     expect(token.source).toBe("shopify");
     for (const connector of built) expect(connector).not.toHaveProperty("write");

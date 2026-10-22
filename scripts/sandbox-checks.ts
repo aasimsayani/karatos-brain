@@ -1,5 +1,6 @@
+import { randomBytes } from "node:crypto";
 import type { SandboxCheck } from "@karatos/core";
-import { memoryTokenStore, quickBooksConnector, shopifyConnector, stripeConnector } from "@karatos/connectors";
+import { memoryTokenStore, quickBooksConnector, shopifyConnector, squareConnector, stripeConnector } from "@karatos/connectors";
 
 /**
  * Every built connector registers a sandbox check here. Credentials are
@@ -37,6 +38,22 @@ export const SANDBOX_CHECKS: SandboxCheck[] = [
         realmId: c.SANDBOX_QUICKBOOKS_REALM_ID!,
         environment: "sandbox",
         tokens: memoryTokenStore(c.SANDBOX_QUICKBOOKS_REFRESH_TOKEN!),
+      }),
+  },
+  {
+    // A Square developer account's sandbox seller, connected to the app over OAuth with the read scopes only.
+    // Always the sandbox host. Square keeps the same refresh token, so the secret doesn't need updating after a run.
+    // Each run makes its own customer reference key, as nothing it stores is kept.
+    integration: "square",
+    name: "Square",
+    credentials: ["SANDBOX_SQUARE_APPLICATION_ID", "SANDBOX_SQUARE_APPLICATION_SECRET", "SANDBOX_SQUARE_REFRESH_TOKEN"],
+    connector: (c) =>
+      squareConnector({
+        environment: "sandbox",
+        applicationId: c.SANDBOX_SQUARE_APPLICATION_ID!,
+        applicationSecret: c.SANDBOX_SQUARE_APPLICATION_SECRET!,
+        refreshToken: c.SANDBOX_SQUARE_REFRESH_TOKEN!,
+        customerKey: randomBytes(32).toString("hex"),
       }),
   },
 ];

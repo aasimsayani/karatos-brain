@@ -14,6 +14,7 @@ import {
   resolveBankProfiles,
   resolvePosProfile,
   shopifyConnector,
+  squareConnector,
   stripeConnector,
 } from "@karatos/connectors";
 
@@ -91,6 +92,25 @@ const FACTORIES: Record<string, { needs: (env: Env) => string[]; make: (env: Env
         environment: set(env, "QUICKBOOKS_ENVIRONMENT")!,
         // Intuit rotates the refresh token daily; the newest is kept, encrypted, in the instance's database.
         tokens: store ? sealedTokenStore({ ...store, source: "quickbooks", seed, keyMaterial: clientSecret }) : memoryTokenStore(seed),
+      });
+    },
+  },
+  square: {
+    needs: (env) => [
+      ...(set(env, "CUSTOMER_REF_KEY") ? [] : ["CUSTOMER_REF_KEY"]),
+      ...(set(env, "SQUARE_ACCESS_TOKEN") || ["SQUARE_APPLICATION_ID", "SQUARE_APPLICATION_SECRET", "SQUARE_REFRESH_TOKEN"].every((name) => set(env, name))
+        ? []
+        : ["SQUARE_APPLICATION_ID", "SQUARE_APPLICATION_SECRET", "SQUARE_REFRESH_TOKEN"]),
+    ],
+    make: async (env) => {
+      const oauth = ["SQUARE_APPLICATION_ID", "SQUARE_APPLICATION_SECRET", "SQUARE_REFRESH_TOKEN"].every((name) => set(env, name));
+      // The OAuth connection is preferred: each refresh asks for the read scopes only.
+      return squareConnector({
+        customerKey: set(env, "CUSTOMER_REF_KEY")!,
+        ...(set(env, "SQUARE_ENVIRONMENT") ? { environment: set(env, "SQUARE_ENVIRONMENT")! } : {}),
+        ...(oauth
+          ? { applicationId: set(env, "SQUARE_APPLICATION_ID")!, applicationSecret: set(env, "SQUARE_APPLICATION_SECRET")!, refreshToken: set(env, "SQUARE_REFRESH_TOKEN")! }
+          : { accessToken: set(env, "SQUARE_ACCESS_TOKEN")! }),
       });
     },
   },

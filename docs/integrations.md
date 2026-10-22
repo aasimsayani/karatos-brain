@@ -36,7 +36,7 @@ Used by: R is retail, W is wholesale, M is manufacturing. Test with says how we 
 | Jewel360 | R | Partner | Partner | No | Planned (Partner integrations only. Start with exports) |
 | ARMS | R | Unknown | Unknown | No | Planned |
 | Lightspeed Retail | R | Public API | Unknown | Yes | Planned |
-| Square | R | Public API | Free sandbox | Yes | Planned |
+| Square | R | Public API | Free sandbox | Yes | Built (Connector in @karatos/connectors: orders, payments, refunds, catalog items, inventory counts and customers, read-only) |
 | Clover | R | Public API | Free sandbox | Yes | Planned |
 | Valigara | R, W, M | Unknown | Unknown | No | Planned |
 | WooCommerce | R | Public API | Free sandbox | Yes | Planned |
@@ -194,7 +194,7 @@ For paid and partner systems there's nothing to record yet, so the connector is 
 - the auth the docs describe, answering 401 without it like the real API;
 - its `assumptions`: anything the docs leave out that the mock had to guess, such as a default filter or a unit. Each one is checked on the first live run, then fixed or removed.
 
-A request for a path or method the docs don't list throws `UndocumentedRequestError`, so a connector can't come to depend on behavior nobody has seen documented. Data in mocks is synthetic. The mocks cover Stuller's invoice and metal market rate endpoints (API v2), and QuickBooks Online's query and change data capture endpoints with Intuit's token refresh (minor version 75). QuickBooks has a free sandbox, so its mock is a stand-in until an Intuit developer account is set up for the nightly run.
+A request for a path or method the docs don't list throws `UndocumentedRequestError`, so a connector can't come to depend on behavior nobody has seen documented. Data in mocks is synthetic. The mocks cover Stuller's invoice and metal market rate endpoints (API v2), QuickBooks Online's query and change data capture endpoints with Intuit's token refresh (minor version 75), and Square's read endpoints with its OAuth refresh and token status check (API version 2026-09-16). QuickBooks and Square have free sandboxes, so their mocks are stand-ins until developer accounts are set up for the nightly run.
 
 ### Vendor docs watch
 
@@ -327,6 +327,35 @@ Reads the QuickBooks Online Accounting API, pinned to minor version 75 (Intuit r
 **Webhooks.** QuickBooks sends CloudEvents (Intuit moved every app to them by 31 July 2026), and a notification names what changed without the record itself. `verifyQuickBooksWebhook` checks `intuit-signature`, the base64 HMAC-SHA256 of the raw body keyed with the verifier token, and `quickBooksWebhookChanges` lists the changes for this company. A notification is a prompt to sync, not data, so a replayed one finds nothing new. The instance doesn't take webhooks yet; the scheduled sync picks every change up.
 
 **Testing.** Until an Intuit developer account exists, the tests run against a mock built from Intuit's docs (`packages/testkit/src/mocks/quickbooks.ts`), which rotates refresh tokens, refuses the old one, answers 401 without a valid access token, and parses only the queries the docs describe. Its assumptions are listed in the mock and checked on the first sandbox run. For the nightly run, create a free Intuit developer account and sandbox company, connect it to the app with its Development keys, and add `SANDBOX_QUICKBOOKS_CLIENT_ID`, `SANDBOX_QUICKBOOKS_CLIENT_SECRET`, `SANDBOX_QUICKBOOKS_REALM_ID` and `SANDBOX_QUICKBOOKS_REFRESH_TOKEN` as GitHub Actions secrets. The nightly run can't save the token Intuit rotates to, so when it fails with `invalid_grant`, reconnect the sandbox company and update that secret.
+
+### Square
+
+Reads the Square API on `connect.squareup.com` (or `connect.squareupsandbox.com`), pinned to API version 2026-09-16 with the `Square-Version` header. Read-only is enforced twice. Before its first read, and after every token refresh, the client asks Square which scopes the token holds (`POST /oauth2/token/status`) and stops unless they are exactly the six read scopes below, naming any extra or missing one. A personal access token from the Developer Console has full access to the account, so the connector stops with one. The client also sends requests to eight read endpoints only, each with its own method, path and parameters, and anything else is stopped before it leaves the server: `GET /v2/locations`, `POST /v2/catalog/search`, `POST /v2/catalog/batch-retrieve`, `POST /v2/inventory/counts/batch-retrieve`, `POST /v2/customers/search`, `POST /v2/orders/search`, `GET /v2/payments` and `GET /v2/refunds`. The writes it may do later (adjust inventory, update catalog items) are declared and stay behind the write gate.
+
+| Setting | What it is |
+| --- | --- |
+| `SQUARE_APPLICATION_ID`, `SQUARE_APPLICATION_SECRET` | The KaratOS app's credentials from developer.squareup.com: the Sandbox tab for a sandbox seller, Production for a store |
+| `SQUARE_REFRESH_TOKEN` | The refresh token from the seller authorizing the app (the OAuth code flow) |
+| `SQUARE_ACCESS_TOKEN` | Instead of the three above, for a short test only: an OAuth access token already limited to the read scopes. It lasts 30 days and isn't refreshed |
+| `SQUARE_ENVIRONMENT` | Optional. `production` (the default) or `sandbox` |
+| `CUSTOMER_REF_KEY` | Keys the customer references (below). Generated by `npm run secrets:setup`; never rotated |
+| `SQUARE_WEBHOOK_SIGNATURE_KEY`, `SQUARE_WEBHOOK_URL` | Optional. The webhook subscription's signature key and its notification URL exactly as set, for when webhooks are turned on |
+
+**Scopes.** Authorize with exactly `MERCHANT_PROFILE_READ ITEMS_READ INVENTORY_READ CUSTOMERS_READ ORDERS_READ PAYMENTS_READ`. Every refresh asks for these scopes only, and Square limits the new token to them, so even an authorization that once included more yields a read-only token. Access tokens last 30 days and are refreshed a day early, one refresh at a time; Square returns the same refresh token each time, so nothing needs saving.
+
+**What it reads.** In order: the catalog's items with their variations (deleted and archived ones too), the current in-stock counts at every location, customers, orders, payments and refunds. The historical import reads the whole catalog and every count, and five years of customers, orders, payments and refunds. Orders are searched ten locations at a time and payments read per location, since Square lists only the main location's payments unless told otherwise; inactive locations are read too. Payments and refunds are always filtered from five years back on creation, as Square otherwise looks back only a year. Incremental passes read what changed since the previous pass started, less five minutes; with no checkpoint the first pass looks back 48 hours. The checkpoint keeps the stream, the location and Square's page cursor, so a crash resumes at the next page.
+
+**SKUs.** Order lines and counts name a catalog variation, not its SKU. The connector uses the SKUs the catalog stream gave it and asks the catalog (`batch-retrieve`, deleted objects included) for any variation it hasn't seen this run, so a Square sale carries the same SKU as the same ring sold on Shopify or in a POS export. A variation without a SKU becomes `square-variation-<id>`, and an amount rung up without a catalog item `square-line-<order>-<line>`.
+
+**Events.** The same types and shapes as the connectors already built. Orders give `order.updated` (Shopify's shape), `sale.completed` once completed, with one payment per tender (card, cash, gift card, financing, wire or other), and `sale.returned` for each return in a return order, against the original sale. Payments and refunds give `payment.charge_updated` and `payment.refund_updated` (Stripe's shape). Items give `product.updated` (Shopify's shape), with each variation's SKU and price. Counts give `inventory.counted` per location (the POS connector's shape); a fractional or negative count is dead-lettered. Customers give `customer.profile_updated` with marketing consent off, since Square records only unsubscribes. Each event is keyed by record and `updated_at` (a sale by its order alone), so a replay is a duplicate.
+
+**Privacy.** A customer becomes `square:customer:<hmac>`, an HMAC-SHA256 of Square's customer ID keyed with `CUSTOMER_REF_KEY`, the key custom form submissions use for theirs; the profile's name is a label made from that reference. No names, email addresses, phone numbers, addresses, birthdays, notes, ticket names, receipt links or refund reasons are kept, and of a card only its brand: never the last four digits, expiry, BIN or fingerprint.
+
+**Rate limits.** Square limits requests per application and answers 429 `RATE_LIMITED`. The client waits with exponential backoff and jitter (1, 2 and 4 seconds, or `Retry-After` up to a minute when sent), then hands the error to `runSync`, and the next run resumes from the checkpoint.
+
+**Webhooks.** `verifySquareWebhook` checks `x-square-hmacsha256-signature`, the base64 HMAC-SHA256, keyed with the subscription's signature key, of the notification URL followed by the raw body, compared in constant time. Square signs no timestamp, so a captured delivery stays valid: `SquareReplayGuard` handles each `event_id` once within 25 hours (Square retries for 24), and the event keys, the same ones the sync uses, stop a replay from storing anything twice after a restart. Payment, refund and customer notifications become events (`handleWebhook`); order, inventory and catalog ones only name what changed, so they are a prompt to sync. The instance doesn't take webhooks yet; the scheduled sync picks every change up.
+
+**Testing.** Until a Square developer account is set up, the tests run against a mock built from Square's docs (`packages/testkit/src/mocks/square.ts`), which refreshes tokens with the documented scope intersection, reports each token's scopes, answers 401 without a valid token and 403 without the scope, ties each cursor to its query, and enforces the documented limits and defaults. Its assumptions are listed in the mock and checked on the first sandbox run. For the nightly run, create a free Square developer account, open its sandbox seller, authorize the app on the sandbox with the read scopes above, and add `SANDBOX_SQUARE_APPLICATION_ID`, `SANDBOX_SQUARE_APPLICATION_SECRET` and `SANDBOX_SQUARE_REFRESH_TOKEN` as GitHub Actions secrets.
 
 ### Inventory and POS systems
 

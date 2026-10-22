@@ -159,6 +159,17 @@ describe("docMockWatchTargets", () => {
       "https://developer.intuit.com/app/developer/qbo/docs/api/accounting/all-entities/account",
       "https://developer.intuit.com/app/developer/qbo/docs/learn/explore-the-quickbooks-online-api/data-queries",
       "https://developer.intuit.com/app/developer/qbo/docs/api/accounting/all-entities/changedatacapture",
+      "https://developer.squareup.com/docs/build-basics/versioning-overview",
+      "https://developer.squareup.com/reference/square/oauth-api/obtain-token",
+      "https://developer.squareup.com/reference/square/oauth-api/retrieve-token-status",
+      "https://developer.squareup.com/reference/square/locations-api/list-locations",
+      "https://developer.squareup.com/reference/square/catalog-api/search-catalog-objects",
+      "https://developer.squareup.com/reference/square/catalog-api/batch-retrieve-catalog-objects",
+      "https://developer.squareup.com/reference/square/inventory-api/batch-retrieve-inventory-counts",
+      "https://developer.squareup.com/reference/square/customers-api/search-customers",
+      "https://developer.squareup.com/reference/square/orders-api/search-orders",
+      "https://developer.squareup.com/reference/square/payments-api/list-payments",
+      "https://developer.squareup.com/reference/square/payments-api/list-payment-refunds",
     ]);
   });
 });
@@ -238,14 +249,14 @@ describe("Stuller doc mock", () => {
 describe("docMockVendorDocsTargets", () => {
   it("gives each mock page its own watch key, named after the catalog entry", () => {
     const targets = docMockVendorDocsTargets(allDocMocks());
-    expect(targets).toHaveLength(7);
+    expect(targets).toHaveLength(18);
     expect(targets[0]).toEqual({
       integration: "stuller:api-stuller-com-help",
       name: "Stuller",
       url: "https://api.stuller.com/help",
       mock: { integration: "stuller", retrievedOn: "2026-10-15" },
     });
-    expect(new Set(targets.map((t) => t.integration)).size).toBe(7);
+    expect(new Set(targets.map((t) => t.integration)).size).toBe(18);
   });
 
   it("falls back to the integration id for a mock outside the catalog", () => {
