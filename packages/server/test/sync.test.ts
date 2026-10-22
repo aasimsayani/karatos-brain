@@ -95,6 +95,9 @@ describe("scheduledConnectors", () => {
     expect(scheduledConnectors(["quickbooks"], { QUICKBOOKS_CLIENT_ID: "id", QUICKBOOKS_REFRESH_TOKEN: secret }).skipped).toEqual([
       { id: "quickbooks", reason: "missing QUICKBOOKS_CLIENT_SECRET, QUICKBOOKS_REALM_ID, QUICKBOOKS_ENVIRONMENT" },
     ]);
+    expect(scheduledConnectors(["google_workspace"], { GOOGLE_CLIENT_SECRET: secret, GOOGLE_WORKSPACE_REFRESH_TOKEN: secret }).skipped).toEqual([
+      { id: "google_workspace", reason: "missing GOOGLE_CLIENT_ID, GOOGLE_DRIVE_ROOT_FOLDER_ID, CORRESPONDENT_HASH_KEY" },
+    ]);
   });
 
   it("syncs nothing unless an integration is turned on, even when its settings are present", () => {
@@ -125,10 +128,25 @@ describe("scheduledConnectors", () => {
       QUICKBOOKS_REALM_ID: "9341450000",
       QUICKBOOKS_REFRESH_TOKEN: "refresh-value",
       QUICKBOOKS_ENVIRONMENT: "sandbox",
+      GOOGLE_CLIENT_ID: "000000000000-test.apps.googleusercontent.com",
+      GOOGLE_CLIENT_SECRET: "client-secret-value",
+      GOOGLE_WORKSPACE_REFRESH_TOKEN: "refresh-value",
+      GOOGLE_DRIVE_ROOT_FOLDER_ID: "1TestRootFolder_abcdefghij",
+      GOOGLE_DRIVE_SHARED_DRIVE_IDS: "0ATestSharedDrive_abc",
+      GOOGLE_DRIVE_FILE_NAMES: "drop",
+      GOOGLE_SHEETS_RANGES: "1TestSpreadsheet_abcdefghij/Stock!A1:C10",
+      GOOGLE_CALENDAR_IDS: "primary",
+      CORRESPONDENT_HASH_KEY: "0".repeat(64),
     };
     const { connectors } = scheduledConnectors(SYNCABLE_INTEGRATIONS, env);
     const built = await Promise.all(connectors.map((c) => c.make()));
-    expect(built.map((c) => c.source).sort()).toEqual(["bank_statements", "chase", "inventory_pos", "quickbooks", "shopify", "stripe"]);
+    expect(built.map((c) => c.source).sort()).toEqual(["bank_statements", "chase", "google_workspace", "inventory_pos", "quickbooks", "shopify", "stripe"]);
+    // Optional Google settings have defaults; names are only keep or drop, and every list is checked before anything runs.
+    const { GOOGLE_DRIVE_SHARED_DRIVE_IDS: _d, GOOGLE_DRIVE_FILE_NAMES: _n, GOOGLE_SHEETS_RANGES: _s, GOOGLE_CALENDAR_IDS: _c, ...defaults } = env;
+    expect((await scheduledConnectors(["google_workspace"], defaults).connectors[0]!.make()).source).toBe("google_workspace");
+    await expect(scheduledConnectors(["google_workspace"], { ...env, GOOGLE_DRIVE_FILE_NAMES: "some" }).connectors[0]!.make()).rejects.toThrow("GOOGLE_DRIVE_FILE_NAMES must be keep or drop");
+    await expect(scheduledConnectors(["google_workspace"], { ...env, GOOGLE_SHEETS_RANGES: "nope" }).connectors[0]!.make()).rejects.toThrow("GOOGLE_SHEETS_RANGES");
+    await expect(scheduledConnectors(["google_workspace"], { ...env, GOOGLE_CALENDAR_IDS: "not a calendar" }).connectors[0]!.make()).rejects.toThrow("GOOGLE_CALENDAR_IDS");
     const token = await scheduledConnectors(["shopify"], { SHOPIFY_SHOP_DOMAIN: "demo.myshopify.com", SHOPIFY_ADMIN_ACCESS_TOKEN: "t" }).connectors[0]!.make();
     expect(token.source).toBe("shopify");
     for (const connector of built) expect(connector).not.toHaveProperty("write");
