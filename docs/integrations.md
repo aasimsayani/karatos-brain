@@ -280,7 +280,7 @@ These systems come from the technology vendors exhibiting at JCK Las Vegas 2026,
 
 | Integration | Used by | Access | Test with | Webhooks | Status |
 | --- | --- | --- | --- | --- | --- |
-| TheWatchSearch (by TheWatchCloud) | R, W | Unknown | Unknown | No | Planned (Live offers and wanted lists pulled from dealer WhatsApp groups. The exact platform is being confirmed with the owner; closest match is TheWatchSearch by TheWatchCloud. No API or export published) |
+| TheWatchSearch (by TheWatchCloud) | R, W | File export | Sample files | No | Planned (Live offers and wanted lists from dealer WhatsApp groups. No API, so it starts from WhatsApp group chat exports the store already has; a partner feed from TheWatchCloud comes later) |
 | Search The Watch Market Business API | R, W | Public API | Paid account | No | Planned (Prices, 13-week price history, days to sell and recent listings by reference. Public API on a paid plan. Found in luxury watch trade research) |
 | ElixIQ.io (formerly WatchFind.io) | R, W | Unknown | Unknown | No | Planned (Turns dealer WhatsApp group messages into structured watch listings with alerts. No API or export documented; start with scheduled exports. Found in luxury watch trade research) |
 | Chrono24 dealer inventory feed | R, W | File export | Paid account | No | Planned (A dealer-hosted inventory feed that Chrono24 pulls daily, so listings, prices and sold status stay in step. No public API; the feed is set up through a Chrono24 integration manager. Found in luxury watch trade research) |
