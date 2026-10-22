@@ -653,6 +653,17 @@ describe("Google Workspace sync", () => {
     expect((await run(mock, "incremental", store, extra)).report).toMatchObject({ ingested: 0, duplicates: 0 });
   });
 
+  it("pages through a busy calendar 2,500 appointments at a time before taking the sync token", async () => {
+    googleEvent.reset();
+    const events = googleEvent.many(2600, () => ({ start: { dateTime: "2026-01-10T15:00:00.000Z" }, end: { dateTime: "2026-01-10T16:00:00.000Z" }, updated: "2026-01-09T00:00:00.000Z" }));
+    const mock = googleWorkspaceDocMock(workspace({ calendars: { primary: events } }));
+    const store = testPipeline();
+    const { report } = await run(mock, "incremental", store, { sheets: [] });
+    expect(store.memory.events.filter((e) => e.type === "calendar.appointment_updated")).toHaveLength(2600);
+    expect(urls(mock).filter((u) => u.includes("/events"))).toHaveLength(2);
+    expect(parseGoogleWorkspaceCursor(report.cursor)!.calendarTokens.primary).toBeDefined();
+  });
+
   it("stores a range again only when its values change, and skips a spreadsheet that's gone", async () => {
     const data = workspace();
     const mock = googleWorkspaceDocMock(data);
@@ -746,7 +757,7 @@ describe("Google Workspace sync", () => {
       { ...good, index: 51 },
       { ...good, since: "2021-01-20" },
       { ...good, since: "2021-02-30T00:00:00.000Z" },
-      { ...good, folders: Array.from({ length: GOOGLE_DRIVE_MAX_FOLDERS + 1 }, (_, i) => `f${i}`) },
+      { ...good, folders: [GOOGLE_MOCK_ROOT, ...Array.from({ length: GOOGLE_DRIVE_MAX_FOLDERS }, (_, i) => `f${i}`)] },
     ];
     for (const cursor of bad) expect(() => parseGoogleWorkspaceCursor(JSON.stringify(cursor)), JSON.stringify(cursor).slice(0, 80)).toThrow("not in the expected shape");
   });
@@ -789,6 +800,8 @@ describe("Google Workspace push notifications", () => {
     expect(v.verify(headers({ "X-Goog-Channel-Token": undefined }))).toEqual({ ok: false, reason: "missing" });
     expect(v.verify(headers({ "X-Goog-Resource-ID": undefined }))).toEqual({ ok: false, reason: "missing" });
     expect(v.verify(headers({ "X-Goog-Channel-Token": "has space" }))).toEqual({ ok: false, reason: "malformed" });
+    // Longer than Google allows a channel token (256): malformed before any comparison.
+    expect(v.verify(headers({ "X-Goog-Channel-Token": CHANNEL_TOKEN + "x".repeat(300) }))).toEqual({ ok: false, reason: "malformed" });
     expect(v.verify(headers({ "X-Goog-Message-Number": "-1" }))).toEqual({ ok: false, reason: "malformed" });
     expect(v.verify(headers({ "X-Goog-Channel-ID": "chan-other" }))).toEqual({ ok: false, reason: "unknown_channel" });
     expect(v.verify(headers({ "X-Goog-Resource-ID": "res_other" }))).toEqual({ ok: false, reason: "unknown_channel" });
@@ -809,6 +822,14 @@ describe("Google Workspace push notifications", () => {
     expect(v.verify(headers({ "X-Goog-Message-Number": "90071992547409929" }))).toEqual({ ok: false, reason: "replayed" });
     const restarted = googlePushVerifier({ channelToken: CHANNEL_TOKEN, channels, lastSeen: v.lastSeen(), clock: () => Date.parse(GOOGLE_MOCK_NOW) });
     expect(restarted.verify(headers({ "X-Goog-Message-Number": "6" }))).toEqual({ ok: false, reason: "replayed" });
+    // Compared as numbers, not text: 9 comes before 10.
+    const fresh = () => googlePushVerifier({ channelToken: CHANNEL_TOKEN, channels, clock: () => Date.parse(GOOGLE_MOCK_NOW) });
+    const ten = fresh();
+    expect(ten.verify(headers({ "X-Goog-Message-Number": "10" })).ok).toBe(true);
+    expect(ten.verify(headers({ "X-Goog-Message-Number": "9" }))).toEqual({ ok: false, reason: "replayed" });
+    const nine = fresh();
+    expect(nine.verify(headers({ "X-Goog-Message-Number": "9" })).ok).toBe(true);
+    expect(nine.verify(headers({ "X-Goog-Message-Number": "10" })).ok).toBe(true);
     // Each channel counts on its own.
     expect(restarted.verify(headers({ "X-Goog-Channel-ID": "chan-cal-1", "X-Goog-Resource-ID": "res_cal_1", "X-Goog-Resource-State": "exists", "X-Goog-Message-Number": "1" })).ok).toBe(true);
   });
