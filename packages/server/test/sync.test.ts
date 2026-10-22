@@ -99,6 +99,7 @@ describe("scheduledConnectors", () => {
       { id: "square", reason: "missing CUSTOMER_REF_KEY, SQUARE_APPLICATION_ID, SQUARE_APPLICATION_SECRET, SQUARE_REFRESH_TOKEN" },
     ]);
     expect(scheduledConnectors(["square"], { SQUARE_ACCESS_TOKEN: secret }).skipped).toEqual([{ id: "square", reason: "missing CUSTOMER_REF_KEY" }]);
+    expect(scheduledConnectors(["xero"], { XERO_CLIENT_SECRET: secret, XERO_REFRESH_TOKEN: secret }).skipped).toEqual([{ id: "xero", reason: "missing XERO_CLIENT_ID, XERO_TENANT_ID" }]);
   });
 
   it("syncs nothing unless an integration is turned on, even when its settings are present", () => {
@@ -134,10 +135,14 @@ describe("scheduledConnectors", () => {
       SQUARE_APPLICATION_ID: "sandbox-app-id",
       SQUARE_APPLICATION_SECRET: "app-secret-value",
       SQUARE_REFRESH_TOKEN: "refresh-value",
+      XERO_CLIENT_ID: "client-id",
+      XERO_CLIENT_SECRET: "client-secret-value",
+      XERO_TENANT_ID: "00000000-0000-4000-8000-00000000a0a0",
+      XERO_REFRESH_TOKEN: "refresh-value",
     };
     const { connectors } = scheduledConnectors(SYNCABLE_INTEGRATIONS, env);
     const built = await Promise.all(connectors.map((c) => c.make()));
-    expect(built.map((c) => c.source).sort()).toEqual(["bank_statements", "chase", "inventory_pos", "quickbooks", "shopify", "square", "stripe"]);
+    expect(built.map((c) => c.source).sort()).toEqual(["bank_statements", "chase", "inventory_pos", "quickbooks", "shopify", "square", "stripe", "xero"]);
     const square = await scheduledConnectors(["square"], { CUSTOMER_REF_KEY: "0".repeat(64), SQUARE_ACCESS_TOKEN: "t" }).connectors[0]!.make();
     expect(square.source).toBe("square");
     const token = await scheduledConnectors(["shopify"], { SHOPIFY_SHOP_DOMAIN: "demo.myshopify.com", SHOPIFY_ADMIN_ACCESS_TOKEN: "t" }).connectors[0]!.make();
