@@ -178,7 +178,7 @@ describe("Wix client", () => {
       const mock = wixDocMock(site({ apps: app([...WIX_READ_ONLY_PERMISSIONS, extra]) }));
       const { fetch, sent } = recording(mock);
       const client = wixClient(options(mock, { fetch }));
-      await expect(client.read("orders", { search: {} })).rejects.toThrow(new RegExp(`holds ${extra.replace(/[.]/g, "\\.")}`));
+      await expect(client.read("orders", { search: {} })).rejects.toThrow(`holds ${extra}`);
       expect(sent.map((s) => s.path)).toEqual(["/oauth2/token", "/apps/v1/instance"]);
     }
     // An unreadable entry counts as a write, and is never echoed.
