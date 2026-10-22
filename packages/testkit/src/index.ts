@@ -6,5 +6,6 @@ export * from "./writes.js";
 export * from "./doc-mock.js";
 export * from "./mocks/stuller.js";
 export * from "./mocks/quickbooks.js";
+export * from "./mocks/klaviyo.js";
 export * from "./mocks/index.js";
 export * from "./pdf.js";

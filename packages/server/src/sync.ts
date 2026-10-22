@@ -9,6 +9,7 @@ import {
   chaseFormats,
   directorySource,
   inventoryPosConnector,
+  klaviyoConnector,
   memoryTokenStore,
   quickBooksConnector,
   resolveBankProfiles,
@@ -92,6 +93,13 @@ const FACTORIES: Record<string, { needs: (env: Env) => string[]; make: (env: Env
         // Intuit rotates the refresh token daily; the newest is kept, encrypted, in the instance's database.
         tokens: store ? sealedTokenStore({ ...store, source: "quickbooks", seed, keyMaterial: clientSecret }) : memoryTokenStore(seed),
       });
+    },
+  },
+  klaviyo: {
+    needs: (env) => ["KLAVIYO_PRIVATE_API_KEY", "CUSTOMER_REF_KEY"].filter((name) => !set(env, name)),
+    make: async (env) => {
+      const metric = set(env, "KLAVIYO_CONVERSION_METRIC_ID");
+      return klaviyoConnector({ apiKey: set(env, "KLAVIYO_PRIVATE_API_KEY")!, customerKey: set(env, "CUSTOMER_REF_KEY")!, ...(metric ? { conversionMetricId: metric } : {}) });
     },
   },
   bank_statements: {

@@ -174,7 +174,13 @@ export const INTEGRATIONS: IntegrationSpec[] = [
   { id: "clientbook", name: "Clientbook", domain: "crm", segments: ["retail"], access: "partner", testWith: "partner", departments: ["clienteling", "sales"], historicalImportYears: 5, webhooks: false, settings: [], changelog: null, status: "planned" },
   { id: "podium", name: "Podium", domain: "communication", segments: ["retail"], access: "public_api", testWith: "unknown", departments: ["clienteling", "marketing", "sales"], historicalImportYears: 5, webhooks: true, settings: [], changelog: "https://docs.podium.com/changelog", status: "planned" },
   { id: "birdeye", name: "Birdeye", domain: "crm", segments: ["retail"], access: "public_api", testWith: "unknown", departments: ["marketing", "clienteling"], historicalImportYears: 5, webhooks: false, settings: [], changelog: null, status: "planned" },
-  { id: "klaviyo", name: "Klaviyo", domain: "marketing", segments: ["retail"], access: "public_api", testWith: "sandbox", departments: ["marketing", "clienteling"], historicalImportYears: 5, webhooks: true, settings: [], changelog: "https://developers.klaviyo.com/en/docs/changelog_", status: "planned" },
+  { id: "klaviyo", name: "Klaviyo", domain: "marketing", segments: ["retail"], access: "public_api", testWith: "sandbox", departments: ["marketing", "clienteling"], historicalImportYears: 5, webhooks: true, settings: ["KLAVIYO_PRIVATE_API_KEY", "CUSTOMER_REF_KEY"], changelog: "https://developers.klaviyo.com/en/docs/changelog_", status: "built", note: "Read-only by allowlist: Klaviyo can't be asked which scopes a private key holds, so the connector sends only listed reads and the two read-only report queries. Webhooks need Advanced KDP or a Klaviyo app", capabilities: [
+      "Imports every profile, list, segment, campaign and flow, then keeps them current",
+      "Marketing sees five years of sends, opens, clicks, conversions and revenue for each campaign and flow message",
+      "Clienteling sees whether each customer agreed to email and text marketing, and which lists and segments they are in",
+      "Links a Klaviyo profile to the same person's form submissions without keeping their email address, phone number, name or location",
+      "Read-only: the connector only reads, and asks for a key with read-only scopes",
+    ] },
   { id: "attentive", name: "Attentive", domain: "marketing", segments: ["retail"], access: "public_api", testWith: "unknown", departments: ["marketing"], historicalImportYears: 5, webhooks: true, settings: [], changelog: null, status: "planned" },
   { id: "twilio", name: "Twilio", domain: "communication", segments: ["retail", "wholesale"], access: "public_api", testWith: "sandbox", departments: ["clienteling", "repairs", "marketing"], historicalImportYears: 5, webhooks: true, settings: [], changelog: "https://www.twilio.com/en-us/changelog", status: "planned" },
 

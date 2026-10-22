@@ -1,5 +1,6 @@
+import { randomBytes } from "node:crypto";
 import type { SandboxCheck } from "@karatos/core";
-import { memoryTokenStore, quickBooksConnector, shopifyConnector, stripeConnector } from "@karatos/connectors";
+import { klaviyoConnector, memoryTokenStore, quickBooksConnector, shopifyConnector, stripeConnector } from "@karatos/connectors";
 
 /**
  * Every built connector registers a sandbox check here. Credentials are
@@ -38,6 +39,14 @@ export const SANDBOX_CHECKS: SandboxCheck[] = [
         environment: "sandbox",
         tokens: memoryTokenStore(c.SANDBOX_QUICKBOOKS_REFRESH_TOKEN!),
       }),
+  },
+  {
+    // A free Klaviyo test account, seeded with synthetic profiles, lists, a campaign and a flow, and a private key with read-only scopes.
+    // Each run makes its own customer reference key, as nothing it stores is kept.
+    integration: "klaviyo",
+    name: "Klaviyo",
+    credentials: ["SANDBOX_KLAVIYO_PRIVATE_API_KEY"],
+    connector: (c) => klaviyoConnector({ apiKey: c.SANDBOX_KLAVIYO_PRIVATE_API_KEY!, customerKey: randomBytes(32).toString("hex") }),
   },
 ];
 

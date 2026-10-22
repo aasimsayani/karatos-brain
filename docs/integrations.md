@@ -85,7 +85,7 @@ Used by: R is retail, W is wholesale, M is manufacturing. Test with says how we 
 | Clientbook | R | Partner | Partner | No | Planned |
 | Podium | R | Public API | Unknown | Yes | Planned |
 | Birdeye | R | Public API | Unknown | No | Planned |
-| Klaviyo | R | Public API | Free sandbox | Yes | Planned |
+| Klaviyo | R | Public API | Free sandbox | Yes | Built (Read-only by allowlist: Klaviyo can't be asked which scopes a private key holds, so the connector sends only listed reads and the two read-only report queries. Webhooks need Advanced KDP or a Klaviyo app) |
 | Attentive | R | Public API | Unknown | Yes | Planned |
 | Twilio | R, W | Public API | Free sandbox | Yes | Planned |
 | Calendly | R | Public API | Free sandbox | Yes | Planned (Appointments for consultations, bridal and repair drop-off) |
@@ -194,7 +194,7 @@ For paid and partner systems there's nothing to record yet, so the connector is 
 - the auth the docs describe, answering 401 without it like the real API;
 - its `assumptions`: anything the docs leave out that the mock had to guess, such as a default filter or a unit. Each one is checked on the first live run, then fixed or removed.
 
-A request for a path or method the docs don't list throws `UndocumentedRequestError`, so a connector can't come to depend on behavior nobody has seen documented. Data in mocks is synthetic. The mocks cover Stuller's invoice and metal market rate endpoints (API v2), and QuickBooks Online's query and change data capture endpoints with Intuit's token refresh (minor version 75). QuickBooks has a free sandbox, so its mock is a stand-in until an Intuit developer account is set up for the nightly run.
+A request for a path or method the docs don't list throws `UndocumentedRequestError`, so a connector can't come to depend on behavior nobody has seen documented. Data in mocks is synthetic. The mocks cover Stuller's invoice and metal market rate endpoints (API v2), and QuickBooks Online's query and change data capture endpoints with Intuit's token refresh (minor version 75). Klaviyo's mock covers its profile, list, segment, campaign, flow and metric reads and the campaign and flow values reports (revision 2026-10-15). QuickBooks has a free sandbox, so its mock is a stand-in until an Intuit developer account is set up for the nightly run.
 
 ### Vendor docs watch
 
@@ -327,6 +327,39 @@ Reads the QuickBooks Online Accounting API, pinned to minor version 75 (Intuit r
 **Webhooks.** QuickBooks sends CloudEvents (Intuit moved every app to them by 31 July 2026), and a notification names what changed without the record itself. `verifyQuickBooksWebhook` checks `intuit-signature`, the base64 HMAC-SHA256 of the raw body keyed with the verifier token, and `quickBooksWebhookChanges` lists the changes for this company. A notification is a prompt to sync, not data, so a replayed one finds nothing new. The instance doesn't take webhooks yet; the scheduled sync picks every change up.
 
 **Testing.** Until an Intuit developer account exists, the tests run against a mock built from Intuit's docs (`packages/testkit/src/mocks/quickbooks.ts`), which rotates refresh tokens, refuses the old one, answers 401 without a valid access token, and parses only the queries the docs describe. Its assumptions are listed in the mock and checked on the first sandbox run. For the nightly run, create a free Intuit developer account and sandbox company, connect it to the app with its Development keys, and add `SANDBOX_QUICKBOOKS_CLIENT_ID`, `SANDBOX_QUICKBOOKS_CLIENT_SECRET`, `SANDBOX_QUICKBOOKS_REALM_ID` and `SANDBOX_QUICKBOOKS_REFRESH_TOKEN` as GitHub Actions secrets. The nightly run can't save the token Intuit rotates to, so when it fails with `invalid_grant`, reconnect the sandbox company and update that secret.
+
+### Klaviyo
+
+Reads Klaviyo's JSON:API (`https://a.klaviyo.com/api/...`) with a private API key, sending the `revision` header pinned to 2026-10-15, the revision the connector was built against.
+
+| Setting | What it is |
+| --- | --- |
+| `KLAVIYO_PRIVATE_API_KEY` | A private key (`pk_`) made as a Custom Key with Read Access to Profiles, Lists, Segments, Campaigns, Flows and Metrics (`profiles:read`, `lists:read`, `segments:read`, `campaigns:read`, `flows:read`, `metrics:read`) and No Access to everything else |
+| `CUSTOMER_REF_KEY` | Generated. Keys the customer references (below); the same key custom forms, Square and WooCommerce use |
+| `KLAVIYO_CONVERSION_METRIC_ID` | Optional. The metric the reports count conversions and revenue by. Empty means the metric named Placed Order |
+| `KLAVIYO_WEBHOOK_SECRET` | Optional. The `secret_key` of a system webhook, for accounts that have webhooks |
+
+**Read-only.** Klaviyo documents no way to read the scopes a private key holds, keys can't be edited after they are made, and keys made before scopes existed have full access. So the connector can't check the key the way it checks Square and HubSpot tokens; the allowlist in the client is the guard. Every GET must be one of eight listed endpoints with its listed parameters, and each filter (one `greater-than` on a time field), sort, page size, sparse fieldset and cursor is checked before the request is made. The only POSTs are Klaviyo's two reporting endpoints, `POST /api/campaign-values-reports/` and `POST /api/flow-values-reports/`. Klaviyo serves reports as POSTs because the query is a JSON body, but they only return aggregates. They are allowed by exact path, with no query string, and only with a body the client builds itself: the report type, a fixed list of count statistics, a timeframe of at most a year, a metric id and the group-by fields. A body with anything else is stopped. Adding profiles to a list, subscribing, creating events (which is how flows are triggered) and every other write never leave the server, whatever the key allows. Still give the key read access only.
+
+**What it reads.** Profiles, then lists and the profile ids in each list, then segments and their profile ids, then campaigns and flows: all of them on the first import, since they are current state. Then the metrics list, to find the conversion metric, and the campaign and flow values reports for five years, one calendar year per report (Klaviyo's longest timeframe), grouped by message and channel. Every listing is paged with the cursor in `links.next`; a next link that doesn't continue the same request (another host, path or query, or a cursor that doesn't look like one) stops the sync rather than being followed or ending it early. Each page is one batch, so a crash resumes at the next page. Incremental syncs read profiles, campaigns and flows changed since the last pass started (`filter=greater-than(updated,...)`), members who joined each list and segment since then (`joined_group_at`), and the reports for the calendar years the last 30 days touch, since conversions keep being attributed to a message after it is sent. With no checkpoint the first pass looks back 48 hours. Klaviyo rate-limits each endpoint with a per-second burst and a per-minute steady rate (the reports allow 1 a second, 2 a minute and 225 a day) and answers 429 with `Retry-After` in seconds. The client waits that long, up to a minute, three times, then leaves the error to `runSync`, which retries from the checkpoint; a longer wait (the reports' daily cap) is left to the next run.
+
+**Events.**
+
+| Event | From | Key |
+| --- | --- | --- |
+| `customer.profile_updated` | A profile: consent to email and text marketing, created and updated times, in the clienteling shape | profile reference and `updated` |
+| `marketing.group_membership_seen` | A profile in a list or segment | group and profile reference |
+| `marketing.list_updated`, `marketing.segment_updated` | A list's name and opt-in process, a segment's name and whether it is active | group and `updated` |
+| `marketing.campaign_updated`, `marketing.flow_updated` | Name, archived flag, a flow's status and trigger | campaign or flow and its update time |
+| `marketing.campaign_metrics_reported`, `marketing.flow_metrics_reported` | Recipients, deliveries, bounces, opens, clicks (all and unique), conversions, revenue in cents and unsubscribes, per message, channel and calendar year | message, channel, year and a digest of the figures |
+| `campaign.sent` | A campaign message that reached anyone, in the marketing department's shape with `costCents` 0, as Klaviyo holds no cost | campaign, message and channel |
+| `marketing.consent_changed` | A webhook for a subscribe, unsubscribe or suppression | Klaviyo's event id |
+
+**Privacy.** Profiles are asked for with sparse fieldsets (`email`, `phone_number`, `created`, `updated` and `subscriptions`), so names, locations, organizations and custom properties never reach the server. Email addresses and phone numbers are used only to make references and are never stored, and segment definitions, which can name a person, are never asked for. Each profile gets a profile reference, an HMAC-SHA256 of its Klaviyo id keyed with `CUSTOMER_REF_KEY`, which never changes, so memberships and consent changes link to it. It also gets contact references made exactly the way custom forms makes them, from the normalized email address and phone number, and its `customerId` is the email's reference when it has one. Square and WooCommerce key their references by their own customer ids, which Klaviyo doesn't know, so an id can't link Klaviyo to them; the email address is the one detail Klaviyo and a form submitter share, so a Klaviyo profile and a form submission from the same address name the same customer. Campaign and flow figures are kept only in aggregate; per-person opens and clicks are never read.
+
+**Webhooks.** Only Advanced KDP customers and Klaviyo app partners can create system webhooks, so most accounts rely on the scheduled sync. `verifyKlaviyoWebhook` checks `Klaviyo-Signature`, the hex HMAC-SHA256 keyed with the webhook's secret over the raw body followed directly by the `Klaviyo-Timestamp` header, in constant time. It rejects a timestamp more than five minutes off, so a captured delivery can't be replayed later, and a body whose `meta.klaviyo_webhook_id` doesn't match `Klaviyo-Webhook-Id`, as Klaviyo advises. `KlaviyoReplayGuard` handles each event's `external_id` once, and the event keys make a redelivery a duplicate. Email and SMS consent topics become `marketing.consent_changed`; other topics are per-person activity and are dropped. The instance doesn't take webhooks yet.
+
+**Testing.** Until a Klaviyo account is set up for the nightly run, the tests run against a mock built from Klaviyo's API reference (`packages/testkit/src/mocks/klaviyo.ts`). It answers 401 without the key and 400 without a revision, applies sparse fieldsets, binds each cursor to its query, and checks report bodies the way the reference describes. Its assumptions are listed in the mock and checked on the first sandbox run. For the nightly run, create a free Klaviyo account for testing only, add a few synthetic profiles, a list, a campaign and a flow, make a private key with the read scopes above, and add it as the `SANDBOX_KLAVIYO_PRIVATE_API_KEY` GitHub Actions secret. The writes it may do later (add profiles to lists, trigger flows) are declared, and the write-gate test shows each one is stopped.
 
 ### Inventory and POS systems
 

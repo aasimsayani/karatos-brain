@@ -159,6 +159,17 @@ describe("docMockWatchTargets", () => {
       "https://developer.intuit.com/app/developer/qbo/docs/api/accounting/all-entities/account",
       "https://developer.intuit.com/app/developer/qbo/docs/learn/explore-the-quickbooks-online-api/data-queries",
       "https://developer.intuit.com/app/developer/qbo/docs/api/accounting/all-entities/changedatacapture",
+      "https://developers.klaviyo.com/en/docs/authenticate_",
+      "https://developers.klaviyo.com/en/reference/get_profiles",
+      "https://developers.klaviyo.com/en/reference/get_lists",
+      "https://developers.klaviyo.com/en/reference/get_profile_ids_for_list",
+      "https://developers.klaviyo.com/en/reference/get_segments",
+      "https://developers.klaviyo.com/en/reference/get_profile_ids_for_segment",
+      "https://developers.klaviyo.com/en/reference/get_campaigns",
+      "https://developers.klaviyo.com/en/reference/get_flows",
+      "https://developers.klaviyo.com/en/reference/get_metrics",
+      "https://developers.klaviyo.com/en/reference/query_campaign_values",
+      "https://developers.klaviyo.com/en/reference/query_flow_values",
     ]);
   });
 });
@@ -238,14 +249,14 @@ describe("Stuller doc mock", () => {
 describe("docMockVendorDocsTargets", () => {
   it("gives each mock page its own watch key, named after the catalog entry", () => {
     const targets = docMockVendorDocsTargets(allDocMocks());
-    expect(targets).toHaveLength(7);
+    expect(targets).toHaveLength(18);
     expect(targets[0]).toEqual({
       integration: "stuller:api-stuller-com-help",
       name: "Stuller",
       url: "https://api.stuller.com/help",
       mock: { integration: "stuller", retrievedOn: "2026-10-15" },
     });
-    expect(new Set(targets.map((t) => t.integration)).size).toBe(7);
+    expect(new Set(targets.map((t) => t.integration)).size).toBe(18);
   });
 
   it("falls back to the integration id for a mock outside the catalog", () => {

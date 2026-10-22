@@ -89,6 +89,27 @@ describe("sandbox checks", () => {
     expect(sent[1]!.auth).toBe("Bearer test-access");
   });
 
+  it("build the Klaviyo connector with the test account's private key and the pinned revision", async () => {
+    const klaviyo = SANDBOX_CHECKS.find((c) => c.integration === "klaviyo")!;
+    expect(klaviyo.credentials).toEqual(["SANDBOX_KLAVIYO_PRIVATE_API_KEY"]);
+    const key = ["pk", "testkey".repeat(4)].join("_");
+    const sent: { url: string; method: string; headers: Headers }[] = [];
+    vi.stubGlobal("fetch", async (url: string | URL, init?: RequestInit) => {
+      sent.push({ url: String(url), method: init?.method ?? "GET", headers: new Headers(init?.headers) });
+      return new Response(JSON.stringify({ errors: [{ code: "not_authenticated", detail: "stop" }] }), { status: 401 });
+    });
+    try {
+      const connector = klaviyo.connector({ SANDBOX_KLAVIYO_PRIVATE_API_KEY: key });
+      const batches = connector.historicalImport({ organizationId: "demo-store", cursor: null });
+      await expect(batches[Symbol.asyncIterator]().next()).rejects.toMatchObject({ code: "not_authenticated" });
+    } finally {
+      vi.unstubAllGlobals();
+    }
+    expect(sent.map((s) => `${s.method} ${s.url.split("?")[0]}`)).toEqual(["GET https://a.klaviyo.com/api/profiles/"]);
+    expect(sent[0]!.headers.get("authorization")).toBe(`Klaviyo-API-Key ${key}`);
+    expect(sent[0]!.headers.get("revision")).toBe("2026-10-15");
+  });
+
   it("catch a credential that isn't passed to the job or isn't a sandbox name", () => {
     const workflow = "          SANDBOX_SHOPIFY_ADMIN_TOKEN: ${{ secrets.SANDBOX_SHOPIFY_ADMIN_TOKEN }}\n";
     expect(credentialProblems([check(["SANDBOX_SHOPIFY_ADMIN_TOKEN"])], workflow)).toEqual([]);
