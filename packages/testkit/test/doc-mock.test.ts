@@ -159,6 +159,16 @@ describe("docMockWatchTargets", () => {
       "https://developer.intuit.com/app/developer/qbo/docs/api/accounting/all-entities/account",
       "https://developer.intuit.com/app/developer/qbo/docs/learn/explore-the-quickbooks-online-api/data-queries",
       "https://developer.intuit.com/app/developer/qbo/docs/api/accounting/all-entities/changedatacapture",
+      "https://docs.bigcommerce.com/developer/docs/overview/api-fundamentals/api-accounts",
+      "https://docs.bigcommerce.com/developer/api-reference/rest/admin/management/store-information/v2/get-store-information",
+      "https://docs.bigcommerce.com/developer/api-reference/rest/admin/management/orders/get-orders",
+      "https://docs.bigcommerce.com/developer/api-reference/rest/admin/management/orders/order-products/get-order-products",
+      "https://docs.bigcommerce.com/developer/api-reference/rest/admin/management/order-operations/payment-actions/get-order-refunds",
+      "https://docs.bigcommerce.com/developer/api-reference/rest/admin/catalog/products/get-products",
+      "https://docs.bigcommerce.com/developer/api-reference/rest/admin/management/inventory/items/get-inventory-items",
+      "https://docs.bigcommerce.com/developer/api-reference/rest/admin/management/customers/v3/get-customers",
+      "https://docs.bigcommerce.com/developer/api-reference/rest/admin/management/price-lists/get-price-lists",
+      "https://docs.bigcommerce.com/developer/api-reference/rest/admin/management/price-lists/price-lists-records/get-price-list-records",
     ]);
   });
 });
@@ -238,14 +248,14 @@ describe("Stuller doc mock", () => {
 describe("docMockVendorDocsTargets", () => {
   it("gives each mock page its own watch key, named after the catalog entry", () => {
     const targets = docMockVendorDocsTargets(allDocMocks());
-    expect(targets).toHaveLength(7);
+    expect(targets).toHaveLength(17);
     expect(targets[0]).toEqual({
       integration: "stuller:api-stuller-com-help",
       name: "Stuller",
       url: "https://api.stuller.com/help",
       mock: { integration: "stuller", retrievedOn: "2026-10-15" },
     });
-    expect(new Set(targets.map((t) => t.integration)).size).toBe(7);
+    expect(new Set(targets.map((t) => t.integration)).size).toBe(17);
   });
 
   it("falls back to the integration id for a mock outside the catalog", () => {

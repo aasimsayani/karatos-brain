@@ -4,6 +4,7 @@ import { sealedTokenStore } from "./token-store.js";
 import {
   accountsFromDirectory,
   bankStatementsConnector,
+  bigCommerceConnector,
   chaseAccountsFromDirectory,
   chaseConnector,
   chaseFormats,
@@ -93,6 +94,11 @@ const FACTORIES: Record<string, { needs: (env: Env) => string[]; make: (env: Env
         tokens: store ? sealedTokenStore({ ...store, source: "quickbooks", seed, keyMaterial: clientSecret }) : memoryTokenStore(seed),
       });
     },
+  },
+  bigcommerce: {
+    needs: (env) => ["BIGCOMMERCE_STORE_HASH", "BIGCOMMERCE_ACCESS_TOKEN", "CUSTOMER_REF_KEY"].filter((name) => !set(env, name)),
+    make: async (env) =>
+      bigCommerceConnector({ storeHash: set(env, "BIGCOMMERCE_STORE_HASH")!, accessToken: set(env, "BIGCOMMERCE_ACCESS_TOKEN")!, customerKey: set(env, "CUSTOMER_REF_KEY")! }),
   },
   bank_statements: {
     needs: (env) => (set(env, "BANK_STATEMENTS_IMPORT_DIR") ? [] : ["BANK_STATEMENTS_IMPORT_DIR"]),

@@ -1,5 +1,6 @@
+import { randomBytes } from "node:crypto";
 import type { SandboxCheck } from "@karatos/core";
-import { memoryTokenStore, quickBooksConnector, shopifyConnector, stripeConnector } from "@karatos/connectors";
+import { bigCommerceConnector, memoryTokenStore, quickBooksConnector, shopifyConnector, stripeConnector } from "@karatos/connectors";
 
 /**
  * Every built connector registers a sandbox check here. Credentials are
@@ -38,6 +39,15 @@ export const SANDBOX_CHECKS: SandboxCheck[] = [
         environment: "sandbox",
         tokens: memoryTokenStore(c.SANDBOX_QUICKBOOKS_REFRESH_TOKEN!),
       }),
+  },
+  {
+    // A free BigCommerce sandbox store and a store-level API account holding read-only scopes only.
+    // The token doesn't expire or rotate. Each run makes its own customer reference key, as nothing it stores is kept.
+    integration: "bigcommerce",
+    name: "BigCommerce",
+    credentials: ["SANDBOX_BIGCOMMERCE_STORE_HASH", "SANDBOX_BIGCOMMERCE_ACCESS_TOKEN"],
+    connector: (c) =>
+      bigCommerceConnector({ storeHash: c.SANDBOX_BIGCOMMERCE_STORE_HASH!, accessToken: c.SANDBOX_BIGCOMMERCE_ACCESS_TOKEN!, customerKey: randomBytes(32).toString("hex") }),
   },
 ];
 
