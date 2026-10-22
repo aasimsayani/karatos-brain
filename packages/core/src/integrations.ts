@@ -139,7 +139,13 @@ export const INTEGRATIONS: IntegrationSpec[] = [
   { id: "arms", name: "ARMS", domain: "pos", segments: ["retail"], access: "unknown", testWith: "unknown", departments: ["sales", "inventory", "clienteling", "repairs"], historicalImportYears: 5, webhooks: false, settings: [], changelog: null, status: "planned" },
   { id: "lightspeed", name: "Lightspeed Retail", domain: "pos", segments: ["retail"], access: "public_api", testWith: "unknown", departments: ["sales", "inventory", "clienteling", "repairs"], historicalImportYears: 5, webhooks: true, settings: [], changelog: "https://x-series-api.lightspeedhq.com/changelog", status: "planned" },
   { id: "square", name: "Square", domain: "pos", segments: ["retail"], access: "public_api", testWith: "sandbox", departments: ["sales", "inventory", "clienteling", "repairs"], historicalImportYears: 5, webhooks: true, settings: [], changelog: "https://developer.squareup.com/docs/changelog/connect", status: "planned" },
-  { id: "clover", name: "Clover", domain: "pos", segments: ["retail"], access: "public_api", testWith: "sandbox", departments: ["sales", "inventory", "clienteling", "repairs"], historicalImportYears: 5, webhooks: true, settings: [], changelog: "https://docs.clover.com/dev/changelog", status: "planned" },
+  { id: "clover", name: "Clover", domain: "pos", segments: ["retail"], access: "public_api", testWith: "sandbox", departments: ["sales", "inventory", "clienteling", "repairs"], historicalImportYears: 5, webhooks: true, settings: ["CLOVER_MERCHANT_ID", "CLOVER_REGION", "CUSTOMER_REF_KEY"], signIn: [["CLOVER_APP_ID", "CLOVER_APP_SECRET", "CLOVER_REFRESH_TOKEN"], ["CLOVER_API_TOKEN"]], changelog: "https://docs.clover.com/dev/changelog", status: "built", note: "Connector in @karatos/connectors: orders, payments, refunds, items, stock and customers, read-only. Clover can't report an app's permissions, so the connector sends only its listed GET requests", capabilities: [
+      "Imports five years of Clover orders, payments and refunds, then keeps them current as they change",
+      "Sales sees every counter sale and return with its lines and how it was paid, in the same shape as Shopify",
+      "Inventory sees every item with its price and cost, and the stock on hand each day",
+      "Clienteling sees each customer as a private reference with their marketing choice, never their name or contact details",
+      "Read-only: KaratOS only reads from Clover and never changes stock, items or orders",
+    ] },
   { id: "valigara", name: "Valigara", domain: "ecommerce", segments: ALL, access: "unknown", testWith: "unknown", departments: ["inventory", "sales", "marketing"], historicalImportYears: 5, webhooks: false, settings: [], changelog: null, status: "planned" },
 
   // E-commerce

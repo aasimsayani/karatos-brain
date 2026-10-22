@@ -95,6 +95,13 @@ describe("scheduledConnectors", () => {
     expect(scheduledConnectors(["quickbooks"], { QUICKBOOKS_CLIENT_ID: "id", QUICKBOOKS_REFRESH_TOKEN: secret }).skipped).toEqual([
       { id: "quickbooks", reason: "missing QUICKBOOKS_CLIENT_SECRET, QUICKBOOKS_REALM_ID, QUICKBOOKS_ENVIRONMENT" },
     ]);
+    // Clover takes a merchant API token, or the app ID, secret and refresh token.
+    expect(scheduledConnectors(["clover"], { CLOVER_REFRESH_TOKEN: secret }).skipped).toEqual([
+      { id: "clover", reason: "missing CLOVER_MERCHANT_ID, CLOVER_REGION, CUSTOMER_REF_KEY, CLOVER_APP_ID, CLOVER_APP_SECRET" },
+    ]);
+    expect(scheduledConnectors(["clover"], { CLOVER_API_TOKEN: secret, CLOVER_MERCHANT_ID: "MTEST0000000A", CLOVER_REGION: "sandbox" }).skipped).toEqual([
+      { id: "clover", reason: "missing CUSTOMER_REF_KEY" },
+    ]);
   });
 
   it("syncs nothing unless an integration is turned on, even when its settings are present", () => {
@@ -125,12 +132,20 @@ describe("scheduledConnectors", () => {
       QUICKBOOKS_REALM_ID: "9341450000",
       QUICKBOOKS_REFRESH_TOKEN: "refresh-value",
       QUICKBOOKS_ENVIRONMENT: "sandbox",
+      CLOVER_MERCHANT_ID: "MTEST0000000A",
+      CLOVER_REGION: "north_america",
+      CLOVER_APP_ID: "APPTEST00000A",
+      CLOVER_APP_SECRET: "app-secret-value-0000",
+      CLOVER_REFRESH_TOKEN: "refresh-value",
+      CUSTOMER_REF_KEY: "k".repeat(64),
     };
     const { connectors } = scheduledConnectors(SYNCABLE_INTEGRATIONS, env);
     const built = await Promise.all(connectors.map((c) => c.make()));
-    expect(built.map((c) => c.source).sort()).toEqual(["bank_statements", "chase", "inventory_pos", "quickbooks", "shopify", "stripe"]);
+    expect(built.map((c) => c.source).sort()).toEqual(["bank_statements", "chase", "clover", "inventory_pos", "quickbooks", "shopify", "stripe"]);
     const token = await scheduledConnectors(["shopify"], { SHOPIFY_SHOP_DOMAIN: "demo.myshopify.com", SHOPIFY_ADMIN_ACCESS_TOKEN: "t" }).connectors[0]!.make();
     expect(token.source).toBe("shopify");
+    const cloverToken = scheduledConnectors(["clover"], { CLOVER_MERCHANT_ID: "MTEST0000000A", CLOVER_REGION: "europe", CLOVER_API_TOKEN: "t", CUSTOMER_REF_KEY: "k".repeat(64) });
+    expect((await cloverToken.connectors[0]!.make()).source).toBe("clover");
     for (const connector of built) expect(connector).not.toHaveProperty("write");
   });
 });

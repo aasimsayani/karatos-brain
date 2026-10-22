@@ -7,6 +7,7 @@ import {
   chaseAccountsFromDirectory,
   chaseConnector,
   chaseFormats,
+  cloverConnector,
   directorySource,
   inventoryPosConnector,
   memoryTokenStore,
@@ -91,6 +92,27 @@ const FACTORIES: Record<string, { needs: (env: Env) => string[]; make: (env: Env
         environment: set(env, "QUICKBOOKS_ENVIRONMENT")!,
         // Intuit rotates the refresh token daily; the newest is kept, encrypted, in the instance's database.
         tokens: store ? sealedTokenStore({ ...store, source: "quickbooks", seed, keyMaterial: clientSecret }) : memoryTokenStore(seed),
+      });
+    },
+  },
+  clover: {
+    // A merchant API token, or the app ID with a refresh token (and the app secret, which seals the stored token).
+    needs: (env) => [
+      ...["CLOVER_MERCHANT_ID", "CLOVER_REGION", "CUSTOMER_REF_KEY"].filter((name) => !set(env, name)),
+      ...(set(env, "CLOVER_API_TOKEN") ? [] : ["CLOVER_APP_ID", "CLOVER_APP_SECRET", "CLOVER_REFRESH_TOKEN"].filter((name) => !set(env, name))),
+    ],
+    make: async (env, store) => {
+      const apiToken = set(env, "CLOVER_API_TOKEN");
+      const seed = set(env, "CLOVER_REFRESH_TOKEN");
+      const appSecret = set(env, "CLOVER_APP_SECRET");
+      return cloverConnector({
+        merchantId: set(env, "CLOVER_MERCHANT_ID")!,
+        region: set(env, "CLOVER_REGION")!,
+        customerKey: set(env, "CUSTOMER_REF_KEY")!,
+        // Clover retires the refresh token on every refresh; the newest is kept, encrypted, in the instance's database.
+        auth: apiToken
+          ? { apiToken }
+          : { appId: set(env, "CLOVER_APP_ID")!, tokens: store ? sealedTokenStore({ ...store, source: "clover", seed: seed!, keyMaterial: appSecret! }) : memoryTokenStore(seed!) },
       });
     },
   },

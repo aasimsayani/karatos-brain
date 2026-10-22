@@ -159,6 +159,16 @@ describe("docMockWatchTargets", () => {
       "https://developer.intuit.com/app/developer/qbo/docs/api/accounting/all-entities/account",
       "https://developer.intuit.com/app/developer/qbo/docs/learn/explore-the-quickbooks-online-api/data-queries",
       "https://developer.intuit.com/app/developer/qbo/docs/api/accounting/all-entities/changedatacapture",
+      "https://docs.clover.com/dev/docs/refresh-access-tokens",
+      "https://docs.clover.com/dev/docs/making-rest-api-calls",
+      "https://docs.clover.com/dev/reference/merchantgetmerchant",
+      "https://docs.clover.com/dev/reference/inventorygetitem",
+      "https://docs.clover.com/dev/reference/inventorygetitems",
+      "https://docs.clover.com/dev/reference/inventorygetitemstocks",
+      "https://docs.clover.com/dev/reference/customersgetcustomers",
+      "https://docs.clover.com/dev/reference/ordergetorders",
+      "https://docs.clover.com/dev/reference/paygetpayments",
+      "https://docs.clover.com/dev/reference/paygetrefunds-3",
     ]);
   });
 });
@@ -238,14 +248,14 @@ describe("Stuller doc mock", () => {
 describe("docMockVendorDocsTargets", () => {
   it("gives each mock page its own watch key, named after the catalog entry", () => {
     const targets = docMockVendorDocsTargets(allDocMocks());
-    expect(targets).toHaveLength(7);
+    expect(targets).toHaveLength(17);
     expect(targets[0]).toEqual({
       integration: "stuller:api-stuller-com-help",
       name: "Stuller",
       url: "https://api.stuller.com/help",
       mock: { integration: "stuller", retrievedOn: "2026-10-15" },
     });
-    expect(new Set(targets.map((t) => t.integration)).size).toBe(7);
+    expect(new Set(targets.map((t) => t.integration)).size).toBe(17);
   });
 
   it("falls back to the integration id for a mock outside the catalog", () => {
