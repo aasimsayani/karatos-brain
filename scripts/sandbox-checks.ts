@@ -1,6 +1,6 @@
 import type { SandboxCheck } from "@karatos/core";
 import { randomBytes } from "node:crypto";
-import { memoryTokenStore, quickBooksConnector, shopifyConnector, slackConnector, stripeConnector } from "@karatos/connectors";
+import { memoryTokenStore, quickBooksConnector, shopifyConnector, slackConnector, stripeConnector, xeroConnector } from "@karatos/connectors";
 
 /**
  * Every built connector registers a sandbox check here. Credentials are
@@ -49,6 +49,22 @@ export const SANDBOX_CHECKS: SandboxCheck[] = [
     name: "Slack",
     credentials: ["SANDBOX_SLACK_BOT_TOKEN"],
     connector: (c) => slackConnector({ token: c.SANDBOX_SLACK_BOT_TOKEN!, correspondentKey: randomBytes(32).toString("hex"), textChannels: "all" }),
+  },
+  {
+    // Xero's Demo Company, connected to a test app with the read-only scopes. Xero has no separate sandbox API:
+    // the Demo Company is a throwaway organisation on the real API that Xero resets every 28 days.
+    // Xero retires the refresh token on each refresh and the run can't save the new one, so the secret needs
+    // updating after every run; until a way to store it exists, expect this check to fail with invalid_grant.
+    integration: "xero",
+    name: "Xero",
+    credentials: ["SANDBOX_XERO_CLIENT_ID", "SANDBOX_XERO_CLIENT_SECRET", "SANDBOX_XERO_TENANT_ID", "SANDBOX_XERO_REFRESH_TOKEN"],
+    connector: (c) =>
+      xeroConnector({
+        clientId: c.SANDBOX_XERO_CLIENT_ID!,
+        clientSecret: c.SANDBOX_XERO_CLIENT_SECRET!,
+        tenantId: c.SANDBOX_XERO_TENANT_ID!,
+        tokens: memoryTokenStore(c.SANDBOX_XERO_REFRESH_TOKEN!),
+      }),
   },
 ];
 
