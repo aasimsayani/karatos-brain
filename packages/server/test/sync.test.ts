@@ -98,6 +98,7 @@ describe("scheduledConnectors", () => {
     ]);
     expect(scheduledConnectors(["klaviyo"], { KLAVIYO_PRIVATE_API_KEY: secret }).skipped).toEqual([{ id: "klaviyo", reason: "missing CUSTOMER_REF_KEY" }]);
     expect(scheduledConnectors(["klaviyo"], {}).skipped).toEqual([{ id: "klaviyo", reason: "missing KLAVIYO_PRIVATE_API_KEY, CUSTOMER_REF_KEY" }]);
+    expect(scheduledConnectors(["xero"], { XERO_CLIENT_SECRET: secret, XERO_REFRESH_TOKEN: secret }).skipped).toEqual([{ id: "xero", reason: "missing XERO_CLIENT_ID, XERO_TENANT_ID" }]);
   });
 
   it("syncs nothing unless an integration is turned on, even when its settings are present", () => {
@@ -131,10 +132,14 @@ describe("scheduledConnectors", () => {
       KLAVIYO_PRIVATE_API_KEY: klaviyoKey,
       CUSTOMER_REF_KEY: "0".repeat(64),
       KLAVIYO_CONVERSION_METRIC_ID: "AbC123",
+      XERO_CLIENT_ID: "client-id",
+      XERO_CLIENT_SECRET: "client-secret-value",
+      XERO_TENANT_ID: "00000000-0000-4000-8000-00000000a0a0",
+      XERO_REFRESH_TOKEN: "refresh-value",
     };
     const { connectors } = scheduledConnectors(SYNCABLE_INTEGRATIONS, env);
     const built = await Promise.all(connectors.map((c) => c.make()));
-    expect(built.map((c) => c.source).sort()).toEqual(["bank_statements", "chase", "inventory_pos", "klaviyo", "quickbooks", "shopify", "stripe"]);
+    expect(built.map((c) => c.source).sort()).toEqual(["bank_statements", "chase", "inventory_pos", "klaviyo", "quickbooks", "shopify", "stripe", "xero"]);
     const klaviyo = await scheduledConnectors(["klaviyo"], { KLAVIYO_PRIVATE_API_KEY: klaviyoKey, CUSTOMER_REF_KEY: "0".repeat(64) }).connectors[0]!.make();
     expect(klaviyo.source).toBe("klaviyo");
     const token = await scheduledConnectors(["shopify"], { SHOPIFY_SHOP_DOMAIN: "demo.myshopify.com", SHOPIFY_ADMIN_ACCESS_TOKEN: "t" }).connectors[0]!.make();
