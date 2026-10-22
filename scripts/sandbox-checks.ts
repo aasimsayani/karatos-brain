@@ -1,6 +1,6 @@
 import type { SandboxCheck } from "@karatos/core";
 import { randomBytes } from "node:crypto";
-import { customFormsConnector, memoryTokenStore, quickBooksConnector, shopifyConnector, stripeConnector, xeroConnector } from "@karatos/connectors";
+import { customFormsConnector, memoryTokenStore, plaidConnector, quickBooksConnector, shopifyConnector, stripeConnector, xeroConnector } from "@karatos/connectors";
 
 /**
  * Every built connector registers a sandbox check here. Credentials are
@@ -51,6 +51,20 @@ export const SANDBOX_CHECKS: SandboxCheck[] = [
         forms: [c.SANDBOX_CUSTOM_FORMS_TYPEFORM_FORM_ID!],
         customerKey: randomBytes(32).toString("hex"),
         typeform: { accessToken: c.SANDBOX_CUSTOM_FORMS_TYPEFORM_TOKEN! },
+      }),
+  },
+  {
+    // A Plaid Sandbox Item, linked to one of Plaid's test banks with the transactions product only.
+    // Always the sandbox host, whatever the token, and the client refuses a token that names production.
+    integration: "plaid",
+    name: "Plaid",
+    credentials: ["SANDBOX_PLAID_CLIENT_ID", "SANDBOX_PLAID_SECRET", "SANDBOX_PLAID_ACCESS_TOKEN"],
+    connector: (c) =>
+      plaidConnector({
+        clientId: c.SANDBOX_PLAID_CLIENT_ID!,
+        secret: c.SANDBOX_PLAID_SECRET!,
+        accessToken: c.SANDBOX_PLAID_ACCESS_TOKEN!,
+        environment: "sandbox",
       }),
   },
   {
