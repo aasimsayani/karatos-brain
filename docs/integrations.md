@@ -200,8 +200,9 @@ A request for a path or method the docs don't list throws `UndocumentedRequestEr
 - QuickBooks Online's query and change data capture endpoints with Intuit's token refresh (minor version 75)
 - Xero's Accounting API endpoints with its token refresh
 - Plaid's accounts, transactions sync, Item and webhook verification key endpoints (API version 2020-09-14), with webhooks signed the way Plaid signs them
+- Google Drive (files and changes, v3), Sheets (`values:batchGet`, v4) and Calendar (`events.list` with sync tokens, v3) with Google's token refresh, enforcing each API's documented scopes so `drive.metadata.readonly` can't read Sheets values
 
-Where a vendor has a free sandbox (QuickBooks and Plaid so far), its mock is a stand-in until a developer account is set up for the nightly run. Google Drive (files and changes, v3), Sheets (`values:batchGet`, v4) and Calendar (`events.list` with sync tokens, v3) have a mock too, with Google's token refresh; it enforces each API's documented scopes, so `drive.metadata.readonly` can't read Sheets values there either.
+Where a vendor has a free sandbox (QuickBooks and Plaid so far), its mock is a stand-in until a developer account is set up for the nightly run.
 
 ### Vendor docs watch
 
