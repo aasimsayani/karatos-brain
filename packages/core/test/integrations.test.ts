@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { INTEGRATIONS, integrationStatuses, integrationsFor, parseManifest, selfServeIntegrations } from "../src/index.js";
+import { INTEGRATIONS, integrationStatuses, integrationsFor, mergeCatalog, parseManifest, selfServeIntegrations, type CatalogRow } from "../src/index.js";
 
 const catalogDoc = readFileSync(new URL("../../../docs/integrations.md", import.meta.url), "utf8");
 const manifest = parseManifest(
@@ -69,6 +69,29 @@ describe("integration catalog", () => {
       expect(integration.access).not.toBe("partner");
       expect(["sandbox", "fixtures"]).toContain(integration.testWith);
     }
+  });
+});
+
+describe("mergeCatalog", () => {
+  const row = (id: string, over: Partial<CatalogRow> = {}): CatalogRow => ({
+    id, name: id, domain: "crm", segments: ["retail"], access: "public_api", testWith: "sandbox", departments: ["sales"], historicalImportYears: 5, webhooks: true, settings: ["OLD"], changelog: null, ...over,
+  });
+
+  it("lays a built connector's own catalog fields over its row, and leaves the rest planned or deferred", () => {
+    const merged = mergeCatalog([row("alpha", { note: "Old note" }), row("beta"), row("gamma", { status: "deferred" })], {
+      alpha: { status: "built", note: "New note", capabilities: ["Does a useful thing"], settings: ["NEW"] },
+    });
+    expect(merged.map((i) => [i.id, i.status, i.note ?? null, i.settings])).toEqual([
+      ["alpha", "built", "New note", ["NEW"]],
+      ["beta", "planned", null, ["OLD"]],
+      ["gamma", "deferred", null, ["OLD"]],
+    ]);
+    expect(merged[0]!.capabilities).toEqual(["Does a useful thing"]);
+  });
+
+  it("rejects a connector catalog entry with no row, and ignores inherited keys", () => {
+    expect(() => mergeCatalog([row("alpha")], { zeta: { status: "built", capabilities: ["x"] } })).toThrow("catalog entries with no catalog row: zeta");
+    expect(mergeCatalog([row("toString")], {})[0]!.status).toBe("planned");
   });
 });
 
