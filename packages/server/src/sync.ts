@@ -11,6 +11,7 @@ import {
   hubSpotConnector,
   inventoryPosConnector,
   memoryTokenStore,
+  plaidConnector,
   quickBooksConnector,
   resolveBankProfiles,
   resolvePosProfile,
@@ -95,6 +96,18 @@ const FACTORIES: Record<string, { needs: (env: Env) => string[]; make: (env: Env
         tokens: store ? sealedTokenStore({ ...store, source: "quickbooks", seed, keyMaterial: clientSecret }) : memoryTokenStore(seed),
       });
     },
+  },
+  plaid: {
+    needs: (env) => ["PLAID_CLIENT_ID", "PLAID_SECRET", "PLAID_ACCESS_TOKEN", "PLAID_ENVIRONMENT"].filter((name) => !set(env, name)),
+    make: async (env, store) =>
+      plaidConnector({
+        clientId: set(env, "PLAID_CLIENT_ID")!,
+        secret: set(env, "PLAID_SECRET")!,
+        accessToken: set(env, "PLAID_ACCESS_TOKEN")!,
+        environment: set(env, "PLAID_ENVIRONMENT")!,
+        // The first incremental pass carries on from the Plaid cursor the historical import ended on.
+        ...(store ? { historicalCheckpoint: () => store.memory.getCheckpoint(store.organizationId, "plaid", "historical") } : {}),
+      }),
   },
   xero: {
     needs: (env) => ["XERO_CLIENT_ID", "XERO_CLIENT_SECRET", "XERO_TENANT_ID", "XERO_REFRESH_TOKEN"].filter((name) => !set(env, name)),

@@ -1,5 +1,5 @@
 import type { SandboxCheck } from "@karatos/core";
-import { hubSpotConnector, memoryTokenStore, quickBooksConnector, shopifyConnector, stripeConnector, xeroConnector } from "@karatos/connectors";
+import { hubSpotConnector, memoryTokenStore, plaidConnector, quickBooksConnector, shopifyConnector, stripeConnector, xeroConnector } from "@karatos/connectors";
 
 /**
  * Every built connector registers a sandbox check here. Credentials are
@@ -46,6 +46,20 @@ export const SANDBOX_CHECKS: SandboxCheck[] = [
     name: "HubSpot",
     credentials: ["SANDBOX_HUBSPOT_ACCESS_TOKEN"],
     connector: (c) => hubSpotConnector({ accessToken: c.SANDBOX_HUBSPOT_ACCESS_TOKEN! }),
+  },
+  {
+    // A Plaid Sandbox Item, linked to one of Plaid's test banks with the transactions product only.
+    // Always the sandbox host, whatever the token, and the client refuses a token that names production.
+    integration: "plaid",
+    name: "Plaid",
+    credentials: ["SANDBOX_PLAID_CLIENT_ID", "SANDBOX_PLAID_SECRET", "SANDBOX_PLAID_ACCESS_TOKEN"],
+    connector: (c) =>
+      plaidConnector({
+        clientId: c.SANDBOX_PLAID_CLIENT_ID!,
+        secret: c.SANDBOX_PLAID_SECRET!,
+        accessToken: c.SANDBOX_PLAID_ACCESS_TOKEN!,
+        environment: "sandbox",
+      }),
   },
   {
     // Xero's Demo Company, connected to a test app with the read-only scopes. Xero has no separate sandbox API:

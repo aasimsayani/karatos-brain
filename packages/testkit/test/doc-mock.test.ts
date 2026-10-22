@@ -167,6 +167,10 @@ describe("docMockWatchTargets", () => {
       "https://developer.xero.com/documentation/guides/oauth2/auth-flow",
       "https://developer.xero.com/documentation/api/accounting/overview",
       "https://developer.xero.com/documentation/api/accounting/requests-and-responses",
+      "https://plaid.com/docs/api/products/transactions/",
+      "https://plaid.com/docs/api/accounts/",
+      "https://plaid.com/docs/api/items/",
+      "https://plaid.com/docs/api/webhooks/webhook-verification/",
     ]);
   });
 });
@@ -246,14 +250,14 @@ describe("Stuller doc mock", () => {
 describe("docMockVendorDocsTargets", () => {
   it("gives each mock page its own watch key, named after the catalog entry", () => {
     const targets = docMockVendorDocsTargets(allDocMocks());
-    expect(targets).toHaveLength(15);
+    expect(targets).toHaveLength(19);
     expect(targets[0]).toEqual({
       integration: "stuller:api-stuller-com-help",
       name: "Stuller",
       url: "https://api.stuller.com/help",
       mock: { integration: "stuller", retrievedOn: "2026-10-15" },
     });
-    expect(new Set(targets.map((t) => t.integration)).size).toBe(15);
+    expect(new Set(targets.map((t) => t.integration)).size).toBe(19);
   });
 
   it("falls back to the integration id for a mock outside the catalog", () => {
