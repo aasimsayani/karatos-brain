@@ -7,6 +7,7 @@ export * from "./doc-mock.js";
 export * from "./mocks/stuller.js";
 export * from "./mocks/quickbooks.js";
 export * from "./mocks/clover.js";
+export * from "./mocks/plaid.js";
 export * from "./mocks/xero.js";
 export * from "./mocks/index.js";
 export * from "./pdf.js";

@@ -1,7 +1,7 @@
 import { mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { BrainPipeline, InMemoryStore, runSync, type Connector, type SourceBatch, type SyncContext } from "@karatos/core";
 import { createSyncRunner, HISTORICAL_COMPLETE, scheduledConnectors, StaticDocumentationSource, SYNCABLE_INTEGRATIONS, type ScheduledConnector } from "../src/index.js";
 
@@ -102,6 +102,9 @@ describe("scheduledConnectors", () => {
     expect(scheduledConnectors(["clover"], { CLOVER_API_TOKEN: secret, CLOVER_MERCHANT_ID: "MTEST0000000A", CLOVER_REGION: "sandbox" }).skipped).toEqual([
       { id: "clover", reason: "missing CUSTOMER_REF_KEY" },
     ]);
+    expect(scheduledConnectors(["plaid"], { PLAID_CLIENT_ID: "id", PLAID_ACCESS_TOKEN: secret }).skipped).toEqual([
+      { id: "plaid", reason: "missing PLAID_SECRET, PLAID_ENVIRONMENT" },
+    ]);
     expect(scheduledConnectors(["xero"], { XERO_CLIENT_SECRET: secret, XERO_REFRESH_TOKEN: secret }).skipped).toEqual([{ id: "xero", reason: "missing XERO_CLIENT_ID, XERO_TENANT_ID" }]);
   });
 
@@ -139,6 +142,10 @@ describe("scheduledConnectors", () => {
       CLOVER_APP_SECRET: "app-secret-value-0000",
       CLOVER_REFRESH_TOKEN: "refresh-value",
       CUSTOMER_REF_KEY: "k".repeat(64),
+      PLAID_CLIENT_ID: "plaid-client-id",
+      PLAID_SECRET: "plaid-secret-value",
+      PLAID_ACCESS_TOKEN: ["access", "sandbox", "0".repeat(8)].join("-"),
+      PLAID_ENVIRONMENT: "sandbox",
       XERO_CLIENT_ID: "client-id",
       XERO_CLIENT_SECRET: "client-secret-value",
       XERO_TENANT_ID: "00000000-0000-4000-8000-00000000a0a0",
@@ -146,12 +153,42 @@ describe("scheduledConnectors", () => {
     };
     const { connectors } = scheduledConnectors(SYNCABLE_INTEGRATIONS, env);
     const built = await Promise.all(connectors.map((c) => c.make()));
-    expect(built.map((c) => c.source).sort()).toEqual(["bank_statements", "chase", "clover", "inventory_pos", "quickbooks", "shopify", "stripe", "xero"]);
+    expect(built.map((c) => c.source).sort()).toEqual(["bank_statements", "chase", "clover", "inventory_pos", "plaid", "quickbooks", "shopify", "stripe", "xero"]);
     const token = await scheduledConnectors(["shopify"], { SHOPIFY_SHOP_DOMAIN: "demo.myshopify.com", SHOPIFY_ADMIN_ACCESS_TOKEN: "t" }).connectors[0]!.make();
     expect(token.source).toBe("shopify");
     const cloverToken = scheduledConnectors(["clover"], { CLOVER_MERCHANT_ID: "MTEST0000000A", CLOVER_REGION: "europe", CLOVER_API_TOKEN: "t", CUSTOMER_REF_KEY: "k".repeat(64) });
     expect((await cloverToken.connectors[0]!.make()).source).toBe("clover");
     for (const connector of built) expect(connector).not.toHaveProperty("write");
+  });
+});
+
+describe("the Plaid factory", () => {
+  const env = { PLAID_CLIENT_ID: "plaid-client-id", PLAID_SECRET: "plaid-secret-value", PLAID_ACCESS_TOKEN: ["access", "sandbox", "0".repeat(8)].join("-"), PLAID_ENVIRONMENT: "sandbox" };
+
+  /** The cursor the first /transactions/sync request carries, with Plaid stubbed out. */
+  async function firstSyncCursor(store?: { memory: InMemoryStore; organizationId: string }): Promise<unknown> {
+    const cursors: unknown[] = [];
+    vi.stubGlobal("fetch", async (url: string | URL, init?: RequestInit) => {
+      if (String(url).endsWith("/accounts/get")) return new Response(JSON.stringify({ accounts: [] }));
+      cursors.push(JSON.parse(String(init?.body)).cursor ?? null);
+      return new Response(JSON.stringify({ error_type: "INVALID_INPUT", error_code: "stop_here", error_message: "stop" }), { status: 400 });
+    });
+    try {
+      const connector = await scheduledConnectors(["plaid"], env, store).connectors[0]!.make();
+      const batches = connector.incrementalSync({ organizationId: ORG, cursor: null })[Symbol.asyncIterator]();
+      await batches.next();
+      await expect(batches.next()).rejects.toMatchObject({ code: "stop_here" });
+    } finally {
+      vi.unstubAllGlobals();
+    }
+    return cursors[0];
+  }
+
+  it("starts the first incremental pass where the historical import ended", async () => {
+    const memory = new InMemoryStore();
+    await memory.saveCheckpoint(ORG, "plaid", "historical", JSON.stringify({ pass: "historical", step: "done", start: "c-test-9", next: "c-test-9" }));
+    expect(await firstSyncCursor({ memory, organizationId: ORG })).toBe("c-test-9");
+    expect(await firstSyncCursor()).toBeNull();
   });
 });
 
