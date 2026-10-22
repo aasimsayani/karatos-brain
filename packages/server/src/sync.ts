@@ -11,6 +11,7 @@ import {
   directorySource,
   inventoryPosConnector,
   memoryTokenStore,
+  plaidConnector,
   quickBooksConnector,
   resolveBankProfiles,
   resolvePosProfile,
@@ -103,6 +104,18 @@ const FACTORIES: Record<string, { needs: (env: Env) => string[]; make: (env: Env
         apiLoginId: set(env, "AUTHORIZE_NET_API_LOGIN_ID")!,
         transactionKey: set(env, "AUTHORIZE_NET_TRANSACTION_KEY")!,
         environment: set(env, "AUTHORIZE_NET_ENVIRONMENT")!,
+      }),
+  },
+  plaid: {
+    needs: (env) => ["PLAID_CLIENT_ID", "PLAID_SECRET", "PLAID_ACCESS_TOKEN", "PLAID_ENVIRONMENT"].filter((name) => !set(env, name)),
+    make: async (env, store) =>
+      plaidConnector({
+        clientId: set(env, "PLAID_CLIENT_ID")!,
+        secret: set(env, "PLAID_SECRET")!,
+        accessToken: set(env, "PLAID_ACCESS_TOKEN")!,
+        environment: set(env, "PLAID_ENVIRONMENT")!,
+        // The first incremental pass carries on from the Plaid cursor the historical import ended on.
+        ...(store ? { historicalCheckpoint: () => store.memory.getCheckpoint(store.organizationId, "plaid", "historical") } : {}),
       }),
   },
   xero: {

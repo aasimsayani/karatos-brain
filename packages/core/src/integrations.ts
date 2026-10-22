@@ -193,7 +193,13 @@ export const INTEGRATIONS: IntegrationSpec[] = [
       "Keeps contact names without their emails, phone numbers, addresses or tax numbers",
       "Read-only: the connection is granted read scopes only, and KaratOS stops if one could ever change your books",
     ] },
-  { id: "plaid", name: "Plaid", domain: "financial", segments: ALL, access: "public_api", testWith: "sandbox", departments: ["finance", "compliance"], historicalImportYears: 2, webhooks: true, settings: [], changelog: "https://plaid.com/docs/changelog/", status: "planned", note: "Bank feeds beyond Chase" },
+  { id: "plaid", name: "Plaid", domain: "financial", segments: ALL, access: "public_api", testWith: "sandbox", departments: ["finance", "compliance"], historicalImportYears: 2, webhooks: true, settings: ["PLAID_CLIENT_ID", "PLAID_SECRET", "PLAID_ACCESS_TOKEN", "PLAID_ENVIRONMENT"], changelog: "https://plaid.com/docs/changelog/", status: "built", note: "Bank feeds beyond Chase: accounts, balances and transactions from one linked bank, read-only", capabilities: [
+      "Imports up to two years of bank and card transactions from a bank linked through Plaid",
+      "Keeps every new, changed and removed transaction after that within the sync interval",
+      "Reads each account's current and available balance on every sync",
+      "Feeds finance the same transactions a bank statement would, so cash deposits are checked either way",
+      "Read-only: keeps no account numbers or owner details, and never moves money or changes the link",
+    ] },
   { id: "authorize_net", name: "Authorize.net", domain: "financial", segments: ["retail", "wholesale"], access: "public_api", testWith: "sandbox", departments: ["sales", "finance"], historicalImportYears: 5, webhooks: true, settings: ["AUTHORIZE_NET_API_LOGIN_ID", "AUTHORIZE_NET_TRANSACTION_KEY", "AUTHORIZE_NET_ENVIRONMENT"], changelog: "https://developer.authorize.net/api/changes/", status: "built", note: "Read-only, though an Authorize.net key can't be limited to reading: the connector sends Transaction Reporting requests only. The docs watch follows the API changelog, and the nightly sandbox run catches API changes", capabilities: [
       "Imports five years of settlement batches and the card and eCheck transactions in them, then keeps them current",
       "Finance sees what each batch settled to the bank, charges less refunds, so deposits can be matched",
