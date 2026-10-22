@@ -95,6 +95,9 @@ describe("scheduledConnectors", () => {
     expect(scheduledConnectors(["quickbooks"], { QUICKBOOKS_CLIENT_ID: "id", QUICKBOOKS_REFRESH_TOKEN: secret }).skipped).toEqual([
       { id: "quickbooks", reason: "missing QUICKBOOKS_CLIENT_SECRET, QUICKBOOKS_REALM_ID, QUICKBOOKS_ENVIRONMENT" },
     ]);
+    expect(scheduledConnectors(["affirm"], { AFFIRM_PRIVATE_API_KEY: secret, AFFIRM_ENVIRONMENT: "sandbox" }).skipped).toEqual([
+      { id: "affirm", reason: "missing AFFIRM_PUBLIC_API_KEY, AFFIRM_MERCHANT_ID" },
+    ]);
   });
 
   it("syncs nothing unless an integration is turned on, even when its settings are present", () => {
@@ -125,10 +128,15 @@ describe("scheduledConnectors", () => {
       QUICKBOOKS_REALM_ID: "9341450000",
       QUICKBOOKS_REFRESH_TOKEN: "refresh-value",
       QUICKBOOKS_ENVIRONMENT: "sandbox",
+      // Shaped like Affirm's key pair, assembled so no scanner mistakes them for real ones.
+      AFFIRM_PUBLIC_API_KEY: ["TESTPUB", "0".repeat(9)].join(""),
+      AFFIRM_PRIVATE_API_KEY: ["TESTPRIV", "0".repeat(24)].join(""),
+      AFFIRM_MERCHANT_ID: "MERCHANT-TEST",
+      AFFIRM_ENVIRONMENT: "sandbox",
     };
     const { connectors } = scheduledConnectors(SYNCABLE_INTEGRATIONS, env);
     const built = await Promise.all(connectors.map((c) => c.make()));
-    expect(built.map((c) => c.source).sort()).toEqual(["bank_statements", "chase", "inventory_pos", "quickbooks", "shopify", "stripe"]);
+    expect(built.map((c) => c.source).sort()).toEqual(["affirm", "bank_statements", "chase", "inventory_pos", "quickbooks", "shopify", "stripe"]);
     const token = await scheduledConnectors(["shopify"], { SHOPIFY_SHOP_DOMAIN: "demo.myshopify.com", SHOPIFY_ADMIN_ACCESS_TOKEN: "t" }).connectors[0]!.make();
     expect(token.source).toBe("shopify");
     for (const connector of built) expect(connector).not.toHaveProperty("write");

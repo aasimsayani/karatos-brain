@@ -3,6 +3,7 @@ import { runSync } from "@karatos/core";
 import { sealedTokenStore } from "./token-store.js";
 import {
   accountsFromDirectory,
+  affirmConnector,
   bankStatementsConnector,
   chaseAccountsFromDirectory,
   chaseConnector,
@@ -105,6 +106,16 @@ const FACTORIES: Record<string, { needs: (env: Env) => string[]; make: (env: Env
     needs: (env) => ["CHASE_IMPORT_MODE", "CHASE_MANUAL_IMPORT_DIR"].filter((name) => !set(env, name)),
     make: async (env) =>
       chaseConnector({ accounts: await chaseAccountsFromDirectory(set(env, "CHASE_MANUAL_IMPORT_DIR")!), formats: chaseFormats(env.CHASE_IMPORT_MODE) }),
+  },
+  affirm: {
+    needs: (env) => ["AFFIRM_PUBLIC_API_KEY", "AFFIRM_PRIVATE_API_KEY", "AFFIRM_MERCHANT_ID", "AFFIRM_ENVIRONMENT"].filter((name) => !set(env, name)),
+    make: async (env) =>
+      affirmConnector({
+        publicApiKey: set(env, "AFFIRM_PUBLIC_API_KEY")!,
+        privateApiKey: set(env, "AFFIRM_PRIVATE_API_KEY")!,
+        merchantId: set(env, "AFFIRM_MERCHANT_ID")!,
+        environment: set(env, "AFFIRM_ENVIRONMENT")!,
+      }),
   },
 };
 

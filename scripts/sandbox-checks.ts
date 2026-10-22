@@ -1,5 +1,5 @@
 import type { SandboxCheck } from "@karatos/core";
-import { memoryTokenStore, quickBooksConnector, shopifyConnector, stripeConnector } from "@karatos/connectors";
+import { affirmConnector, memoryTokenStore, quickBooksConnector, shopifyConnector, stripeConnector } from "@karatos/connectors";
 
 /**
  * Every built connector registers a sandbox check here. Credentials are
@@ -37,6 +37,20 @@ export const SANDBOX_CHECKS: SandboxCheck[] = [
         realmId: c.SANDBOX_QUICKBOOKS_REALM_ID!,
         environment: "sandbox",
         tokens: memoryTokenStore(c.SANDBOX_QUICKBOOKS_REFRESH_TOKEN!),
+      }),
+  },
+  {
+    // A free Affirm sandbox merchant account (its sandbox keys), never a merchant's live one. Always the sandbox host.
+    // Its keys could capture, refund and void sandbox loans; the client sends its listed GET reads only.
+    integration: "affirm",
+    name: "Affirm",
+    credentials: ["SANDBOX_AFFIRM_PUBLIC_API_KEY", "SANDBOX_AFFIRM_PRIVATE_API_KEY", "SANDBOX_AFFIRM_MERCHANT_ID"],
+    connector: (c) =>
+      affirmConnector({
+        publicApiKey: c.SANDBOX_AFFIRM_PUBLIC_API_KEY!,
+        privateApiKey: c.SANDBOX_AFFIRM_PRIVATE_API_KEY!,
+        merchantId: c.SANDBOX_AFFIRM_MERCHANT_ID!,
+        environment: "sandbox",
       }),
   },
 ];

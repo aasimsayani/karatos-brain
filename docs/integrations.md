@@ -107,7 +107,7 @@ Used by: R is retail, W is wholesale, M is manufacturing. Test with says how we 
 | Xero | R, W, M | Public API | Free sandbox | Yes | Planned |
 | Plaid | R, W, M | Public API | Free sandbox | Yes | Planned (Bank feeds beyond Chase) |
 | Authorize.net | R, W | Public API | Free sandbox | Yes | Planned |
-| Affirm | R | Public API | Free sandbox | Yes | Planned |
+| Affirm | R | Public API | Free sandbox | Yes | Built (Connector in @karatos/connectors: financed orders, captures, refunds, voids, disputes and daily settlements, read-only) |
 | Synchrony | R | Partner | Partner | No | Planned |
 | Acima | R | Partner | Partner | No | Planned |
 | Jewelers Board of Trade | W, M | Partner | Partner | No | Planned (Trade credit ratings) |
@@ -194,7 +194,7 @@ For paid and partner systems there's nothing to record yet, so the connector is 
 - the auth the docs describe, answering 401 without it like the real API;
 - its `assumptions`: anything the docs leave out that the mock had to guess, such as a default filter or a unit. Each one is checked on the first live run, then fixed or removed.
 
-A request for a path or method the docs don't list throws `UndocumentedRequestError`, so a connector can't come to depend on behavior nobody has seen documented. Data in mocks is synthetic. The mocks cover Stuller's invoice and metal market rate endpoints (API v2), and QuickBooks Online's query and change data capture endpoints with Intuit's token refresh (minor version 75). QuickBooks has a free sandbox, so its mock is a stand-in until an Intuit developer account is set up for the nightly run.
+A request for a path or method the docs don't list throws `UndocumentedRequestError`, so a connector can't come to depend on behavior nobody has seen documented. Data in mocks is synthetic. The mocks cover Stuller's invoice and metal market rate endpoints (API v2), and QuickBooks Online's query and change data capture endpoints with Intuit's token refresh (minor version 75). QuickBooks has a free sandbox, so its mock is a stand-in until an Intuit developer account is set up for the nightly run. The Affirm mock covers its transaction, transaction event, daily settlement and dispute reads, and stands in the same way until a sandbox merchant account is set up.
 
 ### Vendor docs watch
 
@@ -305,6 +305,27 @@ Reads Stripe's REST API with GET requests only, pinned to `STRIPE_API_VERSION` o
 **Webhooks.** `verifyStripeWebhook` checks the `Stripe-Signature` header: HMAC-SHA256 of `<t>.<raw body>`, any one of several `v1` signatures (Stripe sends two while a secret rolls), and a timestamp within five minutes, so an old delivery replayed later is refused. Webhooks and the events API carry the same event objects, so whichever arrives second is a duplicate.
 
 **Testing.** The tests use synthetic responses shaped from Stripe's API reference. For the nightly sandbox run, create a restricted key with the read permissions above in test mode and add it as the `SANDBOX_STRIPE_SECRET_KEY` GitHub Actions secret. The writes it may do later (create payment links, create refunds) are declared, and the write-gate test shows each one is refused.
+
+### Affirm
+
+Reads Affirm's Merchant APIs on its US hosts (`https://api.affirm.com`, or `sandbox.affirm.com` for a sandbox account) with GET requests only, authenticated with HTTP Basic: the public API key as the user, the private API key as the password. The same key pair can capture, refund and void loans, and Affirm can't limit a key to reading, so read-only is enforced in the client: it sends five reads only (`list_transactions`, `read_transaction`, `list_transaction_events`, `list_settlement_event_summaries` and Disputes API v3's `list_disputes`), each with only the query parameters it checked itself, and throws before sending anything else. It never sends the transaction list's `query` (which searches shopper emails, names and phones) or expands the checkout. The writes it may do later (capture, refund and void a transaction) are declared and stay behind the write gate.
+
+| Setting | What it is |
+| --- | --- |
+| `AFFIRM_PUBLIC_API_KEY`, `AFFIRM_PRIVATE_API_KEY` | The merchant's key pair, from API keys in the Affirm merchant portal; sandbox and production each have their own |
+| `AFFIRM_MERCHANT_ID` | The Affirm Merchant ID, which the settlement reads require |
+| `AFFIRM_ENVIRONMENT` | `sandbox` or `production`, with no default, so a setting meant for one can't reach the other |
+| `AFFIRM_WEBHOOK_SECRET` | Optional. The secret Affirm signs webhooks with, for when webhooks are turned on |
+
+Canadian accounts are on Affirm's global hosts (`api.global.affirm.com`), which also need a `country-code` header; the connector doesn't read them yet.
+
+**What it reads.** Affirm's transaction list filters by creation time, so the historical import lists the transactions created in the last five years, newest first, 100 per page, each with its current status. It then lists the refund events over the same span, every dispute (100 per page), and the daily settlement summaries 1000 per page. Incremental syncs list the transactions created since the previous pass started, less an hour so nothing saved mid-pass is missed, then every transaction event since then. A capture, void, expired authorization or refund changes a transaction created earlier, so each transaction such an event names is read again for its new status. Disputes are read whole on every pass, since a dispute's status moves without a date to filter on and a store has few. With no checkpoint the first pass looks back 48 hours. Each list stops when Affirm says there is no next page; a next page the connector can't read, or one that points back at the same page, stops the sync with an error rather than skip or loop. Affirm publishes no rate limit; calls go one at a time, and a 429 or 503 is retried (honouring `Retry-After` up to a minute, three tries) before the sync stops and resumes from its checkpoint next run.
+
+**Events.** The same neutral types as Stripe: `payment.charge_updated` for each financed order (Affirm's status alongside succeeded, pending or failed, whether it was captured, voided or disputed, the amount refunded, and the store's own order number so it can be matched to the sale), `payment.refund_updated` for each refund, linked to the transaction, `payment.dispute_updated` for each dispute, and `payout.updated` for each day's settlement, with sales, refunds and Affirm's fees behind the amount deposited and the deposit ID the bank statement shows. Affirm already sends whole cents, with the currency alongside. Each transaction is keyed by its id, status and amount refunded, so each step is stored once and a replay is a duplicate. Affirm's responses carry a signed token that may hold encrypted personal data, and its events can carry the shopper's shipping name, email, phone and address; none of that is kept, nor the bank account's last four digits.
+
+**Webhooks.** Affirm sets webhooks up itself, on request through its support widget; the events its docs describe are about checkouts and prequalification, and a failed delivery isn't resent. `verifyAffirmWebhook` checks the `Affirm-Signature` header (the docs also call it `X-Affirm-Signature`): `t=<timestamp>` and one or more `v0=<hex>` signatures, each the HMAC-SHA512 of `<timestamp>.<raw body>` keyed with the signing secret, compared in constant time. Only `v0` counts, so a downgrade is refused, and a timestamp more than five minutes off is refused as stale, so an old delivery can't be replayed. A delivery is a prompt to sync, never data; the instance doesn't take webhooks yet, and the scheduled sync picks every change up. The docs don't say whether the timestamp is in seconds; the check assumes Unix seconds, as Stripe's scheme does, until a live delivery shows otherwise.
+
+**Testing.** The tests run against a mock built from Affirm's docs (`packages/testkit/src/mocks/affirm.ts`), which answers the sandbox or production host only, checks the key pair, refuses parameters the docs don't list, pages each list as its page describes, and throws for any POST. Its assumptions (the list order, `next_page`'s shape, date formats the docs leave out) are listed in the mock and checked on the first sandbox run. For the nightly run, take the sandbox key pair from sandbox.affirm.com/dashboard/apikeys (an Affirm merchant account comes with sandbox access) and the Merchant ID from Affirm support, and add them as the `SANDBOX_AFFIRM_PUBLIC_API_KEY`, `SANDBOX_AFFIRM_PRIVATE_API_KEY` and `SANDBOX_AFFIRM_MERCHANT_ID` GitHub Actions secrets.
 
 ### QuickBooks Online
 
