@@ -70,7 +70,11 @@ export interface FormBrainEvent {
 export const FORM_ID = /^[A-Za-z0-9_-]{1,64}$/;
 export const RESPONSE_ID = /^[A-Za-z0-9_-]{1,128}$/;
 const ISO_DATE = /^(\d{4})-(\d{2})-(\d{2})$/;
-const CLOCK = /^\s*(\d{1,2})(?::(\d{2}))?\s*(am|pm|a\.m\.|p\.m\.)?\s*$/i;
+const CLOCK = /^(\d{1,2})(?::(\d{2}))? ?(am|pm|a\.m\.|p\.m\.)?$/i;
+/** Answers longer than this are cut before any pattern sees them; customers' text is never kept, only matched. */
+export const ANSWER_MATCH_MAX = 200;
+/** A typed answer as patterns see it: trimmed, inner spaces collapsed, and cut short, so no pattern can run slow on it. */
+const forMatching = (value: string) => value.slice(0, ANSWER_MATCH_MAX * 4).replace(/\s+/g, " ").trim().slice(0, ANSWER_MATCH_MAX);
 const LABEL_MAX = 80;
 
 const CHANNEL_RULES: [RegExp, ContactChannel][] = [
@@ -102,7 +106,7 @@ function isoDay(value: string): string | undefined {
 
 /** A clock time, as HH:MM. "2pm", "2:30 PM" and "14:30" all read. */
 function clockTime(value: string): string | undefined {
-  const m = CLOCK.exec(value);
+  const m = CLOCK.exec(forMatching(value));
   if (!m) return undefined;
   let hours = Number(m[1]);
   const minutes = Number(m[2] ?? "0");
@@ -125,7 +129,8 @@ function category(profile: FormProfile, field: keyof FormProfile["values"], answ
   for (const answer of answers) {
     if (answer.kind !== "choice" && answer.kind !== "text") continue;
     for (const value of answer.values) {
-      const matched = rules.find((rule) => rule.pattern.test(value))?.value ?? extra?.(value);
+      const text = forMatching(value);
+      const matched = rules.find((rule) => rule.pattern.test(text))?.value ?? extra?.(value);
       if (matched) return matched;
       // A label the form's author wrote, never the customer's own words.
       if (answer.kind === "choice" && value.trim()) return value.trim().slice(0, LABEL_MAX);
@@ -139,7 +144,8 @@ function channel(answers: readonly FormAnswer[]): ContactChannel | undefined {
   for (const answer of answers) {
     if (answer.kind !== "choice" && answer.kind !== "text") continue;
     for (const value of answer.values) {
-      const found = CHANNEL_RULES.find(([pattern]) => pattern.test(value));
+      const text = forMatching(value);
+      const found = CHANNEL_RULES.find(([pattern]) => pattern.test(text));
       if (found) return found[1];
     }
   }
@@ -154,7 +160,8 @@ function kindOf(profile: FormProfile, submission: FormSubmission, kindAnswers: r
   const rules = profile.kinds.map((rule) => ({ pattern: new RegExp(rule.match, "i"), kind: rule.kind }));
   const texts = [...kindAnswers.flatMap((a) => (a.kind === "choice" || a.kind === "text" ? a.values : [])), submission.formTitle ?? ""];
   for (const text of texts) {
-    const found = rules.find((rule) => rule.pattern.test(text));
+    const short = forMatching(text);
+    const found = rules.find((rule) => rule.pattern.test(short));
     if (found) return found.kind;
   }
   return "other";

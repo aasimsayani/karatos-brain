@@ -266,6 +266,11 @@ describe("custom forms normalization", () => {
     expect(one("preferred time", "text", "12am")).toMatchObject({ requestedTime: "00:00" });
     expect(one("preferred time", "text", "12 p.m.")).toMatchObject({ requestedTime: "12:00" });
     for (const bad of ["13pm", "2", "25:00", "after lunch with my sister"]) expect(one("preferred time", "text", bad), bad).not.toHaveProperty("requestedTime");
+    expect(one("preferred time", "text", "  2:30   PM  ")).toMatchObject({ requestedTime: "14:30" });
+    // Hostile answers are cut and collapsed before any pattern sees them, so they can't make matching slow.
+    const started = performance.now();
+    for (const hostile of ["1" + " ".repeat(100_000) + "x", "a".repeat(100_000), " \t".repeat(50_000) + "!"]) one("preferred time", "text", hostile);
+    expect(performance.now() - started).toBeLessThan(500);
     expect(one("budget", "number", 2499.6)).toMatchObject({ budgetAmount: 2500 });
     expect(one("budget", "number", -5)).toMatchObject({ unmappedFields: ["budget"] });
     expect(one("budget", "choice", "$1,000 - $2,000")).toMatchObject({ budgetRange: "$1,000 - $2,000" });
