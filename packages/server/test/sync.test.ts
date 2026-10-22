@@ -95,6 +95,9 @@ describe("scheduledConnectors", () => {
     expect(scheduledConnectors(["quickbooks"], { QUICKBOOKS_CLIENT_ID: "id", QUICKBOOKS_REFRESH_TOKEN: secret }).skipped).toEqual([
       { id: "quickbooks", reason: "missing QUICKBOOKS_CLIENT_SECRET, QUICKBOOKS_REALM_ID, QUICKBOOKS_ENVIRONMENT" },
     ]);
+    expect(scheduledConnectors(["gmail"], { GOOGLE_CLIENT_SECRET: secret, GMAIL_REFRESH_TOKEN: secret }).skipped).toEqual([
+      { id: "gmail", reason: "missing GOOGLE_CLIENT_ID, CORRESPONDENT_HASH_KEY" },
+    ]);
   });
 
   it("syncs nothing unless an integration is turned on, even when its settings are present", () => {
@@ -125,10 +128,21 @@ describe("scheduledConnectors", () => {
       QUICKBOOKS_REALM_ID: "9341450000",
       QUICKBOOKS_REFRESH_TOKEN: "refresh-value",
       QUICKBOOKS_ENVIRONMENT: "sandbox",
+      GOOGLE_CLIENT_ID: "000000000000-test.apps.googleusercontent.com",
+      GOOGLE_CLIENT_SECRET: "client-secret-value",
+      GMAIL_REFRESH_TOKEN: "refresh-value",
+      GMAIL_USER: "owner@store.test",
+      GMAIL_LABEL_NAMES: "drop",
+      CORRESPONDENT_HASH_KEY: "0".repeat(64),
     };
     const { connectors } = scheduledConnectors(SYNCABLE_INTEGRATIONS, env);
     const built = await Promise.all(connectors.map((c) => c.make()));
-    expect(built.map((c) => c.source).sort()).toEqual(["bank_statements", "chase", "inventory_pos", "quickbooks", "shopify", "stripe"]);
+    expect(built.map((c) => c.source).sort()).toEqual(["bank_statements", "chase", "gmail", "inventory_pos", "quickbooks", "shopify", "stripe"]);
+    // One mailbox per instance, "me" unless GMAIL_USER names it; label names are only keep or drop.
+    const { GMAIL_USER: _user, GMAIL_LABEL_NAMES: _names, ...defaults } = env;
+    expect((await scheduledConnectors(["gmail"], defaults).connectors[0]!.make()).source).toBe("gmail");
+    await expect(scheduledConnectors(["gmail"], { ...env, GMAIL_LABEL_NAMES: "some" }).connectors[0]!.make()).rejects.toThrow("GMAIL_LABEL_NAMES must be keep or drop");
+    await expect(scheduledConnectors(["gmail"], { ...env, GMAIL_USER: "not an address" }).connectors[0]!.make()).rejects.toThrow("GMAIL_USER must be");
     const token = await scheduledConnectors(["shopify"], { SHOPIFY_SHOP_DOMAIN: "demo.myshopify.com", SHOPIFY_ADMIN_ACCESS_TOKEN: "t" }).connectors[0]!.make();
     expect(token.source).toBe("shopify");
     for (const connector of built) expect(connector).not.toHaveProperty("write");

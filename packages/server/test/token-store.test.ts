@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { BrainPipeline, InMemoryStore, runSync } from "@karatos/core";
-import { QUICKBOOKS_TEST_REALM, qbVendor, quickBooksDocMock } from "@karatos/connector-testkit";
+import { GMAIL_MOCK_LABELS, QUICKBOOKS_TEST_REALM, gmailDocMock, gmailMessage, qbVendor, quickBooksDocMock } from "@karatos/connector-testkit";
 import { REFRESH_TOKEN_STREAM, StaticDocumentationSource, scheduledConnectors, sealedTokenStore } from "../src/index.js";
 
 const ORG = "test-jeweler";
@@ -84,5 +84,24 @@ describe("QuickBooks on a schedule", () => {
     expect(mock.refreshes).toBe(2);
     expect(mock.refreshToken).toBe("RT-TEST-2");
     expect(await sealed(memory)).not.toContain("RT-TEST");
+  });
+});
+
+describe("Gmail on a schedule", () => {
+  it("refreshes with the seed token every round, since Google doesn't rotate it, and stores nothing it didn't get", async () => {
+    gmailMessage.reset();
+    const recent = String(Date.now() - 3_600_000);
+    const mock = gmailDocMock({ messages: gmailMessage.many(2).map((m) => ({ ...m, internalDate: recent })), labels: GMAIL_MOCK_LABELS, refreshToken: SEED });
+    vi.stubGlobal("fetch", mock.fetch);
+    const memory = new InMemoryStore();
+    const pipeline = new BrainPipeline({ memory, normalizers: [], extractors: [], reasoners: [], documentation: new StaticDocumentationSource([]) });
+    const env = { GOOGLE_CLIENT_ID: "000000000000-test.apps.googleusercontent.com", GOOGLE_CLIENT_SECRET: SECRET, GMAIL_REFRESH_TOKEN: SEED, CORRESPONDENT_HASH_KEY: "0".repeat(64) };
+    const round = async () => {
+      const [scheduled] = scheduledConnectors(["gmail"], env, { memory, organizationId: ORG }).connectors;
+      return runSync({ connector: await scheduled!.make(), mode: "incremental", pipeline, memory, organizationId: ORG, sleep: async () => {} });
+    };
+    expect((await round()).ingested).toBe(GMAIL_MOCK_LABELS.length + 2);
+    expect(mock.refreshes).toBe(1);
+    expect(await memory.getCheckpoint(ORG, "gmail", REFRESH_TOKEN_STREAM)).toBeNull();
   });
 });

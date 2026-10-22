@@ -8,6 +8,7 @@ import {
   chaseConnector,
   chaseFormats,
   directorySource,
+  gmailConnector,
   inventoryPosConnector,
   memoryTokenStore,
   quickBooksConnector,
@@ -91,6 +92,25 @@ const FACTORIES: Record<string, { needs: (env: Env) => string[]; make: (env: Env
         environment: set(env, "QUICKBOOKS_ENVIRONMENT")!,
         // Intuit rotates the refresh token daily; the newest is kept, encrypted, in the instance's database.
         tokens: store ? sealedTokenStore({ ...store, source: "quickbooks", seed, keyMaterial: clientSecret }) : memoryTokenStore(seed),
+      });
+    },
+  },
+  gmail: {
+    needs: (env) => ["GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET", "GMAIL_REFRESH_TOKEN", "CORRESPONDENT_HASH_KEY"].filter((name) => !set(env, name)),
+    make: async (env, store) => {
+      const seed = set(env, "GMAIL_REFRESH_TOKEN")!;
+      const clientSecret = set(env, "GOOGLE_CLIENT_SECRET")!;
+      const labelNames = set(env, "GMAIL_LABEL_NAMES");
+      if (labelNames !== undefined && labelNames !== "keep" && labelNames !== "drop") throw new Error("GMAIL_LABEL_NAMES must be keep or drop");
+      return gmailConnector({
+        clientId: set(env, "GOOGLE_CLIENT_ID")!,
+        clientSecret,
+        // One mailbox per instance: the account that connected, unless GMAIL_USER names it.
+        userId: set(env, "GMAIL_USER") ?? "me",
+        correspondentKey: set(env, "CORRESPONDENT_HASH_KEY")!,
+        ...(labelNames ? { labelNames } : {}),
+        // Google doesn't rotate refresh tokens, but one it ever returns is kept the same way as QuickBooks', sealed in the database.
+        tokens: store ? sealedTokenStore({ ...store, source: "gmail", seed, keyMaterial: clientSecret }) : memoryTokenStore(seed),
       });
     },
   },
