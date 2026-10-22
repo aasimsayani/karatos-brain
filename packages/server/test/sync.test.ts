@@ -98,6 +98,7 @@ describe("scheduledConnectors", () => {
     expect(scheduledConnectors(["google_workspace"], { GOOGLE_CLIENT_SECRET: secret, GOOGLE_WORKSPACE_REFRESH_TOKEN: secret }).skipped).toEqual([
       { id: "google_workspace", reason: "missing GOOGLE_CLIENT_ID, GOOGLE_DRIVE_ROOT_FOLDER_ID, CORRESPONDENT_HASH_KEY" },
     ]);
+    expect(scheduledConnectors(["xero"], { XERO_CLIENT_SECRET: secret, XERO_REFRESH_TOKEN: secret }).skipped).toEqual([{ id: "xero", reason: "missing XERO_CLIENT_ID, XERO_TENANT_ID" }]);
   });
 
   it("syncs nothing unless an integration is turned on, even when its settings are present", () => {
@@ -137,10 +138,14 @@ describe("scheduledConnectors", () => {
       GOOGLE_SHEETS_RANGES: "1TestSpreadsheet_abcdefghij/Stock!A1:C10",
       GOOGLE_CALENDAR_IDS: "primary",
       CORRESPONDENT_HASH_KEY: "0".repeat(64),
+      XERO_CLIENT_ID: "client-id",
+      XERO_CLIENT_SECRET: "client-secret-value",
+      XERO_TENANT_ID: "00000000-0000-4000-8000-00000000a0a0",
+      XERO_REFRESH_TOKEN: "refresh-value",
     };
     const { connectors } = scheduledConnectors(SYNCABLE_INTEGRATIONS, env);
     const built = await Promise.all(connectors.map((c) => c.make()));
-    expect(built.map((c) => c.source).sort()).toEqual(["bank_statements", "chase", "google_workspace", "inventory_pos", "quickbooks", "shopify", "stripe"]);
+    expect(built.map((c) => c.source).sort()).toEqual(["bank_statements", "chase", "google_workspace", "inventory_pos", "quickbooks", "shopify", "stripe", "xero"]);
     // Optional Google settings have defaults; names are only keep or drop, and every list is checked before anything runs.
     const { GOOGLE_DRIVE_SHARED_DRIVE_IDS: _d, GOOGLE_DRIVE_FILE_NAMES: _n, GOOGLE_SHEETS_RANGES: _s, GOOGLE_CALENDAR_IDS: _c, ...defaults } = env;
     expect((await scheduledConnectors(["google_workspace"], defaults).connectors[0]!.make()).source).toBe("google_workspace");
