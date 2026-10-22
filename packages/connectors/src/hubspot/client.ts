@@ -156,12 +156,15 @@ const defaultSleep = (ms: number) => new Promise<void>((resolve) => setTimeout(r
 /** Scopes beyond reading. Empty means the token can only read. */
 export const hubSpotWriteScopes = (scopes: readonly string[]) => scopes.filter((s) => !READ_SCOPE.test(s));
 
+/** A string matched literally inside a RegExp. */
+const escapeRegExp = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
 const OBJECTS = HUBSPOT_OBJECTS.join("|");
 const TO = "contacts|companies|deals";
 
 /** Every request the client may send, by method and path. Nothing else leaves the server. */
 export const HUBSPOT_ALLOWED_REQUESTS = [
-  { kind: "token_info", method: "POST", path: new RegExp(`^${HUBSPOT_TOKEN_INFO_PATH.replace(/\//g, "\\/")}$`) },
+  { kind: "token_info", method: "POST", path: new RegExp(`^${escapeRegExp(HUBSPOT_TOKEN_INFO_PATH)}$`) },
   { kind: "list", method: "GET", path: new RegExp(`^/crm/objects/${HUBSPOT_API_VERSION}/(${OBJECTS})$`) },
   { kind: "search", method: "POST", path: new RegExp(`^/crm/objects/${HUBSPOT_API_VERSION}/(${OBJECTS})/search$`) },
   { kind: "associations", method: "POST", path: new RegExp(`^/crm/associations/${HUBSPOT_API_VERSION}/(${OBJECTS})/(${TO})/batch/read$`) },
