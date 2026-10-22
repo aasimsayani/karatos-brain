@@ -14,6 +14,9 @@ import {
   resolveBankProfiles,
   resolvePosProfile,
   shopifyConnector,
+  slackConnector,
+  slackDistribution,
+  slackTextChannels,
   stripeConnector,
 } from "@karatos/connectors";
 
@@ -93,6 +96,17 @@ const FACTORIES: Record<string, { needs: (env: Env) => string[]; make: (env: Env
         tokens: store ? sealedTokenStore({ ...store, source: "quickbooks", seed, keyMaterial: clientSecret }) : memoryTokenStore(seed),
       });
     },
+  },
+  slack: {
+    needs: (env) => ["SLACK_BOT_TOKEN", "CORRESPONDENT_HASH_KEY"].filter((name) => !set(env, name)),
+    make: async (env) =>
+      slackConnector({
+        token: set(env, "SLACK_BOT_TOKEN")!,
+        correspondentKey: set(env, "CORRESPONDENT_HASH_KEY")!,
+        // No message text is kept unless the owner lists the channels, or says all.
+        textChannels: slackTextChannels(env.SLACK_TEXT_CHANNELS),
+        distribution: slackDistribution(env.SLACK_APP_DISTRIBUTION),
+      }),
   },
   bank_statements: {
     needs: (env) => (set(env, "BANK_STATEMENTS_IMPORT_DIR") ? [] : ["BANK_STATEMENTS_IMPORT_DIR"]),

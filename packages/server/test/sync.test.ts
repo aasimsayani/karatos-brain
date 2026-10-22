@@ -95,6 +95,7 @@ describe("scheduledConnectors", () => {
     expect(scheduledConnectors(["quickbooks"], { QUICKBOOKS_CLIENT_ID: "id", QUICKBOOKS_REFRESH_TOKEN: secret }).skipped).toEqual([
       { id: "quickbooks", reason: "missing QUICKBOOKS_CLIENT_SECRET, QUICKBOOKS_REALM_ID, QUICKBOOKS_ENVIRONMENT" },
     ]);
+    expect(scheduledConnectors(["slack"], { SLACK_BOT_TOKEN: secret }).skipped).toEqual([{ id: "slack", reason: "missing CORRESPONDENT_HASH_KEY" }]);
   });
 
   it("syncs nothing unless an integration is turned on, even when its settings are present", () => {
@@ -125,10 +126,19 @@ describe("scheduledConnectors", () => {
       QUICKBOOKS_REALM_ID: "9341450000",
       QUICKBOOKS_REFRESH_TOKEN: "refresh-value",
       QUICKBOOKS_ENVIRONMENT: "sandbox",
+      SLACK_BOT_TOKEN: ["xoxb", "0".repeat(12), "TESTtokenTESTtoken"].join("-"),
+      CORRESPONDENT_HASH_KEY: "0".repeat(64),
+      SLACK_TEXT_CHANNELS: "C0TEST0001",
+      SLACK_APP_DISTRIBUTION: "non_marketplace",
     };
     const { connectors } = scheduledConnectors(SYNCABLE_INTEGRATIONS, env);
     const built = await Promise.all(connectors.map((c) => c.make()));
-    expect(built.map((c) => c.source).sort()).toEqual(["bank_statements", "chase", "inventory_pos", "quickbooks", "shopify", "stripe"]);
+    expect(built.map((c) => c.source).sort()).toEqual(["bank_statements", "chase", "inventory_pos", "quickbooks", "shopify", "slack", "stripe"]);
+    // Text and distribution have defaults, and anything but their listed values stops the connector being built.
+    const { SLACK_TEXT_CHANNELS: _text, SLACK_APP_DISTRIBUTION: _dist, ...slackDefaults } = env;
+    expect((await scheduledConnectors(["slack"], slackDefaults).connectors[0]!.make()).source).toBe("slack");
+    await expect(scheduledConnectors(["slack"], { ...env, SLACK_TEXT_CHANNELS: "repairs" }).connectors[0]!.make()).rejects.toThrow("SLACK_TEXT_CHANNELS must be");
+    await expect(scheduledConnectors(["slack"], { ...env, SLACK_APP_DISTRIBUTION: "public" }).connectors[0]!.make()).rejects.toThrow("SLACK_APP_DISTRIBUTION must be");
     const token = await scheduledConnectors(["shopify"], { SHOPIFY_SHOP_DOMAIN: "demo.myshopify.com", SHOPIFY_ADMIN_ACCESS_TOKEN: "t" }).connectors[0]!.make();
     expect(token.source).toBe("shopify");
     for (const connector of built) expect(connector).not.toHaveProperty("write");
