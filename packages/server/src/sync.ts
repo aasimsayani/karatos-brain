@@ -15,6 +15,7 @@ import {
   resolvePosProfile,
   shopifyConnector,
   stripeConnector,
+  wooCommerceConnector,
 } from "@karatos/connectors";
 
 /**
@@ -93,6 +94,16 @@ const FACTORIES: Record<string, { needs: (env: Env) => string[]; make: (env: Env
         tokens: store ? sealedTokenStore({ ...store, source: "quickbooks", seed, keyMaterial: clientSecret }) : memoryTokenStore(seed),
       });
     },
+  },
+  woocommerce: {
+    needs: (env) => ["WOOCOMMERCE_STORE_URL", "WOOCOMMERCE_CONSUMER_KEY", "WOOCOMMERCE_CONSUMER_SECRET", "CUSTOMER_REF_KEY"].filter((name) => !set(env, name)),
+    make: async (env) =>
+      wooCommerceConnector({
+        storeUrl: set(env, "WOOCOMMERCE_STORE_URL")!,
+        consumerKey: set(env, "WOOCOMMERCE_CONSUMER_KEY")!,
+        consumerSecret: set(env, "WOOCOMMERCE_CONSUMER_SECRET")!,
+        customerKey: set(env, "CUSTOMER_REF_KEY")!,
+      }),
   },
   bank_statements: {
     needs: (env) => (set(env, "BANK_STATEMENTS_IMPORT_DIR") ? [] : ["BANK_STATEMENTS_IMPORT_DIR"]),

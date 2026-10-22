@@ -143,7 +143,13 @@ export const INTEGRATIONS: IntegrationSpec[] = [
   { id: "valigara", name: "Valigara", domain: "ecommerce", segments: ALL, access: "unknown", testWith: "unknown", departments: ["inventory", "sales", "marketing"], historicalImportYears: 5, webhooks: false, settings: [], changelog: null, status: "planned" },
 
   // E-commerce
-  { id: "woocommerce", name: "WooCommerce", domain: "ecommerce", segments: ["retail"], access: "public_api", testWith: "sandbox", departments: ["sales", "inventory", "marketing"], historicalImportYears: 5, webhooks: true, settings: [], changelog: "https://developer.woocommerce.com/changelog/", status: "planned" },
+  { id: "woocommerce", name: "WooCommerce", domain: "ecommerce", segments: ["retail"], access: "public_api", testWith: "sandbox", departments: ["sales", "inventory", "clienteling", "marketing"], historicalImportYears: 5, webhooks: true, settings: ["WOOCOMMERCE_STORE_URL", "WOOCOMMERCE_CONSUMER_KEY", "WOOCOMMERCE_CONSUMER_SECRET", "CUSTOMER_REF_KEY"], changelog: "https://developer.woocommerce.com/changelog/", status: "built", note: "A REST API key with Read permission over https; the connector sends only GET requests to five read endpoints. Sales, refunds, products and stock use the same events as Shopify, Square and Clover", capabilities: [
+      "Imports five years of orders and refunds and the whole catalog, then keeps them current",
+      "Sales sees every WooCommerce sale and return with its SKUs and how it was paid, the same way as Shopify sales",
+      "Inventory sees each product and variation with its price, and the stock WooCommerce counts for it",
+      "Links a customer's orders together without keeping their name, email address, phone number or address",
+      "Read-only: KaratOS connects with a Read key and only ever reads from your store",
+    ] },
   { id: "bigcommerce", name: "BigCommerce", domain: "ecommerce", segments: ["retail", "wholesale"], access: "public_api", testWith: "sandbox", departments: ["sales", "inventory", "marketing"], historicalImportYears: 5, webhooks: true, settings: [], changelog: "https://docs.bigcommerce.com/developer/changelog", status: "planned" },
   { id: "wix", name: "Wix", domain: "ecommerce", segments: ["retail"], access: "public_api", testWith: "sandbox", departments: ["sales", "inventory", "marketing"], historicalImportYears: 5, webhooks: true, settings: [], changelog: "https://dev.wix.com/docs/changelog", status: "planned" },
   { id: "punchmark", name: "Punchmark", domain: "ecommerce", segments: ["retail"], access: "partner", testWith: "partner", departments: ["sales", "inventory", "marketing"], historicalImportYears: 5, webhooks: false, settings: [], changelog: null, status: "planned" },

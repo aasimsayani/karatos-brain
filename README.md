@@ -29,25 +29,25 @@ This section updates itself as work lands: it is generated from [docs/milestones
 <!-- progress:start -->
 <!-- Generated from docs/milestones.json and the integration catalog by npm run progress:write. Edit those, not this block. -->
 
-**Overall: 45% complete**, 17 of 38 roadmap items done. 5 of the 75 systems in the integration catalog are connected.
+**Overall: 50% complete**, 19 of 38 roadmap items done. 7 of the 75 systems in the integration catalog are connected.
 
 | Milestone | What it gives a jeweler | Progress | Target |
 | --- | --- | --- | --- |
 | Foundation | Every record is validated, stored once and traceable to its source. | ██████████ 100% | Done |
 | Retail departments | Eleven departments that turn store data into daily recommendations. | ███████░░░ 67% | Dec 2026 |
-| Core integrations | Connects what most jewelers already run: online store, POS, payments, bank and books. | █████████░ 86% | Nov 2026 |
+| Core integrations | Connects what most jewelers already run: online store, POS, payments, bank and books. | ██████████ 100% | Done |
 | Client instances | Each business gets its own isolated instance, in accounts it owns. | ████████░░ 75% | Dec 2026 |
 | AI reasoning | Claude explains each recommendation in plain language and learns from the owner's decisions. | ░░░░░░░░░░ 0% | Jan 2027 |
 | Self-serve AI dashboards | Owners ask a question and get a dashboard, without a developer. | ███░░░░░░░ 33% | Mar 2027 |
 | Self-hosted and managed plans | Run it yourself for free, or let us host it on the premium plan. | ███░░░░░░░ 33% | Mar 2027 |
-| Integrations, next wave | Jewelry POS, CRM, messaging, marketing and diamond feeds join the catalog. | ░░░░░░░░░░ 0% | Jun 2027 |
+| Integrations, next wave | Jewelry POS, CRM, messaging, marketing and diamond feeds join the catalog. | █░░░░░░░░░ 11% | Jun 2027 |
 | Manufacturing departments | Bench, casting and setting work tracked with metal loss and labor cost per piece. | ░░░░░░░░░░ 0% | Jun 2027 |
 
 ### Up next
 
-- **Core integrations** (target Nov 2026): QuickBooks Online
 - **Retail departments** (target Dec 2026): Tune thresholds against a live store's data
 - **Client instances** (target Dec 2026): First live client instance
+- **AI reasoning** (target Jan 2027): Claude-powered reasoner with provenance and confidence; Owner feedback tunes future recommendations; Semantic search over the business's documents
 <!-- progress:end -->
 
 The [roadmap](docs/roadmap.md) has the detail behind each milestone, and the [changelog](CHANGELOG.md) lists what shipped.
