@@ -8,6 +8,7 @@ import {
   chaseConnector,
   chaseFormats,
   directorySource,
+  hubSpotConnector,
   inventoryPosConnector,
   memoryTokenStore,
   quickBooksConnector,
@@ -105,6 +106,11 @@ const FACTORIES: Record<string, { needs: (env: Env) => string[]; make: (env: Env
     needs: (env) => ["CHASE_IMPORT_MODE", "CHASE_MANUAL_IMPORT_DIR"].filter((name) => !set(env, name)),
     make: async (env) =>
       chaseConnector({ accounts: await chaseAccountsFromDirectory(set(env, "CHASE_MANUAL_IMPORT_DIR")!), formats: chaseFormats(env.CHASE_IMPORT_MODE) }),
+  },
+  hubspot: {
+    needs: (env) => (set(env, "HUBSPOT_ACCESS_TOKEN") ? [] : ["HUBSPOT_ACCESS_TOKEN"]),
+    // A private app token doesn't expire or rotate on its own, so there is nothing to keep between runs.
+    make: async (env) => hubSpotConnector({ accessToken: set(env, "HUBSPOT_ACCESS_TOKEN")! }),
   },
 };
 

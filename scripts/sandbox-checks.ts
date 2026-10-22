@@ -1,5 +1,5 @@
 import type { SandboxCheck } from "@karatos/core";
-import { memoryTokenStore, quickBooksConnector, shopifyConnector, stripeConnector } from "@karatos/connectors";
+import { hubSpotConnector, memoryTokenStore, quickBooksConnector, shopifyConnector, stripeConnector } from "@karatos/connectors";
 
 /**
  * Every built connector registers a sandbox check here. Credentials are
@@ -38,6 +38,14 @@ export const SANDBOX_CHECKS: SandboxCheck[] = [
         environment: "sandbox",
         tokens: memoryTokenStore(c.SANDBOX_QUICKBOOKS_REFRESH_TOKEN!),
       }),
+  },
+  {
+    // A free HubSpot developer test account with a private app holding the four read scopes only. The connector
+    // checks the token's scopes before reading and stops if any could change data.
+    integration: "hubspot",
+    name: "HubSpot",
+    credentials: ["SANDBOX_HUBSPOT_ACCESS_TOKEN"],
+    connector: (c) => hubSpotConnector({ accessToken: c.SANDBOX_HUBSPOT_ACCESS_TOKEN! }),
   },
 ];
 

@@ -8,6 +8,7 @@ import { createSyncRunner, HISTORICAL_COMPLETE, scheduledConnectors, StaticDocum
 const ORG = "test-jeweler";
 // Assembled at runtime so no key-shaped string sits in the repository.
 const fakeKey = (kind: "rk" | "sk", mode: "test" | "live") => [kind, mode, "0".repeat(24)].join("_");
+const fakeHubSpotToken = () => ["pat", "na1", ["00000000", "0000", "4000", "8000", "000000000000"].join("-")].join("-");
 
 const event = (n: number) => ({
   id: `evt_${n}`,
@@ -95,6 +96,7 @@ describe("scheduledConnectors", () => {
     expect(scheduledConnectors(["quickbooks"], { QUICKBOOKS_CLIENT_ID: "id", QUICKBOOKS_REFRESH_TOKEN: secret }).skipped).toEqual([
       { id: "quickbooks", reason: "missing QUICKBOOKS_CLIENT_SECRET, QUICKBOOKS_REALM_ID, QUICKBOOKS_ENVIRONMENT" },
     ]);
+    expect(scheduledConnectors(["hubspot"], { HUBSPOT_ACCESS_TOKEN: " " }).skipped).toEqual([{ id: "hubspot", reason: "missing HUBSPOT_ACCESS_TOKEN" }]);
   });
 
   it("syncs nothing unless an integration is turned on, even when its settings are present", () => {
@@ -125,10 +127,11 @@ describe("scheduledConnectors", () => {
       QUICKBOOKS_REALM_ID: "9341450000",
       QUICKBOOKS_REFRESH_TOKEN: "refresh-value",
       QUICKBOOKS_ENVIRONMENT: "sandbox",
+      HUBSPOT_ACCESS_TOKEN: fakeHubSpotToken(),
     };
     const { connectors } = scheduledConnectors(SYNCABLE_INTEGRATIONS, env);
     const built = await Promise.all(connectors.map((c) => c.make()));
-    expect(built.map((c) => c.source).sort()).toEqual(["bank_statements", "chase", "inventory_pos", "quickbooks", "shopify", "stripe"]);
+    expect(built.map((c) => c.source).sort()).toEqual(["bank_statements", "chase", "hubspot", "inventory_pos", "quickbooks", "shopify", "stripe"]);
     const token = await scheduledConnectors(["shopify"], { SHOPIFY_SHOP_DOMAIN: "demo.myshopify.com", SHOPIFY_ADMIN_ACCESS_TOKEN: "t" }).connectors[0]!.make();
     expect(token.source).toBe("shopify");
     for (const connector of built) expect(connector).not.toHaveProperty("write");
