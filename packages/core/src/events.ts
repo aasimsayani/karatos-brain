@@ -16,6 +16,16 @@ export const EventEnvelopeSchema = z.object({
   /** Stable key so replays and retries never create duplicate events. */
   idempotencyKey: z.string().min(1),
   payload: z.record(z.string(), z.unknown()),
+  /**
+   * The vendor's own record, when the connector knows it, so a person can
+   * open the original after the raw payload is cleared. See data-retention.md.
+   */
+  sourceRecord: z
+    .object({
+      id: z.string().min(1),
+      url: z.url({ protocol: /^https$/ }).optional(),
+    })
+    .optional(),
 });
 
 export type EventEnvelope = z.infer<typeof EventEnvelopeSchema>;

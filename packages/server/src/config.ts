@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { INTEGRATIONS, invalidWriteEntries } from "@karatos/core";
+import { DEFAULT_RAW_RETENTION_DAYS, INTEGRATIONS, invalidWriteEntries, MAX_RAW_RETENTION_DAYS, MIN_RAW_RETENTION_DAYS } from "@karatos/core";
 import { RETAIL_DEPARTMENTS } from "@karatos/retail";
 
 const DEPARTMENT_IDS = RETAIL_DEPARTMENTS.map((d) => d.id);
@@ -51,6 +51,12 @@ export const InstanceConfigSchema = z.object({
   }),
   /** Minutes between the end of one sync round and the start of the next. */
   SYNC_INTERVAL_MINUTES: z.coerce.number().int().min(5).max(1440).default(60),
+  /**
+   * Days raw vendor data (event payloads, dead-letter input, uploaded file
+   * contents) is kept before it is cleared. Facts, signals and source
+   * references are kept. See docs/architecture/data-retention.md.
+   */
+  RAW_RETENTION_DAYS: z.coerce.number().int().min(MIN_RAW_RETENTION_DAYS).max(MAX_RAW_RETENTION_DAYS).default(DEFAULT_RAW_RETENTION_DAYS),
 });
 
 export type InstanceConfig = z.infer<typeof InstanceConfigSchema>;

@@ -24,6 +24,10 @@ Guards: `npm run secrets:scan` runs in CI on every push and fails on anything sh
 
 ## Threats and controls
 
+## Keeping less
+
+An instance holds a slim copy of a client's data. Raw vendor records (event payloads, dead-lettered input, uploaded file contents) are cleared after `RAW_RETENTION_DAYS` (default 30); the cleaned-up facts, signals and a reference back to each source record are kept. Less raw data held means less to expose. See [data retention](architecture/data-retention.md).
+
 ### Someone reaches an instance's API
 
 - Every route except `/healthz` needs `Authorization: Bearer <INSTANCE_API_KEY>`. The key is compared with `timingSafeEqual` over fixed-width zero-padded buffers, then by length, so neither its contents nor its length leak through timing.

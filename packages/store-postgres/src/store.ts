@@ -1,5 +1,9 @@
 import {
+  DEFAULT_RAW_RETENTION_DAYS,
   IdentityCollisionError,
+  rawRetentionCutoff,
+  sha256Json,
+  sourceReferenceFor,
   type DeadLetter,
   type EntityKind,
   type EntityRef,
@@ -8,9 +12,12 @@ import {
   type IdentityLink,
   type MemoryStore,
   type NormalizedEntity,
+  type PurgeResult,
+  type RawDataRetention,
   type ReasoningRun,
   type Recommendation,
   type Signal,
+  type StoredEvent,
 } from "@karatos/core";
 import type { SqlClient } from "./client.js";
 
@@ -24,6 +31,21 @@ interface SignalRow {
   confidence: string | number;
   derived_from_event_ids: string[];
   observed_at: Date | string;
+}
+
+interface EventRow {
+  id: string;
+  organization_id: string;
+  source: string;
+  type: string;
+  occurred_at: Date | string;
+  received_at: Date | string;
+  idempotency_key: string;
+  payload: Record<string, unknown>;
+  source_record_id: string;
+  source_url: string | null;
+  payload_sha256: string;
+  payload_cleared_at: Date | string | null;
 }
 
 interface EntityRow {
@@ -49,13 +71,15 @@ interface RecommendationRow {
 const iso = (value: Date | string) => (value instanceof Date ? value.toISOString() : new Date(value).toISOString());
 
 /** MemoryStore backed by the Brain A Postgres schema (supabase/migrations). */
-export class PostgresMemoryStore implements MemoryStore {
+export class PostgresMemoryStore implements MemoryStore, RawDataRetention {
   constructor(private readonly db: SqlClient) {}
 
   async appendEvent(event: EventEnvelope): Promise<{ inserted: boolean }> {
+    const ref = sourceReferenceFor(event);
     const { rows } = await this.db.query(
-      `insert into events (id, organization_id, source, type, occurred_at, received_at, idempotency_key, payload)
-       values ($1, $2, $3, $4, $5, $6, $7, $8)
+      `insert into events (id, organization_id, source, type, occurred_at, received_at, idempotency_key, payload,
+                           source_record_id, source_url, payload_sha256)
+       values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
        on conflict (organization_id, source, idempotency_key) do nothing
        returning id`,
       [
@@ -67,15 +91,81 @@ export class PostgresMemoryStore implements MemoryStore {
         event.receivedAt,
         event.idempotencyKey,
         JSON.stringify(event.payload),
+        ref.recordId,
+        ref.url ?? null,
+        sha256Json(event.payload),
       ],
     );
     return { inserted: rows.length > 0 };
   }
 
+  async getEvent(organizationId: string, id: string): Promise<StoredEvent | null> {
+    const { rows } = await this.db.query<EventRow>("select * from events where organization_id = $1 and id = $2", [organizationId, id]);
+    const r = rows[0];
+    if (!r) return null;
+    return {
+      id: r.id,
+      organizationId: r.organization_id,
+      source: r.source,
+      type: r.type,
+      occurredAt: iso(r.occurred_at),
+      receivedAt: iso(r.received_at),
+      idempotencyKey: r.idempotency_key,
+      payload: r.payload,
+      sourceRef: { system: r.source, recordId: r.source_record_id, ...(r.source_url ? { url: r.source_url } : {}) },
+      payloadSha256: r.payload_sha256,
+      payloadClearedAt: r.payload_cleared_at === null ? null : iso(r.payload_cleared_at),
+    };
+  }
+
+  /**
+   * Clears raw vendor data older than the window: event payloads, dead-letter
+   * input and uploaded file contents. Rows stay, with their ids, idempotency
+   * keys, hashes and source references, so replays are still duplicates and
+   * provenance still resolves. Each run is recorded in retention_runs.
+   */
+  async purgeRawData(organizationId: string, now: Date, retentionDays = DEFAULT_RAW_RETENTION_DAYS): Promise<PurgeResult> {
+    const cutoff = rawRetentionCutoff(now, retentionDays).toISOString();
+    const at = now.toISOString();
+    const count = async (sql: string) => (await this.db.query<{ n: number }>(sql, [organizationId, cutoff, at])).rows[0]!.n;
+    const events = await count(
+      `with cleared as (
+         update events set
+           payload = jsonb_build_object('cleared', true, 'at', $3::text, 'reason', 'retention'),
+           payload_cleared_at = $3::timestamptz
+         where organization_id = $1 and payload_cleared_at is null and received_at < $2::timestamptz
+         returning 1
+       ) select count(*)::int as n from cleared`,
+    );
+    // Dead letters that named no organization are this instance's too.
+    const deadLetters = await count(
+      `with cleared as (
+         update dead_letter_events set
+           raw = jsonb_build_object('cleared', true, 'at', $3::text, 'reason', 'retention'),
+           raw_cleared_at = $3::timestamptz
+         where (organization_id = $1 or organization_id is null) and raw_cleared_at is null and received_at < $2::timestamptz
+         returning 1
+       ) select count(*)::int as n from cleared`,
+    );
+    const fileImports = await count(
+      `with cleared as (
+         update file_imports set contents_cleared_at = $3::timestamptz
+         where organization_id = $1 and contents_cleared_at is null and uploaded_at < $2::timestamptz
+         returning 1
+       ) select count(*)::int as n from cleared`,
+    );
+    await this.db.query(
+      `insert into retention_runs (organization_id, ran_at, cutoff, retention_days, events_cleared, dead_letters_cleared, file_imports_cleared)
+       values ($1, $2, $3, $4, $5, $6, $7)`,
+      [organizationId, at, cutoff, retentionDays, events, deadLetters, fileImports],
+    );
+    return { organizationId, ranAt: at, cutoff, retentionDays, events, deadLetters, fileImports };
+  }
+
   async appendDeadLetter(deadLetter: DeadLetter): Promise<void> {
     await this.db.query(
-      `insert into dead_letter_events (id, organization_id, source, reason, issues, raw, received_at)
-       values ($1, (select id from organizations where id = $2), $3, $4, $5, $6, $7)`,
+      `insert into dead_letter_events (id, organization_id, source, reason, issues, raw, received_at, raw_sha256, source_record_id)
+       values ($1, (select id from organizations where id = $2), $3, $4, $5, $6, $7, $8, $9)`,
       [
         deadLetter.id,
         deadLetter.organizationId ?? null,
@@ -84,6 +174,8 @@ export class PostgresMemoryStore implements MemoryStore {
         JSON.stringify(deadLetter.issues),
         JSON.stringify(deadLetter.raw ?? null),
         deadLetter.receivedAt,
+        sha256Json(deadLetter.raw),
+        recordIdOf(deadLetter.raw),
       ],
     );
   }
@@ -256,6 +348,13 @@ export class PostgresMemoryStore implements MemoryStore {
     );
     return rows[0]?.cursor ?? null;
   }
+}
+
+/** The idempotency key a rejected input named, if any, so its source record can still be found. */
+function recordIdOf(raw: unknown): string | null {
+  if (typeof raw !== "object" || raw === null) return null;
+  const key = (raw as Record<string, unknown>).idempotencyKey;
+  return typeof key === "string" && key ? key : null;
 }
 
 function toRecommendation(row: RecommendationRow): Recommendation {
