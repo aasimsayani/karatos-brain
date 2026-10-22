@@ -57,6 +57,7 @@ const DOMAIN_LABELS: Record<IntegrationSpec["domain"], string> = {
   edi: "EDI",
   insurance: "Insurance",
   shipping: "Shipping",
+  operations: "Operations",
 };
 
 const ACCESS_LABELS: Record<IntegrationSpec["access"], string> = {

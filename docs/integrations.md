@@ -6,7 +6,7 @@ The catalog lives in code at [`packages/core/src/integrations.ts`](../packages/c
 
 ## Build order: self-serve first
 
-The first phase builds every integration we can finish without asking any vendor, company or person for anything: a public API with a free developer sandbox, or a file or EDI format we can test with synthetic samples. `selfServeIntegrations()` returns that list (37 systems today). Systems that need a paid subscription, a trade account or a partnership come later, once the core is built out.
+The first phase builds every integration we can finish without asking any vendor, company or person for anything: a public API with a free developer sandbox, or a file or EDI format we can test with synthetic samples. `selfServeIntegrations()` returns that list (58 systems today). Systems that need a paid subscription, a trade account or a partnership come later, once the core is built out.
 
 Which vendors offer a free sandbox is our current understanding as of October 2026. Confirm it when signing up for each developer account.
 
@@ -23,6 +23,8 @@ Which vendors offer a free sandbox is our current understanding as of October 20
 Most jewelry-specific POS systems (The Edge, Jewel360, ARMS) publish no public API, so exports come first for them. Diamond networks (RapNet, IDEX, Nivoda) list many of the same stones, so connectors match stones on the grading lab and report number before counting inventory.
 
 ## Catalog
+
+The October 2026 wave widens the catalog three ways. Communication everywhere a customer reaches the store: Microsoft 365 and any IMAP mailbox beside Gmail, Teams, business phone and text, Zoom consultations, helpdesks, Apple Messages for Business, SMS marketing, and the review, loyalty and social sites where customers talk about the store. Jewelry-trade systems: secondhand and gold-buying reports to the police, HRD and GCAL reports, jewelry insurance, supplier invoices and memos with their Kimberley Process and System of Warranties statements, tray counts, wholesale marketplaces and the carriers that move high-value parcels. Running-the-business tools: bills and company cards, pay-over-time financing, ERP and manufacturing systems, staff schedules, task boards, signed agreements, shared files and store traffic counts. WhatsApp stays in the Meta entry, since it goes through the same Meta developer app. 1stDibs, Chrono24, Rio Grande and Yelp are left out for now: none offers a documented way to read a store's own data.
 
 Used by: R is retail, W is wholesale, M is manufacturing. Test with says how we test the connector without a client's real account. Access details for vendors marked Partner or Unknown still need confirming with the vendor before a connector is built.
 
@@ -45,6 +47,12 @@ Used by: R is retail, W is wholesale, M is manufacturing. Test with says how we 
 | Punchmark | R | Partner | Partner | No | Planned |
 | Etsy | R, M | Public API | Unknown | No | Planned |
 | eBay | R, W | Public API | Free sandbox | Yes | Planned (Estate and pre-owned pieces) |
+| Amazon (Selling Partner API) | R, W, M | Public API | Free sandbox | Yes | Planned (Amazon orders, listings, stock, fees and settlements; notifications arrive through Amazon's queues) |
+| TikTok Shop | R | Partner | Unknown | Yes | Planned (Orders, products and returns from TikTok's in-app shop, through an app registered in TikTok Shop Partner Center) |
+| Faire | W, M | Public API | Unknown | No | Planned (Wholesale orders from independent boutiques through the Faire marketplace) |
+| NuORDER | W, M | Public API | Unknown | No | Planned (B2B wholesale orders, line sheets and buyers, with API keys a brand approves in NuORDER Admin) |
+| JOOR | W, M | Partner | Partner | No | Planned (B2B wholesale orders and buyers; JOOR's integrations team issues API tokens) |
+| Squarespace Commerce | R | Public API | Paid account | Yes | Planned (Orders, products, stock, customers and transactions from a Squarespace store) |
 
 ### Diamonds, suppliers and grading
 
@@ -61,6 +69,10 @@ Used by: R is retail, W is wholesale, M is manufacturing. Test with says how we 
 | GIA Report Results | R, W, M | Public API | Paid account | No | Planned (Needs a GIA lab account) |
 | IGI report verification | R, W | Unknown | Unknown | No | Planned (Web lookup only; no API found) |
 | GemGuide Appraisal Software | R | Unknown | Unknown | No | Planned |
+| HRD Antwerp report check | R, W | Unknown | Unknown | No | Planned (Web lookup through MyHRD only; no API found) |
+| GCAL report verification | R, W | Unknown | Unknown | No | Planned (Web lookup through GCAL by Sarine only; no API found) |
+| Supplier invoices and memos | R, W, M | File export | Sample files | No | Planned (Invoice and memo PDFs or CSVs from any supplier, read for memo terms and Kimberley Process and System of Warranties statements) |
+| Overnight Mountings | R | File export | Sample files | No | Planned (Catalog downloads as Excel or CSV with images; no ordering API found) |
 
 ### Pricing
 
@@ -95,6 +107,25 @@ Used by: R is retail, W is wholesale, M is manufacturing. Test with says how we 
 | Google Ads | R | Public API | Free sandbox | No | Planned (Test accounts for development; production needs an approved developer token) |
 | Meta Ads | R | Public API | Free sandbox | No | Planned |
 | Google Business Profile | R | Partner | Partner | No | Planned (Reviews and local listings; Google approves API access on request) |
+| Microsoft 365 Outlook mail and calendar | R, W, M | Public API | Paid account | Yes | Planned (Customer and vendor email and appointments for stores on Microsoft 365, read-only. Microsoft's free developer tenant now goes only to Visual Studio subscribers) |
+| Any other mailbox (IMAP) | R, W, M | Public API | Sample files | No | Planned (Read-only mail from any provider that offers IMAP, for stores not on Google or Microsoft) |
+| Microsoft Teams | R, W, M | Public API | Paid account | Yes | Planned (Channel messages where staff hand off repairs, custom orders and sales, like Slack. Microsoft Graph has one changelog, watched through the Outlook entry) |
+| RingCentral | R, W, M | Public API | Paid account | Yes | Planned (Business phone call logs, texts and voicemail. RingCentral replaced its free developer account with a low-cost package) |
+| Quo (formerly OpenPhone) | R | Public API | Unknown | Yes | Planned (Small-business calls and texts, with call recordings and transcripts) |
+| Zoom | R, W, M | Public API | Unknown | Yes | Planned (Virtual consultations: who met, when and for how long, and whether it was recorded) |
+| Gorgias | R | Public API | Paid account | Yes | Planned (E-commerce helpdesk tickets from email, chat and social, common with Shopify jewelry brands) |
+| Zendesk | R, W, M | Public API | Paid account | Yes | Planned (Helpdesk tickets and customer conversations. Zendesk offers a 14-day trial, and sponsored test accounts only to Marketplace partners) |
+| Apple Messages for Business | R | Partner | Partner | No | Planned (iMessage conversations with customers, reached through a messaging service provider Apple has approved) |
+| Postscript | R | Partner | Partner | Yes | Planned (Shopify SMS marketing. Custom API access is limited to enterprise plans and integration partners) |
+| Yotpo reviews and loyalty | R | Public API | Unknown | Yes | Planned (Product reviews, questions, photos and loyalty points) |
+| Judge.me | R | Public API | Unknown | Yes | Planned (Shopify product reviews and ratings) |
+| Smile.io | R | Public API | Paid account | No | Planned (Loyalty points, VIP tiers and referrals. The API needs the Plus or Enterprise plan) |
+| Trustpilot | R, W | Public API | Paid account | No | Planned (Company reviews and trust score. The API needs Trustpilot's API module add-on) |
+| Pinterest | R, M | Public API | Free sandbox | No | Planned (Organic pins, boards and pin analytics, where bridal shoppers save ideas) |
+| TikTok | R | Public API | Free sandbox | No | Planned (The store's own videos and how they perform) |
+| TikTok Ads | R | Public API | Free sandbox | No | Planned (Ad spend and results from TikTok's API for Business. No public API changelog found; the nightly sandbox run catches API changes) |
+| Yext | R | Public API | Free sandbox | No | Planned (Local listings and reviews from many sites in one place, including Yelp, whose own API shows only a few reviews. No public API changelog found; the nightly sandbox run catches API changes) |
+| Google Calendar | R, W, M | Public API | Free sandbox | Yes | Planned (Appointments booked straight into Google Calendar, for stores that don't use a booking tool) |
 
 ### Money
 
@@ -116,6 +147,11 @@ Used by: R is retail, W is wholesale, M is manufacturing. Test with says how we 
 | FinCEN Form 8300 cash reporting | R, W, M | File export | Sample files | No | Planned (Cash payments over $10,000; filed through BSA E-Filing, which has no API, so the brain prepares and tracks filings) |
 | Refiner and scrap settlement statements | R, W, M | File export | Sample files | No | Planned (CSV or PDF from the refiner) |
 | Gusto | R, W, M | Public API | Free sandbox | Yes | Planned (Payroll, commissions and staff costs) |
+| LeadsOnline secondhand reporting | R | Partner | Partner | No | Planned (Gold and secondhand buys many US police departments require; LeadsOnline issues API credentials to point-of-sale partners) |
+| BILL | R, W, M | Public API | Free sandbox | Yes | Planned (Supplier bills, approvals and vendor payments) |
+| Ramp | R, W, M | Public API | Unknown | Yes | Planned (Company card spending, receipts, reimbursements and bills) |
+| Klarna | R | Public API | Unknown | No | Planned (Pay-over-time orders, captures, refunds and settlement reports) |
+| Afterpay | R | Public API | Partner | No | Planned (Pay-over-time orders, refunds and settlements; sandbox credentials come from an Afterpay account manager) |
 
 ### Manufacturing and wholesale operations
 
@@ -131,6 +167,33 @@ Used by: R is retail, W is wholesale, M is manufacturing. Test with says how we 
 | Malca-Amit | W, M | Partner | Partner | No | Planned |
 | MatrixGold CAD | R, M | Unknown | Unknown | No | Planned (Custom design files and metal weight estimates) |
 | Formlabs 3D printing | R, M | Unknown | Unknown | No | Planned (Print jobs for wax and resin models) |
+| BriteCo jewelry insurance | R | Partner | Partner | No | Planned (Appraisals and insurance offered at the point of sale; reached through POS partners today) |
+| Extend product protection | R | Partner | Partner | Yes | Planned (Protection plans sold online and the claims made on them; needs an Extend merchant account) |
+| ShipStation | R, W | Public API | Paid account | Yes | Planned (Shipments, labels, insured values and tracking across carriers. API access needs a Gold plan or above) |
+| FedEx | R, W, M | Public API | Free sandbox | Yes | Planned (Tracking, declared values and delivery exceptions; tracking webhooks need an enterprise shipping account) |
+| UPS | R, W, M | Public API | Free sandbox | No | Planned (Tracking, declared values and delivery exceptions for parcels sent to customers and vendors) |
+| USPS | R, W, M | Public API | Free sandbox | Yes | Planned (Tracking for Registered Mail and other USPS parcels, with tracking event subscriptions. USPS publishes no changelog for its new APIs) |
+| NetSuite | W, M | Public API | Paid account | No | Planned (ERP for wholesalers and manufacturers: items, orders, purchase orders and the books. Release notes are published per release, so the nightly sandbox run catches API changes) |
+| Katana | M | Public API | Unknown | Yes | Planned (Manufacturing orders, materials, stock and costs for small makers) |
+| Cin7 Core | W, M, R | Public API | Paid account | Yes | Planned (Inventory, purchasing and sales across channels; webhooks need the Automation module) |
+
+### Running the business
+
+The tools a store runs on day to day: staff schedules and time clocks, task boards, signed agreements, shared files and store traffic counts.
+
+| Integration | Used by | Access | Test with | Webhooks | Status |
+| --- | --- | --- | --- | --- | --- |
+| RFID and barcode tray counts | R, W, M | File export | Sample files | No | Planned (Tray and case scan exports, so the nightly count is checked against what should be there) |
+| Homebase | R | Partner | Partner | No | Planned (Staff schedules and time clock, so labor can be set against sales. API keys need the Enterprise plan and a request to Homebase support) |
+| Deputy | R, W, M | Public API | Unknown | Yes | Planned (Staff rosters and timesheets, so labor can be set against sales or bench work) |
+| Asana | R, W, M | Public API | Free sandbox | Yes | Planned (Tasks and projects used to track repairs, custom orders and buying trips) |
+| Trello | R, W, M | Public API | Free sandbox | Yes | Planned (Boards and cards used to track repairs, custom orders and buying) |
+| Airtable | R, W, M | Public API | Free sandbox | Yes | Planned (Bases many stores use for memo logs, repair intake and custom order tracking) |
+| Notion | R, W, M | Public API | Free sandbox | Yes | Planned (Databases and pages used for job tracking, procedures and buying notes) |
+| Docusign | R, W, M | Public API | Free sandbox | Yes | Planned (Signed appraisal, consignment, memo and custom order agreements, and who has yet to sign) |
+| Dropbox | R, W, M | Public API | Free sandbox | Yes | Planned (Files such as invoices, appraisals and design files. Dropbox publishes no API changelog; changes are announced on its developer blog) |
+| Microsoft OneDrive and SharePoint files | R, W, M | Public API | Free sandbox | Yes | Planned (Files kept in OneDrive or SharePoint, read through Microsoft Graph, whose one changelog is watched through the Outlook entry) |
+| Verkada store traffic | R | Public API | Paid account | Yes | Planned (People counts from store cameras, to compare footfall with sales) |
 
 ## Systems by department
 
@@ -138,19 +201,19 @@ Every department reads from more than one system, and a test keeps it that way. 
 
 | Department | Systems it reads from |
 | --- | --- |
-| Sales and POS | Shopify, Inventory and POS systems, Stripe, HubSpot, Monday.com, Slack, Instagram DMs, Facebook Messenger and WhatsApp Business, The Edge (Abbott Jewelry Systems), Jewel360, ARMS, Lightspeed Retail, Square, Clover, Valigara, WooCommerce, BigCommerce, Wix, Punchmark, Clientbook, Podium, Authorize.net, Affirm, Synchrony, Acima, EDI with retail partners (X12 850, 855, 856, 810, 846, 852), Jewelers Mutual care plans, Google Analytics 4, Etsy, eBay |
-| Inventory and Merchandising | Shopify, Inventory and POS systems, The Edge (Abbott Jewelry Systems), Jewel360, ARMS, Lightspeed Retail, Square, Clover, Valigara, WooCommerce, BigCommerce, Wix, Punchmark, RapNet and the Rapaport Price List, IDEX Online, Nivoda, VDB (Virtual Diamond Boutique), Polygon, Stuller, GemFind JewelCloud, Quality Gold, GIA Report Results, IGI report verification, PIRO, Adaptive Jewelry ERP, Acumatica JewelShop, DiamTrade, EDI with retail partners (X12 850, 855, 856, 810, 846, 852), Parcel Pro, Malca-Amit, Etsy, eBay |
-| Clienteling and CRM | Inventory and POS systems, HubSpot, Custom forms, Gmail, Instagram DMs, Facebook Messenger and WhatsApp Business, The Edge (Abbott Jewelry Systems), Jewel360, ARMS, Lightspeed Retail, Square, Clover, Clientbook, Podium, Birdeye, Klaviyo, Twilio, Calendly, Acuity Scheduling, Mailchimp, Google Business Profile |
-| Repairs and Service | Monday.com, Custom forms, Slack, The Edge (Abbott Jewelry Systems), Jewel360, ARMS, Lightspeed Retail, Square, Clover, Stuller, Geller's Blue Book, Twilio, Jewelers Mutual care plans, Parcel Pro, Malca-Amit, Calendly, Acuity Scheduling |
-| Custom and Special Orders | Monday.com, Custom forms, Gmail, Slack, Stuller, Quality Gold, Calendly, Acuity Scheduling, MatrixGold CAD, Formlabs 3D printing |
-| Appraisals | RapNet and the Rapaport Price List, IDEX Online, Nivoda, VDB (Virtual Diamond Boutique), GIA Report Results, IGI report verification, GemGuide Appraisal Software |
-| Buying, Vendors and Memo | Gmail, RapNet and the Rapaport Price List, IDEX Online, Nivoda, VDB (Virtual Diamond Boutique), Polygon, Stuller, GemFind JewelCloud, Quality Gold, GIA Report Results, nFusion Solutions metals feed, Metals-API, Jewelers Board of Trade, Adaptive Jewelry ERP, Acumatica JewelShop, DiamTrade |
-| Metals and Gold Buying | nFusion Solutions metals feed, Metals-API, Refiner and scrap settlement statements |
-| Marketing | Shopify, Inventory and POS systems, HubSpot, Instagram DMs, Facebook Messenger and WhatsApp Business, Valigara, WooCommerce, BigCommerce, Wix, Punchmark, GemFind JewelCloud, Podium, Birdeye, Klaviyo, Attentive, Twilio, Mailchimp, Google Analytics 4, Google Ads, Meta Ads, Google Business Profile, Etsy |
-| Finance | Stripe, Chase business bank accounts and credit cards, Bank and credit card statements (any bank), Google Workspace and Drive, QuickBooks Online, Xero, Plaid, Authorize.net, Affirm, Synchrony, Acima, Jewelers Board of Trade, Avalara AvaTax, TaxJar, Refiner and scrap settlement statements, Gusto |
-| Compliance | Chase business bank accounts and credit cards, Bank and credit card statements (any bank), Google Workspace and Drive, QuickBooks Online, Xero, Plaid, Jewelers Mutual care plans, Parcel Pro, Malca-Amit, Avalara AvaTax, TaxJar, FinCEN Form 8300 cash reporting, Gusto |
-| Manufacturing (planned) | PIRO, Adaptive Jewelry ERP, Acumatica JewelShop, DiamTrade, MatrixGold CAD, Formlabs 3D printing |
-| Wholesale (planned) | RapNet and the Rapaport Price List, IDEX Online, Nivoda, VDB (Virtual Diamond Boutique), Polygon, GemFind JewelCloud, Jewelers Board of Trade, PIRO, Adaptive Jewelry ERP, Acumatica JewelShop, DiamTrade, EDI with retail partners (X12 850, 855, 856, 810, 846, 852) |
+| Sales and POS | Shopify, Inventory and POS systems, Stripe, HubSpot, Monday.com, Slack, Instagram DMs, Facebook Messenger and WhatsApp Business, The Edge (Abbott Jewelry Systems), Jewel360, ARMS, Lightspeed Retail, Square, Clover, Valigara, WooCommerce, BigCommerce, Wix, Punchmark, Clientbook, Podium, Authorize.net, Affirm, Synchrony, Acima, EDI with retail partners (X12 850, 855, 856, 810, 846, 852), Jewelers Mutual care plans, Google Analytics 4, Etsy, eBay, Microsoft Teams, RingCentral, Quo (formerly OpenPhone), Zoom, Gorgias, Zendesk, Apple Messages for Business, Pinterest, Amazon (Selling Partner API), TikTok Shop, Faire, NuORDER, JOOR, Squarespace Commerce, BriteCo jewelry insurance, Extend product protection, ShipStation, Cin7 Core, Klarna, Afterpay, Homebase, Deputy, Verkada store traffic |
+| Inventory and Merchandising | Shopify, Inventory and POS systems, The Edge (Abbott Jewelry Systems), Jewel360, ARMS, Lightspeed Retail, Square, Clover, Valigara, WooCommerce, BigCommerce, Wix, Punchmark, RapNet and the Rapaport Price List, IDEX Online, Nivoda, VDB (Virtual Diamond Boutique), Polygon, Stuller, GemFind JewelCloud, Quality Gold, GIA Report Results, IGI report verification, PIRO, Adaptive Jewelry ERP, Acumatica JewelShop, DiamTrade, EDI with retail partners (X12 850, 855, 856, 810, 846, 852), Parcel Pro, Malca-Amit, Etsy, eBay, Amazon (Selling Partner API), TikTok Shop, Faire, NuORDER, JOOR, Squarespace Commerce, HRD Antwerp report check, GCAL report verification, Supplier invoices and memos, Overnight Mountings, RFID and barcode tray counts, ShipStation, FedEx, UPS, USPS, NetSuite, Katana, Cin7 Core, Airtable |
+| Clienteling and CRM | Shopify, Inventory and POS systems, Stripe, HubSpot, Custom forms, Gmail, Instagram DMs, Facebook Messenger and WhatsApp Business, The Edge (Abbott Jewelry Systems), Jewel360, ARMS, Lightspeed Retail, Square, Clover, Clientbook, Podium, Birdeye, Klaviyo, Twilio, Calendly, Acuity Scheduling, Mailchimp, Google Business Profile, Microsoft 365 Outlook mail and calendar, Any other mailbox (IMAP), RingCentral, Quo (formerly OpenPhone), Zoom, Gorgias, Zendesk, Apple Messages for Business, Postscript, Yotpo reviews and loyalty, Judge.me, Smile.io, Trustpilot, Yext, Squarespace Commerce, BriteCo jewelry insurance, Extend product protection, Google Calendar |
+| Repairs and Service | Monday.com, Custom forms, Slack, The Edge (Abbott Jewelry Systems), Jewel360, ARMS, Lightspeed Retail, Square, Clover, Stuller, Geller's Blue Book, Twilio, Jewelers Mutual care plans, Parcel Pro, Malca-Amit, Calendly, Acuity Scheduling, Microsoft 365 Outlook mail and calendar, Any other mailbox (IMAP), Microsoft Teams, RingCentral, Quo (formerly OpenPhone), Gorgias, Zendesk, Extend product protection, FedEx, UPS, USPS, Asana, Trello, Airtable, Notion, Google Calendar |
+| Custom and Special Orders | Monday.com, Custom forms, Gmail, Slack, Stuller, Quality Gold, Calendly, Acuity Scheduling, MatrixGold CAD, Formlabs 3D printing, Microsoft 365 Outlook mail and calendar, Any other mailbox (IMAP), Microsoft Teams, Zoom, Overnight Mountings, Asana, Trello, Airtable, Notion, Docusign, Dropbox, Microsoft OneDrive and SharePoint files, Google Calendar |
+| Appraisals | RapNet and the Rapaport Price List, IDEX Online, Nivoda, VDB (Virtual Diamond Boutique), GIA Report Results, IGI report verification, GemGuide Appraisal Software, HRD Antwerp report check, GCAL report verification, BriteCo jewelry insurance, Docusign |
+| Buying, Vendors and Memo | Gmail, RapNet and the Rapaport Price List, IDEX Online, Nivoda, VDB (Virtual Diamond Boutique), Polygon, Stuller, GemFind JewelCloud, Quality Gold, GIA Report Results, nFusion Solutions metals feed, Metals-API, Jewelers Board of Trade, Adaptive Jewelry ERP, Acumatica JewelShop, DiamTrade, Microsoft 365 Outlook mail and calendar, Any other mailbox (IMAP), LeadsOnline secondhand reporting, HRD Antwerp report check, GCAL report verification, Supplier invoices and memos, Overnight Mountings, BILL, Ramp, NetSuite, Katana, Cin7 Core, Asana, Trello, Airtable, Notion |
+| Metals and Gold Buying | nFusion Solutions metals feed, Metals-API, Refiner and scrap settlement statements, LeadsOnline secondhand reporting |
+| Marketing | Shopify, Inventory and POS systems, HubSpot, Instagram DMs, Facebook Messenger and WhatsApp Business, Valigara, WooCommerce, BigCommerce, Wix, Punchmark, GemFind JewelCloud, Podium, Birdeye, Klaviyo, Attentive, Twilio, Mailchimp, Google Analytics 4, Google Ads, Meta Ads, Google Business Profile, Etsy, Postscript, Yotpo reviews and loyalty, Judge.me, Smile.io, Trustpilot, Pinterest, TikTok, TikTok Ads, Yext, TikTok Shop, Squarespace Commerce, Verkada store traffic |
+| Finance | Stripe, Chase business bank accounts and credit cards, Bank and credit card statements (any bank), Google Workspace and Drive, QuickBooks Online, Xero, Plaid, Authorize.net, Affirm, Synchrony, Acima, Jewelers Board of Trade, Avalara AvaTax, TaxJar, Refiner and scrap settlement statements, Gusto, Amazon (Selling Partner API), Supplier invoices and memos, BILL, Ramp, NetSuite, Klarna, Afterpay, Homebase, Deputy, Dropbox, Microsoft OneDrive and SharePoint files |
+| Compliance | Chase business bank accounts and credit cards, Bank and credit card statements (any bank), Google Workspace and Drive, QuickBooks Online, Xero, Plaid, Jewelers Mutual care plans, Parcel Pro, Malca-Amit, Avalara AvaTax, TaxJar, FinCEN Form 8300 cash reporting, Gusto, LeadsOnline secondhand reporting, Supplier invoices and memos, RFID and barcode tray counts, ShipStation, FedEx, UPS, USPS, Docusign, Dropbox, Microsoft OneDrive and SharePoint files |
+| Manufacturing (planned) | PIRO, Adaptive Jewelry ERP, Acumatica JewelShop, DiamTrade, MatrixGold CAD, Formlabs 3D printing, NetSuite, Katana, Deputy |
+| Wholesale (planned) | RapNet and the Rapaport Price List, IDEX Online, Nivoda, VDB (Virtual Diamond Boutique), Polygon, GemFind JewelCloud, Jewelers Board of Trade, PIRO, Adaptive Jewelry ERP, Acumatica JewelShop, DiamTrade, EDI with retail partners (X12 850, 855, 856, 810, 846, 852), Faire, NuORDER, JOOR, NetSuite, Cin7 Core, Docusign |
 
 ## Bank and card statements
 
