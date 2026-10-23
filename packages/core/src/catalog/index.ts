@@ -3,6 +3,7 @@ import type { ConnectorCatalogEntry } from "../integrations.js";
 import affirm from "./affirm.js";
 import authorize_net from "./authorize_net.js";
 import bank_statements from "./bank_statements.js";
+import bigcommerce from "./bigcommerce.js";
 import chase from "./chase.js";
 import inventory_pos from "./inventory_pos.js";
 import plaid from "./plaid.js";
@@ -12,4 +13,4 @@ import stripe from "./stripe.js";
 import xero from "./xero.js";
 
 /** Each built connector's own catalog fields, by catalog id. */
-export const CONNECTOR_CATALOG: Readonly<Record<string, ConnectorCatalogEntry>> = { affirm, authorize_net, bank_statements, chase, inventory_pos, plaid, quickbooks, shopify, stripe, xero };
+export const CONNECTOR_CATALOG: Readonly<Record<string, ConnectorCatalogEntry>> = { affirm, authorize_net, bank_statements, bigcommerce, chase, inventory_pos, plaid, quickbooks, shopify, stripe, xero };
