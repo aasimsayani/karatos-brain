@@ -64,6 +64,7 @@ These are built, tested against recorded vendor responses, and run read-only. Th
 | Xero | Imports six years of invoices, bills, credit notes, payments, bank transactions and manual journals, with the chart of accounts and contacts | Finance, Compliance |
 | Plaid | Imports up to two years of bank and card transactions from a bank linked through Plaid | Finance, Compliance |
 | Authorize.net | Imports five years of settlement batches and the card and eCheck transactions in them, then keeps them current | Sales, Finance |
+| Affirm | Imports five years of Affirm financed orders, refunds, disputes and daily settlements, then keeps them current | Sales, Finance |
 <!-- connected:end -->
 
 ### Landing next
