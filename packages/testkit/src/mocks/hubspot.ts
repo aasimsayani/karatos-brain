@@ -1,5 +1,5 @@
 import { fixtureBuilder, synthetic, type FixtureBuilder } from "../fixtures.js";
-import { checkDocMock, docMockFetch, type DocMock, type DocMockFetch, type DocMockResponse } from "../doc-mock.js";
+import { checkDocMock, docMockFetch, type DocMock, type DocMockFetch, type DocMockResponse, type DocMockModule } from "../doc-mock.js";
 
 /**
  * HubSpot's CRM API (date version 2026-09) as the connector reads it: the
@@ -311,3 +311,16 @@ export function hubSpotDocMock(data: HubSpotMockData): HubSpotMock {
 
   return { api, fetch: docMockFetch(api), searches };
 }
+
+export default {
+  integration: "hubspot",
+  covers: "HubSpot's CRM search, archived list, batch association and token info endpoints (date version 2026-09)",
+  watchPages: [
+    "https://developers.hubspot.com/docs/api-reference/latest/overview",
+    "https://developers.hubspot.com/docs/apps/legacy-apps/private-apps/overview",
+    "https://developers.hubspot.com/docs/api-reference/latest/crm/using-object-apis",
+    "https://developers.hubspot.com/docs/api-reference/latest/crm/search-the-crm",
+    "https://developers.hubspot.com/docs/api-reference/crm-associations-v4/batch/post-crm-v4-associations-fromObjectType-toObjectType-batch-read",
+  ],
+  docMocks: () => [hubSpotDocMock({ records: {}, accessToken: "" }).api],
+} satisfies DocMockModule;
