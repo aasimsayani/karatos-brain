@@ -24,7 +24,7 @@ describe("the TheWatchSearch factory", () => {
     });
   });
 
-  it("refuses a date order it doesn't know before reading anything", async () => {
+  it("rejects a date order it doesn't know before reading anything", async () => {
     const dir = await emptyFolder("watchsearch");
     await expect(buildsFromSettings("watchsearch", { WATCHSEARCH_IMPORT_DIR: dir, WATCHSEARCH_DEALER_KEY: KEY, WATCHSEARCH_DATE_ORDER: "ymd" })).rejects.toThrow(
       "WATCHSEARCH_DATE_ORDER must be auto, dmy or mdy",

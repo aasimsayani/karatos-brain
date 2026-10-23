@@ -115,7 +115,7 @@ describe("WhatsApp chat exports", () => {
     expect(n!.at).toBe("2026-10-22T00:05:09.000Z");
   });
 
-  it("works out the date order, takes the setting when it can't, and refuses one that contradicts the file", () => {
+  it("works out the date order, takes the setting when it can't, and rejects one that contradicts the file", () => {
     expect(chatDateOrder([{ a: 13, b: 1 }], "auto", "f")).toBe("dmy");
     expect(chatDateOrder([{ a: 1, b: 13 }], "auto", "f")).toBe("mdy");
     expect(chatDateOrder([{ a: 1, b: 2 }], "mdy", "f")).toBe("mdy");
@@ -127,7 +127,7 @@ describe("WhatsApp chat exports", () => {
     expect(parseChat("01/02/2026, 10:00 - Test Dealer 1: hi", { fileName: "a.txt", dateOrder: "dmy" })[0]!.at).toBe("2026-02-01T10:00:00.000Z");
   });
 
-  it("refuses a timestamp that isn't a real date or time, naming the line", () => {
+  it("rejects a timestamp that isn't a real date or time, naming the line", () => {
     expect(() => parseChat("13/01/2026, 10:00 - A: hi\n31/02/2026, 10:00 - A: hi", { fileName: "a.txt" })).toThrow("a.txt:2: the timestamp isn't a real date and time");
     expect(() => parseChat("13/01/2026, 25:00 - A: hi", { fileName: "a.txt" })).toThrow(ChatExportError);
     expect(() => parseChat("13/01/2026, 13:00 PM - A: hi", { fileName: "a.txt" })).toThrow(ChatExportError);
@@ -382,7 +382,7 @@ describe("TheWatchSearch connector", () => {
     expect(dealer("Test Dealer 1")).toMatch(/^watchsearch:dealer:[0-9a-f]{24}$/);
   });
 
-  it("names the group from the export's file name, and refuses an export named only _chat", async () => {
+  it("names the group from the export's file name, and rejects an export named only _chat", async () => {
     expect(groupOf("WhatsApp Chat with Test Group Alpha.txt")).toBe("Test Group Alpha");
     expect(groupOf("WhatsApp Chat - Test Group Beta.txt")).toBe("Test Group Beta");
     expect(groupOf("Test Group Gamma.TXT")).toBe("Test Group Gamma");
@@ -440,7 +440,7 @@ describe("TheWatchSearch connector", () => {
     expect(c.handleWebhook).toBeUndefined();
   });
 
-  it("refuses a checkpoint it didn't write", () => {
+  it("rejects a checkpoint it didn't write", () => {
     expect(parseWatchSearchCursor(null)).toBeNull();
     expect(() => parseWatchSearchCursor(JSON.stringify({ done: null, current: null }))).toThrow("WatchSearch import checkpoint is not in the expected shape");
   });
