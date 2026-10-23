@@ -113,7 +113,7 @@ export function parseBankProfile(input: unknown): BankProfile {
   return result.data;
 }
 
-/** Reads the column names listed under "Bank and card statements" in docs/integrations.md. */
+/** Reads the column names listed in docs/integrations/bank_statements.md. */
 export const GENERIC_BANK_PROFILE: BankProfile = parseBankProfile({
   id: "generic",
   name: "Generic CSV",

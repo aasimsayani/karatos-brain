@@ -59,6 +59,26 @@ export interface DocMock {
   assumptions: string[];
 }
 
+/**
+ * What a mock module in `src/mocks/<id>.ts` registers as its default export.
+ * `npm run registry:write` collects them into `allDocMocks()` and the mock
+ * list in docs/integrations.md, so adding a mock touches only its own file.
+ */
+export interface DocMockModule {
+  /** Catalog id of the integration the mocks stand in for. */
+  integration: string;
+  /** What the mocks cover, as one line of the docs' mock list, e.g. "Stuller's invoice endpoints (API v2)". */
+  covers: string;
+  /**
+   * Every doc page the mocks were built from, in the order the docs watch
+   * lists them. A test checks this matches the mocks, so a page added to a
+   * route is never left out of the watch by mistake.
+   */
+  watchPages: string[];
+  /** The module's mocks with empty data, for checks and the vendor docs watch. */
+  docMocks: () => DocMock[];
+}
+
 export class UndocumentedRequestError extends Error {
   constructor(
     readonly method: string,

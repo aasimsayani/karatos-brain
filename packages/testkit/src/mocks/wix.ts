@@ -1,5 +1,5 @@
 import { fixtureBuilder, synthetic } from "../fixtures.js";
-import { checkDocMock, docMockFetch, type DocMock, type DocMockFetch, type DocMockRequest, type DocMockResponse } from "../doc-mock.js";
+import { checkDocMock, docMockFetch, type DocMock, type DocMockFetch, type DocMockRequest, type DocMockResponse, type DocMockModule } from "../doc-mock.js";
 
 /**
  * The Wix REST API endpoints the Wix connector reads, and the app token
@@ -514,3 +514,20 @@ export function wixDocMock(data: WixMockData): WixMock {
   const base = docMockFetch(api);
   return { api, fetch: base, tokens };
 }
+
+export default {
+  integration: "wix",
+  covers: "A Wix site's read endpoints (eCommerce orders, Catalog V3 and V1, Contacts V5) with the app token, its permissions and cursor paging",
+  watchPages: [
+    "https://dev.wix.com/docs/api-reference/business-solutions/e-commerce/orders/orders/search-orders",
+    "https://dev.wix.com/docs/build-apps/develop-your-app/access/authentication/authenticate-using-oauth",
+    "https://dev.wix.com/docs/api-reference/app-management/app-instance/get-app-instance",
+    "https://dev.wix.com/docs/api-reference/business-solutions/stores/catalog-versioning/get-catalog-version",
+    "https://dev.wix.com/docs/api-reference/business-solutions/stores/catalog-v3/products-v3/query-products",
+    "https://dev.wix.com/docs/api-reference/business-solutions/stores/catalog-v3/read-only-variants-v3/query-variants",
+    "https://dev.wix.com/docs/api-reference/business-solutions/stores/catalog-v3/inventory-items-v3/query-inventory-items",
+    "https://dev.wix.com/docs/api-reference/business-solutions/stores/catalog-v1/catalog/query-products",
+    "https://dev.wix.com/docs/api-reference/crm/members-contacts/contacts/contacts-v5/query-contacts",
+  ],
+  docMocks: () => [wixDocMock({}).api],
+} satisfies DocMockModule;

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { Connector, SourceBatch } from "@karatos/core";
 import { INTEGRATIONS } from "@karatos/core";
 import {
+  DOC_MOCK_MODULES,
   DocMockDefinitionError,
   UndocumentedRequestError,
   allDocMocks,
@@ -150,32 +151,14 @@ describe("docMockWatchTargets", () => {
     ]);
   });
 
-  it("covers every page the built-in mocks came from", () => {
-    expect(docMockWatchTargets(allDocMocks()).map((t) => t.url)).toEqual([
-      "https://api.stuller.com/help",
-      "https://api.stuller.com/Help/Api/GET-namespace-v2.Invoice-Rest",
-      "https://api.stuller.com/Help/Api/GET-namespace-v2.Products-MetalMarketRates",
-      "https://developer.intuit.com/app/developer/qbo/docs/develop/authentication-and-authorization/oauth-2.0",
-      "https://developer.intuit.com/app/developer/qbo/docs/api/accounting/all-entities/account",
-      "https://developer.intuit.com/app/developer/qbo/docs/learn/explore-the-quickbooks-online-api/data-queries",
-      "https://developer.intuit.com/app/developer/qbo/docs/api/accounting/all-entities/changedatacapture",
-      "https://dev.wix.com/docs/api-reference/business-solutions/e-commerce/orders/orders/search-orders",
-      "https://dev.wix.com/docs/build-apps/develop-your-app/access/authentication/authenticate-using-oauth",
-      "https://dev.wix.com/docs/api-reference/app-management/app-instance/get-app-instance",
-      "https://dev.wix.com/docs/api-reference/business-solutions/stores/catalog-versioning/get-catalog-version",
-      "https://dev.wix.com/docs/api-reference/business-solutions/stores/catalog-v3/products-v3/query-products",
-      "https://dev.wix.com/docs/api-reference/business-solutions/stores/catalog-v3/read-only-variants-v3/query-variants",
-      "https://dev.wix.com/docs/api-reference/business-solutions/stores/catalog-v3/inventory-items-v3/query-inventory-items",
-      "https://dev.wix.com/docs/api-reference/business-solutions/stores/catalog-v1/catalog/query-products",
-      "https://dev.wix.com/docs/api-reference/crm/members-contacts/contacts/contacts-v5/query-contacts",
-      "https://developer.xero.com/documentation/guides/oauth2/auth-flow",
-      "https://developer.xero.com/documentation/api/accounting/overview",
-      "https://developer.xero.com/documentation/api/accounting/requests-and-responses",
-      "https://plaid.com/docs/api/products/transactions/",
-      "https://plaid.com/docs/api/accounts/",
-      "https://plaid.com/docs/api/items/",
-      "https://plaid.com/docs/api/webhooks/webhook-verification/",
-    ]);
+  it("covers every page each built-in mock module says it came from, and nothing else", () => {
+    // Each module in src/mocks/<id>.ts lists its own pages, so adding a mock never edits this test.
+    expect(DOC_MOCK_MODULES.length).toBeGreaterThan(0);
+    for (const module of DOC_MOCK_MODULES) {
+      expect(docMockWatchTargets(module.docMocks()).map((t) => t.url), module.integration).toEqual(module.watchPages);
+      for (const mock of module.docMocks()) expect(mock.integration, module.integration).toBe(module.integration);
+    }
+    expect(docMockWatchTargets(allDocMocks()).map((t) => t.url)).toEqual(DOC_MOCK_MODULES.flatMap((m) => m.watchPages));
   });
 });
 
@@ -254,14 +237,15 @@ describe("Stuller doc mock", () => {
 describe("docMockVendorDocsTargets", () => {
   it("gives each mock page its own watch key, named after the catalog entry", () => {
     const targets = docMockVendorDocsTargets(allDocMocks());
-    expect(targets).toHaveLength(23);
-    expect(targets[0]).toEqual({
+    const pages = DOC_MOCK_MODULES.flatMap((m) => m.watchPages);
+    expect(targets).toHaveLength(pages.length);
+    expect(targets.find((t) => t.url === "https://api.stuller.com/help")).toEqual({
       integration: "stuller:api-stuller-com-help",
       name: "Stuller",
       url: "https://api.stuller.com/help",
       mock: { integration: "stuller", retrievedOn: "2026-10-15" },
     });
-    expect(new Set(targets.map((t) => t.integration)).size).toBe(23);
+    expect(new Set(targets.map((t) => t.integration)).size).toBe(pages.length);
   });
 
   it("falls back to the integration id for a mock outside the catalog", () => {
