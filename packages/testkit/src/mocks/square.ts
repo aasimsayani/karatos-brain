@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { fixtureBuilder, synthetic } from "../fixtures.js";
-import { checkDocMock, docMockFetch, type DocMock, type DocMockFetch, type DocMockRequest, type DocMockResponse } from "../doc-mock.js";
+import { checkDocMock, docMockFetch, type DocMock, type DocMockFetch, type DocMockRequest, type DocMockResponse, type DocMockModule } from "../doc-mock.js";
 
 /**
  * The Square API's read endpoints and OAuth token endpoints, built from
@@ -498,3 +498,22 @@ export function squareDocMock(data: SquareMockData): SquareMock {
     revokeAccessTokens: () => issued.clear(),
   };
 }
+
+export default {
+  integration: "square",
+  covers: "Square's read endpoints with its OAuth refresh and token status check (API version 2026-09-16)",
+  watchPages: [
+    "https://developer.squareup.com/docs/build-basics/versioning-overview",
+    "https://developer.squareup.com/reference/square/oauth-api/obtain-token",
+    "https://developer.squareup.com/reference/square/oauth-api/retrieve-token-status",
+    "https://developer.squareup.com/reference/square/locations-api/list-locations",
+    "https://developer.squareup.com/reference/square/catalog-api/search-catalog-objects",
+    "https://developer.squareup.com/reference/square/catalog-api/batch-retrieve-catalog-objects",
+    "https://developer.squareup.com/reference/square/inventory-api/batch-retrieve-inventory-counts",
+    "https://developer.squareup.com/reference/square/customers-api/search-customers",
+    "https://developer.squareup.com/reference/square/orders-api/search-orders",
+    "https://developer.squareup.com/reference/square/payments-api/list-payments",
+    "https://developer.squareup.com/reference/square/payments-api/list-payment-refunds",
+  ],
+  docMocks: () => [squareDocMock({ locations: [] }).api],
+} satisfies DocMockModule;

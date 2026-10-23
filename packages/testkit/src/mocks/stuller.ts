@@ -1,5 +1,5 @@
 import { fixtureBuilder, synthetic } from "../fixtures.js";
-import { checkDocMock, type DocMock } from "../doc-mock.js";
+import { checkDocMock, type DocMock, type DocMockModule } from "../doc-mock.js";
 
 /**
  * Stuller's Invoice and metal market rate endpoints, built from the API help
@@ -154,3 +154,14 @@ export function stullerDocMock(data: StullerMockData): DocMock {
     ],
   });
 }
+
+export default {
+  integration: "stuller",
+  covers: "Stuller's invoice and metal market rate endpoints (API v2)",
+  watchPages: [
+    "https://api.stuller.com/help",
+    "https://api.stuller.com/Help/Api/GET-namespace-v2.Invoice-Rest",
+    "https://api.stuller.com/Help/Api/GET-namespace-v2.Products-MetalMarketRates",
+  ],
+  docMocks: () => [stullerDocMock({ invoices: [], metalRates: [] })],
+} satisfies DocMockModule;
