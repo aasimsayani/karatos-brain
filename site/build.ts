@@ -41,7 +41,11 @@ const PLANNED_DEPARTMENTS = [
   { id: "wholesale", name: "Wholesale and memo", purpose: "Memo exposure, sell-through by door and the same stone listed twice." },
 ];
 
-const DOMAIN_LABELS: Record<IntegrationSpec["domain"], string> = {
+/**
+ * Plain-language label for each catalog domain. Keyed by string so a domain
+ * the catalog adds later still builds; a test fails until it gets a label.
+ */
+export const DOMAIN_LABELS: Readonly<Record<string, string>> = {
   pos: "Point of sale",
   ecommerce: "E-commerce",
   financial: "Money",
@@ -57,7 +61,96 @@ const DOMAIN_LABELS: Record<IntegrationSpec["domain"], string> = {
   edi: "EDI",
   insurance: "Insurance",
   shipping: "Shipping",
+  operations: "Store operations",
 };
+
+export function domainLabel(domain: string): string {
+  return DOMAIN_LABELS[domain] ?? domain[0]!.toUpperCase() + domain.slice(1);
+}
+
+/**
+ * What each kind of connection is worth to the owner: the question it
+ * answers and why that matters. Keyed by catalog domain; a test fails when a
+ * domain with data sources has no entry.
+ */
+export const DOMAIN_VALUE: Readonly<Record<string, { question: string; why: string }>> = {
+  ecommerce: { question: "What sold, where, and what has sat too long?", why: "Aged inventory is cash locked in the case. Seeing it piece by piece is what makes a remake or markdown decision possible." },
+  pos: { question: "What happened at the counter today?", why: "The counter is where most of a jeweler's revenue and cash comes in, so it is the first thing every department reads." },
+  financial: { question: "Did the money that was rung up arrive, and what did each sale really net?", why: "Fees, refunds, disputes and unmatched deposits are where margin leaks. The books stop being a month-end guess." },
+  pricing: { question: "What is this inventory worth today, at melt and at retail?", why: "Gold moves weekly. Repricing at the right moment protects margin, and buying from the public too close to melt erodes it." },
+  crm: { question: "Who is this customer, and what did we promise them?", why: "Anniversaries, wish lists and custom-order promises turn into reminders instead of notes nobody reads." },
+  communication: { question: "Who asked for what, and did anyone answer?", why: "A missed call or an unanswered email about a custom piece is lost revenue. Response time is a sales number." },
+  documents: { question: "Where is the appraisal, the quote or the vendor terms?", why: "The paperwork behind a decision is linked to the record, not lost in a shared drive." },
+  marketing: { question: "Which campaigns brought buyers, not just clicks?", why: "Marketing is judged by the sales it brought in, so you repeat what worked and stop what didn't." },
+  diamonds: { question: "What can I source for the customer in front of me, and at what cost?", why: "Custom quotes go out the same day, priced from what is really available." },
+  suppliers: { question: "What did I order, what is on memo, and what does it cost to replace?", why: "Memo goods come back on time, and nothing is priced below its replacement cost." },
+  grading: { question: "Is this stone what the paperwork says it is?", why: "Grading reports and appraisals are checked against the piece before it is sold or insured." },
+  erp: { question: "What did this piece cost to make, in metal and in bench time?", why: "Casting loss and labor per job show which work actually makes money." },
+  edi: { question: "Which orders and invoices came in from trading partners?", why: "Purchase orders and invoices land without retyping, and match what was shipped." },
+  insurance: { question: "What is insured, and for how much?", why: "Inventory and appraisal values stay in step with the policy, so nothing is under-covered." },
+  shipping: { question: "Where is the package, and was it insured for its value?", why: "High-value shipments are tracked and covered, and a delay reaches the customer before they ask." },
+};
+
+/** Dates for the holiday pilot the site announces. */
+export const HOLIDAY_PILOT = { weekend: "November 21–22, 2026", signupsOpen: "November 16" } as const;
+
+/**
+ * Illustrative plays: what happens when several connected systems are read
+ * together. Each names the catalog systems it combines, by id, and the one
+ * action that comes out of it. A test checks every id is in the catalog, and
+ * rendering stops on an unknown one.
+ */
+export interface Play {
+  title: string;
+  systems: string[];
+  action: string;
+}
+
+export const PLAYS: readonly Play[] = [
+  {
+    title: "An anniversary nobody has to remember",
+    systems: ["inventory_pos", "clientbook", "klaviyo", "calendly"],
+    action: "Three years after a band sold, the client's salesperson gets a nudge, the matching earrings are flagged in stock, and an invitation to book a fitting is drafted for the right day.",
+  },
+  {
+    title: "A late repair that doesn't become a bad review",
+    systems: ["monday", "twilio", "google_business_profile"],
+    action: "A ring past its promised date gets a text drafted to the customer before they ask, and the review request waits until it's picked up happy.",
+  },
+  {
+    title: "Pieces priced below what they cost to replace",
+    systems: ["metals_api", "stuller", "shopify"],
+    action: "When gold moves, every item whose shelf or website price is now under its replacement cost is listed for a reprice.",
+  },
+  {
+    title: "Which memo stones to send back",
+    systems: ["rapnet", "nivoda", "polygon", "quickbooks"],
+    action: "When diamond prices move, buying sees which stones on memo to return before the memo is due.",
+  },
+  {
+    title: "A reportable cash sale, caught",
+    systems: ["inventory_pos", "bank_statements", "fincen_8300"],
+    action: "Cash sales are matched to bank deposits, and any buyer who paid over $10,000 in cash gets a Form 8300 ready to file on time.",
+  },
+  {
+    title: "A watch sold in store, still listed online",
+    systems: ["inventory_pos", "ebay", "shopify"],
+    action: "A pre-owned watch that sold at the counter is still up on the marketplace and the website. Both listings are flagged to come down today.",
+  },
+];
+
+/** The write-back rules the site promises, in the order it lists them. */
+export const WRITE_RULES: readonly { title: string; body: string }[] = [
+  { title: "Every connection starts read-only", body: "KaratOS reads first. Nothing goes back into your systems on day one." },
+  { title: "Off until you turn it on", body: "Writing back is off until your business turns it on, per system and per action." },
+  { title: "Drafts and additions, never deletions", body: "KaratOS prefers a draft or a new note over changing a record, and it never deletes." },
+  { title: "A person approves each write", body: "Nothing is written without someone on your team saying yes to it." },
+  { title: "Checked again, right before", body: "It re-checks the record right before writing, so it works from the record as it is now, not as it was this morning." },
+  { title: "Capped per day", body: "Each system has a daily limit on writes, so a mistake stays small." },
+  { title: "Read back to confirm", body: "After every write it reads the record back to confirm it landed as approved." },
+  { title: "Can be undone", body: "Every write can be undone." },
+  { title: "One mismatch stops everything", body: "If a read-back doesn't match, all writes to that system stop until a person checks." },
+];
 
 const ACCESS_LABELS: Record<IntegrationSpec["access"], string> = {
   public_api: "Public API",
@@ -91,7 +184,39 @@ function statusOf(integration: IntegrationSpec, selfServe: Set<string>): { label
   return { label: "Planned", tone: "plain" };
 }
 
-export function renderSite(): string {
+/**
+ * One card per kind of connection (catalog domain), those with built systems
+ * first: the question it answers, why it matters, and what is connected today,
+ * being built now, or on the roadmap.
+ */
+export function renderValueCards(dataSources: readonly IntegrationSpec[], selfServe: ReadonlySet<string>): string {
+  const domains = [...new Set(dataSources.map((i) => i.domain))];
+  const builtIn = (domain: string) => dataSources.filter((i) => i.domain === domain && i.status === "built");
+  return domains
+    .map((domain, index) => ({ domain, index, built: builtIn(domain).length }))
+    .sort((a, b) => b.built - a.built || a.index - b.index)
+    .map(({ domain }) => {
+      const value = DOMAIN_VALUE[domain];
+      if (!value) throw new Error(`domain ${domain} has data sources but no entry in DOMAIN_VALUE`);
+      const systems = dataSources.filter((i) => i.domain === domain);
+      const built = systems.filter((i) => i.status === "built");
+      const next = systems.filter((i) => i.status !== "built" && selfServe.has(i.id));
+      const status = built.length
+        ? `<p class="value-status live"><strong>Connected today:</strong> ${escapeHtml(built.map((i) => i.name).join(", "))}</p>`
+        : next.length
+          ? `<p class="value-status"><strong>Building now:</strong> ${escapeHtml(next.map((i) => i.name).join(", "))}</p>`
+          : `<p class="value-status"><strong>On the roadmap:</strong> ${systems.length} ${systems.length === 1 ? "system" : "systems"}</p>`;
+      return `<li class="value">
+  <span class="domain">${escapeHtml(domainLabel(domain))}</span>
+  <h3>${escapeHtml(value.question)}</h3>
+  <p>${escapeHtml(value.why)}</p>
+  ${status}
+</li>`;
+    })
+    .join("\n");
+}
+
+export function renderSite(plays: readonly Play[] = PLAYS): string {
   const selfServe = new Set(buildingNow().map((i) => i.id));
   const departments = [
     ...RETAIL_DEPARTMENTS.map((d) => ({ id: d.id, name: d.name, purpose: d.purpose, planned: false })),
@@ -106,9 +231,9 @@ export function renderSite(): string {
     .map((i) => {
       const status = statusOf(i, selfServe);
       const depts = i.departments.map((d) => deptName.get(d) ?? d);
-      const search = [i.name, DOMAIN_LABELS[i.domain], ...depts, ...i.segments].join(" ").toLowerCase();
+      const search = [i.name, domainLabel(i.domain), ...depts, ...i.segments].join(" ").toLowerCase();
       return `<li class="card" data-segments="${i.segments.join(" ")}" data-departments="${i.departments.join(" ")}" data-search="${escapeHtml(search)}">
-  <div class="card-top"><span class="domain">${escapeHtml(DOMAIN_LABELS[i.domain])}</span><span class="pill ${status.tone}">${status.label}</span></div>
+  <div class="card-top"><span class="domain">${escapeHtml(domainLabel(i.domain))}</span><span class="pill ${status.tone}">${status.label}</span></div>
   <h3>${escapeHtml(i.name)}</h3>
   <p class="meta">${escapeHtml(ACCESS_LABELS[i.access])} · ${i.segments.map((s) => s[0]!.toUpperCase() + s.slice(1)).join(", ")}</p>
   <p class="depts">${escapeHtml(depts.join(", "))}</p>${
@@ -119,6 +244,24 @@ export function renderSite(): string {
 </li>`;
     })
     .join("\n");
+
+  const byId = new Map(INTEGRATIONS.map((i) => [i.id, i]));
+  const playCards = plays.map((play) => {
+    const systems = play.systems.map((id) => {
+      const integration = byId.get(id);
+      if (!integration) throw new Error(`play "${play.title}" names ${id}, which is not in the integrations catalog`);
+      return `<li>${escapeHtml(integration.name)}</li>`;
+    });
+    return `<li class="play">
+  <span class="tag">Illustrative</span>
+  <h3>${escapeHtml(play.title)}</h3>
+  <ul class="play-systems" aria-label="Systems combined">${systems.join("")}</ul>
+  <p class="play-action"><strong>Result:</strong> ${escapeHtml(play.action)}</p>
+</li>`;
+  }).join("\n");
+  const writeRules = WRITE_RULES.map((r) => `<li><h3>${escapeHtml(r.title)}</h3><p>${escapeHtml(r.body)}</p></li>`).join("\n");
+
+  const valueCards = renderValueCards(dataSources, selfServe);
 
   const deptOptions = departments.map((d) => `<option value="${d.id}">${escapeHtml(d.name)}</option>`).join("");
   const deptCards = departments
@@ -133,7 +276,7 @@ export function renderSite(): string {
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>KaratOS</title>
-<meta name="description" content="KaratOS connects the systems a jewelry business already runs and turns them into a short list of things to act on, each with the evidence behind it.">
+<meta name="description" content="KaratOS connects the many systems a jewelry or watch business already runs, reads them together and turns them into a short list of things to act on, each with the evidence behind it. It writes back only with a person's approval.">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath d='M16 3 28 12 16 29 4 12Z' fill='%23c9a45c'/%3E%3C/svg%3E">
 ${fontPreloads}
 <style>
@@ -151,9 +294,9 @@ header.nav{position:sticky;top:0;z-index:10;background:color-mix(in srgb,var(--b
 .brand{display:flex;align-items:center;gap:8px;font-weight:600;font-size:20px;letter-spacing:-.01em;text-decoration:none}
 .brand svg{width:22px;height:22px}
 .nav nav{display:flex;gap:24px;font-size:14px;color:var(--ink-2)}
-.nav nav a{text-decoration:none}
+.nav nav a{text-decoration:none;white-space:nowrap}
 .nav nav a:hover{color:var(--ink)}
-@media (max-width:760px){.nav nav{display:none}}
+@media (max-width:1120px){.nav nav{display:none}}
 .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:12px 20px;border-radius:999px;font-weight:600;font-size:15px;text-decoration:none;border:1px solid var(--ink);transition:transform .15s ease}
 .btn:hover{transform:translateY(-1px)}
 .btn.primary{background:var(--ink);color:var(--bg)}
@@ -181,6 +324,23 @@ section{content-visibility:auto;contain-intrinsic-size:auto 900px}
 .example .tag{font-family:var(--mono);font-size:12px;font-weight:500;text-transform:uppercase;letter-spacing:.06em;color:var(--gold-text)}
 .example p{margin:8px 0 0}
 .example .why{color:var(--muted);font-size:14px}
+.plays{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:var(--space-3);list-style:none;padding:0;margin:0}
+.play{background:var(--surface);border:1px solid var(--line);border-top:4px solid var(--gold);border-radius:var(--radius);padding:var(--space-3);display:flex;flex-direction:column}
+.play .tag{font-family:var(--mono);font-size:12px;font-weight:500;text-transform:uppercase;letter-spacing:.06em;color:var(--gold-text)}
+.play h3{margin:var(--space-1) 0 var(--space-2);font-size:18px;line-height:1.3}
+.play-systems{display:flex;flex-wrap:wrap;gap:var(--space-1);list-style:none;padding:0;margin:0 0 var(--space-2)}
+.play-systems li{font-size:13px;line-height:1.4;padding:4px 12px;border-radius:999px;border:1px solid var(--line);background:var(--bg);color:var(--ink-2)}
+.play-systems li+li::before{content:"+ ";color:var(--gold-text)}
+.play-action{margin:auto 0 0;padding-top:var(--space-2);border-top:1px solid var(--line);color:var(--ink-2);font-size:15px}
+.play-action strong{color:var(--ink)}
+.rules{display:grid;grid-template-columns:repeat(3,1fr);gap:var(--space-3);list-style:none;padding:0;margin:0}
+.rules li{padding-top:var(--space-2);border-top:2px solid var(--gold)}
+.rules h3{margin:0 0 8px;font-size:18px}
+.rules p{margin:0;color:var(--ink-2)}
+@media (max-width:860px){.rules{grid-template-columns:1fr}}
+.source{margin-top:var(--space-5);background:var(--gold-soft);border-radius:var(--radius);padding:var(--space-4);max-width:820px}
+.source h3{margin:0 0 var(--space-1);font-size:20px}
+.source p{margin:0;color:var(--ink-2)}
 .depts-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:var(--space-3);list-style:none;padding:0;margin:0}
 .dept{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:var(--space-3)}
 .dept.planned{background:transparent;border-style:dashed}
@@ -246,6 +406,19 @@ section{content-visibility:auto;contain-intrinsic-size:auto 900px}
 .interests legend{font-size:14px;font-weight:500;margin-bottom:var(--space-1)}
 .interests label{display:flex!important;align-items:center;gap:8px;font-weight:400}
 .interests input{width:auto!important}
+.values{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:var(--space-3);list-style:none;padding:0;margin:0}
+.value{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:var(--space-3);display:flex;flex-direction:column}
+.value .domain{font-family:var(--mono);font-size:12px;font-weight:500;text-transform:uppercase;letter-spacing:.06em;color:var(--gold-text)}
+.value h3{margin:var(--space-1) 0 var(--space-2);font-size:18px;line-height:1.3}
+.value p{margin:0;color:var(--ink-2);font-size:15px}
+.value .value-status{margin:auto 0 0;padding-top:var(--space-2);margin-top:var(--space-2);border-top:1px solid var(--line);font-size:14px}
+.value .value-status.live strong{color:var(--gold-text)}
+.pilot{display:grid;grid-template-columns:1.2fr 1fr;gap:var(--space-4);align-items:start}
+.pilot ul{margin:0;padding-left:20px;color:var(--ink-2)}
+.pilot li+li{margin-top:var(--space-1)}
+.pilot .when{background:var(--surface);border:1px solid var(--line);border-top:4px solid var(--gold);border-radius:var(--radius);padding:var(--space-3)}
+.pilot .when strong{display:block;font-size:24px;line-height:1.2;margin:var(--space-1) 0}
+@media (max-width:860px){.pilot{grid-template-columns:1fr}}
 #inquiry .invalid{border-color:#c0392b}
 .hp{position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden}
 .submit-row{display:flex;align-items:center;gap:16px;flex-wrap:wrap}
@@ -265,31 +438,62 @@ footer .wrap{display:flex;flex-wrap:wrap;justify-content:space-between;gap:var(-
 <body>
 <header class="nav"><div class="wrap">
   <a class="brand" href="#top"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M16 3 28 12 16 29 4 12Z" fill="#c9a45c"/><path d="M4 12h24M16 3l-5 9 5 17 5-17-5-9" fill="none" stroke="#16140f" stroke-opacity=".35" stroke-width="1.2"/></svg>KaratOS</a>
-  <nav><a href="#how">How it works</a><a href="#departments">Departments</a><a href="#integrations">Integrations</a><a href="#services">Pricing</a><a href="#broken">Tell us what's broken</a></nav>
+  <nav><a href="#how">How it works</a><a href="#together">Systems together</a><a href="#write-back">Write-back</a><a href="#integrations">Integrations</a><a href="#pilot">Holiday pilot</a><a href="#services">Pricing</a><a href="#broken">What's broken</a></nav>
   <a class="btn primary small" href="#services">Custom services</a>
 </div></header>
 
 <main id="top">
 <div class="wrap hero">
-  <span class="eyebrow">For jewelers, wholesalers and manufacturers</span>
+  <span class="eyebrow">For jewelers, watch dealers, wholesalers and manufacturers</span>
   <h1>The operating brain for jewelry businesses.</h1>
-  <p class="lede">KaratOS connects the systems your business already runs, from the POS and the books to diamond feeds and the repair bench, and turns them into a short list of things to act on today. Every suggestion shows the evidence behind it.</p>
-  <div class="actions"><a class="btn primary" href="#services">Custom services</a><a class="btn ghost" href="#integrations">See the integrations</a></div>
+  <p class="lede">KaratOS connects the many systems your business already runs, from the POS and the books to diamond feeds and the repair bench, reads them together and turns them into a short list of things to act on today. Every suggestion shows the evidence behind it, and when you allow it, KaratOS writes back carefully, one approved change at a time.</p>
+  <div class="actions"><a class="btn primary" href="#pilot">Join the holiday pilot</a><a class="btn ghost" href="#services">Custom services</a><a class="btn ghost" href="#together">See the systems work together</a></div>
   <p class="note">${escapeHtml(earlyAccessNote())}</p>
 </div>
 
 <section id="how"><div class="wrap">
   <h2>From scattered systems to a clear next step.</h2>
-  <p class="section-intro">Most jewelry businesses run a dozen systems that don't talk to each other. KaratOS reads them all, connects what happens in one department to the next, and tells you what matters.</p>
+  <p class="section-intro">Most jewelry businesses run a dozen systems that don't talk to each other. KaratOS connects to as many of them as you run, from ${dataSources.length} systems on our map, reads them together, and tells you what matters.</p>
   <ol class="steps">
-    <li><h3>Connect, read-only</h3><p>Link your POS, store, books, bank statements (CSV or PDF), suppliers and feeds. Every connection starts read-only and lives in accounts you own.</p></li>
+    <li><h3>Connect everything, read-only</h3><p>Link your POS, store, books, bank statements (CSV or PDF), suppliers, messaging and price feeds, as many as you run. Every connection starts read-only.</p></li>
     <li><h3>Understand across departments</h3><p>A sale, a late repair, a stone on memo and a jump in gold all become signals, and each department sees what the others are doing.</p></li>
-    <li><h3>Act with the evidence</h3><p>Each morning, a short list: what to do, why, and the records behind it. Accept, snooze or dismiss, and it learns what helps.</p></li>
+    <li><h3>Act, and write back carefully</h3><p>Each morning, a short list: what to do, why, and the records behind it. Accept, snooze or dismiss. Where you've turned write-back on, a person approves each draft before it goes into your system.</p></li>
   </ol>
   <div class="example">
     <span class="tag">Example</span>
     <p><strong>Call the Hendersons today.</strong> Their anniversary is in 9 days, they bought a band here three years ago, and the matching earrings came back in stock this week.</p>
     <p class="why">Why: based on 4 events from clienteling, sales and inventory. Illustrative.</p>
+  </div>
+</div></section>
+
+<section id="together"><div class="wrap">
+  <span class="eyebrow">Systems that work together</span>
+  <h2>One system knows a little. Together they know what to do.</h2>
+  <p class="section-intro">The win isn't any single connection. It's a sale in the POS meeting a date in the client book, or a gold price meeting a supplier's catalog and your website. A few of the plays that only exist once your systems are read together:</p>
+  <ul class="plays">
+${playCards}
+  </ul>
+</div></section>
+
+<section id="value"><div class="wrap">
+  <span class="eyebrow">What each connection is worth</span>
+  <h2>Every system you connect answers a question the others can't.</h2>
+  <p class="section-intro">KaratOS is useful with one connection and sharper with each one. Here is the question each kind of system answers for the owner, why it matters, and what is connected today.</p>
+  <ul class="values">
+${valueCards}
+  </ul>
+</div></section>
+
+<section id="write-back"><div class="wrap">
+  <span class="eyebrow">Write-back</span>
+  <h2>Reads freely. Writes carefully.</h2>
+  <p class="section-intro">Reading more of your systems makes for better suggestions. Writing back saves your team the typing, but one wrong change in your system costs trust, so KaratOS has to be twice as sure before it writes as when it reads.</p>
+  <ul class="rules">
+${writeRules}
+  </ul>
+  <div class="source">
+    <h3>Your systems stay the source of truth.</h3>
+    <p>KaratOS writes into the POS, store, books and client book you already run, rather than becoming another database to pay for and keep in sync.</p>
   </div>
 </div></section>
 
@@ -318,6 +522,27 @@ ${deptCards}
 ${cards}
   </ul>
   <p class="empty" id="empty" hidden>Nothing matches. <a href="#broken">Tell us about it</a> and we'll add it.</p>
+</div></section>
+
+<section id="pilot"><div class="wrap">
+  <span class="eyebrow">Holiday pilot</span>
+  <h2>Test it before Black Friday.</h2>
+  <div class="pilot">
+    <div>
+      <p class="section-intro">The weeks before Black Friday decide a jeweler's year, so that is when KaratOS has to prove itself. Join the open testing weekend and get your first list of recommendations before the rush.</p>
+      <ul>
+        <li><strong>Read-only from the first minute.</strong> Connect your store, POS, payments or bank. Nothing in your systems is changed.</li>
+        <li><strong>A list by the end of the day.</strong> Aged pieces to reprice, late repairs to call about, deposits that don't match, deadlines coming up.</li>
+        <li><strong>Your feedback shapes the launch.</strong> Every accept, snooze and dismiss tells us what to sharpen before stores rely on it.</li>
+      </ul>
+    </div>
+    <div class="when">
+      <span class="eyebrow">Testing weekend</span>
+      <strong>${HOLIDAY_PILOT.weekend}</strong>
+      <p>Sign-ups open ${HOLIDAY_PILOT.signupsOpen}. Places are limited so we can help every store connect.</p>
+      <div class="actions"><a class="btn primary" href="${CONTACT_ANCHOR}" data-interest="pilot">Join the pilot</a></div>
+    </div>
+  </div>
 </div></section>
 
 <section id="your-data"><div class="wrap">
@@ -382,6 +607,7 @@ ${cards}
     </div>
     <form id="inquiry" novalidate>
       <fieldset class="interests"><legend>Interested in</legend>
+        <label><input type="checkbox" name="interests" value="pilot"> Holiday pilot</label>
         <label><input type="checkbox" name="interests" value="brain_console"> Core plan</label>
         <label><input type="checkbox" name="interests" value="maintenance"> Managed plan</label>
         <label><input type="checkbox" name="interests" value="custom_services"> Custom services</label>
