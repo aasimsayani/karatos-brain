@@ -1,5 +1,5 @@
 import { fixtureBuilder, synthetic } from "../fixtures.js";
-import { checkDocMock, docMockFetch, type DocMock, type DocMockFetch, type DocMockResponse } from "../doc-mock.js";
+import { checkDocMock, docMockFetch, type DocMock, type DocMockFetch, type DocMockResponse, type DocMockModule } from "../doc-mock.js";
 
 /**
  * monday.com's GraphQL API (https://api.monday.com/v2), the read queries the
@@ -443,3 +443,13 @@ export function mondayDocMock(data: MondayMockData): MondayMock {
     versions,
   };
 }
+
+export default {
+  integration: "monday",
+  covers: "monday.com's GraphQL API: boards, items, activity logs and updates",
+  watchPages: [
+    "https://developer.monday.com/api-reference/docs/api-versioning",
+    "https://developer.monday.com/api-reference/docs/authentication",
+  ],
+  docMocks: () => [mondayDocMock({ token: "", boards: [], items: [], now: () => new Date(0) }).api],
+} satisfies DocMockModule;
