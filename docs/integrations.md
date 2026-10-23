@@ -205,7 +205,7 @@ A request for a path or method the docs don't list throws `UndocumentedRequestEr
 <!-- Generated from the mock modules in packages/testkit/src/mocks/ by npm run registry:write. Edit those, not this block. -->
 
 - Authorize.net's Transaction Reporting requests on its JSON API
-- TODO
+- Typeform's Create API (a form's definition) and Responses API
 - Plaid's accounts, transactions sync, Item and webhook verification key endpoints (API version 2020-09-14), with webhooks signed the way Plaid signs them
 - QuickBooks Online's query and change data capture endpoints with Intuit's token refresh (minor version 75)
 - Stuller's invoice and metal market rate endpoints (API v2)
