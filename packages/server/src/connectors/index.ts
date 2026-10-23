@@ -3,6 +3,7 @@ import type { ConnectorFactory } from "../connector-factory.js";
 import bank_statements from "./bank_statements.js";
 import chase from "./chase.js";
 import inventory_pos from "./inventory_pos.js";
+import metals_api from "./metals_api.js";
 import plaid from "./plaid.js";
 import quickbooks from "./quickbooks.js";
 import shopify from "./shopify.js";
@@ -10,4 +11,4 @@ import stripe from "./stripe.js";
 import xero from "./xero.js";
 
 /** How each built connector is made from an instance's settings, by catalog id. */
-export const FACTORIES: Readonly<Record<string, ConnectorFactory>> = { bank_statements, chase, inventory_pos, plaid, quickbooks, shopify, stripe, xero };
+export const FACTORIES: Readonly<Record<string, ConnectorFactory>> = { bank_statements, chase, inventory_pos, metals_api, plaid, quickbooks, shopify, stripe, xero };

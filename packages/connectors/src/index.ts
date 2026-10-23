@@ -3,6 +3,7 @@ export * from "./bank_statements/index.js";
 export * from "./chase/index.js";
 export * from "./files/index.js";
 export * from "./inventory_pos/index.js";
+export * from "./metals_api/index.js";
 export * from "./plaid/index.js";
 export * from "./quickbooks/index.js";
 export * from "./shopify/index.js";
