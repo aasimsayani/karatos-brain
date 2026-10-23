@@ -9,4 +9,5 @@ export * from "./plaid/index.js";
 export * from "./quickbooks/index.js";
 export * from "./shopify/index.js";
 export * from "./stripe/index.js";
+export * from "./twilio/index.js";
 export * from "./xero/index.js";
