@@ -1,5 +1,5 @@
 import { fixtureBuilder, synthetic } from "../fixtures.js";
-import { checkDocMock, docMockFetch, type DocMock, type DocMockFetch, type DocMockResponse } from "../doc-mock.js";
+import { checkDocMock, docMockFetch, type DocMock, type DocMockFetch, type DocMockResponse, type DocMockModule } from "../doc-mock.js";
 
 /**
  * Typeform's Create API (a form's definition) and Responses API, built from
@@ -208,3 +208,14 @@ export function typeformDocMock(data: TypeformMockData): TypeformMock {
   );
   return { api, fetch };
 }
+
+export default {
+  integration: "custom_forms",
+  covers: "Typeform's Create API (a form's definition) and Responses API",
+  watchPages: [
+    "https://www.typeform.com/developers/get-started/",
+    "https://www.typeform.com/developers/create/reference/retrieve-form/",
+    "https://www.typeform.com/developers/responses/reference/retrieve-responses/",
+  ],
+  docMocks: () => [typeformDocMock({ forms: {}, accessToken: "" }).api],
+} satisfies DocMockModule;
