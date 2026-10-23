@@ -93,10 +93,13 @@ describe("scheduledConnectors", () => {
 
   it("has a factory for exactly the connectors the catalog calls built, each with its own test", () => {
     // Each factory lives in packages/server/src/connectors/<id>.ts and its tests in test/connectors/<id>.test.ts.
+    // A connector may add more test files beside it, named <id>.<topic>.test.ts; each must belong to a built connector.
     const built = INTEGRATIONS.filter((i) => i.status === "built").map((i) => i.id).sort();
     expect([...SYNCABLE_INTEGRATIONS].sort()).toEqual(built);
-    const tested = readdirSync(new URL("./connectors/", import.meta.url)).filter((f) => f.endsWith(".test.ts")).map((f) => f.slice(0, -".test.ts".length));
+    const files = readdirSync(new URL("./connectors/", import.meta.url)).filter((f) => f.endsWith(".test.ts"));
+    const tested = files.filter((f) => f.split(".").length === 3).map((f) => f.slice(0, -".test.ts".length));
     expect(tested.sort()).toEqual(built);
+    expect(files.map((f) => f.split(".")[0]!).filter((id) => !built.includes(id))).toEqual([]);
   });
 });
 
