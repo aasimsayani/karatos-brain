@@ -29,7 +29,7 @@ This section updates itself as work lands: it is generated from [docs/milestones
 <!-- progress:start -->
 <!-- Generated from docs/milestones.json and the integration catalog by npm run progress:write. Edit those, not this block. -->
 
-**Overall: 50% complete**, 19 of 38 roadmap items done. 9 of the 232 systems in the integration catalog are connected.
+**Overall: 50% complete**, 19 of 38 roadmap items done. 10 of the 232 systems in the integration catalog are connected.
 
 | Milestone | What it gives a jeweler | Progress | Target |
 | --- | --- | --- | --- |
@@ -207,7 +207,7 @@ The core is MIT-licensed and stays open. The Brain Console and some vertical mod
 This repository is public. Treat everything you commit here as published.
 
 - Never commit a secret, customer data, a bank statement, or anything specific to one client. Client specifics belong in that client's private instance repo; values belong in `.env.local` or a host's secret store.
-- Every secret and setting an instance needs is described, without its value, in [`secrets/manifest.json`](secrets/manifest.json). Follow [docs/secrets.md](docs/secrets.md) to add one.
+- Every secret and setting an instance needs is described, without its value, in [`secrets/manifest.json`](secrets/manifest.json), generated from [`secrets/manifest/`](secrets/manifest/). Follow [docs/secrets.md](docs/secrets.md) to add one.
 - Use test-only sandbox accounts for connector tests, never a client's.
 - CI runs `npm run secrets:scan` on every push.
 - How the code, the instance API, the website and CI are protected, and what each guard is for, is in [docs/security.md](docs/security.md). Report a vulnerability privately as [SECURITY.md](SECURITY.md) describes.
@@ -226,7 +226,8 @@ npm run test:coverage        # fails under 90% lines, functions and statements, 
 - Every behavior change needs a test. A database change needs a migration and a test that runs it against PGlite.
 - Add a changelog fragment, `changelog.d/<branch>.md`, and update the relevant doc in the same PR. Don't edit `CHANGELOG.md` directly; see [changelog.d/README.md](changelog.d/README.md).
 - When a change finishes a roadmap item, mark it done in [docs/milestones.json](docs/milestones.json) and run `npm run progress:write`. Items tied to an integration update on their own once the catalog marks it built.
-- After a PR merges, run `scripts/sync-open-prs.sh` to bring main into every other open PR. It merges rather than rebases, regenerates the progress section, and pushes only after the checks pass.
+- After a PR merges, run `scripts/sync-open-prs.sh` to bring main into every other open PR. It merges rather than rebases, regenerates the progress section and the connector registry, and pushes only after the checks pass.
+- Adding a connector touches only its own files; `npm run registry:write` regenerates every shared list. See [CONTRIBUTING.md](CONTRIBUTING.md#adding-a-connector).
 
 AI agents working in this repo must read [AGENTS.md](AGENTS.md) first.
 
