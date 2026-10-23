@@ -1,5 +1,5 @@
 import { fixtureBuilder, synthetic } from "../fixtures.js";
-import { checkDocMock, docMockFetch, type DocMock, type DocMockFetch, type DocMockRequest, type DocMockResponse } from "../doc-mock.js";
+import { checkDocMock, docMockFetch, type DocMock, type DocMockFetch, type DocMockRequest, type DocMockResponse, type DocMockModule } from "../doc-mock.js";
 
 /**
  * Google Drive v3 (files and changes), Sheets v4 (values.batchGet),
@@ -478,3 +478,18 @@ export function googleWorkspaceDocMock(data: GoogleWorkspaceMockData): GoogleWor
     revokeAccessTokens: () => access.clear(),
   };
 }
+
+export default {
+  integration: "google_workspace",
+  covers: "Google Drive (files and changes, v3), Sheets (`values:batchGet`, v4) and Calendar (`events.list` with sync tokens, v3) with Google's token refresh, enforcing each API's documented scopes so `drive.metadata.readonly` can't read Sheets values",
+  watchPages: [
+    "https://developers.google.com/identity/protocols/oauth2/web-server",
+    "https://developers.google.com/identity/protocols/oauth2",
+    "https://developers.google.com/workspace/drive/api/reference/rest/v3/files/list",
+    "https://developers.google.com/workspace/drive/api/reference/rest/v3/changes/getStartPageToken",
+    "https://developers.google.com/workspace/drive/api/reference/rest/v3/changes/list",
+    "https://developers.google.com/workspace/sheets/api/reference/rest/v4/spreadsheets.values/batchGet",
+    "https://developers.google.com/workspace/calendar/api/v3/reference/events/list",
+  ],
+  docMocks: () => [googleWorkspaceDocMock({ files: [], refreshToken: "" }).oauth, googleWorkspaceDocMock({ files: [], refreshToken: "" }).drive, googleWorkspaceDocMock({ files: [], refreshToken: "" }).sheets, googleWorkspaceDocMock({ files: [], refreshToken: "" }).calendar],
+} satisfies DocMockModule;
