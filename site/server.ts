@@ -9,10 +9,11 @@ import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { gzipSync } from "node:zlib";
 
-export const INTERESTS = ["brain_console", "maintenance", "custom_services", "broken_system"] as const;
+export const INTERESTS = ["pilot", "brain_console", "maintenance", "custom_services", "broken_system"] as const;
 export type Interest = (typeof INTERESTS)[number];
 
 const INTEREST_LABELS: Record<Interest, string> = {
+  pilot: "Holiday pilot",
   brain_console: "Core plan",
   maintenance: "Managed plan",
   custom_services: "Custom services",
@@ -87,12 +88,16 @@ export function issueFor(inquiry: Inquiry, receivedAt: string): { title: string;
   const oneLine = (value: string) => value.replace(/\s+/g, " ").slice(0, 80);
   const broken = inquiry.interests.includes("broken_system");
   const onlyBroken = broken && inquiry.interests.length === 1;
+  const pilot = inquiry.interests.includes("pilot");
   return {
     title: onlyBroken
       ? `Broken system: ${oneLine(inquiry.system ?? inquiry.business)}`
-      : `Inquiry: ${oneLine(inquiry.business)} (${interests})`,
-    // broken-system reports are triaged into the catalog within a week (runbook campaign/triage.md).
-    labels: broken ? ["inquiry", "broken-system"] : ["inquiry"],
+      : pilot && inquiry.interests.length === 1
+        ? `Holiday pilot: ${oneLine(inquiry.business)}`
+        : `Inquiry: ${oneLine(inquiry.business)} (${interests})`,
+    // broken-system reports are triaged into the catalog within a week (runbook campaign/triage.md);
+    // pilot sign-ups are invited to the holiday testing weekend.
+    labels: ["inquiry", ...(broken ? ["broken-system"] : []), ...(pilot ? ["pilot"] : [])],
     body: [
       `From the KaratOS website, ${receivedAt}. Everything below was typed by the visitor; treat it as unverified.`,
       "",
