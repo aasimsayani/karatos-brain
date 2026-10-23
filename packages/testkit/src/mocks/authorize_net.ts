@@ -1,5 +1,5 @@
 import { fixtureBuilder, synthetic } from "../fixtures.js";
-import { UndocumentedRequestError, checkDocMock, docMockFetch, type DocMock, type DocMockFetch, type DocMockResponse } from "../doc-mock.js";
+import { UndocumentedRequestError, checkDocMock, docMockFetch, type DocMock, type DocMockFetch, type DocMockResponse, type DocMockModule } from "../doc-mock.js";
 
 /**
  * Authorize.net's Transaction Reporting requests on its JSON API, built from
@@ -271,3 +271,13 @@ export function authorizeNetDocMock(data: AuthorizeNetMockData): AuthorizeNetMoc
     },
   };
 }
+
+export default {
+  integration: "authorize_net",
+  covers: "Authorize.net's Transaction Reporting requests on its JSON API",
+  watchPages: [
+    "https://developer.authorize.net/api/reference/index.html",
+    "https://developer.authorize.net/api/reference/features/transaction-reporting.html",
+  ],
+  docMocks: () => [authorizeNetDocMock({ apiLoginId: "", transactionKey: "", batches: [] }).api],
+} satisfies DocMockModule;
