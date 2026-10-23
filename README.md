@@ -226,7 +226,7 @@ npm run test:coverage        # fails under 90% lines, functions and statements, 
 - Every behavior change needs a test. A database change needs a migration and a test that runs it against PGlite.
 - Add a changelog fragment, `changelog.d/<branch>.md`, and update the relevant doc in the same PR. Don't edit `CHANGELOG.md` directly; see [changelog.d/README.md](changelog.d/README.md).
 - When a change finishes a roadmap item, mark it done in [docs/milestones.json](docs/milestones.json) and run `npm run progress:write`. Items tied to an integration update on their own once the catalog marks it built.
-- After a PR merges, run `scripts/sync-open-prs.sh` to bring main into every other open PR. It merges rather than rebases, regenerates the progress section and the connector registry, and pushes only after the checks pass.
+- `npm run prs:plan` prints the order to merge the open PRs in and what each waits on. After a PR merges, run `scripts/sync-open-prs.sh` to bring main into every other open PR, base PRs before the PRs stacked on them. It merges rather than rebases, regenerates the progress section and the connector registry, and pushes only after the checks pass. See [CONTRIBUTING.md](CONTRIBUTING.md#merging-prs-in-order).
 - Adding a connector touches only its own files; `npm run registry:write` regenerates every shared list. See [CONTRIBUTING.md](CONTRIBUTING.md#adding-a-connector).
 
 AI agents working in this repo must read [AGENTS.md](AGENTS.md) first.

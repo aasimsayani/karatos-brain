@@ -43,6 +43,12 @@ Commit what it writes. `npm run registry:check`, and a test in `scripts/registry
 
 After a PR merges, `scripts/sync-open-prs.sh` merges main into every other open PR. A conflict in a generated file is settled by running `npm run registry:write` again, so only a conflict in a connector's own files or in hand-written code is left for a person.
 
+## Merging PRs in order
+
+`npm run prs:plan` prints the order to merge the open PRs in, what each one still waits on (a red or running CI, a conflict, a draft, the PR it's stacked on), which PRs it unblocks, and the hand-written files it shares with other open PRs. Files the tooling settles itself (the generated lists above, the README progress block and changelog fragments) never count as shared. The plan puts ready PRs first, then the ones most other PRs are stacked on, then the ones sharing the fewest files, so each merge leaves the fewest conflicts behind it.
+
+Merge from the top, and run `scripts/sync-open-prs.sh` after each merge. It works in the same order, so a stacked PR merges its base only after that base is current, and it first moves any PR stacked on a merged branch onto that branch's base, since GitHub only does that itself when the branch is deleted. Pass PR numbers (`scripts/sync-open-prs.sh 336 337`) to sync just those.
+
 ### What is still shared
 
 - `packages/core/src/integrations.ts` keeps one row per system with what it is and how it can be reached. A connector PR doesn't edit it: its own catalog file overrides the row's fields. Add a row only for a new system.
