@@ -95,6 +95,9 @@ describe("scheduledConnectors", () => {
     expect(scheduledConnectors(["quickbooks"], { QUICKBOOKS_CLIENT_ID: "id", QUICKBOOKS_REFRESH_TOKEN: secret }).skipped).toEqual([
       { id: "quickbooks", reason: "missing QUICKBOOKS_CLIENT_SECRET, QUICKBOOKS_REALM_ID, QUICKBOOKS_ENVIRONMENT" },
     ]);
+    expect(scheduledConnectors(["authorize_net"], { AUTHORIZE_NET_TRANSACTION_KEY: secret }).skipped).toEqual([
+      { id: "authorize_net", reason: "missing AUTHORIZE_NET_API_LOGIN_ID, AUTHORIZE_NET_ENVIRONMENT" },
+    ]);
     expect(scheduledConnectors(["plaid"], { PLAID_CLIENT_ID: "id", PLAID_ACCESS_TOKEN: secret }).skipped).toEqual([
       { id: "plaid", reason: "missing PLAID_SECRET, PLAID_ENVIRONMENT" },
     ]);
@@ -129,6 +132,10 @@ describe("scheduledConnectors", () => {
       QUICKBOOKS_REALM_ID: "9341450000",
       QUICKBOOKS_REFRESH_TOKEN: "refresh-value",
       QUICKBOOKS_ENVIRONMENT: "sandbox",
+      AUTHORIZE_NET_API_LOGIN_ID: "testlogin0",
+      // Shaped like a Transaction Key, assembled so no scanner mistakes it for one.
+      AUTHORIZE_NET_TRANSACTION_KEY: ["TEST", "0".repeat(12)].join(""),
+      AUTHORIZE_NET_ENVIRONMENT: "sandbox",
       PLAID_CLIENT_ID: "plaid-client-id",
       PLAID_SECRET: "plaid-secret-value",
       PLAID_ACCESS_TOKEN: ["access", "sandbox", "0".repeat(8)].join("-"),
@@ -140,7 +147,7 @@ describe("scheduledConnectors", () => {
     };
     const { connectors } = scheduledConnectors(SYNCABLE_INTEGRATIONS, env);
     const built = await Promise.all(connectors.map((c) => c.make()));
-    expect(built.map((c) => c.source).sort()).toEqual(["bank_statements", "chase", "inventory_pos", "plaid", "quickbooks", "shopify", "stripe", "xero"]);
+    expect(built.map((c) => c.source).sort()).toEqual(["authorize_net", "bank_statements", "chase", "inventory_pos", "plaid", "quickbooks", "shopify", "stripe", "xero"]);
     const token = await scheduledConnectors(["shopify"], { SHOPIFY_SHOP_DOMAIN: "demo.myshopify.com", SHOPIFY_ADMIN_ACCESS_TOKEN: "t" }).connectors[0]!.make();
     expect(token.source).toBe("shopify");
     for (const connector of built) expect(connector).not.toHaveProperty("write");
