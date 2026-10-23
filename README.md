@@ -22,6 +22,87 @@ KaratOS closes those gaps. Every sale, repair, payment and bank line becomes one
 - **Your data stays yours.** Each business runs its own isolated instance. Self-host it for free, or let us host it on the managed plan.
 - **Read-only by default.** KaratOS reads from your systems and never changes them unless you turn a specific action on.
 
+## Who it's for
+
+- **Independent jewelers with one to five stores**, where the owner is also the buyer, the bookkeeper and the compliance officer. They feel every gap above and have no analyst to close it.
+- **Online and hybrid jewelry brands** whose demand is split across a web store, marketplaces and appointments, and who need to know which channel actually pays.
+- **Groups and studios with a bench**, where repairs and custom work are a large share of revenue and a missed promise date costs a customer for life.
+
+The common thread is a business that already runs good systems and still decides by feel, because no single system sees the whole store.
+
+## The value of each connection
+
+KaratOS is useful with one connection and gets sharper with each one, because every system answers a question the others can't. These are the questions each kind of connection answers for the owner:
+
+| When you connect | The question it answers | Why the owner cares |
+| --- | --- | --- |
+| **Online store and POS** | What sold, where, and what has sat too long? | Aged inventory is cash locked in the case. Seeing it by piece, not by category, is what makes a remake or markdown decision possible. |
+| **Payments and processors** | What did each sale really net after fees, refunds and disputes? | A 3% fee on a $4,000 ring is a real cost. Margin is only true once processing is counted. |
+| **Bank and card statements** | Did the money that was rung up actually arrive? | Unmatched deposits are the first sign of a drawer problem, a missed payout or fraud. |
+| **Accounting** | Do the books agree with the store? | Month-end close stops being a weekend of spreadsheets, and the accountant gets a clean trail. |
+| **Metal prices** | What is this inventory worth today, at melt and at retail? | Gold moves weekly. Repricing 140 pieces at the right moment protects margin; buying from the public too close to melt erodes it. |
+| **Financing** | Which customers buy bigger when they can pay over time? | Financing lifts average ticket on bridal. Knowing who used it and who was declined shapes the next offer. |
+| **Messages, email and calls** | Who asked for what, and did anyone answer? | A missed call about a custom order is lost revenue. Response time is a sales metric. |
+| **CRM and marketing** | Which campaigns brought buyers, not just clicks? | Marketing spend gets judged by the sales it brought in, so the owner can repeat what worked and cut what didn't. |
+| **Diamond and vendor feeds** | What can I source, and at what cost, for the customer in front of me? | Custom quotes go out the same day, priced from real availability. |
+
+### Connected today
+
+These are built, tested against recorded vendor responses, and run read-only. The table is generated from the [integration catalog](docs/integrations.md), so it names exactly what is built.
+
+<!-- connected:start -->
+<!-- Generated from the integration catalog by npm run progress:write. Edit the catalog, not this block. -->
+
+| System | What the business gets | Feeds |
+| --- | --- | --- |
+| Shopify | Imports five years of orders, refunds and fulfillments, then keeps them current as orders change | Sales, Inventory, Clienteling, Marketing |
+| Inventory and POS systems | Imports item lists, stock counts, customer lists and sales from any POS that exports CSV | Sales, Inventory, Clienteling, Marketing |
+| Stripe | Imports five years of charges, refunds, disputes and payouts, then keeps them current from Stripe's events | Sales, Finance, Clienteling |
+| Chase business bank accounts and credit cards | Imports six years of Chase business checking, savings and credit card activity from CSV downloads, PDF statements or both | Finance, Compliance |
+| Bank and credit card statements (any bank) | Imports six years of bank and credit card transactions from any bank's CSV exports or PDF statements | Finance, Compliance |
+| QuickBooks Online | Imports six years of invoices, bills, payments and journal entries, with the chart of accounts, customers and vendors | Finance, Compliance |
+| Xero | Imports six years of invoices, bills, credit notes, payments, bank transactions and manual journals, with the chart of accounts and contacts | Finance, Compliance |
+| Plaid | Imports up to two years of bank and card transactions from a bank linked through Plaid | Finance, Compliance |
+| Authorize.net | Imports five years of settlement batches and the card and eCheck transactions in them, then keeps them current | Sales, Finance |
+| Affirm | Imports five years of Affirm financed orders, refunds, disputes and daily settlements, then keeps them current | Sales, Finance |
+<!-- connected:end -->
+
+### Landing next
+
+Each of these is built and in review, one connector at a time, so each can ship on its own:
+
+- **Store and POS:** Square, Clover, WooCommerce, BigCommerce and Wix, so a store on any common platform gets the same picture.
+- **Financing:** Affirm, so financed sales show up next to the payment that settled them.
+- **Metal prices:** live spot prices, so inventory and gold-buying offers are valued at today's market.
+- **Customers and conversations:** HubSpot, Gmail, Google Workspace, Slack, Twilio calls and texts, and web forms, so every inquiry and follow-up is counted.
+- **Marketing and operations:** Klaviyo and monday.com, so campaign results and bench work are tied to the sales they produced.
+
+The [roadmap](docs/roadmap.md) has the full sequence, including jewelry POS systems, diamond feeds and manufacturing.
+
+## How we'll know it works
+
+We judge KaratOS by what changes in the store, not by how many recommendations it makes. These are the measures for the first pilots. They are targets, not results yet.
+
+| Measure | What it shows | Pilot target |
+| --- | --- | --- |
+| Recommendations accepted | The advice is worth acting on | Half or more of recommendations accepted or adjusted, not rejected |
+| Time to first useful recommendation | Value on day one | Within an hour of connecting the first system |
+| Aged inventory acted on | Cash released from the case | Every piece over 270 days reviewed within the first month |
+| Repairs and custom orders past their promise date | Promises kept | Every late job flagged before the customer calls |
+| Unreconciled deposits | Cash that reached the bank | Every gap between sales and deposits explained at month end |
+| Cash reporting deadlines | Compliance risk | No Form 8300 deadline missed |
+
+Every accept, reject and override is stored, so these numbers come from the system itself rather than a survey.
+
+## Holiday pilot
+
+The weeks before Black Friday decide a jeweler's year, so that is when KaratOS has to prove itself. We are running an open testing weekend on **November 21–22, 2026**, the weekend before Black Friday, with sign-ups open from November 16.
+
+- **For jewelers:** connect your store, POS or bank in read-only mode and get your first list of recommendations before the holiday rush. Nothing in your systems is changed.
+- **For developers:** every connector runs against recorded vendor responses, so you can run the full suite offline with `npm test` and help us break things before stores rely on them.
+
+Sign up with the pilot form on the KaratOS website, or open an issue here to join as a tester.
+
 ## Progress
 
 This section updates itself as work lands: it is generated from [docs/milestones.json](docs/milestones.json) and the [integration catalog](docs/integrations.md), and a test fails if it falls behind. Targets are estimates and move as priorities change.
@@ -226,7 +307,7 @@ npm run test:coverage        # fails under 90% lines, functions and statements, 
 - Every behavior change needs a test. A database change needs a migration and a test that runs it against PGlite.
 - Add a changelog fragment, `changelog.d/<branch>.md`, and update the relevant doc in the same PR. Don't edit `CHANGELOG.md` directly; see [changelog.d/README.md](changelog.d/README.md).
 - When a change finishes a roadmap item, mark it done in [docs/milestones.json](docs/milestones.json) and run `npm run progress:write`. Items tied to an integration update on their own once the catalog marks it built.
-- After a PR merges, run `scripts/sync-open-prs.sh` to bring main into every other open PR. It merges rather than rebases, regenerates the progress section and the connector registry, and pushes only after the checks pass.
+- `npm run prs:plan` prints the order to merge the open PRs in and what each waits on. After a PR merges, run `scripts/sync-open-prs.sh` to bring main into every other open PR, base PRs before the PRs stacked on them. It merges rather than rebases, regenerates the progress section and the connector registry, and pushes only after the checks pass. See [CONTRIBUTING.md](CONTRIBUTING.md#merging-prs-in-order).
 - Adding a connector touches only its own files; `npm run registry:write` regenerates every shared list. See [CONTRIBUTING.md](CONTRIBUTING.md#adding-a-connector).
 
 AI agents working in this repo must read [AGENTS.md](AGENTS.md) first.
