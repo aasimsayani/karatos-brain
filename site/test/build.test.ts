@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { contentSecurityPolicy } from "../server.js";
 import { INTEGRATIONS, selfServeIntegrations } from "../../packages/core/src/index.js";
 import { RETAIL_DEPARTMENTS } from "../../packages/retail/src/index.js";
-import { CONTACT_ANCHOR, CORE_PRICE, DOMAIN_LABELS, FONTS, MANAGED_PRICE, PLAYS, REPORT_URL, WRITE_RULES, buildingNow, domainLabel, earlyAccessNote, escapeHtml, renderSite } from "../build.js";
+import { CONTACT_ANCHOR, CORE_PRICE, DOMAIN_LABELS, DOMAIN_VALUE, FONTS, HOLIDAY_PILOT, MANAGED_PRICE, PLAYS, REPORT_URL, WRITE_RULES, buildingNow, domainLabel, renderValueCards, earlyAccessNote, escapeHtml, renderSite } from "../build.js";
 
 const html = renderSite();
 const sectionOf = (id: string) => {
@@ -251,8 +251,8 @@ describe("KaratOS website", () => {
     expect(html).toContain(`<strong>${MANAGED_PRICE}</strong> per store per month`);
     expect(html).not.toContain("per user per month");
     expect(html.match(/<strong>By quote<\/strong>/g)?.length).toBe(1);
-    // Three plans plus the broken-systems campaign.
-    expect(html.split(`href="${CONTACT_ANCHOR}"`).length - 1).toBe(4);
+    // Three plans, the holiday pilot and the broken-systems campaign.
+    expect(html.split(`href="${CONTACT_ANCHOR}"`).length - 1).toBe(5);
     // Managed is the featured plan.
     const featured = html.slice(html.indexOf('<li class="plan featured">'));
     expect(featured.slice(0, featured.indexOf("</li>"))).toContain("<h3>Managed</h3>");
@@ -266,11 +266,83 @@ describe("KaratOS website", () => {
 
   it("sends quote requests to the private form, with each plan's interest preselected", () => {
     expect(html).toContain('<form id="inquiry"');
-    for (const interest of ["brain_console", "maintenance", "custom_services", "broken_system"]) {
+    for (const interest of ["pilot", "brain_console", "maintenance", "custom_services", "broken_system"]) {
       expect(html).toContain(`data-interest="${interest}"`);
       expect(html).toContain(`name="interests" value="${interest}"`);
     }
     expect(html).toContain("fetch('/api/inquiry'");
     expect(html).not.toContain("custom-services.yml");
+  });
+
+  it("says what each kind of connection is worth, connected kinds first, naming what is built", () => {
+    const value = sectionOf("value");
+    const domains = [...new Set(INTEGRATIONS.filter((i) => i.departments.length > 0).map((i) => i.domain))];
+    for (const domain of domains) {
+      expect(DOMAIN_VALUE[domain], domain).toBeTruthy();
+      expect(value).toContain(`<h3>${escapeHtml(DOMAIN_VALUE[domain]!.question)}</h3>`);
+    }
+    expect(value.match(/<li class="value">/g)?.length).toBe(domains.length);
+    const built = INTEGRATIONS.filter((i) => i.status === "built" && i.departments.length > 0);
+    for (const i of built) expect(value).toContain(escapeHtml(i.name));
+    // Every card for a kind with a built system comes before any card without one.
+    const cards = value.split('<li class="value">').slice(1);
+    const live = cards.map((c) => c.includes("Connected today:"));
+    expect(live.indexOf(false)).toBe(live.filter(Boolean).length);
+    expect(live.filter(Boolean).length).toBe(new Set(built.map((i) => i.domain)).size);
+    const bare = cards.find((c) => !c.includes("Connected today:") && !c.includes("Building now:"));
+    if (bare) expect(bare).toMatch(/On the roadmap:<\/strong> \d+ system/);
+  });
+
+  it("puts value cards with a connected system first, keeps catalog order otherwise, and counts the rest", () => {
+    const spec = (id: string, domain: string, status: "built" | "planned") => ({ ...INTEGRATIONS[0]!, id, name: `${id} <name>`, domain, status }) as (typeof INTEGRATIONS)[number];
+    const values = DOMAIN_VALUE as Record<string, { question: string; why: string }>;
+    values.test_a = { question: "Planned & only?", why: "<why a>" };
+    values.test_b = { question: "Being built?", why: "why b" };
+    values.test_c = { question: "Connected?", why: "why c" };
+    try {
+      const out = renderValueCards(
+        [spec("a1", "test_a", "planned"), spec("a2", "test_a", "planned"), spec("b1", "test_b", "planned"), spec("b2", "test_b", "planned"), spec("c1", "test_c", "built")],
+        new Set(["b1"]),
+      );
+      const cards = out.split('<li class="value">').slice(1);
+      expect(cards.map((c) => c.match(/<h3>(.*)<\/h3>/)![1])).toEqual(["Connected?", "Planned &amp; only?", "Being built?"]);
+      expect(cards[0]).toContain("<strong>Connected today:</strong> c1 &lt;name&gt;</p>");
+      expect(cards[1]).toContain("<p>&lt;why a&gt;</p>");
+      expect(cards[1]).toContain("<strong>On the roadmap:</strong> 2 systems</p>");
+      expect(cards[2]).toContain("<strong>Building now:</strong> b1 &lt;name&gt;</p>");
+      expect(cards[2]).not.toContain("b2");
+      expect(renderValueCards([spec("a1", "test_a", "planned")], new Set())).toContain("<strong>On the roadmap:</strong> 1 system</p>");
+    } finally {
+      delete values.test_a;
+      delete values.test_b;
+      delete values.test_c;
+    }
+  });
+
+  it("hides the nav links before they would crowd the header", () => {
+    expect(html).toContain(".nav nav a{text-decoration:none;white-space:nowrap}");
+    expect(html).toContain("@media (max-width:1120px){.nav nav{display:none}}");
+  });
+
+  it("stops the build when a kind of connection has no value written for it", () => {
+    const domain = "ecommerce";
+    const saved = DOMAIN_VALUE[domain]!;
+    delete (DOMAIN_VALUE as Record<string, unknown>)[domain];
+    try {
+      expect(() => renderSite()).toThrow("domain ecommerce has data sources but no entry in DOMAIN_VALUE");
+    } finally {
+      (DOMAIN_VALUE as Record<string, unknown>)[domain] = saved;
+    }
+  });
+
+  it("invites jewelers to the holiday pilot, sending sign-ups to the private form", () => {
+    const pilot = sectionOf("pilot");
+    expect(pilot).toContain(`<strong>${HOLIDAY_PILOT.weekend}</strong>`);
+    expect(pilot).toContain(`Sign-ups open ${HOLIDAY_PILOT.signupsOpen}.`);
+    expect(pilot).toContain(`href="${CONTACT_ANCHOR}" data-interest="pilot">Join the pilot</a>`);
+    expect(pilot).toContain("Nothing in your systems is changed.");
+    const hero = html.slice(html.indexOf('<div class="wrap hero">'), html.indexOf('<section id="how"'));
+    expect(hero).toContain('<a class="btn primary" href="#pilot">Join the holiday pilot</a>');
+    expect(html).toContain('<a href="#pilot">Holiday pilot</a>');
   });
 });
