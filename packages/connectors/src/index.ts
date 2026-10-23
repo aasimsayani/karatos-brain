@@ -8,5 +8,6 @@ export * from "./inventory_pos/index.js";
 export * from "./plaid/index.js";
 export * from "./quickbooks/index.js";
 export * from "./shopify/index.js";
+export * from "./square/index.js";
 export * from "./stripe/index.js";
 export * from "./xero/index.js";
