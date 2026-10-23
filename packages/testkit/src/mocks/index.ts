@@ -5,6 +5,7 @@ import authorize_net from "./authorize_net.js";
 import plaid from "./plaid.js";
 import quickbooks from "./quickbooks.js";
 import stuller from "./stuller.js";
+import wix from "./wix.js";
 import xero from "./xero.js";
 
 export * from "./affirm.js";
@@ -12,10 +13,11 @@ export * from "./authorize_net.js";
 export * from "./plaid.js";
 export * from "./quickbooks.js";
 export * from "./stuller.js";
+export * from "./wix.js";
 export * from "./xero.js";
 
 /** Every mock module, one per catalog integration. */
-export const DOC_MOCK_MODULES: readonly DocMockModule[] = [affirm, authorize_net, plaid, quickbooks, stuller, xero];
+export const DOC_MOCK_MODULES: readonly DocMockModule[] = [affirm, authorize_net, plaid, quickbooks, stuller, wix, xero];
 
 /** Every doc-derived mock, with empty data, for checks and the vendor docs watch. */
 export function allDocMocks(): DocMock[] {
