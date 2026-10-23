@@ -95,6 +95,25 @@ describe("inquiry issue", () => {
     expect(mixedIssue.title).toBe("Inquiry: Example Jewelers (Custom services, A broken system)");
     expect(mixedIssue.labels).toEqual(["inquiry", "broken-system"]);
   });
+
+  it("labels holiday pilot sign-ups and titles them by the business", () => {
+    const only = parseInquiry({ ...valid, interests: ["pilot"] });
+    if (!only.ok) throw new Error("expected valid");
+    const issue = issueFor(only.inquiry, "t");
+    expect(issue.title).toBe("Holiday pilot: Example Jewelers");
+    expect(issue.labels).toEqual(["inquiry", "pilot"]);
+    expect(issue.body).toContain("**Interested in**\n```text\nHoliday pilot\n```");
+
+    const mixed = parseInquiry({ ...valid, interests: ["pilot", "broken_system"], system: "Our POS" });
+    if (!mixed.ok) throw new Error("expected valid");
+    const mixedIssue = issueFor(mixed.inquiry, "t");
+    expect(mixedIssue.title).toBe("Inquiry: Example Jewelers (Holiday pilot, A broken system)");
+    expect(mixedIssue.labels).toEqual(["inquiry", "broken-system", "pilot"]);
+
+    const plan = parseInquiry({ ...valid, interests: ["brain_console"] });
+    if (!plan.ok) throw new Error("expected valid");
+    expect(issueFor(plan.inquiry, "t").labels).toEqual(["inquiry"]);
+  });
 });
 
 function rawGet(url: string, headers: Record<string, string>): Promise<{ headers: Record<string, unknown>; body: Buffer }> {
