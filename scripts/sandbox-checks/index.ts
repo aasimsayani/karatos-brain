@@ -4,7 +4,8 @@ import plaid from "./plaid.js";
 import quickbooks from "./quickbooks.js";
 import shopify from "./shopify.js";
 import stripe from "./stripe.js";
+import twilio from "./twilio.js";
 import xero from "./xero.js";
 
 /** Every connector's nightly sandbox check. */
-export const SANDBOX_CHECKS: SandboxCheck[] = [plaid, quickbooks, shopify, stripe, xero];
+export const SANDBOX_CHECKS: SandboxCheck[] = [plaid, quickbooks, shopify, stripe, twilio, xero];
