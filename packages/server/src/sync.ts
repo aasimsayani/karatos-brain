@@ -3,6 +3,7 @@ import { runSync } from "@karatos/core";
 import { sealedTokenStore } from "./token-store.js";
 import {
   accountsFromDirectory,
+  authorizeNetConnector,
   bankStatementsConnector,
   chaseAccountsFromDirectory,
   chaseConnector,
@@ -95,6 +96,15 @@ const FACTORIES: Record<string, { needs: (env: Env) => string[]; make: (env: Env
         tokens: store ? sealedTokenStore({ ...store, source: "quickbooks", seed, keyMaterial: clientSecret }) : memoryTokenStore(seed),
       });
     },
+  },
+  authorize_net: {
+    needs: (env) => ["AUTHORIZE_NET_API_LOGIN_ID", "AUTHORIZE_NET_TRANSACTION_KEY", "AUTHORIZE_NET_ENVIRONMENT"].filter((name) => !set(env, name)),
+    make: async (env) =>
+      authorizeNetConnector({
+        apiLoginId: set(env, "AUTHORIZE_NET_API_LOGIN_ID")!,
+        transactionKey: set(env, "AUTHORIZE_NET_TRANSACTION_KEY")!,
+        environment: set(env, "AUTHORIZE_NET_ENVIRONMENT")!,
+      }),
   },
   plaid: {
     needs: (env) => ["PLAID_CLIENT_ID", "PLAID_SECRET", "PLAID_ACCESS_TOKEN", "PLAID_ENVIRONMENT"].filter((name) => !set(env, name)),
