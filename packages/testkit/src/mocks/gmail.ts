@@ -1,5 +1,5 @@
 import { fixtureBuilder, synthetic } from "../fixtures.js";
-import { checkDocMock, docMockFetch, type DocMock, type DocMockFetch, type DocMockResponse } from "../doc-mock.js";
+import { checkDocMock, docMockFetch, type DocMock, type DocMockFetch, type DocMockResponse, type DocMockModule } from "../doc-mock.js";
 
 /**
  * The Gmail API's read endpoints and Google's OAuth token refresh, built from
@@ -380,3 +380,17 @@ export function gmailDocMock(data: GmailMockData): GmailMock {
     },
   };
 }
+
+export default {
+  integration: "gmail",
+  covers: "Gmail's message, label and history reads with Google's token refresh (API v1)",
+  watchPages: [
+    "https://developers.google.com/identity/protocols/oauth2/web-server",
+    "https://developers.google.com/identity/protocols/oauth2",
+    "https://developers.google.com/workspace/gmail/api/reference/rest/v1/users.messages/list",
+    "https://developers.google.com/workspace/gmail/api/reference/rest/v1/users.messages/get",
+    "https://developers.google.com/workspace/gmail/api/reference/rest/v1/users.labels/list",
+    "https://developers.google.com/workspace/gmail/api/reference/rest/v1/users.history/list",
+  ],
+  docMocks: () => [gmailDocMock({ messages: [], labels: [], refreshToken: "" }).oauth, gmailDocMock({ messages: [], labels: [], refreshToken: "" }).api],
+} satisfies DocMockModule;
