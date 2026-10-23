@@ -80,7 +80,7 @@ Used by: R is retail, W is wholesale, M is manufacturing. Test with says how we 
 | HubSpot | R, W | Public API | Free sandbox | Yes | Planned |
 | Monday.com | R, W, M | Public API | Free sandbox | Yes | Planned |
 | Custom forms | R | Public API | Sample files | Yes | Planned |
-| Gmail | R, W, M | Public API | Free sandbox | Yes | Planned |
+| Gmail | R, W, M | Public API | Free sandbox | Yes | Built (Metadata scope only, which Google classes as restricted: an app outside one Workspace organization needs Google's verification before production use, and a consent screen left in Testing gives tokens that last seven days. Push through Pub/Sub isn't used; the scheduled sync reads the mailbox history) |
 | Google Workspace and Drive | R, W, M | Public API | Free sandbox | Yes | Planned |
 | Slack | R, W, M | Public API | Free sandbox | Yes | Planned |
 | Instagram DMs, Facebook Messenger and WhatsApp Business | R | Public API | Free sandbox | Yes | Deferred (Waiting on Facebook account recovery) |
@@ -206,12 +206,13 @@ A request for a path or method the docs don't list throws `UndocumentedRequestEr
 
 - Affirm's transaction, transaction event, daily settlement and dispute reads
 - Authorize.net's Transaction Reporting requests on its JSON API
+- Gmail's message, label and history reads with Google's token refresh (API v1)
 - Plaid's accounts, transactions sync, Item and webhook verification key endpoints (API version 2020-09-14), with webhooks signed the way Plaid signs them
 - QuickBooks Online's query and change data capture endpoints with Intuit's token refresh (minor version 75)
 - Stuller's invoice and metal market rate endpoints (API v2)
 - Xero's Accounting API endpoints with its token refresh
 
-Where a vendor has a free sandbox (Affirm, Authorize.net, Plaid, QuickBooks Online and Xero so far), its mock is a stand-in until a developer account is set up for the nightly run.
+Where a vendor has a free sandbox (Affirm, Authorize.net, Gmail, Plaid, QuickBooks Online and Xero so far), its mock is a stand-in until a developer account is set up for the nightly run.
 
 <!-- registry:mocks:end -->
 
@@ -379,6 +380,36 @@ Chase business checking, savings and credit cards, from the CSV activity downloa
 The profiles were written from Chase's published download format and statement layout. Before sign-off, check them against one of the client's own statements and confirm the event count matches the statement's transaction count.
 
 **Testing.** `packages/connectors/test/chase.test.ts` writes a synthetic two-page checking statement, a card statement and matching CSV downloads. It checks that each format reads the same transactions with the same keys, that each import mode reads only its own files, and that account folders get the right profile. No real statement goes in a repo.
+
+### Gmail
+
+Reads one mailbox's message metadata, threads and labels through the Gmail API, for clienteling (who the store is talking to and how recently), buying (which vendors write, and how often) and custom orders (the threads around a commission). It never reads a message body, an attachment or a subject.
+
+**Scope.** The mailbox is connected with `https://www.googleapis.com/auth/gmail.metadata` only: headers and labels, without bodies or attachments, and no way to change anything. With that scope Gmail rejects a search query (`q`) and the `full` and `raw` formats, so the limits are Google's as well as the connector's. `gmail.readonly` isn't needed and would expose bodies; `gmail.labels` can create and delete labels, and `gmail.modify`, `gmail.send`, `gmail.compose` and `https://mail.google.com/` can change or send mail. The client checks the `scope` field of every token Google issues and stops if it holds anything beyond `gmail.metadata` and the sign-in scopes (`openid`, `email`), or doesn't say. Read-only is also enforced in code: the client sends four GETs (`messages.list`, `messages.get` with `format=metadata` and the headers `From`, `To` and `Cc` only, `labels.list`, `history.list`), checks every parameter, and throws on anything else before it is sent. Its one POST is the token refresh to `oauth2.googleapis.com`. The writes it may do later (`draft_reply`, `apply_label`) are declared and stay behind the write gate.
+
+**Google verification.** `gmail.metadata` is a restricted scope. An app whose consent screen is set to **Internal**, used only by accounts in the business's own Google Workspace organization, doesn't need Google's verification. Any other app (a consent screen set to **External**, for instance for a personal gmail.com mailbox) needs Google's OAuth verification for restricted scopes before production use, and Google asks for a security assessment when restricted-scope data is kept on servers, which a KaratOS instance does. Until then, an External app in **Testing** status is limited to 100 listed test users, and **its refresh tokens expire after 7 days**, so the sync stops with `invalid_grant` a week after each connection.
+
+| Setting | What it is |
+| --- | --- |
+| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | The instance's Google OAuth client (Web application), shared with Google Drive |
+| `GMAIL_REFRESH_TOKEN` | The refresh token from connecting the mailbox with `gmail.metadata` and `access_type=offline` |
+| `CORRESPONDENT_HASH_KEY` | The instance's key for correspondent references. `npm run secrets:setup` generates it; don't rotate it, or history stops lining up |
+| `GMAIL_USER` | Optional. `me` (the default) or the mailbox's address. One mailbox per instance |
+| `GMAIL_LABEL_NAMES` | Optional. `keep` (the default) or `drop`, for a mailbox whose labels are named after customers |
+
+**Tokens.** Access tokens last an hour and are refreshed two minutes early, one refresh at a time. Google doesn't rotate refresh tokens, so `GMAIL_REFRESH_TOKEN` keeps working until the owner revokes access, changes their password, leaves it unused for six months, or (in Testing) seven days pass; an account holds at most 100 live refresh tokens per client, and connecting a 101st silently ends the oldest. The token store is the same sealed one QuickBooks uses, so if Google ever does return a new refresh token it is saved, encrypted, in the instance's database. An `invalid_grant` error means the mailbox needs reconnecting.
+
+**What it reads.** The historical import reads the labels, then every message newest first, 500 to a page, with each one's metadata, and stops after the first page in which every message is more than five years old. With the metadata scope Gmail takes no search query, so there is no date filter: the cutoff is applied to each message's `internalDate`. Incremental syncs read the labels again and then the mailbox history from the last history id (messages added and deleted, labels added and removed), and read each changed message again so its event carries its whole label set. Gmail keeps history for about a week, sometimes less; when it answers 404 the pass lists messages back to where the previous pass started and takes a fresh history id. A label change on an older message during such a gap is picked up the next time that message changes. Drafts and spam are skipped.
+
+**Quota.** Gmail allows 6,000 quota units a minute per mailbox, and a message read costs 20, so the client paces itself to 5,000 a minute: about 250 messages a minute, or several hours for a busy mailbox's first import, which resumes from its checkpoint if interrupted. 429s and `rateLimitExceeded` or `userRateLimitExceeded` 403s are retried with backoff, honouring `Retry-After`; a `dailyLimitExceeded` 403 stops the sync until the next round.
+
+**Events.** `communication.message_logged` keeps the message and thread ids, `internalDate`, direction (`sent` when the message has the `SENT` label, otherwise `received`), the sender and the To and Cc recipients as correspondent references (at most 50 per header, with the full count), and the label ids. `communication.label_updated` keeps each label's id, whether it is a system or user label, and its name. `communication.message_deleted` records a deletion. A message is keyed by its id and a hash of its label set, so a label change is stored as a new version and a replay is a duplicate.
+
+**Personal data.** Kept: ids, times, direction, counts, label ids and names. Never kept: bodies, attachments and file names (the scope can't see them), subjects (never requested, since they often carry a customer's name, a ring size or an order number), the snippet of text Gmail sends with every message, display names, and every raw address. Each address becomes `correspondent:<hash>`, an HMAC-SHA256 under `CORRESPONDENT_HASH_KEY`, so the same person is the same reference across messages but the reference can't be reversed or matched against another instance's. The address's domain is kept beside it only for business domains, so a vendor's mail is attributable; consumer services (gmail.com, outlook.com, yahoo.com, icloud.com and the like) keep no domain. A sole trader on their own domain still keeps that domain. User label names are kept unless they contain an @ or four digits in a row; set `GMAIL_LABEL_NAMES=drop` if the mailbox names labels after customers.
+
+**Push.** Gmail can push changes through Cloud Pub/Sub (`users.watch`), which needs a Pub/Sub topic in the owner's Google Cloud project, publish rights for `gmail-api-push@system.gserviceaccount.com` and a renewal at least every seven days. It isn't built; the scheduled sync reads the same history.
+
+**Testing.** Until a test account is set up, the tests run against a mock built from Google's docs (`packages/testkit/src/mocks/gmail.ts`), which holds the metadata scope to its documented limits (no `q`, no `full` or `raw`), answers 401 without a valid access token, pages lists and history, expires history below a floor, and answers 404 for deleted messages. Every docs fact it relies on is listed with its URL, and what the docs leave out is in its assumptions, checked on the first live run. Google has no Gmail sandbox: for the nightly run, make a Google account for testing that holds only synthetic mail, create an OAuth client in a test Cloud project with the consent screen in Testing and that account as a test user, connect it with `gmail.metadata` only, and add `SANDBOX_GMAIL_CLIENT_ID`, `SANDBOX_GMAIL_CLIENT_SECRET` and `SANDBOX_GMAIL_REFRESH_TOKEN` as GitHub Actions secrets. Tokens in Testing expire after seven days, so when the run fails with `invalid_grant`, reconnect the test account and update the secret.
 
 ### Inventory and POS systems
 
