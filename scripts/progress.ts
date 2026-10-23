@@ -6,6 +6,8 @@ import type { IntegrationSpec } from "../packages/core/src/index.js";
 export const MILESTONES = "docs/milestones.json";
 export const START = "<!-- progress:start -->";
 export const END = "<!-- progress:end -->";
+export const CONNECTED_START = "<!-- connected:start -->";
+export const CONNECTED_END = "<!-- connected:end -->";
 
 export interface MilestoneItem {
   name?: string;
@@ -97,9 +99,45 @@ export function renderProgress(milestones: readonly Milestone[], catalog: readon
   return lines.join("\n");
 }
 
+const label = (id: string) => id.replace(/_/g, " ").replace(/^./, (c) => c.toUpperCase());
+
+/**
+ * The README's "Connected today" table: every built system, what it gives the
+ * business (its first catalog capability) and the departments it feeds, so
+ * the README names exactly what is built.
+ */
+export function renderConnected(catalog: readonly IntegrationSpec[]): string {
+  const built = catalog.filter((c) => c.status === "built" && c.departments.length > 0);
+  const lines = [
+    CONNECTED_START,
+    "<!-- Generated from the integration catalog by npm run progress:write. Edit the catalog, not this block. -->",
+    "",
+    ...(built.length
+      ? [
+          "| System | What the business gets | Feeds |",
+          "| --- | --- | --- |",
+          ...built.map((c) => `| ${c.name} | ${(c.capabilities?.[0] ?? c.note ?? "").replace(/\|/g, "\\|")} | ${c.departments.map(label).join(", ")} |`),
+        ]
+      : ["Nothing is connected yet."]),
+    CONNECTED_END,
+  ];
+  return lines.join("\n");
+}
+
+/** Replaces the one block between `startMark` and `endMark`. */
+export function replaceBlock(readme: string, block: string, startMark = START, endMark = END): string {
+  const start = readme.indexOf(startMark);
+  const end = readme.indexOf(endMark);
+  if (start < 0 || end < start || readme.indexOf(startMark, start + 1) >= 0) throw new ProgressError(`README needs exactly one ${startMark} ... ${endMark} block`);
+  return readme.slice(0, start) + block + readme.slice(end + endMark.length);
+}
+
 export function replaceProgress(readme: string, block: string): string {
-  const start = readme.indexOf(START);
-  const end = readme.indexOf(END);
-  if (start < 0 || end < start || readme.indexOf(START, start + 1) >= 0) throw new ProgressError(`README needs exactly one ${START} ... ${END} block`);
-  return readme.slice(0, start) + block + readme.slice(end + END.length);
+  return replaceBlock(readme, block);
+}
+
+/** The README with both generated blocks current. */
+export function renderReadme(readme: string, milestones: readonly Milestone[], catalog: readonly IntegrationSpec[]): string {
+  const withProgress = replaceProgress(readme, renderProgress(milestones, catalog));
+  return replaceBlock(withProgress, renderConnected(catalog), CONNECTED_START, CONNECTED_END);
 }
