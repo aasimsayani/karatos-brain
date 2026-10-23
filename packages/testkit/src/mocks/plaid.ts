@@ -1,6 +1,6 @@
 import { createHash, generateKeyPairSync, sign, type KeyObject } from "node:crypto";
 import { fixtureBuilder, synthetic } from "../fixtures.js";
-import { checkDocMock, docMockFetch, type DocMock, type DocMockFetch, type DocMockResponse } from "../doc-mock.js";
+import { checkDocMock, docMockFetch, type DocMock, type DocMockModule, type DocMockFetch, type DocMockResponse } from "../doc-mock.js";
 
 /**
  * Plaid's /accounts/get, /transactions/sync, /item/get and
@@ -277,3 +277,15 @@ export function plaidDocMock(data: PlaidMockData): PlaidMock {
     },
   };
 }
+
+export default {
+  integration: "plaid",
+  covers: "Plaid's accounts, transactions sync, Item and webhook verification key endpoints (API version 2020-09-14), with webhooks signed the way Plaid signs them",
+  watchPages: [
+    "https://plaid.com/docs/api/products/transactions/",
+    "https://plaid.com/docs/api/accounts/",
+    "https://plaid.com/docs/api/items/",
+    "https://plaid.com/docs/api/webhooks/webhook-verification/",
+  ],
+  docMocks: () => [plaidDocMock({ clientId: "", secret: "", accessToken: "", itemId: "", accounts: [], changes: [] }).api],
+} satisfies DocMockModule;

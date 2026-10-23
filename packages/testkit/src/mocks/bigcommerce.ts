@@ -1,5 +1,5 @@
 import { fixtureBuilder, synthetic } from "../fixtures.js";
-import { checkDocMock, docMockFetch, type DocMock, type DocMockFetch, type DocMockRequest, type DocMockResponse } from "../doc-mock.js";
+import { checkDocMock, docMockFetch, type DocMock, type DocMockFetch, type DocMockRequest, type DocMockResponse, type DocMockModule } from "../doc-mock.js";
 
 /**
  * The BigCommerce REST Management API's read paths the connector uses,
@@ -392,3 +392,21 @@ export function bigCommerceDocMock(data: BigCommerceMockData): BigCommerceMock {
 
   return { api, fetch: docMockFetch(api) };
 }
+
+export default {
+  integration: "bigcommerce",
+  covers: "BigCommerce's v2 order and store paths and v3 catalog, inventory, customer, refund and price list paths",
+  watchPages: [
+    "https://docs.bigcommerce.com/developer/docs/overview/api-fundamentals/api-accounts",
+    "https://docs.bigcommerce.com/developer/api-reference/rest/admin/management/store-information/v2/get-store-information",
+    "https://docs.bigcommerce.com/developer/api-reference/rest/admin/management/orders/get-orders",
+    "https://docs.bigcommerce.com/developer/api-reference/rest/admin/management/orders/order-products/get-order-products",
+    "https://docs.bigcommerce.com/developer/api-reference/rest/admin/management/order-operations/payment-actions/get-order-refunds",
+    "https://docs.bigcommerce.com/developer/api-reference/rest/admin/catalog/products/get-products",
+    "https://docs.bigcommerce.com/developer/api-reference/rest/admin/management/inventory/items/get-inventory-items",
+    "https://docs.bigcommerce.com/developer/api-reference/rest/admin/management/customers/v3/get-customers",
+    "https://docs.bigcommerce.com/developer/api-reference/rest/admin/management/price-lists/get-price-lists",
+    "https://docs.bigcommerce.com/developer/api-reference/rest/admin/management/price-lists/price-lists-records/get-price-list-records",
+  ],
+  docMocks: () => [bigCommerceDocMock({ token: "" }).api],
+} satisfies DocMockModule;
