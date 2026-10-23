@@ -99,6 +99,9 @@ export function renderProgress(milestones: readonly Milestone[], catalog: readon
   return lines.join("\n");
 }
 
+/** A Markdown table cell: backslashes first, then pipes, so neither can end the cell early. */
+const cell = (text: string) => text.replace(/\\/g, "\\\\").replace(/\|/g, "\\|");
+
 const label = (id: string) => id.replace(/_/g, " ").replace(/^./, (c) => c.toUpperCase());
 
 /**
@@ -116,7 +119,7 @@ export function renderConnected(catalog: readonly IntegrationSpec[]): string {
       ? [
           "| System | What the business gets | Feeds |",
           "| --- | --- | --- |",
-          ...built.map((c) => `| ${c.name} | ${(c.capabilities?.[0] ?? c.note ?? "").replace(/\|/g, "\\|")} | ${c.departments.map(label).join(", ")} |`),
+          ...built.map((c) => `| ${cell(c.name)} | ${cell(c.capabilities?.[0] ?? c.note ?? "")} | ${cell(c.departments.map(label).join(", "))} |`),
         ]
       : ["Nothing is connected yet."]),
     CONNECTED_END,

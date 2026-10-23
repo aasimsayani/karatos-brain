@@ -83,7 +83,7 @@ describe("README progress", () => {
 
   it("lists every built system that feeds a department, with its first capability and the departments it feeds", () => {
     const withCaps = [
-      { ...spec("alpha", "built", ["sales", "custom_orders"]), capabilities: ["Reads | pipes", "Second"] },
+      { ...spec("alpha", "built", ["sales", "custom_orders"]), capabilities: ["Reads | pipes and a \\| slash", "Second"] },
       spec("beta", "planned"),
       { ...spec("reasoning", "built", []), capabilities: ["Not a data source"] },
       { ...spec("gamma", "built", ["finance"]), capabilities: undefined, note: "Only a note" },
@@ -94,7 +94,7 @@ describe("README progress", () => {
       "",
       "| System | What the business gets | Feeds |",
       "| --- | --- | --- |",
-      "| alpha name | Reads \\| pipes | Sales, Custom orders |",
+      "| alpha name | Reads \\| pipes and a \\\\\\| slash | Sales, Custom orders |",
       "| gamma name | Only a note | Finance |",
       CONNECTED_END,
     ]);
