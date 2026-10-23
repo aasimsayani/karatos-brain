@@ -69,6 +69,32 @@ export function domainLabel(domain: string): string {
 }
 
 /**
+ * What each kind of connection is worth to the owner: the question it
+ * answers and why that matters. Keyed by catalog domain; a test fails when a
+ * domain with data sources has no entry.
+ */
+export const DOMAIN_VALUE: Readonly<Record<string, { question: string; why: string }>> = {
+  ecommerce: { question: "What sold, where, and what has sat too long?", why: "Aged inventory is cash locked in the case. Seeing it piece by piece is what makes a remake or markdown decision possible." },
+  pos: { question: "What happened at the counter today?", why: "The counter is where most of a jeweler's revenue and cash comes in, so it is the first thing every department reads." },
+  financial: { question: "Did the money that was rung up arrive, and what did each sale really net?", why: "Fees, refunds, disputes and unmatched deposits are where margin leaks. The books stop being a month-end guess." },
+  pricing: { question: "What is this inventory worth today, at melt and at retail?", why: "Gold moves weekly. Repricing at the right moment protects margin, and buying from the public too close to melt erodes it." },
+  crm: { question: "Who is this customer, and what did we promise them?", why: "Anniversaries, wish lists and custom-order promises turn into reminders instead of notes nobody reads." },
+  communication: { question: "Who asked for what, and did anyone answer?", why: "A missed call or an unanswered email about a custom piece is lost revenue. Response time is a sales number." },
+  documents: { question: "Where is the appraisal, the quote or the vendor terms?", why: "The paperwork behind a decision is linked to the record, not lost in a shared drive." },
+  marketing: { question: "Which campaigns brought buyers, not just clicks?", why: "Marketing is judged by the sales it brought in, so you repeat what worked and stop what didn't." },
+  diamonds: { question: "What can I source for the customer in front of me, and at what cost?", why: "Custom quotes go out the same day, priced from what is really available." },
+  suppliers: { question: "What did I order, what is on memo, and what does it cost to replace?", why: "Memo goods come back on time, and nothing is priced below its replacement cost." },
+  grading: { question: "Is this stone what the paperwork says it is?", why: "Grading reports and appraisals are checked against the piece before it is sold or insured." },
+  erp: { question: "What did this piece cost to make, in metal and in bench time?", why: "Casting loss and labor per job show which work actually makes money." },
+  edi: { question: "Which orders and invoices came in from trading partners?", why: "Purchase orders and invoices land without retyping, and match what was shipped." },
+  insurance: { question: "What is insured, and for how much?", why: "Inventory and appraisal values stay in step with the policy, so nothing is under-covered." },
+  shipping: { question: "Where is the package, and was it insured for its value?", why: "High-value shipments are tracked and covered, and a delay reaches the customer before they ask." },
+};
+
+/** Dates for the holiday pilot the site announces. */
+export const HOLIDAY_PILOT = { weekend: "November 21–22, 2026", signupsOpen: "November 16" } as const;
+
+/**
  * Illustrative plays: what happens when several connected systems are read
  * together. Each names the catalog systems it combines, by id, and the one
  * action that comes out of it. A test checks every id is in the catalog, and
@@ -158,6 +184,38 @@ function statusOf(integration: IntegrationSpec, selfServe: Set<string>): { label
   return { label: "Planned", tone: "plain" };
 }
 
+/**
+ * One card per kind of connection (catalog domain), those with built systems
+ * first: the question it answers, why it matters, and what is connected today,
+ * being built now, or on the roadmap.
+ */
+export function renderValueCards(dataSources: readonly IntegrationSpec[], selfServe: ReadonlySet<string>): string {
+  const domains = [...new Set(dataSources.map((i) => i.domain))];
+  const builtIn = (domain: string) => dataSources.filter((i) => i.domain === domain && i.status === "built");
+  return domains
+    .map((domain, index) => ({ domain, index, built: builtIn(domain).length }))
+    .sort((a, b) => b.built - a.built || a.index - b.index)
+    .map(({ domain }) => {
+      const value = DOMAIN_VALUE[domain];
+      if (!value) throw new Error(`domain ${domain} has data sources but no entry in DOMAIN_VALUE`);
+      const systems = dataSources.filter((i) => i.domain === domain);
+      const built = systems.filter((i) => i.status === "built");
+      const next = systems.filter((i) => i.status !== "built" && selfServe.has(i.id));
+      const status = built.length
+        ? `<p class="value-status live"><strong>Connected today:</strong> ${escapeHtml(built.map((i) => i.name).join(", "))}</p>`
+        : next.length
+          ? `<p class="value-status"><strong>Building now:</strong> ${escapeHtml(next.map((i) => i.name).join(", "))}</p>`
+          : `<p class="value-status"><strong>On the roadmap:</strong> ${systems.length} ${systems.length === 1 ? "system" : "systems"}</p>`;
+      return `<li class="value">
+  <span class="domain">${escapeHtml(domainLabel(domain))}</span>
+  <h3>${escapeHtml(value.question)}</h3>
+  <p>${escapeHtml(value.why)}</p>
+  ${status}
+</li>`;
+    })
+    .join("\n");
+}
+
 export function renderSite(plays: readonly Play[] = PLAYS): string {
   const selfServe = new Set(buildingNow().map((i) => i.id));
   const departments = [
@@ -203,6 +261,8 @@ export function renderSite(plays: readonly Play[] = PLAYS): string {
   }).join("\n");
   const writeRules = WRITE_RULES.map((r) => `<li><h3>${escapeHtml(r.title)}</h3><p>${escapeHtml(r.body)}</p></li>`).join("\n");
 
+  const valueCards = renderValueCards(dataSources, selfServe);
+
   const deptOptions = departments.map((d) => `<option value="${d.id}">${escapeHtml(d.name)}</option>`).join("");
   const deptCards = departments
     .map(
@@ -234,9 +294,9 @@ header.nav{position:sticky;top:0;z-index:10;background:color-mix(in srgb,var(--b
 .brand{display:flex;align-items:center;gap:8px;font-weight:600;font-size:20px;letter-spacing:-.01em;text-decoration:none}
 .brand svg{width:22px;height:22px}
 .nav nav{display:flex;gap:24px;font-size:14px;color:var(--ink-2)}
-.nav nav a{text-decoration:none}
+.nav nav a{text-decoration:none;white-space:nowrap}
 .nav nav a:hover{color:var(--ink)}
-@media (max-width:960px){.nav nav{display:none}}
+@media (max-width:1120px){.nav nav{display:none}}
 .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:12px 20px;border-radius:999px;font-weight:600;font-size:15px;text-decoration:none;border:1px solid var(--ink);transition:transform .15s ease}
 .btn:hover{transform:translateY(-1px)}
 .btn.primary{background:var(--ink);color:var(--bg)}
@@ -346,6 +406,19 @@ section{content-visibility:auto;contain-intrinsic-size:auto 900px}
 .interests legend{font-size:14px;font-weight:500;margin-bottom:var(--space-1)}
 .interests label{display:flex!important;align-items:center;gap:8px;font-weight:400}
 .interests input{width:auto!important}
+.values{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:var(--space-3);list-style:none;padding:0;margin:0}
+.value{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:var(--space-3);display:flex;flex-direction:column}
+.value .domain{font-family:var(--mono);font-size:12px;font-weight:500;text-transform:uppercase;letter-spacing:.06em;color:var(--gold-text)}
+.value h3{margin:var(--space-1) 0 var(--space-2);font-size:18px;line-height:1.3}
+.value p{margin:0;color:var(--ink-2);font-size:15px}
+.value .value-status{margin:auto 0 0;padding-top:var(--space-2);margin-top:var(--space-2);border-top:1px solid var(--line);font-size:14px}
+.value .value-status.live strong{color:var(--gold-text)}
+.pilot{display:grid;grid-template-columns:1.2fr 1fr;gap:var(--space-4);align-items:start}
+.pilot ul{margin:0;padding-left:20px;color:var(--ink-2)}
+.pilot li+li{margin-top:var(--space-1)}
+.pilot .when{background:var(--surface);border:1px solid var(--line);border-top:4px solid var(--gold);border-radius:var(--radius);padding:var(--space-3)}
+.pilot .when strong{display:block;font-size:24px;line-height:1.2;margin:var(--space-1) 0}
+@media (max-width:860px){.pilot{grid-template-columns:1fr}}
 #inquiry .invalid{border-color:#c0392b}
 .hp{position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden}
 .submit-row{display:flex;align-items:center;gap:16px;flex-wrap:wrap}
@@ -365,7 +438,7 @@ footer .wrap{display:flex;flex-wrap:wrap;justify-content:space-between;gap:var(-
 <body>
 <header class="nav"><div class="wrap">
   <a class="brand" href="#top"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M16 3 28 12 16 29 4 12Z" fill="#c9a45c"/><path d="M4 12h24M16 3l-5 9 5 17 5-17-5-9" fill="none" stroke="#16140f" stroke-opacity=".35" stroke-width="1.2"/></svg>KaratOS</a>
-  <nav><a href="#how">How it works</a><a href="#together">Systems together</a><a href="#write-back">Write-back</a><a href="#integrations">Integrations</a><a href="#services">Pricing</a><a href="#broken">What's broken</a></nav>
+  <nav><a href="#how">How it works</a><a href="#together">Systems together</a><a href="#write-back">Write-back</a><a href="#integrations">Integrations</a><a href="#pilot">Holiday pilot</a><a href="#services">Pricing</a><a href="#broken">What's broken</a></nav>
   <a class="btn primary small" href="#services">Custom services</a>
 </div></header>
 
@@ -374,7 +447,7 @@ footer .wrap{display:flex;flex-wrap:wrap;justify-content:space-between;gap:var(-
   <span class="eyebrow">For jewelers, watch dealers, wholesalers and manufacturers</span>
   <h1>The operating brain for jewelry businesses.</h1>
   <p class="lede">KaratOS connects the many systems your business already runs, from the POS and the books to diamond feeds and the repair bench, reads them together and turns them into a short list of things to act on today. Every suggestion shows the evidence behind it, and when you allow it, KaratOS writes back carefully, one approved change at a time.</p>
-  <div class="actions"><a class="btn primary" href="#services">Custom services</a><a class="btn ghost" href="#together">See the systems work together</a></div>
+  <div class="actions"><a class="btn primary" href="#pilot">Join the holiday pilot</a><a class="btn ghost" href="#services">Custom services</a><a class="btn ghost" href="#together">See the systems work together</a></div>
   <p class="note">${escapeHtml(earlyAccessNote())}</p>
 </div>
 
@@ -399,6 +472,15 @@ footer .wrap{display:flex;flex-wrap:wrap;justify-content:space-between;gap:var(-
   <p class="section-intro">The win isn't any single connection. It's a sale in the POS meeting a date in the client book, or a gold price meeting a supplier's catalog and your website. A few of the plays that only exist once your systems are read together:</p>
   <ul class="plays">
 ${playCards}
+  </ul>
+</div></section>
+
+<section id="value"><div class="wrap">
+  <span class="eyebrow">What each connection is worth</span>
+  <h2>Every system you connect answers a question the others can't.</h2>
+  <p class="section-intro">KaratOS is useful with one connection and sharper with each one. Here is the question each kind of system answers for the owner, why it matters, and what is connected today.</p>
+  <ul class="values">
+${valueCards}
   </ul>
 </div></section>
 
@@ -440,6 +522,27 @@ ${deptCards}
 ${cards}
   </ul>
   <p class="empty" id="empty" hidden>Nothing matches. <a href="#broken">Tell us about it</a> and we'll add it.</p>
+</div></section>
+
+<section id="pilot"><div class="wrap">
+  <span class="eyebrow">Holiday pilot</span>
+  <h2>Test it before Black Friday.</h2>
+  <div class="pilot">
+    <div>
+      <p class="section-intro">The weeks before Black Friday decide a jeweler's year, so that is when KaratOS has to prove itself. Join the open testing weekend and get your first list of recommendations before the rush.</p>
+      <ul>
+        <li><strong>Read-only from the first minute.</strong> Connect your store, POS, payments or bank. Nothing in your systems is changed.</li>
+        <li><strong>A list by the end of the day.</strong> Aged pieces to reprice, late repairs to call about, deposits that don't match, deadlines coming up.</li>
+        <li><strong>Your feedback shapes the launch.</strong> Every accept, snooze and dismiss tells us what to sharpen before stores rely on it.</li>
+      </ul>
+    </div>
+    <div class="when">
+      <span class="eyebrow">Testing weekend</span>
+      <strong>${HOLIDAY_PILOT.weekend}</strong>
+      <p>Sign-ups open ${HOLIDAY_PILOT.signupsOpen}. Places are limited so we can help every store connect.</p>
+      <div class="actions"><a class="btn primary" href="${CONTACT_ANCHOR}" data-interest="pilot">Join the pilot</a></div>
+    </div>
+  </div>
 </div></section>
 
 <section id="your-data"><div class="wrap">
@@ -504,6 +607,7 @@ ${cards}
     </div>
     <form id="inquiry" novalidate>
       <fieldset class="interests"><legend>Interested in</legend>
+        <label><input type="checkbox" name="interests" value="pilot"> Holiday pilot</label>
         <label><input type="checkbox" name="interests" value="brain_console"> Core plan</label>
         <label><input type="checkbox" name="interests" value="maintenance"> Managed plan</label>
         <label><input type="checkbox" name="interests" value="custom_services"> Custom services</label>

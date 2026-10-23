@@ -45,11 +45,19 @@ Quote and Brain Console requests use a private form on the page. `site/server.ts
 | `INQUIRY_REPO` | `owner/name` of the private repository that receives inquiries |
 | `INQUIRY_GITHUB_TOKEN` | Fine-grained token with Issues read and write on that repository only |
 
-Without both, the form answers that it isn't connected yet and the rest of the site works normally. The repository needs the labels `inquiry` and `broken-system`.
+Without both, the form answers that it isn't connected yet and the rest of the site works normally. The repository needs the labels `inquiry`, `broken-system` and `pilot`.
 
 ## Broken-systems campaign
 
 "Is a system in your jewelry business broken? Tell us." sends people to the same private form with "Reporting a broken system" ticked, plus an optional field naming the system. Those issues are titled `Broken system: <system>` and labelled `broken-system` as well as `inquiry`. The public [integration request form](../.github/ISSUE_TEMPLATE/integration-request.yml) stays as the alternative for people happy to post in the open. Each report is triaged within a week into a catalog change, a vote on an existing entry, or a partnership ask; the triage steps and outreach copy live in the private commercial runbook.
+
+## What each connection is worth
+
+The "Value" section has one card per catalog domain that has data sources: the question that kind of system answers for the owner, why it matters, and which systems are connected today (or being built now, or how many are on the roadmap). Domains with a built system come first. The copy lives in `DOMAIN_VALUE`; a new domain with data sources stops the build until it has an entry, so the page never shows a kind of system without saying what it is worth.
+
+## Holiday pilot
+
+The "Holiday pilot" section announces the testing weekend before Black Friday. Its dates live in `HOLIDAY_PILOT` (`weekend` and `signupsOpen`), so moving the weekend is a one-line change. "Join the pilot" and the hero's primary button send people to the private form with "Holiday pilot" ticked. Pilot sign-ups are titled `Holiday pilot: <business>` when nothing else is ticked, and labelled `pilot` as well as `inquiry`.
 
 ## Deploy
 
