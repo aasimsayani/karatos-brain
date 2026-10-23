@@ -1,6 +1,7 @@
 import { z } from "zod";
+import type { Signal } from "@karatos/core";
 import type { DepartmentModule } from "../department.js";
-import { calendarDaysSince, dollars, extractor, latestBySubject, recommend, signalFrom, value } from "../department.js";
+import { calendarDaysSince, daysBetween, dollars, extractor, latestBySubject, recommend, signalFrom, value } from "../department.js";
 
 const MemoReceived = z.object({
   memoId: z.string().min(1),
@@ -17,10 +18,43 @@ const PurchaseOrderCreated = z.object({
   totalCents: z.number().int().nonnegative(),
 });
 const PurchaseOrderReceived = z.object({ poId: z.string().min(1) });
+/** A dealer's offer seen in the trade's WhatsApp groups, such as through TheWatchSearch. Dealers are keyed hashes; the group is the name the store gave its export. */
+const WatchOfferSeen = z
+  .object({
+    offerId: z.string().min(1),
+    side: z.enum(["selling", "looking_for"]),
+    brand: z.string().min(1),
+    reference: z.string().min(1),
+    priceMinor: z.number().int().positive().optional(),
+    currency: z.string().regex(/^[A-Z]{3}$/).optional(),
+    year: z.number().int().min(1900).max(2100).optional(),
+    condition: z.enum(["new", "pre_owned"]).optional(),
+    set: z.enum(["full_set", "watch_only", "box_only", "papers_only"]).optional(),
+    dealerRef: z.string().min(1),
+    group: z.string().min(1),
+  })
+  .refine((p) => (p.priceMinor === undefined) === (p.currency === undefined), { message: "a price needs its currency, and a currency its price" });
 
 type Memo = z.infer<typeof MemoReceived>;
 type PurchaseOrder = z.infer<typeof PurchaseOrderCreated>;
+type WatchOffer = z.infer<typeof WatchOfferSeen>;
 const MEMO_WARNING_DAYS = 14;
+/** How far back the trade's offers count, and how many dealers looking for one reference make it worth acting on. */
+const WATCH_MARKET_DAYS = 14;
+const WATCH_WANTED_DEALERS = 3;
+
+const money = (minor: number, currency: string) =>
+  currency === "USD" ? dollars(minor) : (minor / 100).toLocaleString("en-US", { style: "currency", currency });
+
+/** The lowest asking price per currency, most offers first, as "$14,500.00 (lowest of 4 asks)". */
+function lowestAsks(offers: WatchOffer[]): string | null {
+  const byCurrency = new Map<string, number[]>();
+  for (const o of offers) if (o.side === "selling" && o.priceMinor && o.currency) byCurrency.set(o.currency, [...(byCurrency.get(o.currency) ?? []), o.priceMinor]);
+  const [best] = [...byCurrency.entries()].sort((a, b) => b[1].length - a[1].length || (a[0] < b[0] ? -1 : 1));
+  if (!best) return null;
+  const [currency, prices] = best;
+  return `${money(Math.min(...prices), currency)} (lowest of ${prices.length} ${prices.length === 1 ? "ask" : "asks"})`;
+}
 
 /** Buying, vendors and memo (consignment) goods. */
 export const buying: DepartmentModule = {
@@ -32,6 +66,7 @@ export const buying: DepartmentModule = {
     "memo.settled": MemoSettled,
     "purchase_order.created": PurchaseOrderCreated,
     "purchase_order.received": PurchaseOrderReceived,
+    "watch_market.offer_seen": WatchOfferSeen,
   },
   normalizers: [],
   extractors: [
@@ -52,6 +87,10 @@ export const buying: DepartmentModule = {
         case "purchase_order.received": {
           const p = PurchaseOrderReceived.parse(event.payload);
           return [signalFrom(event, "po.received", { kind: "purchase_order", id: p.poId }, { ...p })];
+        }
+        case "watch_market.offer_seen": {
+          const p = WatchOfferSeen.parse(event.payload);
+          return [signalFrom(event, "watch.offer", { kind: "watch_reference", id: `${p.brand}|${p.reference}` }, { ...p })];
         }
         default:
           return [];
@@ -110,6 +149,36 @@ export const buying: DepartmentModule = {
             }),
           ];
         });
+      },
+    },
+    {
+      name: "buying.watch-wanted",
+      reason: ({ organizationId, signals, now }) => {
+        const recent = signals.filter((s) => s.kind === "watch.offer" && daysBetween(s.observedAt, now) < WATCH_MARKET_DAYS && s.observedAt <= now);
+        const byReference = new Map<string, Signal[]>();
+        for (const s of recent) byReference.set(s.subject.id, [...(byReference.get(s.subject.id) ?? []), s]);
+        return [...byReference.entries()]
+          .sort((a, b) => (a[0] < b[0] ? -1 : 1))
+          .flatMap(([id, offerSignals]) => {
+            const offers = offerSignals.map((s) => value<WatchOffer>(s));
+            const dealers = new Set(offers.filter((o) => o.side === "looking_for").map((o) => o.dealerRef));
+            if (dealers.size < WATCH_WANTED_DEALERS) return [];
+            const { brand, reference } = offers[0]!;
+            const asks = lowestAsks(offers);
+            const market = asks ? ` Dealers in the same groups are asking from ${asks}.` : "";
+            return [
+              recommend({
+                department: "buying",
+                key: `watch_wanted_${id.replace(/[^A-Za-z0-9]/g, "_")}`,
+                organizationId,
+                summary: `${dealers.size} dealers in your WhatsApp groups have asked for the ${brand} ${reference} in the last ${WATCH_MARKET_DAYS} days.${market} If you have one, or can source one, offer it to them.`,
+                confidence: 0.7,
+                expectedImpact: "Sells to dealers already looking, at today's trade price",
+                basedOn: offerSignals,
+                now,
+              }),
+            ];
+          });
       },
     },
   ],

@@ -206,6 +206,9 @@ const ROWS: CatalogRow[] = [
   { id: "ebay", name: "eBay", domain: "ecommerce", segments: ["retail", "wholesale"], access: "public_api", testWith: "sandbox", departments: ["sales", "inventory"], historicalImportYears: 3, webhooks: true, settings: [], changelog: "https://developer.ebay.com/develop/api/trading-api/release-notes", note: "Estate and pre-owned pieces" },
   { id: "matrixgold", name: "MatrixGold CAD", domain: "erp", segments: ["retail", "manufacturing"], access: "unknown", testWith: "unknown", departments: ["custom_orders", "manufacturing"], historicalImportYears: 2, webhooks: false, settings: [], changelog: null, note: "Custom design files and metal weight estimates" },
   { id: "formlabs", name: "Formlabs 3D printing", domain: "erp", segments: ["retail", "manufacturing"], access: "unknown", testWith: "unknown", departments: ["custom_orders", "manufacturing"], historicalImportYears: 1, webhooks: false, settings: [], changelog: null, note: "Print jobs for wax and resin models" },
+
+  // Luxury watches
+  { id: "watchsearch", name: "TheWatchSearch (by TheWatchCloud)", domain: "pricing", segments: ["retail", "wholesale"], access: "file", testWith: "fixtures", departments: ["buying", "sales", "inventory"], historicalImportYears: 0, webhooks: false, settings: [], changelog: null, note: "Live offers and wanted lists from dealer WhatsApp groups. No API, so it starts from WhatsApp group chat exports the store already has; a partner feed from TheWatchCloud comes later" },
 ];
 
 /** Each row with its connector's own catalog entry laid over it, when one is built. */
