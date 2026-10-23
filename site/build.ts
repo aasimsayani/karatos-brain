@@ -89,6 +89,7 @@ export const DOMAIN_VALUE: Readonly<Record<string, { question: string; why: stri
   edi: { question: "Which orders and invoices came in from trading partners?", why: "Purchase orders and invoices land without retyping, and match what was shipped." },
   insurance: { question: "What is insured, and for how much?", why: "Inventory and appraisal values stay in step with the policy, so nothing is under-covered." },
   shipping: { question: "Where is the package, and was it insured for its value?", why: "High-value shipments are tracked and covered, and a delay reaches the customer before they ask." },
+  operations: { question: "Who is on shift, what is on the task board, and is the store secure?", why: "Staffing, open tasks and store security sit beside the sales they support, so a busy Saturday is covered before it starts." },
 };
 
 /** Dates for the holiday pilot the site announces. */

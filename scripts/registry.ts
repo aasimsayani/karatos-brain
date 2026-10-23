@@ -227,6 +227,7 @@ export const CATALOG_SECTIONS: readonly { title: string; domains: readonly Integ
   { title: "Customers, marketing and communication", domains: ["crm", "communication", "documents", "marketing"] },
   { title: "Money", domains: ["financial"] },
   { title: "Manufacturing and wholesale operations", domains: ["erp", "edi", "insurance", "shipping"] },
+  { title: "Running the business", domains: ["operations"] },
 ];
 
 const ACCESS: Record<IntegrationSpec["access"], string> = { public_api: "Public API", partner: "Partner", edi: "EDI", file: "File export", unknown: "Unknown" };
