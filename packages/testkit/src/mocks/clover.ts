@@ -1,5 +1,5 @@
 import { fixtureBuilder, synthetic } from "../fixtures.js";
-import { checkDocMock, docMockFetch, type DocMock, type DocMockFetch, type DocMockRequest, type DocMockResponse } from "../doc-mock.js";
+import { checkDocMock, docMockFetch, type DocMock, type DocMockFetch, type DocMockRequest, type DocMockResponse, type DocMockModule } from "../doc-mock.js";
 
 /**
  * The Clover REST API (v3) read endpoints for one merchant and Clover's v2
@@ -388,3 +388,21 @@ export function cloverDocMock(data: CloverMockData): CloverMock {
     revokeAccessTokens: () => access.clear(),
   };
 }
+
+export default {
+  integration: "clover",
+  covers: "Clover's REST API v3 read endpoints with its v2 OAuth token refresh, including its 90-day cap on orders, payments and refunds",
+  watchPages: [
+    "https://docs.clover.com/dev/docs/refresh-access-tokens",
+    "https://docs.clover.com/dev/docs/making-rest-api-calls",
+    "https://docs.clover.com/dev/reference/merchantgetmerchant",
+    "https://docs.clover.com/dev/reference/inventorygetitem",
+    "https://docs.clover.com/dev/reference/inventorygetitems",
+    "https://docs.clover.com/dev/reference/inventorygetitemstocks",
+    "https://docs.clover.com/dev/reference/customersgetcustomers",
+    "https://docs.clover.com/dev/reference/ordergetorders",
+    "https://docs.clover.com/dev/reference/paygetpayments",
+    "https://docs.clover.com/dev/reference/paygetrefunds-3",
+  ],
+  docMocks: () => [cloverDocMock({ records: {}, now: () => 0 }).oauth, cloverDocMock({ records: {}, now: () => 0 }).api],
+} satisfies DocMockModule;

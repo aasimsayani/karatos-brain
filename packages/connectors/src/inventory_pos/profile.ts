@@ -4,7 +4,7 @@ import { z } from "zod";
  * A mapping profile says how one point-of-sale system writes its exports:
  * which files hold what, which column holds each value, and how dates and
  * labels are written. The generic profile reads the column names in
- * docs/integrations.md. A profile for one client's system belongs in that
+ * docs/integrations/inventory_pos.md. A profile for one client's system belongs in that
  * client's private instance repo, never here.
  */
 
@@ -117,7 +117,7 @@ export function parsePosProfile(input: unknown): PosProfile {
   return profile;
 }
 
-/** Reads the column names listed under "Inventory and POS systems" in docs/integrations.md. */
+/** Reads the column names listed in docs/integrations/inventory_pos.md. */
 export const GENERIC_POS_PROFILE: PosProfile = parsePosProfile({
   id: "generic",
   name: "Generic CSV",
