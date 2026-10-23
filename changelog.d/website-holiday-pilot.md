@@ -1,0 +1,1 @@
+- The website has a "Value" section with the question each kind of connection answers for the owner and what is connected today, generated from the catalog, and a "Holiday pilot" section for the testing weekend on November 21–22, 2026. Pilot sign-ups go through the private inquiry form, titled `Holiday pilot: <business>` and labelled `pilot`.
