@@ -2,6 +2,7 @@
 import type { SandboxCheck } from "@karatos/core";
 import affirm from "./affirm.js";
 import authorize_net from "./authorize_net.js";
+import hubspot from "./hubspot.js";
 import plaid from "./plaid.js";
 import quickbooks from "./quickbooks.js";
 import shopify from "./shopify.js";
@@ -9,4 +10,4 @@ import stripe from "./stripe.js";
 import xero from "./xero.js";
 
 /** Every connector's nightly sandbox check. */
-export const SANDBOX_CHECKS: SandboxCheck[] = [affirm, authorize_net, plaid, quickbooks, shopify, stripe, xero];
+export const SANDBOX_CHECKS: SandboxCheck[] = [affirm, authorize_net, hubspot, plaid, quickbooks, shopify, stripe, xero];

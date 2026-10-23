@@ -77,7 +77,7 @@ Used by: R is retail, W is wholesale, M is manufacturing. Test with says how we 
 
 | Integration | Used by | Access | Test with | Webhooks | Status |
 | --- | --- | --- | --- | --- | --- |
-| HubSpot | R, W | Public API | Free sandbox | Yes | Planned |
+| HubSpot | R, W | Public API | Free sandbox | Yes | Built (Read scopes only; KaratOS checks the token's scopes before every sync and stops if one could change data. Pinned to HubSpot's 2026-09 API version, and the docs watch follows HubSpot's changelog) |
 | Monday.com | R, W, M | Public API | Free sandbox | Yes | Planned |
 | Custom forms | R | Public API | Sample files | Yes | Planned |
 | Gmail | R, W, M | Public API | Free sandbox | Yes | Planned |
@@ -206,12 +206,13 @@ A request for a path or method the docs don't list throws `UndocumentedRequestEr
 
 - Affirm's transaction, transaction event, daily settlement and dispute reads
 - Authorize.net's Transaction Reporting requests on its JSON API
+- HubSpot's CRM search, archived list, batch association and token info endpoints (date version 2026-09)
 - Plaid's accounts, transactions sync, Item and webhook verification key endpoints (API version 2020-09-14), with webhooks signed the way Plaid signs them
 - QuickBooks Online's query and change data capture endpoints with Intuit's token refresh (minor version 75)
 - Stuller's invoice and metal market rate endpoints (API v2)
 - Xero's Accounting API endpoints with its token refresh
 
-Where a vendor has a free sandbox (Affirm, Authorize.net, Plaid, QuickBooks Online and Xero so far), its mock is a stand-in until a developer account is set up for the nightly run.
+Where a vendor has a free sandbox (Affirm, Authorize.net, HubSpot, Plaid, QuickBooks Online and Xero so far), its mock is a stand-in until a developer account is set up for the nightly run.
 
 <!-- registry:mocks:end -->
 
@@ -379,6 +380,27 @@ Chase business checking, savings and credit cards, from the CSV activity downloa
 The profiles were written from Chase's published download format and statement layout. Before sign-off, check them against one of the client's own statements and confirm the event count matches the statement's transaction count.
 
 **Testing.** `packages/connectors/test/chase.test.ts` writes a synthetic two-page checking statement, a card statement and matching CSV downloads. It checks that each format reads the same transactions with the same keys, that each import mode reads only its own files, and that account folders get the right profile. No real statement goes in a repo.
+
+### HubSpot
+
+Reads HubSpot's CRM API for one account, pinned to the 2026-09 date version (HubSpot moved to date-based versions in 2026; each one keeps working until its end-of-life date). Read-only is enforced twice. Before its first read the client asks HubSpot which scopes the token holds (`POST /oauth/v2/private-apps/get/access-token-info`) and refuses to sync if any of them is more than a read scope, or if one of the four it needs is missing. And it sends four kinds of request only: that lookup, CRM searches, archived list reads and batch association reads. Each is checked against an allowlist, and each search body against the one shape the connector builds, before anything leaves the server. The writes it may do later (update contacts and deals, log activities) are declared and stay behind the write gate.
+
+| Setting | What it is |
+| --- | --- |
+| `HUBSPOT_ACCESS_TOKEN` | The access token of a private app holding exactly `crm.objects.contacts.read`, `crm.objects.companies.read`, `crm.objects.deals.read` and `crm.objects.tickets.read`. HubSpot puts calls, emails, meetings, notes and tasks under the contacts scope. The older `tickets` scope can change tickets, so a token holding it is refused |
+| `HUBSPOT_WEBHOOK_SECRET` | Optional. The private app's client secret, which signs webhook deliveries |
+
+**What it reads.** Companies, contacts, deals, tickets, then calls, emails, meetings, notes and tasks. For each, CRM search reads what changed (`lastmodifieddate` for contacts, `hs_lastmodifieddate` for the rest), oldest first, 200 per page, and the list endpoint then reads archived records 100 per page as deletions, since search never returns them. Deals, tickets and engagements are linked to their contacts, companies or deals with batch association reads of 100 ids. The historical import reads changes from the last five years. Incremental syncs read from where the previous pass started, less ten minutes, because search is fed from an index that can lag a change; with no checkpoint the first pass looks back 48 hours. Each pass reads changes up to the moment it started, so paging stays stable while records change.
+
+**Search's 10,000 cap.** One search query can page through at most 10,000 results. The connector never gets near that: after each full page it starts a new query from the page's newest modified time, and the checkpoint lists the ids already read at exactly that time so they aren't read twice. Only a page whose records all share one time is paged with HubSpot's offset. If more than 10,000 records ever changed in the same millisecond the sync stops with an error rather than skip any.
+
+**Rate limits.** Private apps get 100 requests per 10 seconds (190 on Professional and Enterprise) and a daily allowance per account, and search allows five requests a second. Searches are spaced 200 ms apart. A 10-second limit or a 5xx is retried with backoff, three tries; the daily limit (`policyName: DAILY`) stops the sync with a message, and the next run resumes from its checkpoint.
+
+**Events.** Contacts become clienteling `customer.profile_updated` events, with the contact's first and last name as the only personal detail and marketing consent always off, since subscription and legal-basis data isn't read. The rest keep a neutral CRM shape: `crm.company_updated` (name), `crm.deal_updated` (name, pipeline, stage, amount in whole cents, currency, close date, contacts and companies), `crm.ticket_updated` (pipeline, status, priority, contacts and companies), `crm.engagement_logged` (kind, time, contacts and deals) and `crm.record_deleted`. Each event is keyed by object, id and last modified time, and a deletion by when it was archived, so each version is stored once and a replay is a duplicate. No email addresses, phone numbers, addresses, ticket subjects or bodies, notes, email bodies, meeting descriptions or call recordings are requested or kept.
+
+**Webhooks.** `verifyHubSpotWebhook` checks `X-HubSpot-Signature-v3`, the base64 HMAC-SHA256 of method, URI, raw body and `X-HubSpot-Request-Timestamp`, keyed with the app's client secret and compared in constant time, and refuses a timestamp more than five minutes off, so a captured delivery can't be replayed. `hubSpotWebhookChanges` lists the contact, company, deal and ticket changes for one account, leaving property values out. A delivery is a prompt to sync, not data. The instance doesn't take webhooks yet; the scheduled sync picks every change up.
+
+**Testing.** The tests run against a mock built from HubSpot's docs (`packages/testkit/src/mocks/hubspot.ts`), which answers 401 without the token, enforces search's filter, page size and 10,000-result limits, returns contacts' default properties (email included) whatever was asked for, and lists its assumptions. For the nightly run, create a free HubSpot developer test account, add a private app with the four read scopes above, and add its token as the `SANDBOX_HUBSPOT_ACCESS_TOKEN` GitHub Actions secret.
 
 ### Inventory and POS systems
 
