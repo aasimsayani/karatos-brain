@@ -82,7 +82,7 @@ Used by: R is retail, W is wholesale, M is manufacturing. Test with says how we 
 | Custom forms | R | Public API | Sample files | Yes | Planned |
 | Gmail | R, W, M | Public API | Free sandbox | Yes | Planned |
 | Google Workspace and Drive | R, W, M | Public API | Free sandbox | Yes | Planned |
-| Slack | R, W, M | Public API | Free sandbox | Yes | Planned |
+| Slack | R, W, M | Public API | Free sandbox | Yes | Built (Bot token with read scopes only, as an internal app made in the business's own workspace. Since May 2025 an app distributed outside the Slack Marketplace may read history only once a minute, 15 messages at a time, so a five-year import needs the internal app. Events API webhooks are verified but the instance doesn't take them yet; the scheduled sync reads the same messages) |
 | Instagram DMs, Facebook Messenger and WhatsApp Business | R | Public API | Free sandbox | Yes | Deferred (Waiting on Facebook account recovery) |
 | Claude (Anthropic API) | R, W, M | Public API | Paid account | No | Planned (Reasoning, not a data source) |
 | Clientbook | R | Partner | Partner | No | Planned |
@@ -208,10 +208,11 @@ A request for a path or method the docs don't list throws `UndocumentedRequestEr
 - Authorize.net's Transaction Reporting requests on its JSON API
 - Plaid's accounts, transactions sync, Item and webhook verification key endpoints (API version 2020-09-14), with webhooks signed the way Plaid signs them
 - QuickBooks Online's query and change data capture endpoints with Intuit's token refresh (minor version 75)
+- Slack's auth.test, conversations.list, conversations.history and conversations.replies, with both rate-limit regimes (Web API)
 - Stuller's invoice and metal market rate endpoints (API v2)
 - Xero's Accounting API endpoints with its token refresh
 
-Where a vendor has a free sandbox (Affirm, Authorize.net, Plaid, QuickBooks Online and Xero so far), its mock is a stand-in until a developer account is set up for the nightly run.
+Where a vendor has a free sandbox (Affirm, Authorize.net, Plaid, QuickBooks Online, Slack and Xero so far), its mock is a stand-in until a developer account is set up for the nightly run.
 
 <!-- registry:mocks:end -->
 
@@ -501,6 +502,32 @@ Only what the departments use is kept: no email addresses, phone numbers or stre
 **Webhooks.** `verifyShopifyWebhook` checks `X-Shopify-Hmac-SHA256` against the raw body before it's parsed. `handleWebhook({ topic, payload })` maps the REST-shaped delivery onto the same events the sync produces, so a webhook for a record already synced, or a redelivery, is a duplicate. Topics read: orders, refunds, products and customers.
 
 **Testing.** The tests use synthetic, doc-shaped responses until the nightly sandbox run has a development store. To set one up, create a free development store and an app with the read scopes above in the same Shopify Dev Dashboard organization, then add `SANDBOX_SHOPIFY_SHOP_DOMAIN`, `SANDBOX_SHOPIFY_CLIENT_ID` and `SANDBOX_SHOPIFY_CLIENT_SECRET` as GitHub Actions secrets. Until those exist, the nightly run lists Shopify as skipped. The writes it may do later (adjust inventory, tag customers and orders, create draft orders) are declared, and the write-gate test shows each one is rejected.
+
+### Slack
+
+Reads the messages and threads in the channels the KaratOS app's bot has been invited to, through the Slack Web API, for sales (what the floor is talking about), repairs (job updates in a repairs channel) and custom orders (the threads around a commission). It reads nothing from a channel the bot isn't in, and no direct messages.
+
+**The app.** The business makes its own app at api.slack.com/apps in its own workspace and doesn't distribute it. That keeps Slack's internal-app limits: conversations.history and conversations.replies are Tier 3 (50+ requests a minute, up to 1,000 messages a page). Since 29 May 2025, an app distributed to other workspaces that isn't in the Slack Marketplace gets Tier 1 for those two methods on every new installation, one request a minute and at most 15 messages a page, which makes a five-year import of a busy channel take days. Set `SLACK_APP_DISTRIBUTION=non_marketplace` only for an app installed that way; the connector then reads 15 a page and paces itself to one read a minute.
+
+**Scopes.** Bot token scopes `channels:read` and `channels:history`, and `groups:read` with `groups:history` to read private channels the bot is invited to. Nothing else: not `chat:write` (posting), `users:read` (names and profiles), `files:read` (file contents), `im:history` or `mpim:history` (direct messages). The client checks the token with `auth.test` before its first read and reads the scopes Slack reports in the `x-oauth-scopes` header on that and every later answer; it stops if any scope beyond those four is there, if the private pair is incomplete, if the header is missing, or if `auth.test` names no bot (a user token). Read-only is also enforced in code: it sends `auth.test` (a POST, as documented, which changes nothing) and three GETs (`conversations.list`, `conversations.history`, `conversations.replies`), checks every argument, and throws on anything else, `chat.postMessage` included, before it is sent. The token goes in the Authorization header, never the URL. The writes it may do later (`post_recommendation`, `post_alert`, both `chat.postMessage`) are declared and stay behind the write gate.
+
+| Setting | What it is |
+| --- | --- |
+| `SLACK_BOT_TOKEN` | The app's Bot User OAuth Token (`xoxb-`). User and app-level tokens are refused |
+| `CORRESPONDENT_HASH_KEY` | The instance's key for people references, shared with Gmail. `npm run secrets:setup` generates it; don't rotate it, or history stops lining up |
+| `SLACK_TEXT_CHANNELS` | Optional. `none` (the default), `all`, or channel ids separated by commas: the channels whose message text is kept |
+| `SLACK_APP_DISTRIBUTION` | Optional. `internal` (the default) or `non_marketplace` |
+| `SLACK_SIGNING_SECRET` | Optional. The app's signing secret, for Events API webhooks once the instance takes them |
+
+**What it reads.** Each pass lists the workspace's channels, 200 a page, and keeps those the bot is a member of (up to 1,000). Then, channel by channel, it reads the history newest first, 200 a page, and for each thread parent the thread's replies, every page. The historical import reads five years back. Incremental syncs read each channel again from seven days before the previous pass started, because a new reply doesn't move its thread up the history, and read the replies only of threads with a reply since the previous pass. A channel the bot joined since the previous pass is read five years back. A reply to a thread more than seven days old reaches the brain through the Events API once the instance takes webhooks. With no checkpoint an incremental pass looks back 48 hours. The checkpoint holds the step, Slack's cursors and the channel list, so a crash resumes at the page it stopped on. A channel the bot was removed from mid-pass is skipped. 429s are waited out for their `Retry-After` (up to five minutes), five times, before the error goes to the sync, which resumes from the checkpoint.
+
+**Events.** `communication.channel_updated` for each channel the bot is in: id, public or private, name, archived, created, member count and whether its text is kept. `communication.message_logged` for each message and reply: the channel, message and thread references, whether it's a reply, when it was sent, the author's reference (or the bot's id for an app's post), the kind (message, bot message, file share, thread broadcast, me message), reply, file and reaction counts, whether it was edited, and the text where kept. `communication.message_deleted` from a webhook. A message is keyed by channel, timestamp and a hash of its edit time and whether its text is kept, so an edit is a new version and a message seen by both the sync and a webhook, or replayed, is stored once. Join, leave, topic, purpose, rename and pin notices are skipped.
+
+**Personal data.** Kept: ids, times, counts, channel names, and text only from the channels in `SLACK_TEXT_CHANNELS`. Every Slack user id becomes `slack_user:<hash>`, an HMAC-SHA256 under `CORRESPONDENT_HASH_KEY`, so the same person is the same reference everywhere but can't be identified or matched against another instance. Display names, profiles and email addresses are never read (there's no `users:read`). Kept text is cut to 12,000 characters before any pattern sees it and to 4,000 after, and is redacted in one pass: email addresses and `mailto:` links become `[email]`; phone numbers, `tel:` links and any run of seven or more digits (order, card and account numbers) become `[number]`, though dates like 2026-01-22, prices and ring sizes stay; links keep only their host (`[link: vendor.test]`); mentions of people become their reference. Files are counted, never fetched: no names, titles, previews or links. Reactions are counted without who reacted. Blocks and attachments are dropped. A channel name with four digits in a row is withheld.
+
+**Webhooks.** `verifySlackWebhook` checks `X-Slack-Signature`: `v0=` and the hex HMAC-SHA256 of `v0:<X-Slack-Request-Timestamp>:<raw body>` under `SLACK_SIGNING_SECRET`, compared in constant time, and refuses a timestamp more than 300 seconds from now, before the body is parsed. `slackUrlVerification` gives the challenge to answer Slack's `url_verification`. `handleWebhook` turns a verified `event_callback` for a message posted, edited (`message_changed`) or deleted (`message_deleted`) in a channel or private channel into the same events the sync makes, so a webhook for a synced message, or a delivery Slack retries, is a duplicate. Subscribing needs the `message.channels` and `message.groups` bot events. The instance doesn't take webhooks yet; the scheduled sync picks up the same messages.
+
+**Testing.** Until a sandbox is set up, the tests run against a mock built from Slack's docs (`packages/testkit/src/mocks/slack.ts`), which pages by cursor, filters channels by membership and scope, answers `not_in_channel`, `missing_scope`, `invalid_auth` and `ratelimited` the way the docs describe, and holds a non-Marketplace app to 15-message pages. What the docs leave out is in its assumptions, checked on the first live run. For the nightly run, join the Slack Developer Program, create a free developer sandbox workspace holding only synthetic messages, create an internal app there with the four read scopes above, install it, invite the bot to a test channel and a test private channel, and add the bot token as the `SANDBOX_SLACK_BOT_TOKEN` GitHub Actions secret.
 
 ### Stripe
 

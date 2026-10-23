@@ -8,8 +8,9 @@ import inventory_pos from "./inventory_pos.js";
 import plaid from "./plaid.js";
 import quickbooks from "./quickbooks.js";
 import shopify from "./shopify.js";
+import slack from "./slack.js";
 import stripe from "./stripe.js";
 import xero from "./xero.js";
 
 /** Each built connector's own catalog fields, by catalog id. */
-export const CONNECTOR_CATALOG: Readonly<Record<string, ConnectorCatalogEntry>> = { affirm, authorize_net, bank_statements, chase, inventory_pos, plaid, quickbooks, shopify, stripe, xero };
+export const CONNECTOR_CATALOG: Readonly<Record<string, ConnectorCatalogEntry>> = { affirm, authorize_net, bank_statements, chase, inventory_pos, plaid, quickbooks, shopify, slack, stripe, xero };
