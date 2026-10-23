@@ -14,7 +14,7 @@ Each connector keeps everything about itself in its own files, named after its c
 | `packages/connectors/test/<id>.test.ts` | Its unit and contract tests |
 | `packages/core/src/catalog/<id>.ts` | Its catalog fields once built: `status: "built"`, `note`, `capabilities`, and any row field it settles while being built (`settings`, `signIn`, `testWith`, `departments`). They take the place of the row's own in `packages/core/src/integrations.ts`, which you leave alone |
 | `packages/server/src/connectors/<id>.ts` | Its factory: the settings it needs and how the scheduled runner builds it |
-| `packages/server/test/connectors/<id>.test.ts` | The factory's tests: what it reports missing, and that it builds from settings |
+| `packages/server/test/connectors/<id>.test.ts` | The factory's tests: what it reports missing, and that it builds from settings. Longer tests, such as the scheduled sync with a token store, go beside it in `<id>.<topic>.test.ts` |
 | `scripts/sandbox-checks/<id>.ts` and `<id>.test.ts` | Its nightly sandbox check, when the vendor has a free sandbox. Its `credentials` are passed to the nightly job for you |
 | `packages/testkit/src/mocks/<id>.ts` | A mock built from the vendor's docs, when there's nothing else to test against yet. Its default export says what it `covers`, its `watchPages` and its `docMocks()` |
 | `secrets/manifest/<id>.json` | Its settings: `{ "integration": "<id>", "uses": [...], "entries": [...] }`. Each entry is `requiredFor: ["integration:<id>"]` |
