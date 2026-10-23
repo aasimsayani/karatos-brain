@@ -1,5 +1,5 @@
 import { fixtureBuilder, synthetic } from "../fixtures.js";
-import { checkDocMock, docMockFetch, type DocMock, type DocMockFetch, type DocMockResponse } from "../doc-mock.js";
+import { checkDocMock, docMockFetch, type DocMock, type DocMockFetch, type DocMockResponse, type DocMockModule } from "../doc-mock.js";
 
 /**
  * The Slack Web API reads a bot token can make on channels it was invited
@@ -279,3 +279,15 @@ export function slackDocMock(data: SlackMockData): SlackMock {
     },
   };
 }
+
+export default {
+  integration: "slack",
+  covers: "Slack's auth.test, conversations.list, conversations.history and conversations.replies, with both rate-limit regimes (Web API)",
+  watchPages: [
+    "https://docs.slack.dev/reference/methods/conversations.history",
+    "https://docs.slack.dev/reference/methods/auth.test",
+    "https://docs.slack.dev/reference/methods/conversations.list",
+    "https://docs.slack.dev/reference/methods/conversations.replies",
+  ],
+  docMocks: () => [slackDocMock({ channels: [], token: "" }).api],
+} satisfies DocMockModule;

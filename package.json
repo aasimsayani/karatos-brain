@@ -27,7 +27,9 @@
     "changelog:check": "node --import tsx scripts/changelog-cli.ts check",
     "changelog:collect": "node --import tsx scripts/changelog-cli.ts collect",
     "progress:write": "node --import tsx scripts/progress-cli.ts write",
-    "progress:check": "node --import tsx scripts/progress-cli.ts check"
+    "progress:check": "node --import tsx scripts/progress-cli.ts check",
+    "registry:write": "node --conditions=source --import tsx scripts/registry-cli.ts write",
+    "registry:check": "node --conditions=source --import tsx scripts/registry-cli.ts check"
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.5.10",
