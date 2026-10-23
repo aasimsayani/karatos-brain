@@ -28,6 +28,8 @@ jobs:
           if git cat-file -e "origin/${GITHUB_BASE_REF}:scripts/changelog-cli.ts" 2>/dev/null; then npm run changelog:check
           else echo "base has no changelog check yet"; fi
       - run: npm run typecheck
+      # Every list of connectors is generated from each connector's own files; this fails when one is stale.
+      - run: npm run registry:check
       - run: npm run test:coverage
       - run: npm run build
 

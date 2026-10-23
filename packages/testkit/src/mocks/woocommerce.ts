@@ -1,5 +1,5 @@
 import { fixtureBuilder, synthetic } from "../fixtures.js";
-import { checkDocMock, docMockFetch, type DocMock, type DocMockFetch, type DocMockRequest, type DocMockResponse } from "../doc-mock.js";
+import { checkDocMock, docMockFetch, type DocMock, type DocMockFetch, type DocMockRequest, type DocMockResponse, type DocMockModule } from "../doc-mock.js";
 
 /**
  * A WooCommerce store's REST API (v3) read endpoints, built from the
@@ -354,3 +354,17 @@ export function wooCommerceDocMock(data: WooCommerceMockData): WooCommerceMock {
 
   return { api, fetch: docMockFetch(api) };
 }
+
+export default {
+  integration: "woocommerce",
+  covers: "A WooCommerce store's REST API v3 read endpoints with its key permissions and page headers",
+  watchPages: [
+    "https://woocommerce.github.io/woocommerce-rest-api-docs/",
+    "https://developer.woocommerce.com/docs/apis/rest-api/v3/orders/",
+    "https://developer.woocommerce.com/docs/apis/rest-api/v3/products/",
+    "https://developer.woocommerce.com/docs/apis/rest-api/v3/product-variations/",
+    "https://developer.woocommerce.com/docs/apis/rest-api/v3/customers/",
+    "https://developer.woocommerce.com/docs/apis/rest-api/v3/refunds/",
+  ],
+  docMocks: () => [wooCommerceDocMock({}).api],
+} satisfies DocMockModule;
