@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { fixtureBuilder, synthetic } from "../fixtures.js";
-import { checkDocMock, docMockFetch, type DocMock, type DocMockFetch, type DocMockRequest, type DocMockResponse } from "../doc-mock.js";
+import { checkDocMock, docMockFetch, type DocMock, type DocMockFetch, type DocMockRequest, type DocMockResponse, type DocMockModule } from "../doc-mock.js";
 
 /**
  * Klaviyo's JSON:API (revision 2026-10-15) as the connector reads it:
@@ -389,3 +389,22 @@ export function klaviyoDocMock(data: KlaviyoMockData): KlaviyoMock {
 
   return { api, fetch: docMockFetch(api), reports };
 }
+
+export default {
+  integration: "klaviyo",
+  covers: "Klaviyo's mock covers its profile, list, segment, campaign, flow and metric reads and the campaign and flow values reports (revision 2026-10-15). Plaid's accounts, transactions sync, Item and webhook verification key endpoints (API version 2020-09-14), with webhooks signed the way Plaid signs them",
+  watchPages: [
+    "https://developers.klaviyo.com/en/docs/authenticate_",
+    "https://developers.klaviyo.com/en/reference/get_profiles",
+    "https://developers.klaviyo.com/en/reference/get_lists",
+    "https://developers.klaviyo.com/en/reference/get_profile_ids_for_list",
+    "https://developers.klaviyo.com/en/reference/get_segments",
+    "https://developers.klaviyo.com/en/reference/get_profile_ids_for_segment",
+    "https://developers.klaviyo.com/en/reference/get_campaigns",
+    "https://developers.klaviyo.com/en/reference/get_flows",
+    "https://developers.klaviyo.com/en/reference/get_metrics",
+    "https://developers.klaviyo.com/en/reference/query_campaign_values",
+    "https://developers.klaviyo.com/en/reference/query_flow_values",
+  ],
+  docMocks: () => [klaviyoDocMock({ apiKey: "" }).api],
+} satisfies DocMockModule;

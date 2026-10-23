@@ -1,5 +1,5 @@
 import { fixtureBuilder, synthetic } from "../fixtures.js";
-import { checkDocMock, docMockFetch, type DocMock, type DocMockFetch, type DocMockResponse } from "../doc-mock.js";
+import { checkDocMock, docMockFetch, type DocMock, type DocMockModule, type DocMockFetch, type DocMockResponse } from "../doc-mock.js";
 
 /**
  * The Xero Accounting API's read endpoints and Xero's OAuth token refresh,
@@ -322,3 +322,17 @@ export function xeroDocMock(data: XeroMockData): XeroMock {
     revokeAccessTokens: () => access.clear(),
   };
 }
+
+export default {
+  integration: "xero",
+  covers: "Xero's Accounting API endpoints with its token refresh",
+  watchPages: [
+    "https://developer.xero.com/documentation/guides/oauth2/auth-flow",
+    "https://developer.xero.com/documentation/api/accounting/overview",
+    "https://developer.xero.com/documentation/api/accounting/requests-and-responses",
+  ],
+  docMocks: () => {
+    const mock = xeroDocMock({ records: {}, refreshToken: "" });
+    return [mock.identity, mock.api];
+  },
+} satisfies DocMockModule;

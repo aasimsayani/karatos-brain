@@ -1,5 +1,5 @@
 import { fixtureBuilder, synthetic } from "../fixtures.js";
-import { checkDocMock, docMockFetch, type DocMock, type DocMockFetch, type DocMockResponse } from "../doc-mock.js";
+import { checkDocMock, docMockFetch, type DocMock, type DocMockModule, type DocMockFetch, type DocMockResponse } from "../doc-mock.js";
 
 /**
  * QuickBooks Online's Accounting API query and change data capture
@@ -295,3 +295,18 @@ export function quickBooksDocMock(data: QuickBooksMockData): QuickBooksMock {
     revokeAccessTokens: () => access.clear(),
   };
 }
+
+export default {
+  integration: "quickbooks",
+  covers: "QuickBooks Online's query and change data capture endpoints with Intuit's token refresh (minor version 75)",
+  watchPages: [
+    "https://developer.intuit.com/app/developer/qbo/docs/develop/authentication-and-authorization/oauth-2.0",
+    "https://developer.intuit.com/app/developer/qbo/docs/api/accounting/all-entities/account",
+    "https://developer.intuit.com/app/developer/qbo/docs/learn/explore-the-quickbooks-online-api/data-queries",
+    "https://developer.intuit.com/app/developer/qbo/docs/api/accounting/all-entities/changedatacapture",
+  ],
+  docMocks: () => {
+    const mock = quickBooksDocMock({ entities: {}, refreshToken: "", now: () => new Date(0) });
+    return [mock.oauth, mock.api];
+  },
+} satisfies DocMockModule;
