@@ -1,8 +1,6 @@
-import { mkdtemp } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { describe, expect, it, vi } from "vitest";
-import { BrainPipeline, InMemoryStore, runSync, type Connector, type SourceBatch, type SyncContext } from "@karatos/core";
+import { readdirSync } from "node:fs";
+import { describe, expect, it } from "vitest";
+import { BrainPipeline, INTEGRATIONS, InMemoryStore, runSync, type Connector, type SourceBatch, type SyncContext } from "@karatos/core";
 import { createSyncRunner, HISTORICAL_COMPLETE, scheduledConnectors, StaticDocumentationSource, SYNCABLE_INTEGRATIONS, type ScheduledConnector } from "../src/index.js";
 
 const ORG = "test-jeweler";
@@ -69,13 +67,6 @@ describe("scheduledConnectors", () => {
     expect(skipped).toEqual([]);
   });
 
-  it("accepts either Shopify sign-in and lists both client settings when neither is set", () => {
-    const client = scheduledConnectors(["shopify"], { SHOPIFY_SHOP_DOMAIN: "demo.myshopify.com", SHOPIFY_CLIENT_ID: "id", SHOPIFY_CLIENT_SECRET: "secret" });
-    expect(client.connectors.map((c) => c.id)).toEqual(["shopify"]);
-    const half = scheduledConnectors(["shopify"], { SHOPIFY_CLIENT_ID: "id-value" });
-    expect(half.skipped).toEqual([{ id: "shopify", reason: "missing SHOPIFY_SHOP_DOMAIN, SHOPIFY_CLIENT_ID, SHOPIFY_CLIENT_SECRET" }]);
-  });
-
   it("skips integrations with no connector yet and those missing settings, naming settings but never values", () => {
     const secret = fakeKey("rk", "live");
     const { connectors, skipped } = scheduledConnectors(["anthropic", "stripe", "inventory_pos", "bank_statements", "stripe"], {
@@ -89,19 +80,7 @@ describe("scheduledConnectors", () => {
       { id: "inventory_pos", reason: "missing POS_IMPORT_DIR" },
       { id: "bank_statements", reason: "missing BANK_STATEMENTS_IMPORT_DIR" },
     ]);
-    expect(scheduledConnectors(["chase"], { CHASE_IMPORT_MODE: "manual_pdf" }).skipped).toEqual([{ id: "chase", reason: "missing CHASE_MANUAL_IMPORT_DIR" }]);
-    expect(scheduledConnectors(["chase"], { CHASE_MANUAL_IMPORT_DIR: "/data/chase" }).skipped).toEqual([{ id: "chase", reason: "missing CHASE_IMPORT_MODE" }]);
     expect(JSON.stringify(skipped)).not.toContain(secret);
-    expect(scheduledConnectors(["quickbooks"], { QUICKBOOKS_CLIENT_ID: "id", QUICKBOOKS_REFRESH_TOKEN: secret }).skipped).toEqual([
-      { id: "quickbooks", reason: "missing QUICKBOOKS_CLIENT_SECRET, QUICKBOOKS_REALM_ID, QUICKBOOKS_ENVIRONMENT" },
-    ]);
-    expect(scheduledConnectors(["affirm"], { AFFIRM_PRIVATE_API_KEY: secret, AFFIRM_ENVIRONMENT: "sandbox" }).skipped).toEqual([
-      { id: "affirm", reason: "missing AFFIRM_PUBLIC_API_KEY, AFFIRM_MERCHANT_ID" },
-    ]);
-    expect(scheduledConnectors(["plaid"], { PLAID_CLIENT_ID: "id", PLAID_ACCESS_TOKEN: secret }).skipped).toEqual([
-      { id: "plaid", reason: "missing PLAID_SECRET, PLAID_ENVIRONMENT" },
-    ]);
-    expect(scheduledConnectors(["xero"], { XERO_CLIENT_SECRET: secret, XERO_REFRESH_TOKEN: secret }).skipped).toEqual([{ id: "xero", reason: "missing XERO_CLIENT_ID, XERO_TENANT_ID" }]);
   });
 
   it("syncs nothing unless an integration is turned on, even when its settings are present", () => {
@@ -112,76 +91,12 @@ describe("scheduledConnectors", () => {
     expect(scheduledConnectors(["constructor", "toString"], {}).skipped.map((s) => s.reason)).toEqual(["no connector to sync yet", "no connector to sync yet"]);
   });
 
-  it("builds each built connector from the instance's settings", async () => {
-    const pos = await mkdtemp(join(tmpdir(), "sync-pos-"));
-    const bank = await mkdtemp(join(tmpdir(), "sync-bank-"));
-    const chase = await mkdtemp(join(tmpdir(), "sync-chase-"));
-    const env = {
-      SHOPIFY_SHOP_DOMAIN: "demo.myshopify.com",
-      SHOPIFY_CLIENT_ID: "id",
-      SHOPIFY_CLIENT_SECRET: "secret",
-      SHOPIFY_API_VERSION: "2026-07",
-      STRIPE_SECRET_KEY: fakeKey("rk", "test"),
-      STRIPE_API_VERSION: "2026-09-30.clover",
-      POS_IMPORT_DIR: pos,
-      BANK_STATEMENTS_IMPORT_DIR: bank,
-      CHASE_IMPORT_MODE: "manual_csv_and_pdf",
-      CHASE_MANUAL_IMPORT_DIR: chase,
-      QUICKBOOKS_CLIENT_ID: "client-id",
-      QUICKBOOKS_CLIENT_SECRET: "client-secret-value",
-      QUICKBOOKS_REALM_ID: "9341450000",
-      QUICKBOOKS_REFRESH_TOKEN: "refresh-value",
-      QUICKBOOKS_ENVIRONMENT: "sandbox",
-      // Shaped like Affirm's key pair, assembled so no scanner mistakes them for real ones.
-      AFFIRM_PUBLIC_API_KEY: ["TESTPUB", "0".repeat(9)].join(""),
-      AFFIRM_PRIVATE_API_KEY: ["TESTPRIV", "0".repeat(24)].join(""),
-      AFFIRM_MERCHANT_ID: "MERCHANT-TEST",
-      AFFIRM_ENVIRONMENT: "sandbox",
-      PLAID_CLIENT_ID: "plaid-client-id",
-      PLAID_SECRET: "plaid-secret-value",
-      PLAID_ACCESS_TOKEN: ["access", "sandbox", "0".repeat(8)].join("-"),
-      PLAID_ENVIRONMENT: "sandbox",
-      XERO_CLIENT_ID: "client-id",
-      XERO_CLIENT_SECRET: "client-secret-value",
-      XERO_TENANT_ID: "00000000-0000-4000-8000-00000000a0a0",
-      XERO_REFRESH_TOKEN: "refresh-value",
-    };
-    const { connectors } = scheduledConnectors(SYNCABLE_INTEGRATIONS, env);
-    const built = await Promise.all(connectors.map((c) => c.make()));
-    expect(built.map((c) => c.source).sort()).toEqual(["affirm", "bank_statements", "chase", "inventory_pos", "plaid", "quickbooks", "shopify", "stripe", "xero"]);
-    const token = await scheduledConnectors(["shopify"], { SHOPIFY_SHOP_DOMAIN: "demo.myshopify.com", SHOPIFY_ADMIN_ACCESS_TOKEN: "t" }).connectors[0]!.make();
-    expect(token.source).toBe("shopify");
-    for (const connector of built) expect(connector).not.toHaveProperty("write");
-  });
-});
-
-describe("the Plaid factory", () => {
-  const env = { PLAID_CLIENT_ID: "plaid-client-id", PLAID_SECRET: "plaid-secret-value", PLAID_ACCESS_TOKEN: ["access", "sandbox", "0".repeat(8)].join("-"), PLAID_ENVIRONMENT: "sandbox" };
-
-  /** The cursor the first /transactions/sync request carries, with Plaid stubbed out. */
-  async function firstSyncCursor(store?: { memory: InMemoryStore; organizationId: string }): Promise<unknown> {
-    const cursors: unknown[] = [];
-    vi.stubGlobal("fetch", async (url: string | URL, init?: RequestInit) => {
-      if (String(url).endsWith("/accounts/get")) return new Response(JSON.stringify({ accounts: [] }));
-      cursors.push(JSON.parse(String(init?.body)).cursor ?? null);
-      return new Response(JSON.stringify({ error_type: "INVALID_INPUT", error_code: "stop_here", error_message: "stop" }), { status: 400 });
-    });
-    try {
-      const connector = await scheduledConnectors(["plaid"], env, store).connectors[0]!.make();
-      const batches = connector.incrementalSync({ organizationId: ORG, cursor: null })[Symbol.asyncIterator]();
-      await batches.next();
-      await expect(batches.next()).rejects.toMatchObject({ code: "stop_here" });
-    } finally {
-      vi.unstubAllGlobals();
-    }
-    return cursors[0];
-  }
-
-  it("starts the first incremental pass where the historical import ended", async () => {
-    const memory = new InMemoryStore();
-    await memory.saveCheckpoint(ORG, "plaid", "historical", JSON.stringify({ pass: "historical", step: "done", start: "c-test-9", next: "c-test-9" }));
-    expect(await firstSyncCursor({ memory, organizationId: ORG })).toBe("c-test-9");
-    expect(await firstSyncCursor()).toBeNull();
+  it("has a factory for exactly the connectors the catalog calls built, each with its own test", () => {
+    // Each factory lives in packages/server/src/connectors/<id>.ts and its tests in test/connectors/<id>.test.ts.
+    const built = INTEGRATIONS.filter((i) => i.status === "built").map((i) => i.id).sort();
+    expect([...SYNCABLE_INTEGRATIONS].sort()).toEqual(built);
+    const tested = readdirSync(new URL("./connectors/", import.meta.url)).filter((f) => f.endsWith(".test.ts")).map((f) => f.slice(0, -".test.ts".length));
+    expect(tested.sort()).toEqual(built);
   });
 });
 

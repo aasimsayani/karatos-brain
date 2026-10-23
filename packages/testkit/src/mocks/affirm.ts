@@ -1,5 +1,5 @@
 import { fixtureBuilder, synthetic } from "../fixtures.js";
-import { checkDocMock, docMockFetch, type DocMock, type DocMockFetch, type DocMockRequest, type DocMockResponse } from "../doc-mock.js";
+import { checkDocMock, docMockFetch, type DocMock, type DocMockFetch, type DocMockRequest, type DocMockResponse, type DocMockModule } from "../doc-mock.js";
 
 /**
  * Affirm's Merchant API reads, built from Affirm's developer docs: list and
@@ -386,3 +386,17 @@ export function affirmDocMock(data: AffirmMockData): AffirmMock {
     },
   };
 }
+
+export default {
+  integration: "affirm",
+  covers: "Affirm's transaction, transaction event, daily settlement and dispute reads",
+  watchPages: [
+    "https://docs.affirm.com/developers/reference/introduction",
+    "https://docs.affirm.com/developers/reference/list_transaction_events",
+    "https://docs.affirm.com/developers/reference/read_transaction",
+    "https://docs.affirm.com/developers/reference/list_transactions",
+    "https://docs.affirm.com/developers/reference/list_settlement_event_summaries",
+    "https://docs.affirm.com/developers/reference/listdisputes",
+  ],
+  docMocks: () => [affirmDocMock({ publicApiKey: "", privateApiKey: "", merchantId: "", transactions: [] }).api],
+} satisfies DocMockModule;

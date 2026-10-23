@@ -1,24 +1,9 @@
 import type { BrainPipeline, Connector, MemoryStore, SyncReport } from "@karatos/core";
 import { runSync } from "@karatos/core";
-import { sealedTokenStore } from "./token-store.js";
-import {
-  accountsFromDirectory,
-  affirmConnector,
-  bankStatementsConnector,
-  chaseAccountsFromDirectory,
-  chaseConnector,
-  chaseFormats,
-  directorySource,
-  inventoryPosConnector,
-  memoryTokenStore,
-  plaidConnector,
-  quickBooksConnector,
-  resolveBankProfiles,
-  resolvePosProfile,
-  shopifyConnector,
-  stripeConnector,
-  xeroConnector,
-} from "@karatos/connectors";
+import { FACTORIES } from "./connectors/index.js";
+import type { ConnectorStore, Env } from "./connector-factory.js";
+
+export type { ConnectorFactory, ConnectorStore } from "./connector-factory.js";
 
 /**
  * Runs each connector an instance has turned on, on a schedule. A connector
@@ -26,8 +11,6 @@ import {
  * syncs. Runs never overlap, one connector failing never stops the others,
  * and every connector stays read-only: nothing here performs a write.
  */
-
-type Env = Readonly<Record<string, string | undefined>>;
 
 /** A connector the runner can build fresh for every run, so new folders, profiles and rotated keys are picked up. */
 export interface ScheduledConnector {
@@ -43,111 +26,10 @@ export interface SkippedIntegration {
 /** Records that a connector's historical import ran to the end; afterwards it syncs incrementally. */
 export const HISTORICAL_COMPLETE = "historical_complete";
 
-const set = (env: Env, name: string) => (env[name]?.trim() ? env[name]!.trim() : undefined);
-
-/** Where connectors that keep state of their own, like a rotating refresh token, keep it. */
-export interface ConnectorStore {
-  memory: MemoryStore;
-  organizationId: string;
-}
-
-/** How each built connector is made from an instance's settings. Settings named here are the ones it can't run without. */
-const FACTORIES: Record<string, { needs: (env: Env) => string[]; make: (env: Env, store?: ConnectorStore) => Promise<Connector> }> = {
-  shopify: {
-    needs: (env) => [
-      ...(set(env, "SHOPIFY_SHOP_DOMAIN") ? [] : ["SHOPIFY_SHOP_DOMAIN"]),
-      ...(set(env, "SHOPIFY_ADMIN_ACCESS_TOKEN") || (set(env, "SHOPIFY_CLIENT_ID") && set(env, "SHOPIFY_CLIENT_SECRET"))
-        ? []
-        : ["SHOPIFY_CLIENT_ID", "SHOPIFY_CLIENT_SECRET"]),
-    ],
-    make: async (env) => {
-      const token = set(env, "SHOPIFY_ADMIN_ACCESS_TOKEN");
-      const version = set(env, "SHOPIFY_API_VERSION");
-      return shopifyConnector({
-        shopDomain: set(env, "SHOPIFY_SHOP_DOMAIN")!,
-        ...(token ? { accessToken: token } : { clientId: set(env, "SHOPIFY_CLIENT_ID")!, clientSecret: set(env, "SHOPIFY_CLIENT_SECRET")! }),
-        ...(version ? { apiVersion: version } : {}),
-      });
-    },
-  },
-  stripe: {
-    needs: (env) => (set(env, "STRIPE_SECRET_KEY") ? [] : ["STRIPE_SECRET_KEY"]),
-    make: async (env) => {
-      const version = set(env, "STRIPE_API_VERSION");
-      return stripeConnector({ secretKey: set(env, "STRIPE_SECRET_KEY")!, ...(version ? { apiVersion: version } : {}) });
-    },
-  },
-  inventory_pos: {
-    needs: (env) => (set(env, "POS_IMPORT_DIR") ? [] : ["POS_IMPORT_DIR"]),
-    make: async (env) =>
-      inventoryPosConnector({ source: directorySource(set(env, "POS_IMPORT_DIR")!), profile: await resolvePosProfile(env.POS_MAPPING_PROFILE) }),
-  },
-  quickbooks: {
-    needs: (env) => ["QUICKBOOKS_CLIENT_ID", "QUICKBOOKS_CLIENT_SECRET", "QUICKBOOKS_REALM_ID", "QUICKBOOKS_REFRESH_TOKEN", "QUICKBOOKS_ENVIRONMENT"].filter((name) => !set(env, name)),
-    make: async (env, store) => {
-      const seed = set(env, "QUICKBOOKS_REFRESH_TOKEN")!;
-      const clientSecret = set(env, "QUICKBOOKS_CLIENT_SECRET")!;
-      return quickBooksConnector({
-        clientId: set(env, "QUICKBOOKS_CLIENT_ID")!,
-        clientSecret,
-        realmId: set(env, "QUICKBOOKS_REALM_ID")!,
-        environment: set(env, "QUICKBOOKS_ENVIRONMENT")!,
-        // Intuit rotates the refresh token daily; the newest is kept, encrypted, in the instance's database.
-        tokens: store ? sealedTokenStore({ ...store, source: "quickbooks", seed, keyMaterial: clientSecret }) : memoryTokenStore(seed),
-      });
-    },
-  },
-  plaid: {
-    needs: (env) => ["PLAID_CLIENT_ID", "PLAID_SECRET", "PLAID_ACCESS_TOKEN", "PLAID_ENVIRONMENT"].filter((name) => !set(env, name)),
-    make: async (env, store) =>
-      plaidConnector({
-        clientId: set(env, "PLAID_CLIENT_ID")!,
-        secret: set(env, "PLAID_SECRET")!,
-        accessToken: set(env, "PLAID_ACCESS_TOKEN")!,
-        environment: set(env, "PLAID_ENVIRONMENT")!,
-        // The first incremental pass carries on from the Plaid cursor the historical import ended on.
-        ...(store ? { historicalCheckpoint: () => store.memory.getCheckpoint(store.organizationId, "plaid", "historical") } : {}),
-      }),
-  },
-  xero: {
-    needs: (env) => ["XERO_CLIENT_ID", "XERO_CLIENT_SECRET", "XERO_TENANT_ID", "XERO_REFRESH_TOKEN"].filter((name) => !set(env, name)),
-    make: async (env, store) => {
-      const seed = set(env, "XERO_REFRESH_TOKEN")!;
-      const clientSecret = set(env, "XERO_CLIENT_SECRET")!;
-      return xeroConnector({
-        clientId: set(env, "XERO_CLIENT_ID")!,
-        clientSecret,
-        tenantId: set(env, "XERO_TENANT_ID")!,
-        // Xero retires the refresh token on every refresh; the newest is kept, encrypted, in the instance's database.
-        tokens: store ? sealedTokenStore({ ...store, source: "xero", seed, keyMaterial: clientSecret }) : memoryTokenStore(seed),
-      });
-    },
-  },
-  bank_statements: {
-    needs: (env) => (set(env, "BANK_STATEMENTS_IMPORT_DIR") ? [] : ["BANK_STATEMENTS_IMPORT_DIR"]),
-    make: async (env) => {
-      const profileFor = await resolveBankProfiles(env.BANK_STATEMENTS_PROFILES);
-      return bankStatementsConnector({ accounts: await accountsFromDirectory(set(env, "BANK_STATEMENTS_IMPORT_DIR")!, profileFor) });
-    },
-  },
-  chase: {
-    needs: (env) => ["CHASE_IMPORT_MODE", "CHASE_MANUAL_IMPORT_DIR"].filter((name) => !set(env, name)),
-    make: async (env) =>
-      chaseConnector({ accounts: await chaseAccountsFromDirectory(set(env, "CHASE_MANUAL_IMPORT_DIR")!), formats: chaseFormats(env.CHASE_IMPORT_MODE) }),
-  },
-  affirm: {
-    needs: (env) => ["AFFIRM_PUBLIC_API_KEY", "AFFIRM_PRIVATE_API_KEY", "AFFIRM_MERCHANT_ID", "AFFIRM_ENVIRONMENT"].filter((name) => !set(env, name)),
-    make: async (env) =>
-      affirmConnector({
-        publicApiKey: set(env, "AFFIRM_PUBLIC_API_KEY")!,
-        privateApiKey: set(env, "AFFIRM_PRIVATE_API_KEY")!,
-        merchantId: set(env, "AFFIRM_MERCHANT_ID")!,
-        environment: set(env, "AFFIRM_ENVIRONMENT")!,
-      }),
-  },
-};
-
-/** Integration ids the runner knows how to sync. */
+/**
+ * Integration ids the runner knows how to sync: one for each factory in
+ * `packages/server/src/connectors/`, listed there by `npm run registry:write`.
+ */
 export const SYNCABLE_INTEGRATIONS = Object.keys(FACTORIES);
 
 /**
