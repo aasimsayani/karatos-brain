@@ -33,8 +33,9 @@ Guards: `npm run secrets:scan` runs in CI on every push and fails on anything sh
 
 ### A connector or vendor misbehaves
 
-- Every connector is read-only. Write actions are declared but run through a `WriteGate` that refuses them until the client turns writes on for that integration, and every attempt is audited. `assertWritesRefused` in the connector test kit checks this for every connector.
-- We never request write scopes from a vendor.
+- Every connector is read-only. Write actions are declared but run through a `WriteGate` that rejects them until the client turns writes on for that integration and action, and every attempt is audited. `assertWritesRefused` in the connector test kit checks this for every connector.
+- When a write is turned on, it also runs through `SafeWriter`, which checks, in order: the action is a draft, append or update (never a delete); the policy allows it; the integration's breaker is not tripped; the input passes the action's schema and limits; a named person approved it (only a draft may declare none, and an instance can raise approval but never lower it); its idempotency key is new, so a replay sends nothing; the action's daily cap (25 at most) is not reached; and a fresh re-read of the record matches what the proposal saw, or it is rejected as stale. After the write, the record is read back; a mismatch is audited as unverified and turns off every write to that integration until a person clears it. The audit keeps who asked, who approved, the evidence and the before and after values of only the touched fields. `assertWriteSafety` in the connector test kit checks a write target against each of these. See [careful write-back](architecture/write-back.md).
+- We never request write scopes from a vendor. Turning on a real write needs the owner's decision for that client, a sandbox run and the action's own `assertWriteSafety` tests.
 - Webhooks are verified (`timingSafeEqual` on the HMAC) before anything is parsed.
 - Incoming events are validated against each department's schema; anything malformed goes to the dead-letter table instead of into the brain.
 
@@ -62,7 +63,7 @@ Guards: `npm run secrets:scan` runs in CI on every push and fails on anything sh
 
 ## The break-it check
 
-Every PR's mutation check now includes security mutations alongside the functional ones. Typical cases: remove an auth or signature check, loosen a key comparison, drop a security header or a CSP directive, widen an allowlist, trust a client-supplied address, let a write past the `WriteGate`, or log a secret. Each must make a test fail. A surviving security mutation is fixed before the PR is opened.
+Every PR's mutation check now includes security mutations alongside the functional ones. Typical cases: remove an auth or signature check, loosen a key comparison, drop a security header or a CSP directive, widen an allowlist, trust a client-supplied address, let a write past the `WriteGate` or any `SafeWriter` check, or log a secret. Each must make a test fail. A surviving security mutation is fixed before the PR is opened.
 
 ## Reporting
 
