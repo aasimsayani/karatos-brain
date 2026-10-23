@@ -60,4 +60,12 @@ describe("loadInstanceConfig", () => {
     expect(loadInstanceConfig({ ...valid, SYNC_INTERVAL_MINUTES: "1440" }).SYNC_INTERVAL_MINUTES).toBe(1440);
     for (const bad of ["4", "1441", "1.5", "soon"]) expect(() => loadInstanceConfig({ ...valid, SYNC_INTERVAL_MINUTES: bad })).toThrow(/SYNC_INTERVAL_MINUTES/);
   });
+
+  it("keeps raw vendor data 30 days unless told otherwise, from 1 to 365 days", () => {
+    expect(loadInstanceConfig(valid).RAW_RETENTION_DAYS).toBe(30);
+    expect(loadInstanceConfig({ ...valid, RAW_RETENTION_DAYS: "1" }).RAW_RETENTION_DAYS).toBe(1);
+    expect(loadInstanceConfig({ ...valid, RAW_RETENTION_DAYS: "90" }).RAW_RETENTION_DAYS).toBe(90);
+    expect(loadInstanceConfig({ ...valid, RAW_RETENTION_DAYS: "365" }).RAW_RETENTION_DAYS).toBe(365);
+    for (const bad of ["0", "-1", "366", "1.5", "forever"]) expect(() => loadInstanceConfig({ ...valid, RAW_RETENTION_DAYS: bad })).toThrow(/RAW_RETENTION_DAYS/);
+  });
 });

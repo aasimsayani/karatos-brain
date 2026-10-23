@@ -7,6 +7,7 @@ import { createBrainApp } from "./app.js";
 import { createInstancePipeline } from "./brain.js";
 import { loadInstanceConfig } from "./config.js";
 import { StaticDocumentationSource } from "./documentation.js";
+import { createRetentionRunner } from "./retention.js";
 import { createSyncRunner, scheduledConnectors } from "./sync.js";
 
 const config = loadInstanceConfig(process.env);
@@ -61,6 +62,11 @@ const sync = createSyncRunner({
 });
 sync.start();
 
-const shutdown = () => server.close(() => void sync.stop().then(() => pool.end()).then(() => process.exit(0)));
+// Slim copy: raw vendor data older than RAW_RETENTION_DAYS is cleared once a day. Facts, signals and source references stay.
+const retention = createRetentionRunner({ store: memory, organizationId: config.ORGANIZATION_ID, retentionDays: config.RAW_RETENTION_DAYS });
+retention.start();
+
+const shutdown = () =>
+  server.close(() => void Promise.all([sync.stop(), retention.stop()]).then(() => pool.end()).then(() => process.exit(0)));
 process.on("SIGTERM", shutdown);
 process.on("SIGINT", shutdown);
