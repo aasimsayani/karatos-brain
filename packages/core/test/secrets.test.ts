@@ -88,6 +88,12 @@ describe("parseManifest", () => {
       parseManifest({ version: 1, entries: [{ ...manifest.entries[0], example: "BAD EXAMPLE" }] }),
     ).toThrow(/example/);
   });
+
+  it("takes integration ids with digits, as the catalog uses, and nothing else after integration:", () => {
+    const entry = (requiredFor: string) => ({ version: 1, entries: [{ ...manifest.entries[2], requiredFor: [requiredFor] }] });
+    expect(parseManifest(entry("integration:edi_x12")).entries[0]!.requiredFor).toEqual(["integration:edi_x12"]);
+    for (const bad of ["integration:EDI", "integration:edi-x12", "integration:", "integrations:edi_x12"]) expect(() => parseManifest(entry(bad)), bad).toThrow();
+  });
 });
 
 describe("redact", () => {
