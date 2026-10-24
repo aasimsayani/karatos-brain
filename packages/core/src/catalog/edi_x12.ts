@@ -11,4 +11,5 @@ export default {
     "Stores an order a partner sends twice once, and a changed order as a new version",
     "Read-only: KaratOS only reads the mailbox folder and never sends a document to a partner",
   ],
+  settings: ["EDI_IMPORT_DIR"],
 } satisfies ConnectorCatalogEntry;

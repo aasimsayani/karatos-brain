@@ -131,7 +131,7 @@ const pipelineFor = () => testPipeline([], SCHEMAS);
 
 describe("X12 reader", () => {
   it("reads the envelope, groups and sets, with delimiters taken from the ISA segment", () => {
-    const text = `﻿${interchange([{ set: "850", segments: PO_850 }], { element: "|", segment: "\n", after: "" })}\r\n${interchange([{ set: "997", segments: ["AK1*PO*1"] }], { control: "2", after: "\r\n" })}`;
+    const text = `\uFEFF${interchange([{ set: "850", segments: PO_850 }], { element: "|", segment: "\n", after: "" })}\r\n${interchange([{ set: "997", segments: ["AK1*PO*1"] }], { control: "2", after: "\r\n" })}`;
     const [first, second] = parseX12(text);
     expect(first).toMatchObject({ sender: { qualifier: "ZZ", id: RETAILER }, receiver: { qualifier: "ZZ", id: BRAND }, control: "000000001", usage: "P" });
     expect(first!.groups).toHaveLength(1);
