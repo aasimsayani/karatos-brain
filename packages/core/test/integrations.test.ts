@@ -102,7 +102,8 @@ describe("integrationStatuses", () => {
     expect(statuses.find((s) => s.id === "stripe")).toMatchObject({ configured: false, missingSettings: ["STRIPE_WEBHOOK_SECRET"] });
     expect(statuses.find((s) => s.id === "chase")).toMatchObject({ configured: true, missingSettings: [], access: "file", catalogStatus: "built" });
     // An integration with no settings of its own isn't configured just because nothing is missing.
-    expect(statuses.find((s) => s.id === "edi_x12")).toMatchObject({ configured: false, missingSettings: [] });
+    expect(statuses.find((s) => s.id === "piro")).toMatchObject({ configured: false, missingSettings: [] });
+    expect(statuses.find((s) => s.id === "edi_x12")).toMatchObject({ configured: false, missingSettings: ["EDI_IMPORT_DIR"], catalogStatus: "built" });
     expect(statuses.find((s) => s.id === "bank_statements")).toMatchObject({ configured: false, missingSettings: ["BANK_STATEMENTS_IMPORT_DIR"] });
     expect(JSON.stringify(statuses)).not.toContain("stripe-test-value");
   });
