@@ -116,9 +116,13 @@ export const stullerInvoice = fixtureBuilder<StullerInvoice>((n) => {
 export interface StullerMockData {
   invoices: StullerInvoice[];
   metalRates: { Type: "Gold" | "Silver" | "Platinum" | "Palladium"; Rate: number }[];
+  /** The developer login the mock accepts. Any well-formed Basic login is accepted when absent. */
+  login?: { username: string; password: string };
 }
 
 export function stullerDocMock(data: StullerMockData): DocMock {
+  const expected = data.login && `Basic ${Buffer.from(`${data.login.username}:${data.login.password}`).toString("base64")}`;
+  const denied = (request: { headers: Headers }) => (expected !== undefined && request.headers.get("authorization") !== expected ? { status: 401, body: { Message: "Authorization has been denied for this request." } } : null);
   const wanted = (url: URL, name: string) => url.searchParams.getAll(name).flatMap((v) => v.split(",")).filter(Boolean);
   return checkDocMock({
     integration: "stuller",
@@ -130,6 +134,8 @@ export function stullerDocMock(data: StullerMockData): DocMock {
       "Several values for one filter are sent as repeated query parameters or comma separated",
       "Filters combine with AND",
       "MetalMarket Rate is a price in US dollars per troy ounce; the docs' sample shows 1.0 placeholders and no unit",
+      "A wrong developer login answers 401 with the ASP.NET Web API message",
+      "InvoiceDate and OrderDate are ISO dates or times; the docs' sample shows placeholders",
     ],
     routes: [
       {
@@ -137,6 +143,8 @@ export function stullerDocMock(data: StullerMockData): DocMock {
         path: "/api/v2/invoice",
         documentedAt: `${HELP}/GET-namespace-v2.Invoice-Rest`,
         respond(request) {
+          const no = denied(request);
+          if (no) return no;
           const pos = wanted(request.url, "PurchaseOrderNumber");
           const numbers = wanted(request.url, "InvoiceNumber");
           const invoices = data.invoices.filter(
@@ -149,7 +157,7 @@ export function stullerDocMock(data: StullerMockData): DocMock {
         method: "GET",
         path: "/api/v2/products/metalmarketrates",
         documentedAt: `${HELP}/GET-namespace-v2.Products-MetalMarketRates`,
-        respond: () => ({ status: 200, body: { MetalMarkets: data.metalRates } }),
+        respond: (request) => denied(request) ?? { status: 200, body: { MetalMarkets: data.metalRates } },
       },
     ],
   });
