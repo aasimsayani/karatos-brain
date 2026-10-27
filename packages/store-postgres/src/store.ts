@@ -169,12 +169,12 @@ export class PostgresMemoryStore implements MemoryStore {
     }
   }
 
-  async recentSignals(organizationId: string, limit: number): Promise<Signal[]> {
+  async recentSignals(organizationId: string, limit: number, kinds?: readonly string[]): Promise<Signal[]> {
     const { rows } = await this.db.query<SignalRow>(
       `select * from (
-         select * from signals where organization_id = $1 order by seq desc limit $2
+         select * from signals where organization_id = $1 ${kinds ? "and kind = any($3)" : ""} order by seq desc limit $2
        ) recent order by seq asc`,
-      [organizationId, limit],
+      kinds ? [organizationId, limit, [...kinds]] : [organizationId, limit],
     );
     return rows.map((r) => ({
       id: r.id,

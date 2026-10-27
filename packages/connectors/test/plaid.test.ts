@@ -434,6 +434,11 @@ describe("Plaid sync", () => {
     expect(new Set(memory.events.map((e) => e.type))).toEqual(new Set(["bank.account_updated", "bank.transaction_imported", "bank.transaction_updated", "bank.transaction_removed"]));
     const bankSignals = memory.signals.filter((s) => s.kind === "bank.transaction");
     expect(bankSignals).toHaveLength(7);
+    // Finance keeps each account's balances for the console's cash position.
+    expect(memory.signals.filter((s) => s.kind === "bank.balance").map((s) => [s.subject.id, (s.value as { accountKind: string; currentBalanceCents: number }).accountKind, (s.value as { currentBalanceCents: number }).currentBalanceCents])).toEqual([
+      ["plaid:account:acct_test_1", "bank", 110_100],
+      ["plaid:account:acct_test_2", "credit_card", 100_000],
+    ]);
     expect(bankSignals.filter((s) => (s.value as { category: string }).category === "cash_deposit").map((s) => (s.value as { amountCents: number }).amountCents)).toEqual([250_000]);
   });
 

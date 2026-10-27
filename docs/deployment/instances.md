@@ -61,6 +61,7 @@ curl -X POST https://<instance-host>/v1/events \
 | `GET /v1/recommendations` | API key | Latest recommendations, with provenance and the degraded flag (`?limit=`, up to 200) |
 | `POST /v1/recommendations/:id/feedback` | API key | Record `accepted`, `rejected` or `overridden`, with the actor and an optional note |
 | `GET /v1/entities/:kind/:id` | API key | One canonical entity |
+| `GET /v1/signals` | API key | The latest signals, oldest first (`?kind=` up to 10 comma-separated kinds such as `bank.balance,receivable.invoice`; `?limit=`, 200 by default, up to 1,000). The console reads cash position and receivables this way |
 | `GET /v1/integrations` | API key | Every catalog integration and whether this instance has all its settings (`configured`, `missingSettings`). Names settings, never their values |
 
 ## Choosing a host

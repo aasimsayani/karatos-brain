@@ -189,6 +189,46 @@ describe("Brain API", () => {
 });
 
 describe("Brain API: memory endpoints", () => {
+  it("reads the latest signals, by kind when asked, for this instance's organization only", async () => {
+    const { memory, call } = await start();
+    const signal = (id: string, kind: string, organizationId = ORG) => ({
+      id,
+      organizationId,
+      kind,
+      subject: { kind: "bank_account" as const, id },
+      value: { currentBalanceCents: 100 },
+      confidence: 1,
+      derivedFromEventIds: ["evt_1"],
+      observedAt: "2026-10-01T12:00:00.000Z",
+    });
+    await memory.appendSignals([signal("s1", "bank.balance"), signal("s2", "receivable.invoice"), signal("s3", "bank.balance", "other-org"), signal("s4", "sale.line")]);
+    const read = async (query: string) => {
+      const res = await call(`/v1/signals${query}`);
+      return [res.status, ((await res.json()) as { signals?: { id: string }[]; error?: string })] as const;
+    };
+    expect((await read(""))[1].signals!.map((s) => s.id)).toEqual(["s1", "s2", "s4"]);
+    expect((await read("?kind=bank.balance"))[1].signals).toEqual([signal("s1", "bank.balance")]);
+    expect((await read("?kind=bank.balance&org=other-org&organizationId=other-org"))[1].signals!.map((s) => s.id)).toEqual(["s1"]);
+    expect((await read("?kind=bank.balance,%20receivable.invoice&limit=1"))[1].signals!.map((s) => s.id)).toEqual(["s2"]);
+    expect((await read("?limit=-5"))[1].signals!.map((s) => s.id)).toEqual(["s4"]);
+    expect((await read("?limit=nope"))[1].signals).toHaveLength(3);
+    for (const bad of ["?kind=", "?kind=Bank.Balance", "?kind=a;drop", "?kind=bank.balance,", `?kind=${Array.from({ length: 11 }, (_, i) => `k${i}`).join(",")}`]) {
+      expect(await read(bad), bad).toEqual([400, { error: "kind must be up to 10 comma-separated signal kinds, such as bank.balance" }]);
+    }
+    expect((await call("/v1/signals", { auth: false })).status).toBe(401);
+    expect((await call("/v1/signals", { method: "POST", body: "{}" })).status).toBe(405);
+  });
+
+  it("caps a signals read at 1,000", async () => {
+    const { memory, call } = await start();
+    const many = Array.from({ length: 1_005 }, (_, i) => ({ id: `s${i}`, organizationId: ORG, kind: "bank.balance", subject: { kind: "bank_account" as const, id: `a${i}` }, value: 1, confidence: 1, derivedFromEventIds: [], observedAt: "2026-10-01T12:00:00.000Z" }));
+    await memory.appendSignals(many);
+    const body = (await (await call("/v1/signals?limit=5000")).json()) as { signals: { id: string }[] };
+    expect(body.signals).toHaveLength(1_000);
+    expect(body.signals[0]!.id).toBe("s5");
+    expect(((await (await call("/v1/signals")).json()) as { signals: unknown[] }).signals).toHaveLength(200);
+  });
+
   it("lists recommendations and records feedback on them", async () => {
     const { call, memory } = await start();
     await call("/v1/reason", { method: "POST", body: "{}" });

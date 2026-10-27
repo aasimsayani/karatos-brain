@@ -168,6 +168,7 @@ The instance API:
 | `GET /v1/recommendations` | Latest recommendations, with provenance |
 | `POST /v1/recommendations/:id/feedback` | Record an accept, reject or override |
 | `GET /v1/entities/:kind/:id` | One canonical entity |
+| `GET /v1/signals` | The latest signals, filtered by kind, such as each bank balance or open invoice |
 | `GET /v1/integrations` | Each catalog integration and whether this instance has its settings, by name only |
 
 ## Connectors

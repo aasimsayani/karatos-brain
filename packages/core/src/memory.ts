@@ -61,8 +61,8 @@ export class InMemoryStore implements MemoryStore {
     this.signals.push(...signals);
   }
 
-  async recentSignals(organizationId: string, limit: number): Promise<Signal[]> {
-    return this.signals.filter((s) => s.organizationId === organizationId).slice(-limit);
+  async recentSignals(organizationId: string, limit: number, kinds?: readonly string[]): Promise<Signal[]> {
+    return this.signals.filter((s) => s.organizationId === organizationId && (!kinds || kinds.includes(s.kind))).slice(-limit);
   }
 
   async saveRecommendations(recommendations: Recommendation[]): Promise<void> {
