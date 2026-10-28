@@ -29,7 +29,7 @@ This section updates itself as work lands: it is generated from [docs/milestones
 <!-- progress:start -->
 <!-- Generated from docs/milestones.json and the integration catalog by npm run progress:write. Edit those, not this block. -->
 
-**Overall: 66% complete**, 25 of 38 roadmap items done. 21 of the 75 systems in the integration catalog are connected.
+**Overall: 66% complete**, 25 of 38 roadmap items done. 22 of the 75 systems in the integration catalog are connected.
 
 | Milestone | What it gives a jeweler | Progress | Target |
 | --- | --- | --- | --- |

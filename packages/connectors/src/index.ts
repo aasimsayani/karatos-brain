@@ -19,5 +19,6 @@ export * from "./shopify/index.js";
 export * from "./slack/index.js";
 export * from "./square/index.js";
 export * from "./stripe/index.js";
+export * from "./wix/index.js";
 export * from "./woocommerce/index.js";
 export * from "./xero/index.js";
