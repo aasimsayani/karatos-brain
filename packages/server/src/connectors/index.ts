@@ -18,6 +18,7 @@ import metals_api from "./metals_api.js";
 import monday from "./monday.js";
 import plaid from "./plaid.js";
 import quickbooks from "./quickbooks.js";
+import rapnet from "./rapnet.js";
 import shopify from "./shopify.js";
 import slack from "./slack.js";
 import square from "./square.js";
@@ -29,4 +30,4 @@ import woocommerce from "./woocommerce.js";
 import xero from "./xero.js";
 
 /** How each built connector is made from an instance's settings, by catalog id. */
-export const FACTORIES: Readonly<Record<string, ConnectorFactory>> = { affirm, authorize_net, bank_statements, bigcommerce, chase, clover, custom_forms, edi_x12, gia, gmail, google_workspace, hubspot, inventory_pos, klaviyo, metals_api, monday, plaid, quickbooks, shopify, slack, square, stripe, twilio, watchsearch, wix, woocommerce, xero };
+export const FACTORIES: Readonly<Record<string, ConnectorFactory>> = { affirm, authorize_net, bank_statements, bigcommerce, chase, clover, custom_forms, edi_x12, gia, gmail, google_workspace, hubspot, inventory_pos, klaviyo, metals_api, monday, plaid, quickbooks, rapnet, shopify, slack, square, stripe, twilio, watchsearch, wix, woocommerce, xero };
