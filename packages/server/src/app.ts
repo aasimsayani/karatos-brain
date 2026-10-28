@@ -87,6 +87,9 @@ const FeedbackBody = z.object({
   note: z.string().max(2000).optional(),
 });
 
+/** Signal kinds are lowercase dotted names, such as bank.balance or receivable.invoice. */
+const SIGNAL_KIND = /^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*){0,3}$/;
+
 type Handler = (req: IncomingMessage, params: string[], url: URL) => Promise<[number, unknown]>;
 
 /**
@@ -154,6 +157,19 @@ export function createBrainApp(options: BrainAppOptions): RequestListener {
           recordedAt: new Date().toISOString(),
         });
         return [201, { recorded: true }];
+      },
+    ],
+    [
+      "GET",
+      /^\/v1\/signals$/,
+      async (_req, _params, url) => {
+        const limit = Math.min(Math.max(Number(url.searchParams.get("limit") ?? 200) || 200, 1), 1000);
+        const raw = url.searchParams.get("kind");
+        const kinds = raw === null ? undefined : raw.split(",").map((k) => k.trim());
+        if (kinds && (kinds.length > 10 || kinds.some((k) => !SIGNAL_KIND.test(k)))) {
+          throw new HttpError(400, "kind must be up to 10 comma-separated signal kinds, such as bank.balance");
+        }
+        return [200, { signals: await options.memory.recentSignals(options.organizationId, limit, kinds) }];
       },
     ],
     ["GET", /^\/v1\/integrations$/, async () => [200, { integrations: options.integrations ?? [] }]],

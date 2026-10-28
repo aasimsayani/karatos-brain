@@ -457,6 +457,85 @@ describe("finance", () => {
   });
 });
 
+describe("finance balances and receivables", () => {
+  const invoice = (id: string, extra: Record<string, unknown> = {}) => ({
+    invoiceId: `quickbooks:invoice:${id}`,
+    number: `INV-${id}`,
+    customerId: "quickbooks:customer:1",
+    txnDate: "2026-07-01",
+    dueDate: "2026-08-01",
+    totalCents: 40_000,
+    balanceCents: 40_000,
+    currency: "USD",
+    ...extra,
+  });
+
+  it("keeps each bank account's balance as a signal, with nothing left out or made up", async () => {
+    const s = store();
+    await s.send("bank.account_updated", { accountId: "plaid:account:a1", name: "Checking", accountKind: "bank", currentBalanceCents: 1_250_000, availableBalanceCents: 1_200_000, currency: "USD", mask: "0000" });
+    await s.send("bank.account_updated", { accountId: "plaid:account:a2", currentBalanceCents: null });
+    const balances = s.memory.signals.filter((x) => x.kind === "bank.balance");
+    expect(balances.map((x) => [x.subject, x.value])).toEqual([
+      [{ kind: "bank_account", id: "plaid:account:a1" }, { accountId: "plaid:account:a1", name: "Checking", accountKind: "bank", currentBalanceCents: 1_250_000, availableBalanceCents: 1_200_000, currency: "USD" }],
+      [{ kind: "bank_account", id: "plaid:account:a2" }, { accountId: "plaid:account:a2", currentBalanceCents: null }],
+    ]);
+  });
+
+  it("keeps each invoice and each deleted invoice as signals, and ignores other deleted records", async () => {
+    const s = store();
+    await s.send("accounting.invoice_updated", { ...invoice("1"), lines: [{ amountCents: 40_000 }] });
+    await s.send("accounting.record_deleted", { recordId: "quickbooks:invoice:1", entity: "invoice" });
+    await s.send("accounting.record_deleted", { recordId: "quickbooks:bill:9", entity: "bill" });
+    expect(s.memory.signals.filter((x) => x.kind.startsWith("receivable.")).map((x) => [x.kind, x.subject.id, x.value])).toEqual([
+      ["receivable.invoice", "quickbooks:invoice:1", invoice("1")],
+      ["receivable.removed", "quickbooks:invoice:1", { invoiceId: "quickbooks:invoice:1" }],
+    ]);
+  });
+
+  it("dead-letters a balance or invoice without an id, or with an amount that isn't whole cents", async () => {
+    const s = store();
+    await expect(s.send("bank.account_updated", { name: "No id" })).rejects.toThrow();
+    await expect(s.send("bank.account_updated", { accountId: "" })).rejects.toThrow();
+    await expect(s.send("accounting.invoice_updated", invoice("2", { balanceCents: 12.5 }))).rejects.toThrow();
+    await expect(s.send("accounting.record_deleted", { recordId: "x" })).rejects.toThrow();
+    expect(s.memory.deadLetters.map((d) => d.issues[0]?.path)).toEqual(["payload.accountId", "payload.accountId", "payload.balanceCents", "payload.entity"]);
+  });
+
+  it("asks for follow-up on invoices more than 30 days past due, using the latest word on each", async () => {
+    const s = store();
+    await s.send("accounting.invoice_updated", invoice("1"), "2026-07-01T00:00:00Z");
+    await s.send("accounting.invoice_updated", invoice("2", { balanceCents: 25_000 }), "2026-07-02T00:00:00Z");
+    // Paid later, deleted, voided, not yet 30 days late, in another currency, or nothing owed: none count.
+    await s.send("accounting.invoice_updated", invoice("3"), "2026-07-03T00:00:00Z");
+    await s.send("accounting.invoice_updated", invoice("3", { balanceCents: 0 }), "2026-08-15T00:00:00Z");
+    await s.send("accounting.invoice_updated", invoice("4"), "2026-07-04T00:00:00Z");
+    await s.send("accounting.record_deleted", { recordId: "quickbooks:invoice:4", entity: "invoice" }, "2026-08-20T00:00:00Z");
+    await s.send("accounting.invoice_updated", invoice("5", { status: "voided" }), "2026-07-05T00:00:00Z");
+    await s.send("accounting.invoice_updated", invoice("6", { dueDate: "2026-09-03" }), "2026-07-06T00:00:00Z");
+    await s.send("accounting.invoice_updated", invoice("7", { currency: "EUR" }), "2026-07-07T00:00:00Z");
+    await s.send("accounting.invoice_updated", invoice("8", { dueDate: undefined }), "2026-07-08T00:00:00Z");
+    await s.send("accounting.invoice_updated", invoice("9", { dueDate: "August 1" }), "2026-07-09T00:00:00Z");
+    const [rec, ...rest] = about(await s.ask(NOW), "past due");
+    expect(rest).toEqual([]);
+    expect(rec).toMatchObject({
+      id: "rec_finance_overdue_receivables_2026-10-02",
+      summary: "$650.00 across 2 invoices are more than 30 days past due. Follow up with those customers, oldest first.",
+      expectedImpact: "Brings in up to $650.00 owed",
+      confidence: 0.8,
+    });
+    expect(rec!.provenance.signalIds).toHaveLength(2);
+  });
+
+  it("counts an invoice exactly 30 days late, and is quiet under $500", async () => {
+    const s = store();
+    await s.send("accounting.invoice_updated", invoice("1", { dueDate: "2026-09-02", balanceCents: 50_000 }));
+    expect(about(await s.ask(NOW), "past due").map((r) => r.summary)).toEqual(["$500.00 across 1 invoice is more than 30 days past due. Follow up with those customers, oldest first."]);
+    const quiet = store();
+    await quiet.send("accounting.invoice_updated", invoice("1", { balanceCents: 49_999 }));
+    expect(about(await quiet.ask(NOW), "past due")).toEqual([]);
+  });
+});
+
 describe("overdue wording", () => {
   it("says how overdue memos, custom orders and Form 8300 filings are", async () => {
     const s = store();

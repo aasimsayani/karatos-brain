@@ -30,7 +30,8 @@ export interface MemoryStore {
   linkIdentity(link: IdentityLink): Promise<void>;
   resolveIdentity(organizationId: string, source: string, externalId: string): Promise<EntityRef | null>;
   appendSignals(signals: Signal[]): Promise<void>;
-  recentSignals(organizationId: string, limit: number): Promise<Signal[]>;
+  /** The latest signals, oldest first. With kinds, only signals of those kinds count toward the limit. */
+  recentSignals(organizationId: string, limit: number, kinds?: readonly string[]): Promise<Signal[]>;
   saveRecommendations(recommendations: Recommendation[]): Promise<void>;
   listRecommendations(organizationId: string, limit: number): Promise<Recommendation[]>;
   getRecommendation(organizationId: string, id: string): Promise<Recommendation | null>;

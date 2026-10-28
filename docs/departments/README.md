@@ -32,7 +32,7 @@ A department's events are only validated when it is enabled, and departments tha
 | `buying` | Buying, Vendors and Memo | `memo.received`, `memo.settled`, `purchase_order.created`, `purchase_order.received` | Memo goods due back within 14 days (pay if sold, return if not); late purchase orders |
 | `metals` | Metals and Gold Buying | `metal.price_updated`, `gold_purchase.completed` | Spot moves of 5% or more, with the pieces affected; gold bought at more than 85% of melt |
 | `marketing` | Marketing | `campaign.sent`, `campaign.sale_attributed` | After 14 days, campaigns returning 3x or more (repeat them) or less than 1x (rethink them) |
-| `finance` | Finance | `bank.transaction_imported` | Cash sales over 30 days that are more than 5% (and $200) above cash deposits |
+| `finance` | Finance | `bank.transaction_imported`, `bank.account_updated`, `accounting.invoice_updated`, `accounting.record_deleted` | Cash sales over 30 days that are more than 5% (and $200) above cash deposits; $500 or more in US dollar invoices more than 30 days past due. Keeps each bank account's balance (`bank.balance`) and each invoice with what is still owed (`receivable.invoice`, or `receivable.removed` once deleted) as signals for the console |
 | `compliance` | Compliance | none, it reads other departments | IRS Form 8300 for cash over $10,000 in 24 hours, with the 15-day deadline; possible structuring across 30 days; gold bought from the public without seller ID |
 
 Compliance recommendations are reminders for the owner, not legal advice. State rules for secondhand dealers and unclaimed property differ, so those recommendations say to follow the state's rules rather than naming a period.

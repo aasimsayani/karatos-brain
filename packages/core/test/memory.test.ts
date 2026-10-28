@@ -31,6 +31,25 @@ describe("InMemoryStore", () => {
     expect((await store.recentSignals("org-1", 1)).map((s) => s.id)).toEqual(["c"]);
   });
 
+  it("reads the latest signals of given kinds, with only those kinds counting toward the limit", async () => {
+    const store = new InMemoryStore();
+    const signal = (id: string, kind: string, organizationId = "org-1") => ({
+      id,
+      organizationId,
+      kind,
+      subject: { kind: "invoice" as const, id },
+      value: 1,
+      confidence: 1,
+      derivedFromEventIds: [],
+      observedAt: "2026-10-01T00:00:00Z",
+    });
+    await store.appendSignals([signal("a", "bank.balance"), signal("b", "receivable.invoice"), signal("c", "bank.balance", "org-2"), signal("d", "bank.balance"), signal("e", "sale.line")]);
+    expect((await store.recentSignals("org-1", 10, ["bank.balance"])).map((s) => s.id)).toEqual(["a", "d"]);
+    expect((await store.recentSignals("org-1", 1, ["bank.balance", "receivable.invoice"])).map((s) => s.id)).toEqual(["d"]);
+    expect((await store.recentSignals("org-1", 10, ["receivable.invoice", "bank.balance"])).map((s) => s.id)).toEqual(["a", "b", "d"]);
+    expect(await store.recentSignals("org-1", 10, [])).toEqual([]);
+  });
+
   it("links identities and refuses collisions", async () => {
     const store = new InMemoryStore();
     const link = { organizationId: "org", source: "shopify", externalId: "c1", entity: { kind: "customer", id: "cust_1" } };
