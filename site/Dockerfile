@@ -5,6 +5,7 @@ FROM node:26-alpine AS build
 WORKDIR /app
 COPY package.json package-lock.json tsconfig.base.json ./
 COPY packages/core/package.json packages/core/
+COPY packages/connectors/package.json packages/connectors/
 COPY packages/store-postgres/package.json packages/store-postgres/
 COPY packages/retail/package.json packages/retail/
 COPY packages/server/package.json packages/server/

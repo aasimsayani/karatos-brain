@@ -161,6 +161,13 @@ const ACCESS_LABELS: Record<IntegrationSpec["access"], string> = {
   unknown: "To confirm",
 };
 
+/** The catalog ids of every built connector, sorted. The page carries them so a check can tell whether the live site is behind main. */
+export function connectedIds(): string[] {
+  return INTEGRATIONS.filter((i) => i.status === "built")
+    .map((i) => i.id)
+    .sort();
+}
+
 /** Self-serve integrations that are not deferred: the ones being built now. */
 export function buildingNow(): IntegrationSpec[] {
   return selfServeIntegrations().filter((i) => i.status === "planned");
@@ -277,6 +284,8 @@ export function renderSite(plays: readonly Play[] = PLAYS): string {
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>KaratOS</title>
+<meta name="karatos-connected" content="${connectedIds().join(",")}">
+<meta name="karatos-mapped" content="${dataSources.length}">
 <meta name="description" content="KaratOS connects the many systems a jewelry or watch business already runs, reads them together and turns them into a short list of things to act on, each with the evidence behind it. It writes back only with a person's approval.">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath d='M16 3 28 12 16 29 4 12Z' fill='%23c9a45c'/%3E%3C/svg%3E">
 ${fontPreloads}

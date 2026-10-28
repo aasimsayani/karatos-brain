@@ -1,0 +1,3 @@
+- Website: the page now carries the ids of every built connector and the number of mapped systems in two meta tags, so a check can tell when the live site falls behind main.
+- Website freshness check (`npm run site:freshness`, and a workflow that runs daily and after each green CI run on main): compares the live page with a fresh build and opens one `site-freshness` issue while they differ, naming the missing connectors and how to fix the deploy, then closes it once they match.
+- CI: a `website-docker` job builds `site/Dockerfile`, starts the container and checks it serves the page main builds. The Dockerfile now also copies the connectors package manifest before `npm ci`.

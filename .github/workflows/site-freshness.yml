@@ -1,0 +1,43 @@
+name: Website freshness
+
+# The live site should show what main builds. A failed deploy keeps the old
+# page up without any error, so this compares the live page's connector list
+# with a fresh build of main and files an issue while they differ.
+on:
+  schedule:
+    - cron: "41 13 * * *"
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: site-freshness
+  cancel-in-progress: true
+
+jobs:
+  check:
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build -w @karatos/core && node --import tsx site/build.ts
+      # After a push to main, give Railway time to build and roll out the new page.
+      - if: github.event_name == 'workflow_run'
+        run: sleep 600
+      - run: npm run site:freshness
+        env:
+          SITE_URL: ${{ vars.SITE_URL || 'https://website-production-98d7.up.railway.app' }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
