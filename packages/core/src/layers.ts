@@ -1,4 +1,5 @@
 import type { DeadLetter, EventEnvelope } from "./events.js";
+import type { StoredEvent } from "./retention.js";
 import type { EntityKind, EntityRef, NormalizedEntity } from "./entities.js";
 import type { IdentityLink } from "./identity.js";
 import type { Signal } from "./signals.js";
@@ -20,6 +21,8 @@ export interface SignalExtractor {
 /** Layer 4. Durable memory and state. */
 export interface MemoryStore {
   appendEvent(event: EventEnvelope): Promise<{ inserted: boolean }>;
+  /** An event with its source reference. Its payload may have been cleared by retention; the row never goes away. */
+  getEvent(organizationId: string, id: string): Promise<StoredEvent | null>;
   appendDeadLetter(deadLetter: DeadLetter): Promise<void>;
   upsertEntities(entities: NormalizedEntity[]): Promise<void>;
   getEntity(organizationId: string, kind: EntityKind, id: string): Promise<NormalizedEntity | null>;

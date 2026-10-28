@@ -4,9 +4,27 @@ import { IdentityCollisionError, type IdentityLink } from "./identity.js";
 import type { Signal } from "./signals.js";
 import type { Feedback, ReasoningRun, Recommendation } from "./reasoning.js";
 import type { MemoryStore } from "./layers.js";
+import {
+  clearedPayload,
+  isRawExpired,
+  rawRetentionCutoff,
+  sha256Json,
+  sourceReferenceFor,
+  DEFAULT_RAW_RETENTION_DAYS,
+  type PurgeResult,
+  type RawDataRetention,
+  type SourceReference,
+  type StoredEvent,
+} from "./retention.js";
+
+interface EventMeta {
+  sourceRef: SourceReference;
+  payloadSha256: string;
+  payloadClearedAt: string | null;
+}
 
 /** In-process MemoryStore for tests and local experiments. */
-export class InMemoryStore implements MemoryStore {
+export class InMemoryStore implements MemoryStore, RawDataRetention {
   readonly events: EventEnvelope[] = [];
   readonly deadLetters: DeadLetter[] = [];
   readonly entities = new Map<string, NormalizedEntity>();
@@ -16,14 +34,62 @@ export class InMemoryStore implements MemoryStore {
   readonly reasoningRuns: ReasoningRun[] = [];
   readonly feedback: Feedback[] = [];
   readonly checkpoints = new Map<string, string>();
+  /** Every purgeRawData run, so the owner can see retention ran. */
+  readonly retentionRuns: PurgeResult[] = [];
   private readonly idempotencyKeys = new Set<string>();
+  private readonly eventMeta = new Map<string, EventMeta>();
+  private readonly clearedDeadLetters = new Set<string>();
 
   async appendEvent(event: EventEnvelope): Promise<{ inserted: boolean }> {
     const key = `${event.organizationId}:${event.source}:${event.idempotencyKey}`;
     if (this.idempotencyKeys.has(key)) return { inserted: false };
     this.idempotencyKeys.add(key);
     this.events.push(event);
+    this.eventMeta.set(`${event.organizationId}:${event.id}`, {
+      sourceRef: sourceReferenceFor(event),
+      payloadSha256: sha256Json(event.payload),
+      payloadClearedAt: null,
+    });
     return { inserted: true };
+  }
+
+  async getEvent(organizationId: string, id: string): Promise<StoredEvent | null> {
+    const event = this.events.find((e) => e.organizationId === organizationId && e.id === id);
+    const meta = this.eventMeta.get(`${organizationId}:${id}`);
+    return event && meta ? { ...event, ...meta } : null;
+  }
+
+  async purgeRawData(organizationId: string, now: Date, retentionDays = DEFAULT_RAW_RETENTION_DAYS): Promise<PurgeResult> {
+    const cutoff = rawRetentionCutoff(now, retentionDays);
+    const tombstone = clearedPayload(now);
+    let events = 0;
+    this.events.forEach((event, index) => {
+      const meta = this.eventMeta.get(`${event.organizationId}:${event.id}`);
+      if (event.organizationId !== organizationId || !meta || meta.payloadClearedAt !== null) return;
+      if (!isRawExpired(event.receivedAt, now, retentionDays)) return;
+      this.events[index] = { ...event, payload: { ...tombstone } };
+      meta.payloadClearedAt = tombstone.at;
+      events++;
+    });
+    let deadLetters = 0;
+    this.deadLetters.forEach((dl, index) => {
+      if (dl.organizationId !== undefined && dl.organizationId !== organizationId) return;
+      if (this.clearedDeadLetters.has(dl.id) || !isRawExpired(dl.receivedAt, now, retentionDays)) return;
+      this.deadLetters[index] = { ...dl, raw: { ...tombstone } };
+      this.clearedDeadLetters.add(dl.id);
+      deadLetters++;
+    });
+    const result: PurgeResult = {
+      organizationId,
+      ranAt: now.toISOString(),
+      cutoff: cutoff.toISOString(),
+      retentionDays,
+      events,
+      deadLetters,
+      fileImports: 0,
+    };
+    this.retentionRuns.push(result);
+    return result;
   }
 
   async appendDeadLetter(deadLetter: DeadLetter): Promise<void> {

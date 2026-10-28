@@ -44,9 +44,12 @@ reason(org) ──► DocumentationSource.current()
 | File imports | `file_imports` | Bank and card statements (CSV or PDF) and other uploads. The same file uploaded twice is one import, keyed by SHA-256. |
 | Entity links | `entity_links` | How entities relate (an order's customer, a repair's product), readable in both directions |
 | Write audit | `write_audit` | `PostgresIngestionLog` is a `WriteAuditLog`, so every write attempt, refusals included, is kept. Append-only. |
+| Retention runs | `retention_runs`, `purgeRawData` | Raw vendor data is cleared after `RAW_RETENTION_DAYS` (default 30) while facts, signals and source references stay. Every purge is recorded. Append-only. |
 | Careful write-back | `SafeWriter`, `WriteTarget` | A write to a client's system is checked for policy, shape, approval, idempotency, a daily cap and a fresh precondition before it is sent, and read back after. A mismatch turns off that integration's writes. See [careful write-back](write-back.md). |
 
 All of these tables have row-level security keyed on the organization, and the migration ledger (`schema_migrations`) has row-level security with no policy, so only the service role can touch it.
+
+Brain A keeps a slim copy: cleaned-up facts and signals with a link back to each source record, and raw vendor data only for 30 days. See [data retention](data-retention.md).
 
 See [why Brain A compounds in value](../vision/compounding-value.md) and the [incident runbook](../runbooks/incidents.md).
 
