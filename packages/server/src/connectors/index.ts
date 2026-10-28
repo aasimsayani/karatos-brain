@@ -11,6 +11,7 @@ import gmail from "./gmail.js";
 import google_workspace from "./google_workspace.js";
 import hubspot from "./hubspot.js";
 import inventory_pos from "./inventory_pos.js";
+import klaviyo from "./klaviyo.js";
 import monday from "./monday.js";
 import plaid from "./plaid.js";
 import quickbooks from "./quickbooks.js";
@@ -22,4 +23,4 @@ import woocommerce from "./woocommerce.js";
 import xero from "./xero.js";
 
 /** How each built connector is made from an instance's settings, by catalog id. */
-export const FACTORIES: Readonly<Record<string, ConnectorFactory>> = { affirm, authorize_net, bank_statements, bigcommerce, chase, clover, custom_forms, gmail, google_workspace, hubspot, inventory_pos, monday, plaid, quickbooks, shopify, slack, square, stripe, woocommerce, xero };
+export const FACTORIES: Readonly<Record<string, ConnectorFactory>> = { affirm, authorize_net, bank_statements, bigcommerce, chase, clover, custom_forms, gmail, google_workspace, hubspot, inventory_pos, klaviyo, monday, plaid, quickbooks, shopify, slack, square, stripe, woocommerce, xero };
