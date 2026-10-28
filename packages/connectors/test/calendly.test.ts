@@ -369,6 +369,12 @@ describe("Calendly appointments", () => {
       expect(e.payload.title, name).toBeUndefined();
       expect(JSON.stringify(e)).not.toMatch(/customer1/i);
     }
+    // Short names are matched as whole words, so they are caught without dropping titles that only contain the letters.
+    const short = inv({ name: "Al Li", first_name: "Al", last_name: "Li", email: "al.li@example.test" });
+    for (const name of ["Fitting for Al Li", "Li: ring sizing", "al-li pickup"]) {
+      expect(appointmentEvent(event("EV-1", "2026-10-20T15:00:00Z", { name }), short, KEY, RECEIVED).event.payload.title, name).toBeUndefined();
+    }
+    expect(appointmentEvent(event("EV-1", "2026-10-20T15:00:00Z", { name: "Bridal consultation" }), short, KEY, RECEIVED).event.payload.title).toBe("Bridal consultation");
     // The kind is still read from the title it didn't keep.
     expect(appointmentEvent(event("EV-1", "2026-10-20T15:00:00Z", { name: "Customer1 bridal" }), inv(), KEY, RECEIVED).event.payload.kind).toBe("bridal");
     const long = "Bridal consultation ".repeat(10);
@@ -580,6 +586,14 @@ describe("the Calendly connector", () => {
     const batches = c.historicalImport({ organizationId: TEST_ORG, cursor: JSON.stringify({ through: "2020-01-01T00:00:00.000Z", readAtThrough: [], recent: {} }) });
     for await (const _ of batches) void _;
     expect(new URL(fetch.calls[1]!.url).searchParams.get("min_start_time")).toBe("2024-10-28T12:00:00.000Z");
+  });
+
+  it("leaves a finished import finished", async () => {
+    const { c, fetch } = connector(account());
+    const batches = [];
+    for await (const batch of c.historicalImport({ organizationId: TEST_ORG, cursor: JSON.stringify({ through: null, readAtThrough: [], recent: {} }) })) batches.push(batch);
+    expect(batches).toEqual([]);
+    expect(fetch.calls).toEqual([]);
   });
 
   it("checkpoints each batch with where it got to, and keeps only recent events at the end", async () => {

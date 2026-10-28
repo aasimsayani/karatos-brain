@@ -143,6 +143,8 @@ export function calendlyConnector(options: CalendlyOptions): Connector {
   function sync(mode: "historical" | "incremental") {
     return async function* (context: SyncContext): AsyncIterable<SourceBatch> {
       const saved = parseCalendlyCursor(context.cursor);
+      // A historical import that read to the end leaves through at null; running it again reads nothing.
+      if (mode === "historical" && saved && saved.through === null) return;
       const at = now().getTime();
       const receivedAt = iso(at);
       const recentFrom = iso(at - CALENDLY_RECENT_DAYS * DAY);

@@ -104,8 +104,11 @@ function safeTitle(title: string | undefined, invitee: Record<string, unknown>):
   const email = typeof invitee.email === "string" ? invitee.email.toLowerCase() : "";
   const words = [invitee.name, invitee.first_name, invitee.last_name, email.split("@")[0], email]
     .flatMap((v) => (typeof v === "string" ? v.toLowerCase().split(/[\s,.]+/) : []))
-    .filter((w) => w.length >= 3);
-  return words.some((w) => lower.includes(w)) ? undefined : title.slice(0, TITLE_MAX);
+    .filter((w) => w.length >= 2);
+  // Longer words are matched anywhere, so "customer1" is caught in "customer1@...". Short names such as Al or Li are matched as whole words.
+  const titleWords = new Set(lower.split(/[^\p{L}\p{N}]+/u));
+  const named = words.some((w) => (w.length >= 3 ? lower.includes(w) : titleWords.has(w)));
+  return named ? undefined : title.slice(0, TITLE_MAX);
 }
 
 /** Whole cents from Calendly's payment amount in currency units. Null when it isn't a number. */
