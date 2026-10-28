@@ -4,6 +4,7 @@ import affirm from "./affirm.js";
 import authorize_net from "./authorize_net.js";
 import bank_statements from "./bank_statements.js";
 import chase from "./chase.js";
+import gmail from "./gmail.js";
 import hubspot from "./hubspot.js";
 import inventory_pos from "./inventory_pos.js";
 import monday from "./monday.js";
@@ -14,4 +15,4 @@ import stripe from "./stripe.js";
 import xero from "./xero.js";
 
 /** How each built connector is made from an instance's settings, by catalog id. */
-export const FACTORIES: Readonly<Record<string, ConnectorFactory>> = { affirm, authorize_net, bank_statements, chase, hubspot, inventory_pos, monday, plaid, quickbooks, shopify, stripe, xero };
+export const FACTORIES: Readonly<Record<string, ConnectorFactory>> = { affirm, authorize_net, bank_statements, chase, gmail, hubspot, inventory_pos, monday, plaid, quickbooks, shopify, stripe, xero };
