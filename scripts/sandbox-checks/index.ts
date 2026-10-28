@@ -2,6 +2,7 @@
 import type { SandboxCheck } from "@karatos/core";
 import affirm from "./affirm.js";
 import authorize_net from "./authorize_net.js";
+import bigcommerce from "./bigcommerce.js";
 import clover from "./clover.js";
 import custom_forms from "./custom_forms.js";
 import gmail from "./gmail.js";
@@ -18,4 +19,4 @@ import woocommerce from "./woocommerce.js";
 import xero from "./xero.js";
 
 /** Every connector's nightly sandbox check. */
-export const SANDBOX_CHECKS: SandboxCheck[] = [affirm, authorize_net, clover, custom_forms, gmail, google_workspace, hubspot, monday, plaid, quickbooks, shopify, slack, square, stripe, woocommerce, xero];
+export const SANDBOX_CHECKS: SandboxCheck[] = [affirm, authorize_net, bigcommerce, clover, custom_forms, gmail, google_workspace, hubspot, monday, plaid, quickbooks, shopify, slack, square, stripe, woocommerce, xero];
