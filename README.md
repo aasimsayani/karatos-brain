@@ -73,6 +73,7 @@ These are built, tested against recorded vendor responses, and run read-only. Th
 | Wix | Imports five years of orders and the whole catalog, stock and contact list, then keeps them current | Sales, Inventory, Clienteling, Marketing |
 | Metals-API | Keeps gold, silver, platinum and palladium spot prices current, in dollars per troy ounce | Metals, Buying |
 | Klaviyo | Imports every profile, list, segment, campaign and flow, then keeps them current | Marketing, Clienteling |
+| Twilio | Imports five years of the store's texts, WhatsApp messages and calls: who, when, which line and how each one ended | Clienteling, Repairs, Marketing |
 | QuickBooks Online | Imports six years of invoices, bills, payments and journal entries, with the chart of accounts, customers and vendors | Finance, Compliance |
 | Xero | Imports six years of invoices, bills, credit notes, payments, bank transactions and manual journals, with the chart of accounts and contacts | Finance, Compliance |
 | Plaid | Imports up to two years of bank and card transactions from a bank linked through Plaid | Finance, Compliance |
@@ -123,7 +124,7 @@ This section updates itself as work lands: it is generated from [docs/milestones
 <!-- progress:start -->
 <!-- Generated from docs/milestones.json and the integration catalog by npm run progress:write. Edit those, not this block. -->
 
-**Overall: 66% complete**, 25 of 38 roadmap items done. 23 of the 75 systems in the integration catalog are connected.
+**Overall: 66% complete**, 25 of 38 roadmap items done. 24 of the 75 systems in the integration catalog are connected.
 
 | Milestone | What it gives a jeweler | Progress | Target |
 | --- | --- | --- | --- |

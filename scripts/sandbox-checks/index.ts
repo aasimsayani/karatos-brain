@@ -17,9 +17,10 @@ import shopify from "./shopify.js";
 import slack from "./slack.js";
 import square from "./square.js";
 import stripe from "./stripe.js";
+import twilio from "./twilio.js";
 import wix from "./wix.js";
 import woocommerce from "./woocommerce.js";
 import xero from "./xero.js";
 
 /** Every connector's nightly sandbox check. */
-export const SANDBOX_CHECKS: SandboxCheck[] = [affirm, authorize_net, bigcommerce, clover, custom_forms, gmail, google_workspace, hubspot, klaviyo, metals_api, monday, plaid, quickbooks, shopify, slack, square, stripe, wix, woocommerce, xero];
+export const SANDBOX_CHECKS: SandboxCheck[] = [affirm, authorize_net, bigcommerce, clover, custom_forms, gmail, google_workspace, hubspot, klaviyo, metals_api, monday, plaid, quickbooks, shopify, slack, square, stripe, twilio, wix, woocommerce, xero];

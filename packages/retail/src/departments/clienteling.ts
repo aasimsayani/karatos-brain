@@ -26,7 +26,30 @@ const OccasionRecorded = z.object({
 
 const WishlistItemAdded = z.object({ customerId: z.string().min(1), sku: z.string().min(1), note: z.string().optional() });
 
+/** A call on the store's phone line, such as from Twilio. The caller is a keyed reference, never a number. */
+const CallLogged = z.object({
+  callId: z.string().min(1),
+  contactRef: z.string().min(1).optional(),
+  direction: z.enum(["inbound", "outbound"]),
+  status: z.string().min(1),
+  missed: z.boolean().optional(),
+  durationSeconds: z.number().int().nonnegative().optional(),
+});
+
+/**
+ * A text, email or chat message. Shapes differ by channel (Twilio texts
+ * carry a contact and a direction; Gmail says received or sent; team chat
+ * has neither), so only the fields the missed-call check reads are checked.
+ */
+const MessageLogged = z.object({
+  messageId: z.string().min(1),
+  contactRef: z.string().min(1).optional(),
+  direction: z.enum(["inbound", "outbound", "received", "sent"]).optional(),
+});
+
 const OCCASION_LEAD_DAYS = 21;
+/** How far back missed calls are looked for. */
+const MISSED_CALL_DAYS = 7;
 const VIP_LIFETIME_CENTS = 500_000;
 const LAPSED_AFTER_DAYS = 365;
 
@@ -60,6 +83,8 @@ export const clienteling: DepartmentModule = {
     "customer.profile_updated": ProfileUpdated,
     "customer.occasion_recorded": OccasionRecorded,
     "wishlist.item_added": WishlistItemAdded,
+    "communication.call_logged": CallLogged,
+    "communication.message_logged": MessageLogged,
   },
   normalizers: [
     entityFrom<z.infer<typeof ProfileUpdated>>("clienteling-customers", "customer.profile_updated", (p) => ({
@@ -82,6 +107,16 @@ export const clienteling: DepartmentModule = {
         case "wishlist.item_added": {
           const p = WishlistItemAdded.parse(event.payload);
           return [signalFrom(event, "customer.wishlist", subject(p.customerId), { ...p })];
+        }
+        case "communication.call_logged": {
+          const p = CallLogged.parse(event.payload);
+          if (!p.contactRef) return [];
+          return [signalFrom(event, "contact.call", { kind: "contact", id: p.contactRef }, { ...p })];
+        }
+        case "communication.message_logged": {
+          const p = MessageLogged.parse(event.payload);
+          if (!p.contactRef || !p.direction) return [];
+          return [signalFrom(event, "contact.message", { kind: "contact", id: p.contactRef }, { messageId: p.messageId, direction: p.direction })];
         }
         default:
           return [];
@@ -149,6 +184,44 @@ export const clienteling: DepartmentModule = {
             }),
           ];
         });
+      },
+    },
+    {
+      name: "clienteling.missed-calls",
+      reason: ({ organizationId, signals, now }) => {
+        const recent = (s: Signal) => s.observedAt <= now && daysBetween(s.observedAt, now) < MISSED_CALL_DAYS;
+        const contacts = new Map<string, Signal[]>();
+        for (const s of signals) if (s.kind === "contact.call" || s.kind === "contact.message") contacts.set(s.subject.id, [...(contacts.get(s.subject.id) ?? []), s]);
+        // A missed call counts until the store calls or texts that person, or they get through on a later call.
+        const unanswered = [...contacts.values()].flatMap((list) => {
+          const missed = list.filter((s) => s.kind === "contact.call" && value<{ missed?: boolean }>(s).missed === true && recent(s));
+          if (missed.length === 0) return [];
+          const first = missed.map((s) => s.observedAt).sort()[0]!;
+          const reached = list.some((s) => {
+            if (s.observedAt <= first) return false;
+            if (s.kind === "contact.message") return value<{ direction: string }>(s).direction === "outbound";
+            const call = value<{ direction: string; missed?: boolean; status: string }>(s);
+            return call.direction === "outbound" || (call.missed !== true && call.status === "completed");
+          });
+          return reached ? [] : [{ missed, first }];
+        });
+        if (unanswered.length === 0) return [];
+        const calls = unanswered.reduce((n, u) => n + u.missed.length, 0);
+        const oldest = daysBetween(unanswered.map((u) => u.first).sort()[0]!, now);
+        const people = unanswered.length === 1 ? "1 caller" : `${unanswered.length} callers`;
+        const when = oldest === 0 ? "today" : oldest === 1 ? "yesterday" : `${oldest} days ago`;
+        return [
+          recommend({
+            department: "clienteling",
+            key: "missed_calls",
+            organizationId,
+            summary: `${people} rang the store ${calls === 1 ? "once" : `${calls} times`} in the last ${MISSED_CALL_DAYS} days without getting through, and nobody has called or texted them back. The oldest missed call was ${when}. Return them from the call log.`,
+            confidence: 0.75,
+            expectedImpact: "Wins back customers who tried to reach the store",
+            basedOn: unanswered.flatMap((u) => u.missed),
+            now,
+          }),
+        ];
       },
     },
   ],

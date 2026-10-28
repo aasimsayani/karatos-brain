@@ -115,6 +115,68 @@ describe("clienteling", () => {
     const [rec] = about(await s.ask(NOW), "hasn't bought");
     expect(rec!.summary).toBe("Customer vip has spent $6,000.00 with you but hasn't bought in 488 days. Invite them in personally.");
   });
+
+  const callFrom = (contactRef: string, status: string, extra: Record<string, unknown> = {}) => ({
+    callId: `call-${contactRef}-${status}-${JSON.stringify(extra)}`,
+    contactRef,
+    direction: "inbound",
+    status,
+    ...(["busy", "no-answer", "canceled"].includes(status) ? { missed: true } : {}),
+    ...extra,
+  });
+
+  it("flags callers who couldn't get through until someone calls or texts them back", async () => {
+    const s = store();
+    await s.send("communication.call_logged", callFrom("c1", "no-answer"), "2026-09-28T15:00:00Z");
+    await s.send("communication.call_logged", callFrom("c1", "busy"), "2026-09-29T15:00:00Z");
+    await s.send("communication.call_logged", callFrom("c2", "canceled"), "2026-10-01T15:00:00Z");
+    // c3 was texted back, c4 called back, c5 got through later; none of them count.
+    await s.send("communication.call_logged", callFrom("c3", "no-answer"), "2026-09-30T15:00:00Z");
+    await s.send("communication.message_logged", { messageId: "m1", contactRef: "c3", direction: "outbound" }, "2026-09-30T16:00:00Z");
+    await s.send("communication.call_logged", callFrom("c4", "no-answer"), "2026-09-30T15:00:00Z");
+    await s.send("communication.call_logged", callFrom("c4", "no-answer", { direction: "outbound" }), "2026-09-30T17:00:00Z");
+    await s.send("communication.call_logged", callFrom("c5", "busy"), "2026-09-30T15:00:00Z");
+    await s.send("communication.call_logged", callFrom("c5", "completed", { durationSeconds: 120 }), "2026-10-01T09:00:00Z");
+    const [rec, ...rest] = about(await s.ask(NOW), "rang the store");
+    expect(rest).toEqual([]);
+    expect(rec!.summary).toBe(
+      "2 callers rang the store 3 times in the last 7 days without getting through, and nobody has called or texted them back. The oldest missed call was 4 days ago. Return them from the call log.",
+    );
+    expect(rec!.provenance.signalIds).toHaveLength(3);
+  });
+
+  it("doesn't count what came before the missed call, inbound texts, unconnected calls, or calls outside the week", async () => {
+    const s = store();
+    await s.send("communication.message_logged", { messageId: "m1", contactRef: "c1", direction: "outbound" }, "2026-09-30T10:00:00Z");
+    await s.send("communication.call_logged", callFrom("c1", "completed"), "2026-09-30T11:00:00Z");
+    await s.send("communication.call_logged", callFrom("c1", "no-answer"), "2026-09-30T12:00:00Z");
+    await s.send("communication.message_logged", { messageId: "m2", contactRef: "c1", direction: "inbound" }, "2026-09-30T13:00:00Z");
+    // An inbound call still ringing, or one that failed, isn't getting through.
+    await s.send("communication.call_logged", callFrom("c1", "ringing"), "2026-09-30T14:00:00Z");
+    await s.send("communication.call_logged", callFrom("c1", "failed"), "2026-09-30T14:30:00Z");
+    await s.send("communication.call_logged", callFrom("c2", "no-answer"), "2026-09-25T14:59:59Z");
+    await s.send("communication.call_logged", callFrom("c3", "no-answer"), "2026-10-03T00:00:00Z");
+    expect(about(await s.ask(NOW), "rang the store").map((r) => r.summary)).toEqual([
+      "1 caller rang the store once in the last 7 days without getting through, and nobody has called or texted them back. The oldest missed call was 2 days ago. Return them from the call log.",
+    ]);
+    // A call back that didn't connect still counts as trying.
+    await s.send("communication.call_logged", callFrom("c1", "failed", { direction: "outbound" }), "2026-10-01T09:00:00Z");
+    expect(about(await s.ask(NOW), "rang the store")).toEqual([]);
+  });
+
+  it("says today and yesterday, ignores calls with no contact, and accepts other channels' messages", async () => {
+    const s = store();
+    await s.send("communication.call_logged", callFrom("c1", "busy"), "2026-10-02T09:00:00Z");
+    await s.send("communication.call_logged", { callId: "anon", direction: "inbound", status: "no-answer", missed: true }, "2026-10-02T09:00:00Z");
+    await s.send("communication.message_logged", { messageId: "slack:message:1", channel: "slack", conversationId: "slack:channel:1" }, "2026-10-02T09:00:00Z");
+    await s.send("communication.message_logged", { messageId: "gmail:message:1", channel: "email", direction: "sent" }, "2026-10-02T09:00:00Z");
+    expect(about(await s.ask(NOW), "rang the store")[0]!.summary).toContain("1 caller rang the store once in the last 7 days");
+    expect(about(await s.ask(NOW), "rang the store")[0]!.summary).toContain("The oldest missed call was today.");
+    const t = store();
+    await t.send("communication.call_logged", callFrom("c1", "busy"), "2026-10-01T09:00:00Z");
+    expect(about(await t.ask(NOW), "rang the store")[0]!.summary).toContain("The oldest missed call was yesterday.");
+    await expect(t.send("communication.call_logged", { callId: "x", direction: "sideways", status: "busy" })).rejects.toThrow(/dead-lettered/);
+  });
 });
 
 describe("repairs", () => {
