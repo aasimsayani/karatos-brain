@@ -125,8 +125,8 @@ export const PLAYS: readonly Play[] = [
   },
   {
     title: "Which memo stones to send back",
-    systems: ["rapnet", "nivoda", "polygon", "quickbooks"],
-    action: "When diamond prices move, buying sees which stones on memo to return before the memo is due.",
+    systems: ["rapnet", "idex", "nivoda", "quickbooks"],
+    action: "When diamond prices move on the Rapaport list and the trading networks, buying sees which stones on memo to return before the memo is due.",
   },
   {
     title: "A reportable cash sale, caught",
@@ -134,9 +134,9 @@ export const PLAYS: readonly Play[] = [
     action: "Cash sales are matched to bank deposits, and any buyer who paid over $10,000 in cash gets a Form 8300 ready to file on time.",
   },
   {
-    title: "A watch sold in store, still listed online",
-    systems: ["inventory_pos", "ebay", "shopify"],
-    action: "A pre-owned watch that sold at the counter is still up on the marketplace and the website. Both listings are flagged to come down today.",
+    title: "Money owed, followed up before it goes stale",
+    systems: ["quickbooks", "plaid", "twilio"],
+    action: "Invoices more than 30 days past due are totalled, oldest first, beside the cash the bank shows on hand, and a reminder to each customer is drafted for a person to send.",
   },
 ];
 

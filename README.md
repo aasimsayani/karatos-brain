@@ -48,7 +48,7 @@ KaratOS is useful with one connection and gets sharper with each one, because ev
 
 ### Connected today
 
-These are built, tested against recorded vendor responses, and run read-only. The table is generated from the [integration catalog](docs/integrations.md), so it names exactly what is built.
+These are built, tested against recorded vendor responses or mocks built from each vendor's own docs, and run read-only. Systems that need a client's own account, such as IDEX, Nivoda, Stuller and GIA, are checked live with the first pilot that has one. The table is generated from the [integration catalog](docs/integrations.md), so it names exactly what is built.
 
 <!-- connected:start -->
 <!-- Generated from the integration catalog by npm run progress:write. Edit the catalog, not this block. -->
@@ -90,13 +90,10 @@ These are built, tested against recorded vendor responses, and run read-only. Th
 
 ### Landing next
 
-Each of these is built and in review, one connector at a time, so each can ship on its own:
-
-- **Store and POS:** Square, Clover, WooCommerce, BigCommerce and Wix, so a store on any common platform gets the same picture.
-- **Financing:** Affirm, so financed sales show up next to the payment that settled them.
-- **Metal prices:** live spot prices, so inventory and gold-buying offers are valued at today's market.
-- **Customers and conversations:** HubSpot, Gmail, Google Workspace, Slack, Twilio calls and texts, and web forms, so every inquiry and follow-up is counted.
-- **Marketing and operations:** Klaviyo and monday.com, so campaign results and bench work are tied to the sales they produced.
+- **The owner's money view.** Cash in each bank account, what is owed on cards, what customers owe and which invoices are more than 30 days late, on one screen in the Brain Console. The finance department already reads these from Plaid, QuickBooks and Xero and flags overdue invoices of $500 or more.
+- **Live checks with pilot stores.** The trade connectors (IDEX, Nivoda, Stuller, GIA, RapNet) are built against each vendor's docs and turn on with a pilot client's own account.
+- **Jewelry POS and the next wave.** The Edge, Jewel360 and ARMS through their exports, then Lightspeed, Podium, Birdeye, Valigara and Attentive as access arrives.
+- **Plain-language reasoning.** Claude explains each recommendation and learns from the owner's accept, reject and override decisions.
 
 The [roadmap](docs/roadmap.md) has the full sequence, including jewelry POS systems, diamond feeds and manufacturing.
 
@@ -214,6 +211,8 @@ Some insights appear only when departments share signals. These are built today:
 - **A gold price move becomes a pricing review.** Metals sees the spot change, inventory values aged gold pieces at melt, and gold buying flags offers that are too close to melt.
 - **An anniversary becomes a sale.** Clienteling knows the date and the customer's wish list, and reaches out only to customers who agreed to marketing.
 - **Sell-through drives reorders.** Sales feeds inventory, which recommends reordering what moves and marking down what sits.
+- **Late invoices become a follow-up list.** Finance reads open invoices from the books, totals what is more than 30 days past due, and lists the customers to call, oldest first.
+- **A missed call gets a callback.** Clienteling sees calls and texts from Twilio and flags callers nobody got back to within the week.
 
 These come next, as more connectors and reasoners are built:
 
@@ -295,7 +294,7 @@ The Shopify connector is the first one built. See [docs/integrations.md](docs/in
 | `@karatos/core` | Event envelope, layer contracts, pipeline, connector contract and `runSync`, write gate, integration catalog, in-memory store, jewelry math (karat purity, melt value), config validation |
 | `@karatos/retail` | Retail jewelry departments: sales, inventory, clienteling, repairs, custom orders, appraisals, buying, metals, marketing, finance, compliance. See [departments](docs/departments/README.md) |
 | `@karatos/store-postgres` | Postgres/Supabase `MemoryStore`, ingestion log and write audit, migration runner |
-| `@karatos/connectors` | Built connectors, starting with Shopify |
+| `@karatos/connectors` | Every built connector, one folder each, from Shopify and QuickBooks to IDEX, Nivoda and Stuller |
 | `@karatos/connector-testkit` | Shared connector test helpers: fixtures, replay, the `runSync` harness, webhook signing, doc mocks |
 | `@karatos/server` | HTTP API for one client instance, shipped as the `ghcr.io/aasimsayani/karatos-brain` image |
 
@@ -313,6 +312,7 @@ This repository is public. Treat everything you commit here as published.
 - Every secret and setting an instance needs is described, without its value, in [`secrets/manifest.json`](secrets/manifest.json), generated from [`secrets/manifest/`](secrets/manifest/). Follow [docs/secrets.md](docs/secrets.md) to add one.
 - Use test-only sandbox accounts for connector tests, never a client's.
 - CI runs `npm run secrets:scan` on every push.
+- Raw vendor payloads are cleared after 30 days; the facts drawn from them, and the links back to their source, stay. See [docs/security.md](docs/security.md).
 - How the code, the instance API, the website and CI are protected, and what each guard is for, is in [docs/security.md](docs/security.md). Report a vulnerability privately as [SECURITY.md](SECURITY.md) describes.
 
 ## Contributing
