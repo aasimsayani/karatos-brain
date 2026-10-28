@@ -103,8 +103,10 @@ describe("KaratOS website", () => {
     expect(html).not.toMatch(/\.hero\{padding:/);
   });
 
-  it("leaves off-screen sections unrendered until they near the viewport, so the growing catalog doesn't block the first paint", () => {
-    expect(html).toContain("section{content-visibility:auto;contain-intrinsic-size:auto 900px}");
+  it("folds the directory by category, so the growing catalog doesn't block the first paint and links land where they point", () => {
+    // Skipped sections were sized by guess, which sent nav links to the wrong place on long pages.
+    expect(html).not.toContain("content-visibility");
+    expect(html.match(/<details class="group"[^>]*>/g)!.filter((t) => t.includes(" open"))).toHaveLength(1);
     // The hero is not a section, so the first screen always renders straight away.
     expect(html).not.toMatch(/<section[^>]*class="[^"]*hero/);
   });
@@ -196,7 +198,7 @@ describe("KaratOS website", () => {
 
   it("points the hero, steps and nav at many connected systems and careful write-back", () => {
     const hero = html.slice(html.indexOf('<div class="wrap hero">'), html.indexOf("</div>", html.indexOf('<div class="wrap hero">')));
-    expect(hero).toContain("For jewelers, watch dealers, wholesalers and manufacturers");
+    expect(hero).toContain("For jewelers, watch dealers, wholesalers, manufacturers and the businesses that serve them");
     expect(hero).toContain("connects the many systems");
     expect(hero).toContain("writes back carefully");
     const how = sectionOf("how");
@@ -237,7 +239,8 @@ describe("KaratOS website", () => {
     );
     // No external scripts, styles, images or frames: the page loads only from itself.
     expect(html).not.toMatch(/<(script|img|iframe)\b[^>]*\ssrc=/i);
-    expect(html).not.toMatch(/<link\b[^>]*href="https?:/i);
+    // The canonical link names the page's own address and loads nothing.
+    expect(html).not.toMatch(/<link\b(?![^>]*rel="canonical")[^>]*href="https?:/i);
   });
 
   it("names no client", () => {
@@ -253,8 +256,8 @@ describe("KaratOS website", () => {
     expect(html).toContain(`<strong>${MANAGED_PRICE}</strong> per store per month`);
     expect(html).not.toContain("per user per month");
     expect(html.match(/<strong>By quote<\/strong>/g)?.length).toBe(1);
-    // Three plans, the holiday pilot and the broken-systems campaign.
-    expect(html.split(`href="${CONTACT_ANCHOR}"`).length - 1).toBe(5);
+    // Three plans, the holiday pilot, the broken-systems campaign and the partner section.
+    expect(html.split(`href="${CONTACT_ANCHOR}"`).length - 1).toBe(6);
     // Managed is the featured plan.
     const featured = html.slice(html.indexOf('<li class="plan featured">'));
     expect(featured.slice(0, featured.indexOf("</li>"))).toContain("<h3>Managed</h3>");

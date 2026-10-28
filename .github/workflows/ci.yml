@@ -79,7 +79,7 @@ jobs:
           docker run -d --name site -p 8080:8080 -e PORT=8080 karatos-site
           for i in $(seq 1 40); do curl -fs http://127.0.0.1:8080/healthz && break; sleep 0.5; done
           curl -fs http://127.0.0.1:8080/healthz >/dev/null || { docker logs site; echo "::error title=Website image::the container did not start"; exit 1; }
-          SITE_URL=http://127.0.0.1:8080/ npm run site:freshness -- --dry-run
+          SITE_URL=http://127.0.0.1:8080/ npm run site:freshness -- --dry-run --strict
 
   instance-smoke-test:
     runs-on: ubuntu-latest

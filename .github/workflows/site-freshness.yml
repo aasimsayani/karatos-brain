@@ -39,5 +39,5 @@ jobs:
         run: sleep 600
       - run: npm run site:freshness
         env:
-          SITE_URL: ${{ vars.SITE_URL || 'https://website-production-98d7.up.railway.app' }}
+          SITE_URL: ${{ vars.SITE_URL || 'https://karatos.app' }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

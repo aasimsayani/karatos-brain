@@ -8,10 +8,13 @@ import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import { INTEGRATIONS, selfServeIntegrations, type IntegrationSpec } from "../packages/core/src/index.js";
 import { RETAIL_DEPARTMENTS } from "../packages/retail/src/index.js";
+import { CONNECTED_ON, SYSTEM_DETAILS } from "./directory.js";
 
 export const REPORT_URL =
   "https://github.com/aasimsayani/karatos-brain/issues/new?template=integration-request.yml";
 export const REPO_URL = "https://github.com/aasimsayani/karatos-brain";
+/** Where the site is served; links shared from it and search engines point here. */
+export const SITE_URL = "https://karatos.app/";
 /** Quote and Brain Console requests go to the private form on the page. */
 export const CONTACT_ANCHOR = "#contact";
 export const CORE_PRICE = "$299";
@@ -224,6 +227,113 @@ export function renderValueCards(dataSources: readonly IntegrationSpec[], selfSe
     .join("\n");
 }
 
+/** How each access route reads on a card's details. */
+const ACCESS_DETAIL: Record<IntegrationSpec["access"], string> = {
+  public_api: "Its public API, with a sign-in the business authorizes itself",
+  partner: "A partner API, once the vendor approves access",
+  edi: "EDI documents from the business's VAN, AS2 or SFTP mailbox",
+  file: "Scheduled exports or statements the business already gets",
+  unknown: "Still being confirmed with the vendor",
+};
+
+const TESTING_DETAIL: Record<IntegrationSpec["testWith"], string> = {
+  sandbox: "Against the vendor's free sandbox, every night once connected",
+  fixtures: "With sample files in the vendor's own formats",
+  paid_account: "On a paid or trade account",
+  partner: "Through the vendor's partner program",
+  unknown: "To be confirmed",
+};
+
+const STAGE_DETAIL: Record<string, string> = {
+  "Connector built": "Built and tested. It is checked live on the first business that connects it.",
+  "Building now": "Being built now. We can build and test it without waiting on the vendor.",
+  Planned: "On the map. It is built when a business asks for it or the vendor opens access.",
+  Deferred: "On hold until the vendor's access changes.",
+};
+
+/** The detail line for a system, which a test requires for every data source. */
+export function systemDetail(id: string): { about: string; company?: string } {
+  const detail = SYSTEM_DETAILS[id];
+  if (!detail) throw new Error(`${id} is in the catalog but has no entry in site/directory.ts`);
+  return detail;
+}
+
+/** Categories in the order the directory shows them: most connected first, then catalog order. */
+export function directoryCategories(dataSources: readonly IntegrationSpec[]): string[] {
+  const domains = [...new Set(dataSources.map((i) => i.domain))];
+  const built = (d: string) => dataSources.filter((i) => i.domain === d && i.status === "built").length;
+  return domains.map((d, n) => ({ d, n, b: built(d) })).sort((a, b) => b.b - a.b || a.n - b.n).map((x) => x.d);
+}
+
+/** One directory card, with the system's details folded under a disclosure. */
+export function renderCard(i: IntegrationSpec, selfServe: ReadonlySet<string>, deptName: ReadonlyMap<string, string>): string {
+  const status = statusOf(i, selfServe as Set<string>);
+  const detail = systemDetail(i.id);
+  const depts = i.departments.map((d) => deptName.get(d) ?? d);
+  const segments = i.segments.map((s) => s[0]!.toUpperCase() + s.slice(1));
+  const search = [i.name, detail.company ?? "", detail.about, domainLabel(i.domain), ...depts, ...i.segments].join(" ").toLowerCase();
+  const rows: [string, string][] = [
+    ["What KaratOS reads", detail.about],
+    ["How it connects", ACCESS_DETAIL[i.access]],
+    ["History", i.historicalImportYears > 0 ? `Up to ${i.historicalImportYears} ${i.historicalImportYears === 1 ? "year" : "years"} imported on day one` : "From the day it is connected"],
+    ["Updates", i.webhooks ? "As they happen, through the vendor's webhooks" : "On a regular schedule"],
+    ["Tested", TESTING_DETAIL[i.testWith]],
+    ["Feeds", depts.join(", ")],
+    ["For", segments.join(", ")],
+    ["Stage", STAGE_DETAIL[status.label] ?? status.label],
+  ];
+  if (CONNECTED_ON[i.id]) rows.push(["Connected", formatDay(CONNECTED_ON[i.id]!)]);
+  return `<li class="card" data-domain="${i.domain}" data-segments="${i.segments.join(" ")}" data-departments="${i.departments.join(" ")}" data-search="${escapeHtml(search)}">
+  <div class="card-top"><span class="domain">${escapeHtml(detail.company ? `By ${detail.company}` : domainLabel(i.domain))}</span><span class="pill ${status.tone}">${status.label}</span></div>
+  <h3>${escapeHtml(i.name)}</h3>
+  <p class="about">${escapeHtml(detail.about)}</p>
+  <p class="meta">${escapeHtml(ACCESS_LABELS[i.access])} · ${segments.join(", ")}</p>${
+    i.status === "built" && i.capabilities?.length
+      ? `\n  <ul class="caps" aria-label="What you get with ${escapeHtml(i.name)}">${i.capabilities.map((c) => `<li>${escapeHtml(c)}</li>`).join("")}</ul>`
+      : ""
+  }
+  <details class="more"><summary>Details</summary><dl>${rows.map(([k, v]) => `<dt>${k}</dt><dd>${escapeHtml(v)}</dd>`).join("")}</dl></details>
+</li>`;
+}
+
+/**
+ * The directory, one folded group per category, each with its count and how
+ * many are connected. Only the first group starts open: a closed group isn't
+ * laid out, so the page stays quick as the catalog grows, and links further
+ * down the page land where they point.
+ */
+export function renderDirectory(dataSources: readonly IntegrationSpec[], selfServe: ReadonlySet<string>, deptName: ReadonlyMap<string, string>): string {
+  return directoryCategories(dataSources)
+    .map((domain, n) => {
+      const systems = dataSources.filter((i) => i.domain === domain);
+      const built = systems.filter((i) => i.status === "built").length;
+      const counts = `${systems.length} ${systems.length === 1 ? "system" : "systems"}${built ? ` · ${built} connected` : ""}`;
+      return `<details class="group" data-group="${domain}" id="cat-${domain}"${n === 0 ? " open" : ""}>
+  <summary class="group-head"><h3>${escapeHtml(domainLabel(domain))}</h3><span class="count">${counts}</span></summary>
+  <ul class="cards">
+${systems.map((i) => renderCard(i, selfServe, deptName)).join("\n")}
+  </ul>
+</details>`;
+    })
+    .join("\n");
+}
+
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+export function formatDay(day: string): string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(day);
+  if (!m) throw new Error(`${day} is not a YYYY-MM-DD date`);
+  return `${MONTHS[Number(m[2]) - 1]} ${Number(m[3])}, ${m[1]}`;
+}
+
+/** The most recently connected systems, newest first, so each release shows what it added. */
+export function newestConnections(limit = 8): IntegrationSpec[] {
+  return INTEGRATIONS.filter((i) => i.status === "built")
+    .map((i, n) => ({ i, n, day: CONNECTED_ON[i.id] ?? "" }))
+    .sort((a, b) => b.day.localeCompare(a.day) || a.n - b.n)
+    .slice(0, limit)
+    .map((x) => x.i);
+}
+
 export function renderSite(plays: readonly Play[] = PLAYS): string {
   const selfServe = new Set(buildingNow().map((i) => i.id));
   const departments = [
@@ -235,22 +345,12 @@ export function renderSite(plays: readonly Play[] = PLAYS): string {
   const dataSources = INTEGRATIONS.filter((i) => i.departments.length > 0).sort((a, b) => rank(b) - rank(a));
   const deptName = new Map(departments.map((d) => [d.id, d.name]));
 
-  const cards = dataSources
-    .map((i) => {
-      const status = statusOf(i, selfServe);
-      const depts = i.departments.map((d) => deptName.get(d) ?? d);
-      const search = [i.name, domainLabel(i.domain), ...depts, ...i.segments].join(" ").toLowerCase();
-      return `<li class="card" data-segments="${i.segments.join(" ")}" data-departments="${i.departments.join(" ")}" data-search="${escapeHtml(search)}">
-  <div class="card-top"><span class="domain">${escapeHtml(domainLabel(i.domain))}</span><span class="pill ${status.tone}">${status.label}</span></div>
-  <h3>${escapeHtml(i.name)}</h3>
-  <p class="meta">${escapeHtml(ACCESS_LABELS[i.access])} · ${i.segments.map((s) => s[0]!.toUpperCase() + s.slice(1)).join(", ")}</p>
-  <p class="depts">${escapeHtml(depts.join(", "))}</p>${
-    i.status === "built" && i.capabilities?.length
-      ? `\n  <ul class="caps" aria-label="What you get with ${escapeHtml(i.name)}">${i.capabilities.map((c) => `<li>${escapeHtml(c)}</li>`).join("")}</ul>`
-      : ""
-  }
-</li>`;
-    })
+  const directory = renderDirectory(dataSources, selfServe, deptName);
+  const categories = directoryCategories(dataSources);
+  const categoryOptions = categories.map((d) => `<option value="${d}">${escapeHtml(domainLabel(d))}</option>`).join("");
+  const builtCount = dataSources.filter((i) => i.status === "built").length;
+  const newest = newestConnections()
+    .map((i) => `<li><span class="pill gold">${escapeHtml(formatDay(CONNECTED_ON[i.id]!))}</span><strong>${escapeHtml(i.name)}</strong><span>${escapeHtml(systemDetail(i.id).about)}</span></li>`)
     .join("\n");
 
   const byId = new Map(INTEGRATIONS.map((i) => [i.id, i]));
@@ -287,6 +387,11 @@ export function renderSite(plays: readonly Play[] = PLAYS): string {
 <meta name="karatos-connected" content="${connectedIds().join(",")}">
 <meta name="karatos-mapped" content="${dataSources.length}">
 <meta name="description" content="KaratOS connects the many systems a jewelry or watch business already runs, reads them together and turns them into a short list of things to act on, each with the evidence behind it. It writes back only with a person's approval.">
+<link rel="canonical" href="${SITE_URL}">
+<meta property="og:type" content="website">
+<meta property="og:url" content="${SITE_URL}">
+<meta property="og:title" content="KaratOS: the operating brain for jewelry businesses">
+<meta property="og:description" content="KaratOS connects the many systems a jewelry or watch business already runs, reads them together and turns them into a short list of things to act on, each with the evidence behind it. It writes back only with a person's approval.">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath d='M16 3 28 12 16 29 4 12Z' fill='%23c9a45c'/%3E%3C/svg%3E">
 ${fontPreloads}
 <style>
@@ -321,8 +426,6 @@ h2{font-size:clamp(30px,4.5vw,46px);max-width:20ch}
 .actions{display:flex;flex-wrap:wrap;gap:var(--space-2)}
 .note{margin:var(--space-3) 0 0;font-size:14px;color:var(--muted)}
 section{padding:var(--section) 0;border-top:1px solid var(--line);scroll-margin-top:64px}
-/* Below-the-fold sections skip layout and paint until they near the viewport: the integrations catalog alone is hundreds of elements. */
-section{content-visibility:auto;contain-intrinsic-size:auto 900px}
 .section-intro{color:var(--ink-2);max-width:62ch;margin:var(--space-2) 0 var(--space-5);font-size:17px}
 .steps{display:grid;grid-template-columns:repeat(3,1fr);gap:var(--space-3);list-style:none;padding:0;margin:0;counter-reset:step}
 .steps li{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:var(--space-3);counter-increment:step}
@@ -373,6 +476,41 @@ section{content-visibility:auto;contain-intrinsic-size:auto 900px}
 .pill.gold{background:var(--gold-soft);color:var(--gold-text);border-color:transparent}
 .pill.muted{color:var(--muted)}
 .empty{color:var(--muted);padding:var(--space-3) 0}
+.filters{grid-template-columns:1.4fr 1fr 1fr 1fr}
+@media (max-width:1000px){.filters{grid-template-columns:1fr 1fr}}
+.proof{display:flex;flex-wrap:wrap;gap:var(--space-4);list-style:none;padding:var(--space-3) 0 0;margin:var(--space-4) 0 0;border-top:1px solid var(--line)}
+.proof strong{display:block;font-family:var(--mono);font-weight:500;font-size:32px;line-height:1.1;color:var(--gold-text)}
+.proof span{color:var(--muted);font-size:14px}
+.newest{background:var(--gold-soft);border-radius:var(--radius);padding:var(--space-3);margin:0 0 var(--space-4)}
+.newest h3{margin:0 0 var(--space-2);font-size:18px}
+.newest ul{list-style:none;padding:0;margin:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:var(--space-2)}
+.newest li{display:flex;flex-direction:column;gap:4px;font-size:14px;color:var(--ink-2)}
+.newest li strong{color:var(--ink);font-size:16px}
+.newest .pill{width:fit-content}
+.jump{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 var(--space-4)}
+.jump a{font-size:14px;padding:8px 16px;border:1px solid var(--line);border-radius:999px;text-decoration:none;color:var(--ink-2);background:var(--surface)}
+.jump a:hover{color:var(--ink);border-color:var(--ink-2)}
+.group{margin:0 0 var(--space-3);scroll-margin-top:80px}
+.group[hidden]{display:none}
+.group-head{display:flex;align-items:baseline;justify-content:space-between;gap:var(--space-2);border-bottom:1px solid var(--line);padding-bottom:var(--space-1);margin-bottom:var(--space-3);cursor:pointer;list-style:none}
+.group-head::-webkit-details-marker{display:none}
+.group-head h3{margin:0;font-size:22px}
+.group-head h3::before{content:"+";display:inline-block;width:1.2em;color:var(--gold-text);font-family:var(--mono)}
+.group[open]>.group-head h3::before{content:"\\2212"}
+.count{font-family:var(--mono);font-size:13px;color:var(--muted)}
+.about{margin:0 0 var(--space-1);font-size:15px;color:var(--ink-2)}
+.more{margin:var(--space-2) 0 0;font-size:14px}
+.more summary{cursor:pointer;color:var(--gold-text);font-weight:600}
+.more dl{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;margin:var(--space-1) 0 0}
+.more dt{color:var(--muted)}
+.more dd{margin:0;color:var(--ink-2)}
+.ladder{display:grid;grid-template-columns:repeat(3,1fr);gap:var(--space-3);list-style:none;padding:0;margin:0 0 var(--space-4)}
+.ladder li{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:var(--space-3)}
+.ladder strong{display:block;font-family:var(--mono);font-weight:500;font-size:36px;line-height:1;color:var(--gold-text);margin-bottom:var(--space-1)}
+.ladder h3{margin:0 0 8px;font-size:18px}
+.ladder p{margin:0;color:var(--ink-2);font-size:15px}
+#partners .rules{margin-bottom:var(--space-4)}
+@media (max-width:760px){.filters{grid-template-columns:1fr}.ladder{grid-template-columns:1fr}}
 .pillars{display:grid;grid-template-columns:repeat(3,1fr);gap:var(--space-3)}
 .pillars div{padding-top:var(--space-3);border-top:2px solid var(--gold)}
 .pillars h3{margin:0 0 8px;font-size:18px}
@@ -448,16 +586,21 @@ footer .wrap{display:flex;flex-wrap:wrap;justify-content:space-between;gap:var(-
 <body>
 <header class="nav"><div class="wrap">
   <a class="brand" href="#top"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M16 3 28 12 16 29 4 12Z" fill="#c9a45c"/><path d="M4 12h24M16 3l-5 9 5 17 5-17-5-9" fill="none" stroke="#16140f" stroke-opacity=".35" stroke-width="1.2"/></svg>KaratOS</a>
-  <nav><a href="#how">How it works</a><a href="#together">Systems together</a><a href="#write-back">Write-back</a><a href="#integrations">Integrations</a><a href="#pilot">Holiday pilot</a><a href="#services">Pricing</a><a href="#broken">What's broken</a></nav>
+  <nav><a href="#how">How it works</a><a href="#together">Systems together</a><a href="#write-back">Write-back</a><a href="#integrations">Integrations</a><a href="#partners">Partners</a><a href="#pilot">Holiday pilot</a><a href="#services">Pricing</a><a href="#broken">What's broken</a></nav>
   <a class="btn primary small" href="#services">Custom services</a>
 </div></header>
 
 <main id="top">
 <div class="wrap hero">
-  <span class="eyebrow">For jewelers, watch dealers, wholesalers and manufacturers</span>
+  <span class="eyebrow">For jewelers, watch dealers, wholesalers, manufacturers and the businesses that serve them</span>
   <h1>The operating brain for jewelry businesses.</h1>
   <p class="lede">KaratOS connects the many systems your business already runs, from the POS and the books to diamond feeds and the repair bench, reads them together and turns them into a short list of things to act on today. Every suggestion shows the evidence behind it, and when you allow it, KaratOS writes back carefully, one approved change at a time.</p>
   <div class="actions"><a class="btn primary" href="#pilot">Join the holiday pilot</a><a class="btn ghost" href="#services">Custom services</a><a class="btn ghost" href="#together">See the systems work together</a></div>
+  <ul class="proof" aria-label="KaratOS today">
+    <li><strong>${builtCount}</strong><span>systems connected</span></li>
+    <li><strong>${dataSources.length}</strong><span>systems mapped</span></li>
+    <li><strong>${categories.length}</strong><span>categories, from the counter to the bench</span></li>
+  </ul>
   <p class="note">${escapeHtml(earlyAccessNote())}</p>
 </div>
 
@@ -517,8 +660,15 @@ ${deptCards}
 
 <section id="integrations"><div class="wrap">
   <h2>Integrations</h2>
-  <p class="section-intro">Every system on our map, who uses it and how we connect. "Building now" means we can build and test it without waiting on anyone. Everything else follows.</p>
+  <p class="section-intro">Every system on our map, grouped by what it does, with what KaratOS reads from it and how it connects. Open any card for the details. "Building now" means we can build and test it without waiting on anyone. Everything else follows.</p>
+  <div class="newest">
+    <h3>Newest connections</h3>
+    <ul>
+${newest}
+    </ul>
+  </div>
   <div class="stats">
+    <div class="stat"><strong>${builtCount}</strong><span>connected</span></div>
     <div class="stat"><strong>${dataSources.length}</strong><span>systems mapped</span></div>
     <div class="stat"><strong>${selfServe.size}</strong><span>building now</span></div>
     <div class="stat"><strong>${departments.length}</strong><span>departments served</span></div>
@@ -526,12 +676,31 @@ ${deptCards}
   <div class="filters" role="search">
     <input id="q" type="search" placeholder="Search systems, e.g. Shopify, repairs, diamonds" aria-label="Search integrations">
     <select id="segment" aria-label="Kind of business"><option value="">Every kind of business</option><option value="retail">Retail</option><option value="wholesale">Wholesale</option><option value="manufacturing">Manufacturing</option></select>
+    <select id="category" aria-label="Category"><option value="">Every category</option>${categoryOptions}</select>
     <select id="department" aria-label="Department"><option value="">Every department</option>${deptOptions}</select>
   </div>
-  <ul class="cards" id="cards">
-${cards}
-  </ul>
+  <nav class="jump" aria-label="Categories">${categories.map((d) => `<a href="#cat-${d}">${escapeHtml(domainLabel(d))}</a>`).join("")}</nav>
+  <div id="cards">
+${directory}
+  </div>
   <p class="empty" id="empty" hidden>Nothing matches. <a href="#broken">Tell us about it</a> and we'll add it.</p>
+</div></section>
+
+<section id="partners"><div class="wrap">
+  <span class="eyebrow">For partners</span>
+  <h2>Your system, read alongside everything else your customers run.</h2>
+  <p class="section-intro">When a jeweler connects your system to KaratOS, it gets read next to their POS, their books and their suppliers, so your data shows up in the decisions they make every morning. That makes your product harder to replace, not easier.</p>
+  <ul class="ladder" aria-label="How a system moves from the map to connected">
+    <li><strong>${dataSources.length - builtCount - selfServe.size}</strong><h3>On the map</h3><p>Every system our customers run, with how it can be reached. Each one moves up when a business asks for it or its vendor opens access.</p></li>
+    <li><strong>${selfServe.size}</strong><h3>Building now</h3><p>Systems with a public API and a free sandbox. We build and test these without waiting on anyone.</p></li>
+    <li><strong>${builtCount}</strong><h3>Connected</h3><p>Built and tested, checked every night against the vendor's sandbox, and watched for changes to the vendor's API.</p></li>
+  </ul>
+  <ul class="rules">
+    <li><h3>Read-only by default</h3><p>A connector reads only what it needs. It asks for read scopes, and where a key can't be limited, it sends only the read requests it lists.</p></li>
+    <li><h3>No surprise writes</h3><p>Writing back is off until the business turns it on for one action, and a person approves each change before it reaches your system.</p></li>
+    <li><h3>Kept current</h3><p>We follow your API changelog every day and run every connector against its sandbox every night, so a change on your side gets fixed quickly.</p></li>
+  </ul>
+  <div class="actions"><a class="btn primary" href="${REPORT_URL}">Ask for an integration</a><a class="btn ghost" href="${CONTACT_ANCHOR}">Talk to us about partnering</a></div>
 </div></section>
 
 <section id="pilot"><div class="wrap">
@@ -660,17 +829,24 @@ ${cards}
 
 <script>
 (function(){
-  var q=document.getElementById('q'),seg=document.getElementById('segment'),dep=document.getElementById('department');
-  var cards=[].slice.call(document.querySelectorAll('#cards .card')),empty=document.getElementById('empty');
+  var q=document.getElementById('q'),seg=document.getElementById('segment'),dep=document.getElementById('department'),cat=document.getElementById('category');
+  var groups=[].slice.call(document.querySelectorAll('#cards .group')),empty=document.getElementById('empty');
   function apply(){
-    var text=q.value.trim().toLowerCase(),s=seg.value,d=dep.value,shown=0;
-    cards.forEach(function(c){
-      var ok=(!text||c.dataset.search.indexOf(text)>-1)&&(!s||c.dataset.segments.split(' ').indexOf(s)>-1)&&(!d||c.dataset.departments.split(' ').indexOf(d)>-1);
-      c.hidden=!ok; if(ok) shown++;
+    var text=q.value.trim().toLowerCase(),s=seg.value,d=dep.value,k=cat.value,shown=0,filtering=!!(text||s||d||k);
+    groups.forEach(function(g){
+      var inGroup=0;
+      [].forEach.call(g.querySelectorAll('.card'),function(c){
+        var ok=(!k||c.dataset.domain===k)&&(!text||c.dataset.search.indexOf(text)>-1)&&(!s||c.dataset.segments.split(' ').indexOf(s)>-1)&&(!d||c.dataset.departments.split(' ').indexOf(d)>-1);
+        c.hidden=!ok; if(ok) inGroup++;
+      });
+      g.hidden=inGroup===0; shown+=inGroup;
+      if(filtering&&inGroup) g.open=true;
     });
     empty.hidden=shown>0;
   }
-  q.addEventListener('input',apply);seg.addEventListener('change',apply);dep.addEventListener('change',apply);
+  function openFromHash(){var g=document.getElementById(location.hash.slice(1));if(g&&g.classList.contains('group')){g.open=true;g.scrollIntoView()}}
+  window.addEventListener('hashchange',openFromHash);openFromHash();
+  q.addEventListener('input',apply);seg.addEventListener('change',apply);dep.addEventListener('change',apply);cat.addEventListener('change',apply);
 })();
 (function(){
   var form=document.getElementById('inquiry'),status=document.getElementById('inquiry-status');
