@@ -1,6 +1,6 @@
 import type { Connector, SourceBatch, SyncContext, WriteAction } from "@karatos/core";
 import { NIVODA_ENDPOINTS, NIVODA_PAGE_SIZE, nivodaClient, type NivodaClient, type NivodaClientOptions, type NivodaEnvironment } from "./client.js";
-import { delistedEvent, listedEvent, NIVODA_ID, readNivodaItem, unreadableEvent, type NivodaEvent } from "./normalize.js";
+import { nivodaDelistedEvent, nivodaListedEvent, NIVODA_ID, readNivodaItem, nivodaUnreadableEvent, type NivodaEvent } from "./normalize.js";
 
 /**
  * Nivoda's diamond marketplace: the diamonds a saved search finds, read
@@ -141,13 +141,13 @@ export function nivodaConnector(options: NivodaOptions): Connector {
 
     for (const [index, item] of items.entries()) {
       const read = readNivodaItem(item, index + 1);
-      if (read.kind === "unreadable") events.push(unreadableEvent(read, receivedAt));
+      if (read.kind === "unreadable") events.push(nivodaUnreadableEvent(read, receivedAt));
       // A diamond the search moved across a page boundary arrives twice; the first is kept.
       else if (!seen.has(read.id)) {
         seen.add(read.id);
         const before = readEntry(known[read.id]);
         if (before.hash !== read.hash) {
-          events.push(listedEvent(read, before.departures, receivedAt));
+          events.push(nivodaListedEvent(read, before.departures, receivedAt));
           known[read.id] = writeEntry({ hash: read.hash, departures: before.departures });
         }
       }
@@ -157,7 +157,7 @@ export function nivodaConnector(options: NivodaOptions): Connector {
       for (const [id, value] of Object.entries(known)) {
         const before = readEntry(value);
         if (seen.has(id) || before.hash === null) continue;
-        events.push(delistedEvent(id, before.departures + 1, receivedAt));
+        events.push(nivodaDelistedEvent(id, before.departures + 1, receivedAt));
         known[id] = writeEntry({ hash: null, departures: before.departures + 1 });
         if (events.length >= batchSize) yield flush();
       }

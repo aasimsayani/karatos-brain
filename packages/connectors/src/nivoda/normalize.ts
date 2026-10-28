@@ -96,20 +96,20 @@ export function readNivodaItem(item: unknown, position: number): NivodaItem {
 const idOf = (key: string) => key.replace(/^nivoda:/, "nivoda_");
 
 /** A diamond new to the search or changed. `returns` counts the times it left before, so one back unchanged is recorded again. */
-export function listedEvent(stone: Extract<NivodaItem, { kind: "stone" }>, returns: number, receivedAt: string): NivodaEvent {
+export function nivodaListedEvent(stone: Extract<NivodaItem, { kind: "stone" }>, returns: number, receivedAt: string): NivodaEvent {
   const key = `nivoda:listed:${stone.id}:${stone.hash}${returns ? `:${returns}` : ""}`;
   // A listing's time is when KaratOS saw it: Nivoda doesn't say when the diamond was listed.
   return { id: idOf(key), type: NIVODA_EVENT_TYPES.listed, occurredAt: receivedAt, receivedAt, idempotencyKey: key, payload: stone.payload };
 }
 
 /** A diamond that left the search for the `departure`th time, so each departure is recorded once. */
-export function delistedEvent(id: string, departure: number, receivedAt: string): NivodaEvent {
+export function nivodaDelistedEvent(id: string, departure: number, receivedAt: string): NivodaEvent {
   const key = `nivoda:delisted:${id}:${departure}`;
   return { id: idOf(key), type: NIVODA_EVENT_TYPES.delisted, occurredAt: receivedAt, receivedAt, idempotencyKey: key, payload: { source: "Nivoda", nivodaId: id } };
 }
 
 /** An item that doesn't read, kept and dead-lettered with what was wrong. */
-export function unreadableEvent(item: Extract<NivodaItem, { kind: "unreadable" }>, receivedAt: string): NivodaEvent {
+export function nivodaUnreadableEvent(item: Extract<NivodaItem, { kind: "unreadable" }>, receivedAt: string): NivodaEvent {
   const key = `nivoda:unreadable:${item.position}:${item.hash}`;
   return { id: idOf(key), type: NIVODA_EVENT_TYPES.listed, occurredAt: undefined, receivedAt, idempotencyKey: key, payload: { source: "Nivoda", position: item.position, problems: item.problems } };
 }
