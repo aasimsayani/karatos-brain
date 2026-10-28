@@ -96,7 +96,7 @@ Used by: R is retail, W is wholesale, M is manufacturing. Test with says how we 
 | Nivoda | R, W | Public API | Unknown | No | Planned (GraphQL; holds and orders need the Pro API) |
 | VDB (Virtual Diamond Boutique) | R, W | Partner | Partner | No | Planned |
 | Polygon | R, W | Unknown | Unknown | No | Planned (Includes Memo-Track) |
-| Stuller | R, M | Public API | Paid account | No | Planned (Product, gem, order and invoice APIs) |
+| Stuller | R, M | Public API | Paid account | No | Built (Reads the invoices on the business's Stuller account and Stuller's metal market rates, with a developer login. Needs a Stuller account owner to make the login; built against a mock from Stuller's API help pages and checked live once a login is connected) |
 | GemFind JewelCloud | R, W, M | Partner | Partner | No | Planned |
 | Quality Gold | R | Unknown | Unknown | No | Planned |
 | GIA Report Results | R, W, M | Public API | Free sandbox | No | Built (Looks up each certificate number on the business's list once, then follows GIA's free changed-reports feed. GIA's free plan includes a sandbox key; lookups of reports the business didn't submit cost per lookup. The docs watch follows the API changelog, and the nightly sandbox run catches API changes) |
@@ -1184,6 +1184,30 @@ Reads Stripe's REST API with GET requests only, pinned to `STRIPE_API_VERSION` o
 **Webhooks.** `verifyStripeWebhook` checks the `Stripe-Signature` header: HMAC-SHA256 of `<t>.<raw body>`, any one of several `v1` signatures (Stripe sends two while a secret rolls), and a timestamp within five minutes, so an old delivery replayed later is rejected. Webhooks and the events API carry the same event objects, so whichever arrives second is a duplicate.
 
 **Testing.** The tests use synthetic responses shaped from Stripe's API reference. For the nightly sandbox run, create a restricted key with the read permissions above in test mode and add it as the `SANDBOX_STRIPE_SECRET_KEY` GitHub Actions secret. The writes it may do later (create payment links, create refunds) are declared, and the write-gate test shows each one is rejected.
+
+### Stuller
+
+Reads the invoices on the business's Stuller account and Stuller's current metal market rates. Buying and finance see what was ordered, what it cost, what is still owed and where each shipment is, and the metal prices the invoices were priced at. It needs a Stuller account and a developer login, which a Stuller account owner makes under the Developer role; that login works with the API only and can't sign in to Stuller.com.
+
+| Setting | What it is |
+| --- | --- |
+| `STULLER_USERNAME` | The developer login's user name |
+| `STULLER_PASSWORD` | The developer login's password. It is sent only to `api.stuller.com`, which is fixed in the client |
+
+**What it reads.** Each sync reads every invoice from `GET /api/v2/invoice`, since that endpoint has no date filter, and records the ones that are new or changed since the last sync, oldest first. Invoices dated more than five years back are skipped. It then reads `GET /api/v2/products/metalmarketrates`. A login Stuller turns down (HTTP 401) stops the sync and says to check the login and its Developer role. A 429 waits as Retry-After says, up to a minute, three times.
+
+**Events.**
+
+| Event | From | Key |
+| --- | --- | --- |
+| `vendor_invoice.received` | An invoice new or changed: invoice, order and purchase order numbers, ship-to account number, status, invoice and order dates, order, invoice and due totals, sales tax and shipping in cents, ship method, tracking number, the gold, silver and platinum rates it was priced at, and each line's item number, description, quantities shipped and back-ordered, unit price, line total, labor and other charges, and weight | invoice number and a hash of what was read |
+| `vendor_metal_rate.published` | Stuller's current price per troy ounce in cents for gold, silver, platinum and palladium | a hash of the rates |
+
+An invoice is recorded again when its status, tracking or anything else read changes, so a shipment can be followed from order to delivery; unchanged invoices and unchanged rates are not recorded twice. The rates' time is when KaratOS read them, since Stuller's answer carries none. Ship-to addresses and tracking links aren't stored: a drop-shipped order carries the business's customer's address. An invoice without a readable number or date, or with an amount or line that doesn't read, is dead-lettered listing what was wrong; the rest are still read. No department reasons over these events yet.
+
+**Writes.** Declared and turned off: submitting an order to Stuller.
+
+**Testing.** The tests run against a mock built from Stuller's API help pages (`packages/testkit/src/mocks/stuller.ts`), which answers synthetic invoices and rates and turns down a wrong login. It is checked live once a developer login is connected.
 
 ### Twilio
 
