@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { INTEGRATIONS, type IntegrationSpec } from "../packages/core/src/index.js";
-import { END, MILESTONES, ProgressError, START, bar, parseMilestones, renderProgress, replaceProgress } from "./progress.js";
+import { CONNECTED_END, CONNECTED_START, END, MILESTONES, ProgressError, START, bar, parseMilestones, renderConnected, renderProgress, renderReadme, replaceBlock, replaceProgress } from "./progress.js";
 
 const spec = (id: string, status: IntegrationSpec["status"], departments: IntegrationSpec["departments"] = ["sales"]) =>
   ({ ...INTEGRATIONS[0]!, id, name: `${id} name`, status, departments }) as IntegrationSpec;
@@ -18,8 +18,7 @@ const milestone = (over: Record<string, unknown> = {}) => ({
 describe("README progress", () => {
   it("matches docs/milestones.json and the catalog; run npm run progress:write when this fails", () => {
     const readme = readFileSync("README.md", "utf8");
-    const block = renderProgress(parseMilestones(JSON.parse(readFileSync(MILESTONES, "utf8")), INTEGRATIONS), INTEGRATIONS);
-    expect(replaceProgress(readme, block)).toBe(readme);
+    expect(renderReadme(readme, parseMilestones(JSON.parse(readFileSync(MILESTONES, "utf8")), INTEGRATIONS), INTEGRATIONS)).toBe(readme);
   });
 
   it("marks an integration item done only when the catalog says built", () => {
@@ -82,7 +81,38 @@ describe("README progress", () => {
     expect(() => parseMilestones(json, catalog)).toThrow(message);
   });
 
+  it("lists every built system that feeds a department, with its first capability and the departments it feeds", () => {
+    const withCaps = [
+      { ...spec("alpha", "built", ["sales", "custom_orders"]), capabilities: ["Reads | pipes and a \\| slash", "Second"] },
+      spec("beta", "planned"),
+      { ...spec("reasoning", "built", []), capabilities: ["Not a data source"] },
+      { ...spec("gamma", "built", ["finance"]), capabilities: undefined, note: "Only a note" },
+    ] as IntegrationSpec[];
+    expect(renderConnected(withCaps).split("\n")).toEqual([
+      CONNECTED_START,
+      "<!-- Generated from the integration catalog by npm run progress:write. Edit the catalog, not this block. -->",
+      "",
+      "| System | What the business gets | Feeds |",
+      "| --- | --- | --- |",
+      "| alpha name | Reads \\| pipes and a \\\\\\| slash | Sales, Custom orders |",
+      "| gamma name | Only a note | Finance |",
+      CONNECTED_END,
+    ]);
+    expect(renderConnected([spec("beta", "planned")])).toContain("Nothing is connected yet.");
+  });
+
+  it("keeps both generated blocks current and leaves the rest of the README alone", () => {
+    const readme = `intro\n${START}\nold\n${END}\nmiddle\n${CONNECTED_START}\nold\n${CONNECTED_END}\nend`;
+    const out = renderReadme(readme, parseMilestones({ milestones: [milestone()] }, catalog), catalog);
+    expect(out.startsWith("intro\n<!-- progress:start -->")).toBe(true);
+    expect(out).toContain(`${END}\nmiddle\n${CONNECTED_START}`);
+    expect(out).toContain("| alpha name |");
+    expect(out.endsWith(`${CONNECTED_END}\nend`)).toBe(true);
+    expect(() => renderReadme(`${START}\n${END}`, parseMilestones({ milestones: [milestone()] }, catalog), catalog)).toThrow(CONNECTED_START);
+  });
+
   it("replaces only the marked block", () => {
+    expect(replaceBlock(`a\n<!-- x -->\nold\n<!-- y -->\nb`, "NEW", "<!-- x -->", "<!-- y -->")).toBe("a\nNEW\nb");
     expect(replaceProgress(`a\n${START}\nold\n${END}\nb`, "NEW")).toBe("a\nNEW\nb");
   });
 
