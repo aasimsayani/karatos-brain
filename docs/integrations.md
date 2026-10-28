@@ -99,7 +99,7 @@ Used by: R is retail, W is wholesale, M is manufacturing. Test with says how we 
 | Stuller | R, M | Public API | Paid account | No | Planned (Product, gem, order and invoice APIs) |
 | GemFind JewelCloud | R, W, M | Partner | Partner | No | Planned |
 | Quality Gold | R | Unknown | Unknown | No | Planned |
-| GIA Report Results | R, W, M | Public API | Paid account | No | Planned (Needs a GIA lab account) |
+| GIA Report Results | R, W, M | Public API | Free sandbox | No | Built (Looks up each certificate number on the business's list once, then follows GIA's free changed-reports feed. GIA's free plan includes a sandbox key; lookups of reports the business didn't submit cost per lookup. The docs watch follows the API changelog, and the nightly sandbox run catches API changes) |
 | IGI report verification | R, W | Unknown | Unknown | No | Planned (Web lookup only; no API found) |
 | GemGuide Appraisal Software | R | Unknown | Unknown | No | Planned |
 | HRD Antwerp report check | R, W | Unknown | Unknown | No | Planned (Web lookup through MyHRD only; no API found) |
@@ -371,6 +371,7 @@ A request for a path or method the docs don't list throws `UndocumentedRequestEr
 - BigCommerce's v2 order and store paths and v3 catalog, inventory, customer, refund and price list paths
 - Clover's REST API v3 read endpoints with its v2 OAuth token refresh, including its 90-day cap on orders, payments and refunds
 - Typeform's Create API (a form's definition) and Responses API
+- GIA's Report Results API: getReport and getChangedReports
 - Gmail's message, label and history reads with Google's token refresh (API v1)
 - Google Drive (files and changes, v3), Sheets (`values:batchGet`, v4) and Calendar (`events.list` with sync tokens, v3) with Google's token refresh, enforcing each API's documented scopes so `drive.metadata.readonly` can't read Sheets values
 - HubSpot's CRM search, archived list, batch association and token info endpoints (date version 2026-09)
@@ -385,7 +386,7 @@ A request for a path or method the docs don't list throws `UndocumentedRequestEr
 - A WooCommerce store's REST API v3 read endpoints with its key permissions and page headers
 - Xero's Accounting API endpoints with its token refresh
 
-Where a vendor has a free sandbox (Affirm, Authorize.net, BigCommerce, Clover, Custom forms, Gmail, Google Workspace and Drive, HubSpot, Klaviyo, Monday.com, Plaid, QuickBooks Online, Slack, Square, Wix, WooCommerce and Xero so far), its mock is a stand-in until a developer account is set up for the nightly run.
+Where a vendor has a free sandbox (Affirm, Authorize.net, BigCommerce, Clover, Custom forms, GIA Report Results, Gmail, Google Workspace and Drive, HubSpot, Klaviyo, Monday.com, Plaid, QuickBooks Online, Slack, Square, Wix, WooCommerce and Xero so far), its mock is a stand-in until a developer account is set up for the nightly run.
 
 <!-- registry:mocks:end -->
 
@@ -735,6 +736,34 @@ The key is the partner, the set, the document number and a hash of the document'
 **What it leaves out.** Names and addresses in N1 to N4 are never stored: a ship-to store or reporting location is kept as its code only. No department reasons over these events yet; they are stored for the wholesale views to come.
 
 **Testing.** The tests build synthetic interchanges in code, including other delimiters, several interchanges per file, every envelope error, and a broken document of each set.
+
+### GIA Report Results
+
+Looks up the GIA reports behind the certificate numbers the business holds, through GIA's Report Results API, and keeps them current. It confirms what each stone is before it is sold, insured or bought, and flags a number GIA has no report for.
+
+| Setting | What it is |
+| --- | --- |
+| `GIA_API_URL` | The API address GIA gives at signup. Only https addresses on a gia.edu host are accepted, so the key can't be sent anywhere else |
+| `GIA_API_KEY` | A Report Results API key, its own for KaratOS so it can be revoked alone |
+| `GIA_REPORT_NUMBERS_FILE` | A text or CSV file of report numbers, one per line in the first column. Blank lines and lines starting with `#` are skipped; a line holding anything else stops the sync, naming the line but not its contents |
+| `GIA_MAX_LOOKUPS_PER_SYNC` | Optional. The most new numbers one sync looks up, 100 when unset |
+
+**What it reads.** Each sync looks up the numbers on the list it hasn't looked up yet, 25 to a checkpoint, then reads GIA's changed-reports feed from where it left off. A number is looked up once. GIA charges for lookups of reports the business didn't submit on a pay-as-you-go plan, while the feed is free and keeps every report this key has looked up current for two years, so updates come from the feed, never from a second lookup. A report at GIA for service is looked up again on a later sync. A used-up quota stops the sync with an error saying so; what was already looked up is kept.
+
+The client sends two GraphQL queries only, `getReport` and `getChangedReports`, with variables it checked: a report number is 5 to 12 capital letters or digits. It never sends a mutation, so the changed-reports queue is read and never cleared. A 429 waits as Retry-After says, up to a minute, three times; a 403 says the key was denied without showing it.
+
+**Events.**
+
+| Event | From | Key |
+| --- | --- | --- |
+| `grading.report_retrieved` | A report found by lookup or in the changed-reports feed: report type, kind (natural or lab-grown diamond, pearl, identification, melee, narrative, jewelry or other), shape, measurements, carat weight as a number, color, clarity, cut, polish, symmetry, fluorescence, inscription, comments, origin, diamond type, proportions, which assets GIA has, and GIA's note on a reissued report | report number and a hash of the report, so an updated report is a new event and the same one read again is a duplicate |
+| `grading.report_unavailable` | A number GIA has no report for (`not_found`), or won't show this key (`not_permitted`) | report number and reason, so it is recorded once |
+
+A report's time is its report date; one without a readable date or number is dead-lettered with the raw event kept. Asset links are not stored, since GIA's last an hour; only which assets exist. No department reasons over these events yet.
+
+**Writes.** None. Report results are GIA's to change.
+
+**Testing.** The tests run against a mock built from GIA's developer docs (`packages/testkit/src/mocks/gia.ts`), with synthetic reports under GIA's published sandbox numbers. GIA's free plan includes a sandbox key; the nightly sandbox run looks up five sandbox reports once `SANDBOX_GIA_API_URL` and `SANDBOX_GIA_API_KEY` are set.
 
 ### Gmail
 
