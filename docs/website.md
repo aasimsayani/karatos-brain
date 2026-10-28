@@ -62,3 +62,10 @@ The "Holiday pilot" section announces the testing weekend before Black Friday. I
 ## Deploy
 
 The site runs on Railway as its own project, separate from any client instance. The service builds `site/Dockerfile` from the repo root (set `RAILWAY_DOCKERFILE_PATH=site/Dockerfile` on the service) and runs `node site/server.ts` on `$PORT` (Node strips the types; the server has no dependencies). A push to the deployed branch redeploys it.
+
+A failed deploy leaves the old page up with no error, so two checks watch for it:
+
+- CI's `website-docker` job builds `site/Dockerfile`, starts the container and checks that it serves the page main builds.
+- The `Website freshness` workflow runs daily and after each green CI run on main. It compares the live page with a fresh build of main and opens one `site-freshness` issue while they differ, then closes it once they match. The page carries two tags for this: `karatos-connected` (the ids of every built connector) and `karatos-mapped` (how many systems are on the map). The live URL comes from the `SITE_URL` repository variable. Run it by hand with `SITE_URL=<url> npm run site:freshness -- --dry-run` after `node --import tsx site/build.ts`.
+
+When the issue opens, read the latest deployment's build log on the website service in Railway, fix what it names, and redeploy from main.
