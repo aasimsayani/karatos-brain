@@ -4,6 +4,7 @@ import affirm from "./affirm.js";
 import authorize_net from "./authorize_net.js";
 import custom_forms from "./custom_forms.js";
 import gmail from "./gmail.js";
+import google_workspace from "./google_workspace.js";
 import hubspot from "./hubspot.js";
 import monday from "./monday.js";
 import plaid from "./plaid.js";
@@ -16,6 +17,7 @@ export * from "./affirm.js";
 export * from "./authorize_net.js";
 export * from "./custom_forms.js";
 export * from "./gmail.js";
+export * from "./google_workspace.js";
 export * from "./hubspot.js";
 export * from "./monday.js";
 export * from "./plaid.js";
@@ -25,7 +27,7 @@ export * from "./stuller.js";
 export * from "./xero.js";
 
 /** Every mock module, one per catalog integration. */
-export const DOC_MOCK_MODULES: readonly DocMockModule[] = [affirm, authorize_net, custom_forms, gmail, hubspot, monday, plaid, quickbooks, slack, stuller, xero];
+export const DOC_MOCK_MODULES: readonly DocMockModule[] = [affirm, authorize_net, custom_forms, gmail, google_workspace, hubspot, monday, plaid, quickbooks, slack, stuller, xero];
 
 /** Every doc-derived mock, with empty data, for checks and the vendor docs watch. */
 export function allDocMocks(): DocMock[] {

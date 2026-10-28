@@ -4,6 +4,7 @@ import affirm from "./affirm.js";
 import authorize_net from "./authorize_net.js";
 import custom_forms from "./custom_forms.js";
 import gmail from "./gmail.js";
+import google_workspace from "./google_workspace.js";
 import hubspot from "./hubspot.js";
 import monday from "./monday.js";
 import plaid from "./plaid.js";
@@ -14,4 +15,4 @@ import stripe from "./stripe.js";
 import xero from "./xero.js";
 
 /** Every connector's nightly sandbox check. */
-export const SANDBOX_CHECKS: SandboxCheck[] = [affirm, authorize_net, custom_forms, gmail, hubspot, monday, plaid, quickbooks, shopify, slack, stripe, xero];
+export const SANDBOX_CHECKS: SandboxCheck[] = [affirm, authorize_net, custom_forms, gmail, google_workspace, hubspot, monday, plaid, quickbooks, shopify, slack, stripe, xero];
