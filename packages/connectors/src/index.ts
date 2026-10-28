@@ -12,6 +12,7 @@ export * from "./google_workspace/index.js";
 export * from "./hubspot/index.js";
 export * from "./inventory_pos/index.js";
 export * from "./klaviyo/index.js";
+export * from "./metals_api/index.js";
 export * from "./monday/index.js";
 export * from "./plaid/index.js";
 export * from "./quickbooks/index.js";
