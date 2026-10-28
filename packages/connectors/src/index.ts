@@ -3,6 +3,7 @@ export * from "./affirm/index.js";
 export * from "./authorize_net/index.js";
 export * from "./bank_statements/index.js";
 export * from "./chase/index.js";
+export * from "./custom_forms/index.js";
 export * from "./files/index.js";
 export * from "./gmail/index.js";
 export * from "./hubspot/index.js";

@@ -4,6 +4,7 @@ import affirm from "./affirm.js";
 import authorize_net from "./authorize_net.js";
 import bank_statements from "./bank_statements.js";
 import chase from "./chase.js";
+import custom_forms from "./custom_forms.js";
 import gmail from "./gmail.js";
 import hubspot from "./hubspot.js";
 import inventory_pos from "./inventory_pos.js";
@@ -15,4 +16,4 @@ import stripe from "./stripe.js";
 import xero from "./xero.js";
 
 /** Each built connector's own catalog fields, by catalog id. */
-export const CONNECTOR_CATALOG: Readonly<Record<string, ConnectorCatalogEntry>> = { affirm, authorize_net, bank_statements, chase, gmail, hubspot, inventory_pos, monday, plaid, quickbooks, shopify, stripe, xero };
+export const CONNECTOR_CATALOG: Readonly<Record<string, ConnectorCatalogEntry>> = { affirm, authorize_net, bank_statements, chase, custom_forms, gmail, hubspot, inventory_pos, monday, plaid, quickbooks, shopify, stripe, xero };
