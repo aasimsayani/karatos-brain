@@ -37,14 +37,14 @@ const CallLogged = z.object({
 });
 
 /**
- * A text or chat message. Shapes differ by channel (Twilio texts carry a
- * contact and a direction; team chat doesn't), so only the fields the
- * missed-call check reads are checked.
+ * A text, email or chat message. Shapes differ by channel (Twilio texts
+ * carry a contact and a direction; Gmail says received or sent; team chat
+ * has neither), so only the fields the missed-call check reads are checked.
  */
 const MessageLogged = z.object({
   messageId: z.string().min(1),
   contactRef: z.string().min(1).optional(),
-  direction: z.enum(["inbound", "outbound"]).optional(),
+  direction: z.enum(["inbound", "outbound", "received", "sent"]).optional(),
 });
 
 const OCCASION_LEAD_DAYS = 21;

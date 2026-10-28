@@ -169,6 +169,7 @@ describe("clienteling", () => {
     await s.send("communication.call_logged", callFrom("c1", "busy"), "2026-10-02T09:00:00Z");
     await s.send("communication.call_logged", { callId: "anon", direction: "inbound", status: "no-answer", missed: true }, "2026-10-02T09:00:00Z");
     await s.send("communication.message_logged", { messageId: "slack:message:1", channel: "slack", conversationId: "slack:channel:1" }, "2026-10-02T09:00:00Z");
+    await s.send("communication.message_logged", { messageId: "gmail:message:1", channel: "email", direction: "sent" }, "2026-10-02T09:00:00Z");
     expect(about(await s.ask(NOW), "rang the store")[0]!.summary).toContain("1 caller rang the store once in the last 7 days");
     expect(about(await s.ask(NOW), "rang the store")[0]!.summary).toContain("The oldest missed call was today.");
     const t = store();
