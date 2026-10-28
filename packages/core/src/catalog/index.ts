@@ -12,8 +12,9 @@ import monday from "./monday.js";
 import plaid from "./plaid.js";
 import quickbooks from "./quickbooks.js";
 import shopify from "./shopify.js";
+import slack from "./slack.js";
 import stripe from "./stripe.js";
 import xero from "./xero.js";
 
 /** Each built connector's own catalog fields, by catalog id. */
-export const CONNECTOR_CATALOG: Readonly<Record<string, ConnectorCatalogEntry>> = { affirm, authorize_net, bank_statements, chase, custom_forms, gmail, hubspot, inventory_pos, monday, plaid, quickbooks, shopify, stripe, xero };
+export const CONNECTOR_CATALOG: Readonly<Record<string, ConnectorCatalogEntry>> = { affirm, authorize_net, bank_statements, chase, custom_forms, gmail, hubspot, inventory_pos, monday, plaid, quickbooks, shopify, slack, stripe, xero };
