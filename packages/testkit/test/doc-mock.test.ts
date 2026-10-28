@@ -108,6 +108,14 @@ describe("docMockFetch", () => {
     expect(await gone.text()).toBe("");
   });
 
+  it("sends a text body as written, such as a CSV file, with its own content type or plain text", async () => {
+    const route = (headers?: Record<string, string>) => ({ method: "GET" as const, path: "/export", documentedAt: "https://docs.vendor.example/api/export", respond: () => ({ status: 200, text: "a,b\n1,2\n", ...(headers ? { headers } : {}) }) });
+    const csv = await docMockFetch(exampleMock({ routes: [route({ "content-type": "text/csv" })] }))("https://api.vendor.example/v1/export", { headers: bearer });
+    expect([csv.headers.get("content-type"), await csv.text()]).toEqual(["text/csv", "a,b\n1,2\n"]);
+    const plain = await docMockFetch(exampleMock({ routes: [route()] }))("https://api.vendor.example/v1/export", { headers: bearer });
+    expect(plain.headers.get("content-type")).toBe("text/plain; charset=utf-8");
+  });
+
   it("refuses anything the docs don't list", async () => {
     const fetch = docMockFetch(exampleMock());
     for (const [url, method] of [
