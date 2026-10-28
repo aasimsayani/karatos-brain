@@ -34,7 +34,7 @@ export interface CloverBrainEvent {
 
 type Rec = Record<string, unknown>;
 
-export const CUSTOMER_REF_PREFIX = "clover_customer:";
+export const CLOVER_CUSTOMER_REF_PREFIX = "clover_customer:";
 const MIN_KEY_LENGTH = 32;
 
 export class CloverCustomerKeyError extends Error {
@@ -45,7 +45,7 @@ export class CloverCustomerKeyError extends Error {
 }
 
 /** Throws unless the key is long enough to be a secret; generated keys are 64 hex characters. */
-export function checkCustomerRefKey(key: string | undefined): string {
+export function checkCloverCustomerRefKey(key: string | undefined): string {
   const value = key?.trim() ?? "";
   if (value.length < MIN_KEY_LENGTH) throw new CloverCustomerKeyError(`CUSTOMER_REF_KEY must be at least ${MIN_KEY_LENGTH} characters; let npm run secrets:setup generate it`);
   return value;
@@ -155,13 +155,13 @@ export interface CloverNormalizeOptions {
 }
 
 export function cloverNormalizer(options: CloverNormalizeOptions) {
-  const key = checkCustomerRefKey(options.customerKey);
+  const key = checkCloverCustomerRefKey(options.customerKey);
   const merchantId = options.merchantId;
 
   /** The keyed reference for a Clover customer. The merchant is signed in, so two merchants never share one. */
   function customerRef(id: string): string {
     const mac = createHmac("sha256", key).update(`clover:customer:v1:${merchantId}:${id}`, "utf8").digest("hex");
-    return `${CUSTOMER_REF_PREFIX}${mac.slice(0, 32)}`;
+    return `${CLOVER_CUSTOMER_REF_PREFIX}${mac.slice(0, 32)}`;
   }
 
   function orderEvents(order: Rec, receivedAt: string, skus: SkuLookup): CloverBrainEvent[] {
@@ -347,7 +347,7 @@ export function cloverNormalizer(options: CloverNormalizeOptions) {
     const marketingConsent = customer.marketingAllowed === true;
     const version = createHash("sha256").update(`${ref}|${marketingConsent}`).digest("hex").slice(0, 12);
     return [
-      event(`customer:${ref.slice(CUSTOMER_REF_PREFIX.length)}:${version}`, "customer.profile_updated", receivedAt, receivedAt, {
+      event(`customer:${ref.slice(CLOVER_CUSTOMER_REF_PREFIX.length)}:${version}`, "customer.profile_updated", receivedAt, receivedAt, {
         customerId: ref,
         // The clienteling schema needs a name; the customer's own is never kept.
         name: "Clover customer",

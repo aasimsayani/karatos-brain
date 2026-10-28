@@ -31,7 +31,7 @@ import {
   CLOVER_REPLAY_WINDOW_MS,
   CLOVER_WINDOW_MS,
   CLOVER_WRITES,
-  CUSTOMER_REF_PREFIX,
+  CLOVER_CUSTOMER_REF_PREFIX,
   CloverApiError,
   CloverConfigError,
   CloverCustomerKeyError,
@@ -524,7 +524,7 @@ describe("Clover normalization", () => {
     const customer = cloverCustomer.one();
     const [event] = normalizer().customerEvents(customer, RECEIVED);
     const ref = event!.payload.customerId as string;
-    expect(ref).toMatch(new RegExp(`^${CUSTOMER_REF_PREFIX}[0-9a-f]{32}$`));
+    expect(ref).toMatch(new RegExp(`^${CLOVER_CUSTOMER_REF_PREFIX}[0-9a-f]{32}$`));
     expect(event!.payload).toEqual({ customerId: ref, name: "Clover customer", marketingConsent: true });
     const text = JSON.stringify(event);
     for (const dropped of [customer.id as string, "Test", "example.test", "555", "Test Street"]) expect(text, dropped).not.toContain(dropped);
