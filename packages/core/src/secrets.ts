@@ -10,7 +10,7 @@ export const SecretEntrySchema = z.object({
   name: z.string().regex(/^[A-Z][A-Z0-9_]*$/),
   kind: z.enum(["secret", "config"]),
   description: z.string().min(1),
-  requiredFor: z.array(z.string().regex(/^(core|instance|migrations|integration:[a-z_]+)$/)).min(1),
+  requiredFor: z.array(z.string().regex(/^(core|instance|migrations|integration:[a-z0-9_]+)$/)).min(1),
   pattern: z.string().optional(),
   example: z.string().optional(),
   generate: z.object({ method: z.enum(["random_hex", "random_base64url"]), bytes: z.number().int().min(16) }).optional(),
