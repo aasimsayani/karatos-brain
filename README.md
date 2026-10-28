@@ -85,6 +85,7 @@ These are built, tested against recorded vendor responses or mocks built from ea
 | Authorize.net | Imports five years of settlement batches and the card and eCheck transactions in them, then keeps them current | Sales, Finance |
 | Affirm | Imports five years of Affirm financed orders, refunds, disputes and daily settlements, then keeps them current | Sales, Finance |
 | EDI with retail partners (X12 850, 855, 856, 810, 846, 852) | Imports two years of purchase orders (850), inventory reports (846) and sell-through (852) from retail partners | Inventory, Sales, Wholesale |
+| Avalara AvaTax | Imports five years of sales tax for every sale, return and purchase, then keeps it current as transactions are committed, voided or adjusted | Compliance, Finance |
 | TheWatchSearch (by TheWatchCloud) | Turns the dealer WhatsApp groups the store is in into a feed of offers: brand, reference, buy or sell, price, year, condition and set | Buying, Sales, Inventory |
 <!-- connected:end -->
 
@@ -128,7 +129,7 @@ This section updates itself as work lands: it is generated from [docs/milestones
 <!-- progress:start -->
 <!-- Generated from docs/milestones.json and the integration catalog by npm run progress:write. Edit those, not this block. -->
 
-**Overall: 68% complete**, 26 of 38 roadmap items done. 31 of the 232 systems in the integration catalog are connected.
+**Overall: 68% complete**, 26 of 38 roadmap items done. 32 of the 232 systems in the integration catalog are connected.
 
 | Milestone | What it gives a jeweler | Progress | Target |
 | --- | --- | --- | --- |

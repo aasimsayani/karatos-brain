@@ -222,7 +222,7 @@ Used by: R is retail, W is wholesale, M is manufacturing. Test with says how we 
 | Synchrony | R | Partner | Partner | No | Planned |
 | Acima | R | Partner | Partner | No | Planned |
 | Jewelers Board of Trade | W, M | Partner | Partner | No | Planned (Trade credit ratings) |
-| Avalara AvaTax | R, W, M | Public API | Free sandbox | No | Planned (Sales tax by jurisdiction. No public AvaTax changelog; the nightly sandbox run catches API changes) |
+| Avalara AvaTax | R, W, M | Public API | Free sandbox | No | Built (Read-only by allowlist: an AvaTax license key can do anything the account can, so the client sends only its three listed reads, with filters it builds itself. No public AvaTax changelog; the nightly sandbox run catches API changes) |
 | TaxJar | R, W | Public API | Unknown | No | Planned |
 | FinCEN Form 8300 cash reporting | R, W, M | File export | Sample files | No | Planned (Cash payments over $10,000; filed through BSA E-Filing, which has no API, so the brain prepares and tracks filings) |
 | Refiner and scrap settlement statements | R, W, M | File export | Sample files | No | Planned (CSV or PDF from the refiner) |
@@ -370,6 +370,7 @@ A request for a path or method the docs don't list throws `UndocumentedRequestEr
 
 - Affirm's transaction, transaction event, daily settlement and dispute reads
 - Authorize.net's Transaction Reporting requests on its JSON API
+- AvaTax's connection check, company and transaction endpoints (REST API v2)
 - BigCommerce's v2 order and store paths and v3 catalog, inventory, customer, refund and price list paths
 - Clover's REST API v3 read endpoints with its v2 OAuth token refresh, including its 90-day cap on orders, payments and refunds
 - Typeform's Create API (a form's definition) and Responses API
@@ -391,7 +392,7 @@ A request for a path or method the docs don't list throws `UndocumentedRequestEr
 - A WooCommerce store's REST API v3 read endpoints with its key permissions and page headers
 - Xero's Accounting API endpoints with its token refresh
 
-Where a vendor has a free sandbox (Affirm, Authorize.net, BigCommerce, Clover, Custom forms, GIA Report Results, Gmail, Google Workspace and Drive, HubSpot, Klaviyo, Monday.com, Plaid, QuickBooks Online, Slack, Square, Wix, WooCommerce and Xero so far), its mock is a stand-in until a developer account is set up for the nightly run.
+Where a vendor has a free sandbox (Affirm, Authorize.net, Avalara AvaTax, BigCommerce, Clover, Custom forms, GIA Report Results, Gmail, Google Workspace and Drive, HubSpot, Klaviyo, Monday.com, Plaid, QuickBooks Online, Slack, Square, Wix, WooCommerce and Xero so far), its mock is a stand-in until a developer account is set up for the nightly run.
 
 <!-- registry:mocks:end -->
 
@@ -502,6 +503,30 @@ The Transaction Details API must be turned on for the account (Account > Setting
 **Webhooks.** `verifyAuthorizeNetWebhook` checks `X-ANET-Signature`, which is `sha512=` and the hex HMAC-SHA512 of the raw body keyed with the Signature Key (as text), compared in constant time. Anything but a match must be answered 401. `authorizeNetWebhookChange` names the transaction a payment event is about. A delivery carries only part of the transaction, so it is a prompt to sync, not data. The instance doesn't take webhooks yet; the scheduled sync picks every change up.
 
 **Testing.** The tests run against a mock built from Authorize.net's docs (`packages/testkit/src/mocks/authorize_net.ts`), which answers the sandbox or production host only, checks the credentials and the field order, enforces the 31-day range and paging, sends the byte order mark, and throws for any request outside reporting. Its assumptions are listed in the mock and checked on the first sandbox run. For the nightly run, create a free sandbox account at developer.authorize.net, turn on the Transaction Details API, and add its API Login ID and Transaction Key as the `SANDBOX_AUTHORIZE_NET_API_LOGIN_ID` and `SANDBOX_AUTHORIZE_NET_TRANSACTION_KEY` GitHub Actions secrets.
+
+### Avalara AvaTax
+
+Reads AvaTax's REST API v2 (`https://rest.avatax.com`, or `https://sandbox-rest.avatax.com` for a sandbox account) with the account ID and license key as HTTP Basic credentials, sending `X-Avalara-Client` as AvaTax asks.
+
+| Setting | What it is |
+| --- | --- |
+| `AVALARA_ACCOUNT_ID` | The AvaTax account number |
+| `AVALARA_LICENSE_KEY` | The account's license key |
+| `AVALARA_ENVIRONMENT` | `production` or `sandbox`, with no default |
+| `AVALARA_COMPANY_CODE` | Optional. The company to read; empty means the account's default company |
+| `CUSTOMER_REF_KEY` | Generated. Keys the customer references (below); the same key custom forms and Klaviyo use |
+
+**Read-only.** An AvaTax license key can't be limited: it can do anything the account can, including recording, committing and voiding transactions. So the client is the guard. It sends only three GETs, `/api/v2/utilities/ping`, `/api/v2/companies` and `/api/v2/companies/{companyCode}/transactions`, to the fixed host for the environment. Every `$filter` is built from checked values (a day, a whole id or a UTC time, and a company code of letters, digits and `_.-`), so nothing read from settings or replies can change a query, and pages are asked for by the connector's own filter, never by following `@nextLink`. Ping must say the credentials were accepted and belong to `AVALARA_ACCOUNT_ID` before anything else is read. Recording, committing, voiding, adjusting and refunding transactions are declared behind the write gate, and the test shows each one is stopped.
+
+**What it reads.** The first import reads every transaction dated in the last five years, by id, 1,000 a page, with `$include=SummaryOnly`, so the jurisdiction summary comes back without lines, per-line details or addresses. Each page is one batch, and the checkpoint records the last id read, so a resumed import carries on. Each later sync reads the transactions changed since the last pass started, less five minutes for changes still being saved (`modifiedDate ge`, in order of change and then id). The checkpoint records the change time it read up to and how many transactions it read at that time, so a pass that stops part way resumes without skipping or repeating one. With no checkpoint, the first pass looks back seven days. AvaTax requires a date range when listing transactions and otherwise looks only at the last 30 days, so every query also carries `date ge` the start of the history window. A 429 or 503 is waited out for `Retry-After` seconds, up to a minute, three times, then left to `runSync`, which retries from the checkpoint. A 401, or a Ping that says the credentials were turned down, stops the sync with a message saying what to check.
+
+**Events.** Each transaction read becomes a `tax.transaction_updated` event keyed by the transaction id and a digest of what was kept, so reading it again unchanged is a duplicate and a commit, void or adjustment is a new event. It carries the document code, kind (sale, return, purchase, transfer, reverse charge or customs), AvaTax's document type and status, the day and tax day, the currency, the total, taxable, exempt and tax amounts in cents, the region, country and location code, the exemption reason code and whether a certificate was given, any tax override or adjustment reason, the version, whether it is reconciled or locked, and each jurisdiction in the summary with its type, code, name, tax type and name, rate, and taxable, tax, non-taxable and exempt amounts in cents. A transaction whose id, day, change time, type, status or total tax doesn't read is dead-lettered listing what was wrong.
+
+**Privacy.** The customer and vendor names, email addresses, addresses, exemption certificate numbers, business and VAT numbers, purchase order numbers, descriptions, salesperson codes and line items are never kept. The customer code becomes a reference, an HMAC-SHA256 keyed with `CUSTOMER_REF_KEY` over the account, company and code, so a customer's transactions link to each other. When a transaction carries an email address, it also gets contact references made exactly the way custom forms makes them, so it links to the same person's form submissions and Klaviyo profile.
+
+**Webhooks.** None: AvaTax has no webhooks for transactions, so the scheduled sync polls.
+
+**Testing.** The tests run against a mock built from Avalara's API reference (`packages/testkit/src/mocks/avalara.ts`). It answers 401 for the wrong credentials, applies the documented 30-day default when no date filter is sent, reads the filters and orderings the connector sends and answers 400 to any other, and can answer 429 with `Retry-After`. Its assumptions are listed in the mock and checked on the first sandbox run. For the nightly run, sign up for a free AvaTax sandbox account, create a test company, record a few synthetic committed sales, generate a license key, and add `SANDBOX_AVALARA_ACCOUNT_ID` and `SANDBOX_AVALARA_LICENSE_KEY` as GitHub Actions secrets.
 
 ### Bank and credit card statements
 
