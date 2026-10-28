@@ -2,6 +2,18 @@
 
 The public site lives in [`site/`](../site). `site/build.ts` renders one static page, and the integration directory and department list are generated from `packages/core/src/integrations.ts` and `@karatos/retail`, so the site always matches the catalog. Built connectors show a "Connector built" label and their `capabilities`, the plain-language list of what a business gets once that system is connected, and the hero names every built connector. Tests in `site/test` check every integration and department appears and that no client is named.
 
+## The integration directory
+
+The directory groups every system by category (the catalog domain), with the categories that have the most connected systems first. Each category is a folded group with its count and how many are connected, and only the first starts open: a closed group isn't laid out, which keeps the page quick as the catalog grows and makes links further down the page land where they point. A row of category links and a category filter sit above it. Search, filters and category links open the groups they match.
+
+Every card carries one plain sentence on what KaratOS reads from the system, and the company behind it when that company makes several systems on the map ("By Google"). A Details panel adds how it connects, how much history is imported, whether updates arrive live, how it is tested, the departments it feeds, who uses it and what stage it is at. The sentence and company live in `SYSTEM_DETAILS` in [`site/directory.ts`](../site/directory.ts); the rest comes from the catalog. A test fails when a system joins the catalog without an entry, so every new system arrives with its details.
+
+"Newest connections" shows the eight most recently connected systems. The day each connector landed on `main` lives in `CONNECTED_ON` in the same file, and a test fails until a newly built connector has one, so each release shows what it added. The hero's figures (systems connected, mapped and categories) and the Partners section's three stages (on the map, building now, connected) are counted from the catalog.
+
+## Partners
+
+"For partners" is written for the vendors whose systems we connect: why being read next to a jeweler's other systems makes their product harder to replace, how a system moves from the map to connected, and the three promises (read-only by default, no surprise writes, kept current by the docs watch and the nightly sandbox run). It links to the public integration request form and the private contact form.
+
 ## Systems together and write-back
 
 Two sections follow "How it works":
@@ -66,6 +78,6 @@ The site runs on Railway as its own project, separate from any client instance. 
 A failed deploy leaves the old page up with no error, so two checks watch for it:
 
 - CI's `website-docker` job builds `site/Dockerfile`, starts the container and checks that it serves the page main builds.
-- The `Website freshness` workflow runs daily and after each green CI run on main. It compares the live page with a fresh build of main and opens one `site-freshness` issue while they differ, then closes it once they match. The page carries two tags for this: `karatos-connected` (the ids of every built connector) and `karatos-mapped` (how many systems are on the map). The live URL comes from the `SITE_URL` repository variable. Run it by hand with `SITE_URL=<url> npm run site:freshness -- --dry-run` after `node --import tsx site/build.ts`.
+- The `Website freshness` workflow runs daily and after each green CI run on main. It compares the live page with a fresh build of main and opens one `site-freshness` issue while they differ, then closes it once they match. The run itself stays green, so a host that waits for green checks before deploying is never held back by it; CI's image check passes `--strict` to fail instead. The page carries two tags for this: `karatos-connected` (the ids of every built connector) and `karatos-mapped` (how many systems are on the map). The live URL comes from the `SITE_URL` repository variable, and defaults to https://karatos.app. Run it by hand with `SITE_URL=<url> npm run site:freshness -- --dry-run` after `node --import tsx site/build.ts`.
 
 When the issue opens, read the latest deployment's build log on the website service in Railway, fix what it names, and redeploy from main.

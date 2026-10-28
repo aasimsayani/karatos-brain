@@ -7,6 +7,7 @@ import { checkSiteFreshness } from "../site/freshness.js";
 //   GITHUB_TOKEN, GITHUB_REPOSITORY  set by GitHub Actions
 //   --built <file>                   main's page (default site/dist/index.html)
 //   --dry-run                        print what would be filed instead of filing it
+//   --strict                         exit 1 when the site is behind
 
 const args = process.argv.slice(2);
 const dryRun = args.includes("--dry-run");
@@ -35,7 +36,10 @@ const result = await checkSiteFreshness({ url, builtHtml: readFileSync(builtPath
 if (result.status === "fresh") {
   console.log(`The live site matches main.${result.closed ? ` Closed #${result.closed}.` : ""}`);
 } else {
-  for (const p of result.problems) console.log(`::error title=Website::${p}`);
+  for (const p of result.problems) console.log(`::warning title=Website::${p}`);
   if (!dryRun) console.log(`Filed in #${result.issue}.`);
-  process.exitCode = 1;
+  // The issue is the alert. A failing run would put a red check on main's
+  // commit, and a host set to wait for green checks would then skip the very
+  // deploy that fixes the site. --strict fails the run, for CI's own image check.
+  if (args.includes("--strict")) process.exitCode = 1;
 }
