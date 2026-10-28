@@ -60,6 +60,19 @@ These are built, tested against recorded vendor responses, and run read-only. Th
 | Stripe | Imports five years of charges, refunds, disputes and payouts, then keeps them current from Stripe's events | Sales, Finance, Clienteling |
 | Chase business bank accounts and credit cards | Imports six years of Chase business checking, savings and credit card activity from CSV downloads, PDF statements or both | Finance, Compliance |
 | Bank and credit card statements (any bank) | Imports six years of bank and credit card transactions from any bank's CSV exports or PDF statements | Finance, Compliance |
+| HubSpot | Imports five years of contacts, companies, deals, tickets and logged calls, emails, meetings, notes and tasks | Clienteling, Sales, Marketing |
+| Monday.com | Imports five years of items from every board you can see, such as custom orders, repairs and production jobs, then keeps them current | Repairs, Custom orders, Sales |
+| Custom forms | Imports five years of appointment requests, repair intake and custom order requests from Typeform, then keeps them current | Clienteling, Repairs, Custom orders |
+| Gmail | Imports five years of mail metadata from one mailbox: who wrote to whom, when, which thread and which labels | Clienteling, Buying, Custom orders |
+| Google Workspace and Drive | Imports the names, types, folders, sizes and edit times of the files in the folder the business shares, then keeps up with every change | Finance, Compliance |
+| Slack | Imports five years of messages and threads from the channels the KaratOS app is invited to, and nothing else | Sales, Repairs, Custom orders |
+| Square | Imports five years of orders, payments and refunds from every location, then keeps them current | Sales, Inventory, Clienteling, Repairs |
+| Clover | Imports five years of Clover orders, payments and refunds, then keeps them current as they change | Sales, Inventory, Clienteling, Repairs |
+| WooCommerce | Imports five years of orders and refunds and the whole catalog, then keeps them current | Sales, Inventory, Clienteling, Marketing |
+| BigCommerce | Imports five years of orders, refunds, products and customers, then keeps them current | Sales, Inventory, Clienteling, Marketing |
+| Wix | Imports five years of orders and the whole catalog, stock and contact list, then keeps them current | Sales, Inventory, Clienteling, Marketing |
+| Metals-API | Keeps gold, silver, platinum and palladium spot prices current, in dollars per troy ounce | Metals, Buying |
+| Klaviyo | Imports every profile, list, segment, campaign and flow, then keeps them current | Marketing, Clienteling |
 | QuickBooks Online | Imports six years of invoices, bills, payments and journal entries, with the chart of accounts, customers and vendors | Finance, Compliance |
 | Xero | Imports six years of invoices, bills, credit notes, payments, bank transactions and manual journals, with the chart of accounts and contacts | Finance, Compliance |
 | Plaid | Imports up to two years of bank and card transactions from a bank linked through Plaid | Finance, Compliance |
