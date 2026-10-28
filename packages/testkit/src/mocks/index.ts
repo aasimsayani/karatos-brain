@@ -2,6 +2,7 @@
 import type { DocMock, DocMockModule } from "../doc-mock.js";
 import affirm from "./affirm.js";
 import authorize_net from "./authorize_net.js";
+import hubspot from "./hubspot.js";
 import monday from "./monday.js";
 import plaid from "./plaid.js";
 import quickbooks from "./quickbooks.js";
@@ -10,6 +11,7 @@ import xero from "./xero.js";
 
 export * from "./affirm.js";
 export * from "./authorize_net.js";
+export * from "./hubspot.js";
 export * from "./monday.js";
 export * from "./plaid.js";
 export * from "./quickbooks.js";
@@ -17,7 +19,7 @@ export * from "./stuller.js";
 export * from "./xero.js";
 
 /** Every mock module, one per catalog integration. */
-export const DOC_MOCK_MODULES: readonly DocMockModule[] = [affirm, authorize_net, monday, plaid, quickbooks, stuller, xero];
+export const DOC_MOCK_MODULES: readonly DocMockModule[] = [affirm, authorize_net, hubspot, monday, plaid, quickbooks, stuller, xero];
 
 /** Every doc-derived mock, with empty data, for checks and the vendor docs watch. */
 export function allDocMocks(): DocMock[] {
