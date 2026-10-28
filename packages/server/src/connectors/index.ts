@@ -21,9 +21,10 @@ import slack from "./slack.js";
 import square from "./square.js";
 import stripe from "./stripe.js";
 import twilio from "./twilio.js";
+import watchsearch from "./watchsearch.js";
 import wix from "./wix.js";
 import woocommerce from "./woocommerce.js";
 import xero from "./xero.js";
 
 /** How each built connector is made from an instance's settings, by catalog id. */
-export const FACTORIES: Readonly<Record<string, ConnectorFactory>> = { affirm, authorize_net, bank_statements, bigcommerce, chase, clover, custom_forms, gmail, google_workspace, hubspot, inventory_pos, klaviyo, metals_api, monday, plaid, quickbooks, shopify, slack, square, stripe, twilio, wix, woocommerce, xero };
+export const FACTORIES: Readonly<Record<string, ConnectorFactory>> = { affirm, authorize_net, bank_statements, bigcommerce, chase, clover, custom_forms, gmail, google_workspace, hubspot, inventory_pos, klaviyo, metals_api, monday, plaid, quickbooks, shopify, slack, square, stripe, twilio, watchsearch, wix, woocommerce, xero };

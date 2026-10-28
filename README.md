@@ -79,6 +79,7 @@ These are built, tested against recorded vendor responses, and run read-only. Th
 | Plaid | Imports up to two years of bank and card transactions from a bank linked through Plaid | Finance, Compliance |
 | Authorize.net | Imports five years of settlement batches and the card and eCheck transactions in them, then keeps them current | Sales, Finance |
 | Affirm | Imports five years of Affirm financed orders, refunds, disputes and daily settlements, then keeps them current | Sales, Finance |
+| TheWatchSearch (by TheWatchCloud) | Turns the dealer WhatsApp groups the store is in into a feed of offers: brand, reference, buy or sell, price, year, condition and set | Buying, Sales, Inventory |
 <!-- connected:end -->
 
 ### Landing next
@@ -124,7 +125,7 @@ This section updates itself as work lands: it is generated from [docs/milestones
 <!-- progress:start -->
 <!-- Generated from docs/milestones.json and the integration catalog by npm run progress:write. Edit those, not this block. -->
 
-**Overall: 66% complete**, 25 of 38 roadmap items done. 24 of the 75 systems in the integration catalog are connected.
+**Overall: 66% complete**, 25 of 38 roadmap items done. 25 of the 76 systems in the integration catalog are connected.
 
 | Milestone | What it gives a jeweler | Progress | Target |
 | --- | --- | --- | --- |

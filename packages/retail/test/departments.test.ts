@@ -275,6 +275,66 @@ describe("buying", () => {
     const recs = await s.ask(NOW);
     expect(recs.map((r) => r.summary)).toEqual(["Purchase order PO1 from v1 ($800.00) is 12 days late. Follow up with the vendor."]);
   });
+
+  const offer = (dealerRef: string, side: "selling" | "looking_for", extra: Record<string, unknown> = {}) => ({
+    offerId: `${dealerRef}-${side}-${JSON.stringify(extra)}`,
+    side,
+    brand: "Rolex",
+    reference: "126610LN",
+    dealerRef,
+    group: "Test Group",
+    ...extra,
+  });
+
+  it("says when several dealers are hunting the same reference, with the lowest ask in the groups", async () => {
+    const s = store();
+    for (const d of ["d1", "d2", "d3"]) await s.send("watch_market.offer_seen", offer(d, "looking_for"), "2026-09-25T00:00:00Z");
+    // The same dealer asking twice counts once.
+    await s.send("watch_market.offer_seen", offer("d3", "looking_for", { year: 2024 }), "2026-09-26T00:00:00Z");
+    await s.send("watch_market.offer_seen", offer("d4", "selling", { priceMinor: 1_450_000, currency: "USD" }), "2026-09-27T00:00:00Z");
+    await s.send("watch_market.offer_seen", offer("d5", "selling", { priceMinor: 1_390_000, currency: "USD" }), "2026-09-28T00:00:00Z");
+    await s.send("watch_market.offer_seen", offer("d6", "selling", { priceMinor: 1_200_000, currency: "EUR" }), "2026-09-28T00:00:00Z");
+    await s.send("watch_market.offer_seen", offer("d7", "selling"), "2026-09-28T00:00:00Z");
+    // What a buyer offers to pay is not an ask.
+    await s.send("watch_market.offer_seen", offer("d1", "looking_for", { priceMinor: 1_000_000, currency: "USD" }), "2026-09-28T00:00:00Z");
+    const [rec, ...rest] = about(await s.ask(NOW), "126610LN");
+    expect(rest).toEqual([]);
+    expect(rec!.summary).toBe(
+      "3 dealers in your WhatsApp groups have asked for the Rolex 126610LN in the last 14 days. Dealers in the same groups are asking from $13,900.00 (lowest of 2 asks). If you have one, or can source one, offer it to them.",
+    );
+    expect(rec!.provenance.eventIds).toHaveLength(9);
+  });
+
+  it("names the asking price in the currency most dealers use, and leaves it out when nobody is selling", async () => {
+    const s = store();
+    for (const d of ["d1", "d2", "d3"]) await s.send("watch_market.offer_seen", offer(d, "looking_for", { brand: "Patek Philippe", reference: "5711/1A-010" }), "2026-09-25T00:00:00Z");
+    await s.send("watch_market.offer_seen", offer("d4", "selling", { brand: "Patek Philippe", reference: "5711/1A-010", priceMinor: 105_000_000, currency: "HKD" }), "2026-09-25T00:00:00Z");
+    for (const d of ["d1", "d2", "d3"]) await s.send("watch_market.offer_seen", offer(d, "looking_for", { reference: "116500LN" }), "2026-09-25T00:00:00Z");
+    const recs = (await s.ask(NOW)).map((r) => r.summary);
+    expect(recs).toEqual([
+      "3 dealers in your WhatsApp groups have asked for the Patek Philippe 5711/1A-010 in the last 14 days. Dealers in the same groups are asking from HK$1,050,000.00 (lowest of 1 ask). If you have one, or can source one, offer it to them.",
+      "3 dealers in your WhatsApp groups have asked for the Rolex 116500LN in the last 14 days. If you have one, or can source one, offer it to them.",
+    ]);
+  });
+
+  it("ignores references too few dealers want, and asks older than 14 days or still to come", async () => {
+    const s = store();
+    await s.send("watch_market.offer_seen", offer("d1", "looking_for"), "2026-09-18T15:00:01Z");
+    await s.send("watch_market.offer_seen", offer("d2", "looking_for"), "2026-09-30T00:00:00Z");
+    await s.send("watch_market.offer_seen", offer("d3", "looking_for"), "2026-09-18T14:59:59Z");
+    await s.send("watch_market.offer_seen", offer("d4", "looking_for"), "2026-10-03T00:00:00Z");
+    for (const d of ["d5", "d6", "d7"]) await s.send("watch_market.offer_seen", offer(d, "selling", { reference: "116500LN" }), "2026-09-30T00:00:00Z");
+    expect(about(await s.ask(NOW), "dealers")).toEqual([]);
+    await s.send("watch_market.offer_seen", offer("d8", "looking_for"), "2026-10-01T00:00:00Z");
+    expect(about(await s.ask(NOW), "dealers")).toHaveLength(1);
+  });
+
+  it("dead-letters an offer whose price has no currency", async () => {
+    const s = store();
+    await expect(s.send("watch_market.offer_seen", offer("d1", "selling", { priceMinor: 1_450_000 }))).rejects.toThrow(/dead-lettered/);
+    await expect(s.send("watch_market.offer_seen", offer("d1", "selling", { currency: "USD" }))).rejects.toThrow(/dead-lettered/);
+    expect(s.memory.deadLetters.map((d) => d.issues.map((i) => i.message))).toEqual([["a price needs its currency, and a currency its price"], ["a price needs its currency, and a currency its price"]]);
+  });
 });
 
 describe("metals", () => {
