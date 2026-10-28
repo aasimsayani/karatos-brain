@@ -47,6 +47,7 @@ Used by: R is retail, W is wholesale, M is manufacturing. Test with says how we 
 | WooCommerce | R | Public API | Free sandbox | Yes | Built (A REST API key with Read permission over https; the connector sends only GET requests to five read endpoints. Sales, refunds, products and stock use the same events as Shopify, Square and Clover) |
 | BigCommerce | R, W | Public API | Free sandbox | Yes | Built (A store-level API account with read-only scopes. BigCommerce can't report a token's scopes, so the connector sends only GET requests to its listed paths. Sales, refunds, products and stock use the same events as Shopify, Square and Clover) |
 | Wix | R | Public API | Free sandbox | Yes | Built (A self-managed Wix app holding read permissions only; the connector checks the permissions the site granted and stops on any Manage permission, and sends only eight listed read requests. Webhooks need the app (an API key gets none). Sales, products and stock use the same events as Shopify, Square and Clover) |
+| Adobe Commerce (Magento) | R, W | Public API | Free sandbox | No | Planned (Orders, products, stock and customers through the REST API. Tested against a local Magento Open Source install, which is free) |
 | Punchmark | R | Partner | Partner | No | Planned |
 | Etsy | R, M | Public API | Unknown | No | Planned |
 | eBay | R, W | Public API | Free sandbox | Yes | Planned (Estate and pre-owned pieces) |
@@ -101,11 +102,15 @@ Used by: R is retail, W is wholesale, M is manufacturing. Test with says how we 
 | Stuller | R, M | Public API | Paid account | No | Built (Reads the invoices on the business's Stuller account and Stuller's metal market rates, with a developer login. Needs a Stuller account owner to make the login; built against a mock from Stuller's API help pages and checked live once a login is connected) |
 | GemFind JewelCloud | R, W, M | Partner | Partner | No | Planned |
 | Quality Gold | R | Unknown | Unknown | No | Planned |
+| Rio Grande | R, M | Unknown | Paid account | No | Planned (Bench tools, findings, sheet and wire, and gemstones for the workshop. No public API found; orders and invoices arrive by email) |
+| Retail Jewelers Organization (RJO) | R | File export | Sample files | No | Planned (Buying group with vendor programs, dating terms and rebates. No API; start with member statements and vendor program lists) |
+| IJO buying group | R | File export | Sample files | No | Planned (Buying group with vendor programs and rebates. No API; start with member statements and vendor program lists) |
 | GIA Report Results | R, W, M | Public API | Free sandbox | No | Built (Looks up each certificate number on the business's list once, then follows GIA's free changed-reports feed. GIA's free plan includes a sandbox key; lookups of reports the business didn't submit cost per lookup. The docs watch follows the API changelog, and the nightly sandbox run catches API changes) |
 | IGI report verification | R, W | Unknown | Unknown | No | Planned (Web lookup only; no API found) |
 | GemGuide Appraisal Software | R | Unknown | Unknown | No | Planned |
 | HRD Antwerp report check | R, W | Unknown | Unknown | No | Planned (Web lookup through MyHRD only; no API found) |
 | GCAL report verification | R, W | Unknown | Unknown | No | Planned (Web lookup through GCAL by Sarine only; no API found) |
+| AGL report verification | R, W | Unknown | Unknown | No | Planned (Colored stone and pearl reports from American Gemological Laboratories. Web lookup only; no API found) |
 | Supplier invoices and memos | R, W, M | File export | Sample files | No | Planned (Invoice and memo PDFs or CSVs from any supplier, read for memo terms and Kimberley Process and System of Warranties statements) |
 | Overnight Mountings | R | File export | Sample files | No | Planned (Catalog downloads as Excel or CSV with images; no ordering API found) |
 | Laravo | R, W, M | Partner | Partner | No | Planned (Normalized brand product data, codes and images mapped to the store's POS. Partner only. Exhibited at JCK 2026) |
@@ -136,6 +141,7 @@ Used by: R is retail, W is wholesale, M is manufacturing. Test with says how we 
 | Geller's Blue Book | R | Partner | Partner | No | Planned (Repair pricing; reached through the POS today) |
 | nFusion Solutions metals feed | R, W, M | Public API | Paid account | No | Planned |
 | Metals-API | R, W, M | Public API | Free sandbox | No | Built (Spot prices for gold, silver, platinum and palladium in dollars per troy ounce. No public API changelog; the nightly sandbox run catches API changes) |
+| Kitco metal prices | R, W, M | Partner | Partner | No | Planned (Spot prices many stores quote from. Data feeds are licensed, not public; nFusion and Metals-API cover live prices until a license is in place) |
 | Tenoris | R, W, M | Partner | Partner | No | Planned (Category and price-point sales benchmarks from independent jewelers. Partner only. Found in jewelry industry sources) |
 | Edge Retail Academy and Edge Pulse | R | Partner | Partner | No | Planned (Peer KPI benchmarks, inventory aging, turn and open-to-buy guidance. Partner only. Exhibited at Centurion) |
 | TheWatchSearch (by TheWatchCloud) | R, W | File export | Sample files | No | Built (Reads the WhatsApp group chat exports the store already has, since TheWatchSearch publishes no API or export. A partner feed from TheWatchCloud comes later) |
@@ -165,6 +171,8 @@ Used by: R is retail, W is wholesale, M is manufacturing. Test with says how we 
 | Klaviyo | R | Public API | Free sandbox | Yes | Built (Read-only by allowlist: Klaviyo can't be asked which scopes a private key holds, so the connector sends only listed reads and the two read-only report queries. Webhooks need Advanced KDP or a Klaviyo app) |
 | Attentive | R | Public API | Unknown | Yes | Planned |
 | Twilio | R, W | Public API | Free sandbox | No | Built (Text message and call logs through a restricted API key with read permissions only. Message bodies are never kept, and no webhooks, since pointing a number's webhook at KaratOS would change how the store's line answers) |
+| Yelp | R | Public API | Paid account | No | Planned (Business details, rating and up to three review excerpts per call; full reviews are not in the API. Yelp's API is now a paid plan with a trial) |
+| The Knot Pro | R | Unknown | Paid account | No | Planned (Leads and reviews from engaged couples on The Knot and WeddingWire vendor listings. No public API found; start with the lead notification emails) |
 | Calendly | R | Public API | Free sandbox | Yes | Planned (Appointments for consultations, bridal and repair drop-off) |
 | Acuity Scheduling | R | Public API | Paid account | Yes | Planned |
 | Mailchimp | R | Public API | Free sandbox | Yes | Planned |
@@ -172,6 +180,7 @@ Used by: R is retail, W is wholesale, M is manufacturing. Test with says how we 
 | Google Ads | R | Public API | Free sandbox | No | Planned (Test accounts for development; production needs an approved developer token) |
 | Meta Ads | R | Public API | Free sandbox | No | Planned |
 | Google Business Profile | R | Partner | Partner | No | Planned (Reviews and local listings; Google approves API access on request) |
+| Google Merchant Center | R | Public API | Free sandbox | No | Planned (Product listings, disapprovals and free listing clicks through the Merchant API, which replaced the Content API for Shopping in 2026) |
 | Microsoft 365 Outlook mail and calendar | R, W, M | Public API | Paid account | Yes | Planned (Customer and vendor email and appointments for stores on Microsoft 365, read-only. Microsoft's free developer tenant now goes only to Visual Studio subscribers) |
 | Any other mailbox (IMAP) | R, W, M | Public API | Sample files | No | Planned (Read-only mail from any provider that offers IMAP, for stores not on Google or Microsoft) |
 | Microsoft Teams | R, W, M | Public API | Paid account | Yes | Planned (Channel messages where staff hand off repairs, custom orders and sales, like Slack. Microsoft Graph has one changelog, watched through the Outlook entry) |
@@ -218,15 +227,24 @@ Used by: R is retail, W is wholesale, M is manufacturing. Test with says how we 
 | Xero | R, W, M | Public API | Free sandbox | Yes | Built (Read-only scopes only; the connector stops on a connection holding any other. The docs watch follows Xero's changelog, and the nightly run against the Demo Company catches API changes) |
 | Plaid | R, W, M | Public API | Free sandbox | Yes | Built (Bank feeds beyond Chase: accounts, balances and transactions from one linked bank, read-only) |
 | Authorize.net | R, W | Public API | Free sandbox | Yes | Built (Read-only, though an Authorize.net key can't be limited to reading: the connector sends Transaction Reporting requests only. The docs watch follows the API changelog, and the nightly sandbox run catches API changes) |
+| PayPal | R, W | Public API | Free sandbox | Yes | Planned (Sales, refunds, fees and disputes from the Transaction Search API, which reaches back three years. New transactions can take up to three hours to show. PayPal publishes release notes per API, not one changelog; the nightly sandbox run catches API changes) |
+| Signifyd | R | Public API | Paid account | Yes | Planned (Fraud decisions and chargeback outcomes for online orders, with webhooks for each decision. A sandbox team comes with a merchant account) |
+| ClearSale | R | Partner | Partner | No | Planned (Fraud review and chargeback protection for online orders. API credentials come with a merchant contract) |
 | Affirm | R | Public API | Free sandbox | Yes | Built (Read-only, though an Affirm key pair can't be limited to reading: the connector only sends GET requests for transactions, disputes and settlements. US accounts only for now. The docs watch follows the API changelog, and the nightly sandbox run catches API changes) |
+| Sezzle | R | Public API | Free sandbox | Yes | Planned (Pay-in-four orders, captures, refunds and settlements, with a merchant sandbox. No public API changelog found; the nightly sandbox run catches API changes) |
 | Synchrony | R | Partner | Partner | No | Planned |
 | Acima | R | Partner | Partner | No | Planned |
+| Progressive Leasing | R | Partner | Partner | No | Planned (Lease-to-own at checkout for customers who cannot get credit. Merchant portal reports today; the API is for partners) |
+| Snap Finance | R | Partner | Partner | No | Planned (Lease-to-own and financing for customers with thin credit. Merchant portal reports today; the API is for partners) |
 | Jewelers Board of Trade | W, M | Partner | Partner | No | Planned (Trade credit ratings) |
 | Avalara AvaTax | R, W, M | Public API | Free sandbox | No | Planned (Sales tax by jurisdiction. No public AvaTax changelog; the nightly sandbox run catches API changes) |
 | TaxJar | R, W | Public API | Unknown | No | Planned |
 | FinCEN Form 8300 cash reporting | R, W, M | File export | Sample files | No | Planned (Cash payments over $10,000; filed through BSA E-Filing, which has no API, so the brain prepares and tracks filings) |
 | Refiner and scrap settlement statements | R, W, M | File export | Sample files | No | Planned (CSV or PDF from the refiner) |
 | Gusto | R, W, M | Public API | Free sandbox | Yes | Planned (Payroll, commissions and staff costs) |
+| ADP Workforce Now | R, W, M | Partner | Partner | Yes | Planned (Payroll, commissions and staff costs. The API is open to apps listed on the ADP Marketplace) |
+| Paychex Flex | R, W, M | Partner | Partner | No | Planned (Payroll, commissions and staff costs. Paychex issues API access to approved integration partners) |
+| QuickBooks Desktop | R, W, M | File export | Sample files | No | Planned (Books many older stores still keep. The Web Connector needs software on the store's own computer, so start with exported reports) |
 | LeadsOnline secondhand reporting | R | Partner | Partner | No | Planned (Gold and secondhand buys many US police departments require; LeadsOnline issues API credentials to point-of-sale partners) |
 | BILL | R, W, M | Public API | Free sandbox | Yes | Planned (Supplier bills, approvals and vendor payments) |
 | Ramp | R, W, M | Public API | Unknown | Yes | Planned (Company card spending, receipts, reimbursements and bills) |
@@ -279,6 +297,8 @@ Used by: R is retail, W is wholesale, M is manufacturing. Test with says how we 
 
 | Integration | Used by | Access | Test with | Webhooks | Status |
 | --- | --- | --- | --- | --- | --- |
+| OFAC sanctions lists | R, W, M | Public API | Sample files | No | Planned (The US Treasury's sanctions lists, published as free downloadable files, for screening the large buyers and sellers an anti-money laundering program must check) |
+| JSA crime alerts | R, W, M | File export | Sample files | No | Planned (Crime alerts and bulletins the Jewelers' Security Alliance emails its members. No API; read from the alert emails in the connected mailbox) |
 | RFID and barcode tray counts | R, W, M | File export | Sample files | No | Planned (Tray and case scan exports, so the nightly count is checked against what should be there) |
 | Homebase | R | Partner | Partner | No | Planned (Staff schedules and time clock, so labor can be set against sales. API keys need the Enterprise plan and a request to Homebase support) |
 | Deputy | R, W, M | Public API | Unknown | Yes | Planned (Staff rosters and timesheets, so labor can be set against sales or bench work) |
@@ -287,6 +307,7 @@ Used by: R is retail, W is wholesale, M is manufacturing. Test with says how we 
 | Airtable | R, W, M | Public API | Free sandbox | Yes | Planned (Bases many stores use for memo logs, repair intake and custom order tracking) |
 | Notion | R, W, M | Public API | Free sandbox | Yes | Planned (Databases and pages used for job tracking, procedures and buying notes) |
 | Verkada store traffic | R | Public API | Paid account | Yes | Planned (People counts from store cameras, to compare footfall with sales) |
+| ShopperTrak | R | Partner | Partner | No | Planned (Door counts from mall and street store traffic counters, to compare footfall with sales. Data access goes through Sensormatic) |
 | Reshyne | R, W | Partner | Partner | No | Planned (Cloud jewelry and watch repair management: work orders, status and vendor price lists. Partner only. Exhibited at JCK 2026) |
 | Jewelers' Toolbox and Benchtrax | R, M | Unknown | Unknown | No | Planned (Repair and custom quotes, metal buying calculations and RFID bench job tracking. No API found. Exhibited at JCK 2026) |
 | Jewelry Sales Academy | R | Unknown | Unknown | No | Planned (Sales training progress and course completions for the sales floor. No API found. Exhibited at JCK 2026) |
