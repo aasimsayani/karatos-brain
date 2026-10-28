@@ -1,4 +1,5 @@
 import type { DeadLetter, EventEnvelope } from "./events.js";
+import type { StoredEvent } from "./retention.js";
 import type { EntityKind, EntityRef, NormalizedEntity } from "./entities.js";
 import type { IdentityLink } from "./identity.js";
 import type { Signal } from "./signals.js";
@@ -20,6 +21,8 @@ export interface SignalExtractor {
 /** Layer 4. Durable memory and state. */
 export interface MemoryStore {
   appendEvent(event: EventEnvelope): Promise<{ inserted: boolean }>;
+  /** An event with its source reference. Its payload may have been cleared by retention; the row never goes away. */
+  getEvent(organizationId: string, id: string): Promise<StoredEvent | null>;
   appendDeadLetter(deadLetter: DeadLetter): Promise<void>;
   upsertEntities(entities: NormalizedEntity[]): Promise<void>;
   getEntity(organizationId: string, kind: EntityKind, id: string): Promise<NormalizedEntity | null>;
@@ -27,7 +30,8 @@ export interface MemoryStore {
   linkIdentity(link: IdentityLink): Promise<void>;
   resolveIdentity(organizationId: string, source: string, externalId: string): Promise<EntityRef | null>;
   appendSignals(signals: Signal[]): Promise<void>;
-  recentSignals(organizationId: string, limit: number): Promise<Signal[]>;
+  /** The latest signals, oldest first. With kinds, only signals of those kinds count toward the limit. */
+  recentSignals(organizationId: string, limit: number, kinds?: readonly string[]): Promise<Signal[]>;
   saveRecommendations(recommendations: Recommendation[]): Promise<void>;
   listRecommendations(organizationId: string, limit: number): Promise<Recommendation[]>;
   getRecommendation(organizationId: string, id: string): Promise<Recommendation | null>;

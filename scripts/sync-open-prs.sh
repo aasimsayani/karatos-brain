@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Keep every open PR current with its base after a merge: scripts/sync-open-prs.sh
+# Keep every open PR current with its base after a merge: scripts/sync-open-prs.sh [PR number...]
+# npm run prs:plan prints the order to merge them in, and what each one waits on.
 # Needs gh signed in with push access. Run from a clean checkout.
 # - Merges the base in (never rebases, so no force-push).
 # - CHANGELOG.md: a branch's own changelog lines move into changelog.d/<branch>.md and
@@ -18,7 +19,13 @@ G=git
 # Files npm run registry:write makes from each connector's own files (scripts/registry.ts, OUTPUTS).
 GENERATED='packages/connectors/src/index.ts|packages/core/src/catalog/index.ts|packages/server/src/connectors/index.ts|packages/testkit/src/mocks/index.ts|scripts/sandbox-checks/index.ts|secrets/manifest.json|docs/integrations.md|.github/workflows/sandbox-run.yml'
 regenerate() { [ -f scripts/registry-cli.ts ] && npm run -s registry:write >/dev/null 2>&1; }
-for pr in $(gh api "repos/$REPO/pulls?state=open" --jq '.[]|.number' | sort -n); do
+# A PR stacked on a branch that has merged moves onto that branch's base first (GitHub only does this when the branch is deleted).
+GITHUB_REPOSITORY=$REPO node --import tsx scripts/pr-queue-cli.ts retarget
+# Base-first order: a stacked PR syncs after the PR it's stacked on, so it merges an up-to-date base.
+# Pass PR numbers to sync only those, still in that order.
+order=$(GITHUB_REPOSITORY=$REPO node --import tsx scripts/pr-queue-cli.ts order) || { echo "could not work out the PR order"; exit 1; }
+if [ $# -gt 0 ]; then order=$(for n in $order; do for w in "$@"; do [ "$n" = "$w" ] && echo $n; done; done); fi
+for pr in $order; do
   br=$(gh api repos/$REPO/pulls/$pr --jq .head.ref); base=$(gh api repos/$REPO/pulls/$pr --jq .base.ref)
   # Release branches fold the fragments into CHANGELOG.md on purpose.
   case "$br" in release/*) echo "$pr skipped ($br)"; continue;; esac

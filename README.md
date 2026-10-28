@@ -22,6 +22,105 @@ KaratOS closes those gaps. Every sale, repair, payment and bank line becomes one
 - **Your data stays yours.** Each business runs its own isolated instance. Self-host it for free, or let us host it on the managed plan.
 - **Read-only by default.** KaratOS reads from your systems and never changes them unless you turn a specific action on.
 
+## Who it's for
+
+- **Independent jewelers with one to five stores**, where the owner is also the buyer, the bookkeeper and the compliance officer. They feel every gap above and have no analyst to close it.
+- **Online and hybrid jewelry brands** whose demand is split across a web store, marketplaces and appointments, and who need to know which channel actually pays.
+- **Groups and studios with a bench**, where repairs and custom work are a large share of revenue and a missed promise date costs a customer for life.
+
+The common thread is a business that already runs good systems and still decides by feel, because no single system sees the whole store.
+
+## The value of each connection
+
+KaratOS is useful with one connection and gets sharper with each one, because every system answers a question the others can't. These are the questions each kind of connection answers for the owner:
+
+| When you connect | The question it answers | Why the owner cares |
+| --- | --- | --- |
+| **Online store and POS** | What sold, where, and what has sat too long? | Aged inventory is cash locked in the case. Seeing it by piece, not by category, is what makes a remake or markdown decision possible. |
+| **Payments and processors** | What did each sale really net after fees, refunds and disputes? | A 3% fee on a $4,000 ring is a real cost. Margin is only true once processing is counted. |
+| **Bank and card statements** | Did the money that was rung up actually arrive? | Unmatched deposits are the first sign of a drawer problem, a missed payout or fraud. |
+| **Accounting** | Do the books agree with the store? | Month-end close stops being a weekend of spreadsheets, and the accountant gets a clean trail. |
+| **Metal prices** | What is this inventory worth today, at melt and at retail? | Gold moves weekly. Repricing 140 pieces at the right moment protects margin; buying from the public too close to melt erodes it. |
+| **Financing** | Which customers buy bigger when they can pay over time? | Financing lifts average ticket on bridal. Knowing who used it and who was declined shapes the next offer. |
+| **Messages, email and calls** | Who asked for what, and did anyone answer? | A missed call about a custom order is lost revenue. Response time is a sales metric. |
+| **CRM and marketing** | Which campaigns brought buyers, not just clicks? | Marketing spend gets judged by the sales it brought in, so the owner can repeat what worked and cut what didn't. |
+| **Diamond and vendor feeds** | What can I source, and at what cost, for the customer in front of me? | Custom quotes go out the same day, priced from real availability. |
+
+### Connected today
+
+These are built, tested against recorded vendor responses or mocks built from each vendor's own docs, and run read-only. Systems that need a client's own account, such as IDEX, Nivoda, Stuller and GIA, are checked live with the first pilot that has one. The table is generated from the [integration catalog](docs/integrations.md), so it names exactly what is built.
+
+<!-- connected:start -->
+<!-- Generated from the integration catalog by npm run progress:write. Edit the catalog, not this block. -->
+
+| System | What the business gets | Feeds |
+| --- | --- | --- |
+| Shopify | Imports five years of orders, refunds and fulfillments, then keeps them current as orders change | Sales, Inventory, Clienteling, Marketing |
+| Inventory and POS systems | Imports item lists, stock counts, customer lists and sales from any POS that exports CSV | Sales, Inventory, Clienteling, Marketing |
+| Stripe | Imports five years of charges, refunds, disputes and payouts, then keeps them current from Stripe's events | Sales, Finance, Clienteling |
+| Chase business bank accounts and credit cards | Imports six years of Chase business checking, savings and credit card activity from CSV downloads, PDF statements or both | Finance, Compliance |
+| Bank and credit card statements (any bank) | Imports six years of bank and credit card transactions from any bank's CSV exports or PDF statements | Finance, Compliance |
+| HubSpot | Imports five years of contacts, companies, deals, tickets and logged calls, emails, meetings, notes and tasks | Clienteling, Sales, Marketing |
+| Monday.com | Imports five years of items from every board you can see, such as custom orders, repairs and production jobs, then keeps them current | Repairs, Custom orders, Sales |
+| Custom forms | Imports five years of appointment requests, repair intake and custom order requests from Typeform, then keeps them current | Clienteling, Repairs, Custom orders |
+| Gmail | Imports five years of mail metadata from one mailbox: who wrote to whom, when, which thread and which labels | Clienteling, Buying, Custom orders |
+| Google Workspace and Drive | Imports the names, types, folders, sizes and edit times of the files in the folder the business shares, then keeps up with every change | Finance, Compliance |
+| Slack | Imports five years of messages and threads from the channels the KaratOS app is invited to, and nothing else | Sales, Repairs, Custom orders |
+| Square | Imports five years of orders, payments and refunds from every location, then keeps them current | Sales, Inventory, Clienteling, Repairs |
+| Clover | Imports five years of Clover orders, payments and refunds, then keeps them current as they change | Sales, Inventory, Clienteling, Repairs |
+| WooCommerce | Imports five years of orders and refunds and the whole catalog, then keeps them current | Sales, Inventory, Clienteling, Marketing |
+| BigCommerce | Imports five years of orders, refunds, products and customers, then keeps them current | Sales, Inventory, Clienteling, Marketing |
+| Wix | Imports five years of orders and the whole catalog, stock and contact list, then keeps them current | Sales, Inventory, Clienteling, Marketing |
+| RapNet and the Rapaport Price List | Reads the Rapaport Price List for round and pear diamonds every week it is published | Buying, Inventory, Appraisals, Wholesale |
+| IDEX Online | Reads the diamonds the business offers from the IDEX network, with grades, measurements and its own asking prices | Buying, Inventory, Appraisals, Wholesale |
+| Nivoda | Reads the diamonds a saved Nivoda search finds, with grades, measurements and prices | Buying, Inventory, Appraisals, Wholesale |
+| Stuller | Reads every Stuller invoice from the last five years, with its lines, totals, status and tracking number | Buying, Custom orders, Inventory, Repairs |
+| GIA Report Results | Confirms each GIA certificate number the business holds, with shape, carat weight, color, clarity, cut and proportions | Appraisals, Inventory, Buying |
+| Metals-API | Keeps gold, silver, platinum and palladium spot prices current, in dollars per troy ounce | Metals, Buying |
+| Klaviyo | Imports every profile, list, segment, campaign and flow, then keeps them current | Marketing, Clienteling |
+| Twilio | Imports five years of the store's texts, WhatsApp messages and calls: who, when, which line and how each one ended | Clienteling, Repairs, Marketing |
+| QuickBooks Online | Imports six years of invoices, bills, payments and journal entries, with the chart of accounts, customers and vendors | Finance, Compliance |
+| Xero | Imports six years of invoices, bills, credit notes, payments, bank transactions and manual journals, with the chart of accounts and contacts | Finance, Compliance |
+| Plaid | Imports up to two years of bank and card transactions from a bank linked through Plaid | Finance, Compliance |
+| Authorize.net | Imports five years of settlement batches and the card and eCheck transactions in them, then keeps them current | Sales, Finance |
+| Affirm | Imports five years of Affirm financed orders, refunds, disputes and daily settlements, then keeps them current | Sales, Finance |
+| EDI with retail partners (X12 850, 855, 856, 810, 846, 852) | Imports two years of purchase orders (850), inventory reports (846) and sell-through (852) from retail partners | Inventory, Sales, Wholesale |
+| TheWatchSearch (by TheWatchCloud) | Turns the dealer WhatsApp groups the store is in into a feed of offers: brand, reference, buy or sell, price, year, condition and set | Buying, Sales, Inventory |
+<!-- connected:end -->
+
+### Landing next
+
+- **The owner's money view.** Cash in each bank account, what is owed on cards, what customers owe and which invoices are more than 30 days late, on one screen in the Brain Console. The finance department already reads these from Plaid, QuickBooks and Xero and flags overdue invoices of $500 or more.
+- **Live checks with pilot stores.** The trade connectors (IDEX, Nivoda, Stuller, GIA, RapNet) are built against each vendor's docs and turn on with a pilot client's own account.
+- **Jewelry POS and the next wave.** The Edge, Jewel360 and ARMS through their exports, then Lightspeed, Podium, Birdeye, Valigara and Attentive as access arrives.
+- **Plain-language reasoning.** Claude explains each recommendation and learns from the owner's accept, reject and override decisions.
+
+The [roadmap](docs/roadmap.md) has the full sequence, including jewelry POS systems, diamond feeds and manufacturing.
+
+## How we'll know it works
+
+We judge KaratOS by what changes in the store, not by how many recommendations it makes. These are the measures for the first pilots. They are targets, not results yet.
+
+| Measure | What it shows | Pilot target |
+| --- | --- | --- |
+| Recommendations accepted | The advice is worth acting on | Half or more of recommendations accepted or adjusted, not rejected |
+| Time to first useful recommendation | Value on day one | Within an hour of connecting the first system |
+| Aged inventory acted on | Cash released from the case | Every piece over 270 days reviewed within the first month |
+| Repairs and custom orders past their promise date | Promises kept | Every late job flagged before the customer calls |
+| Unreconciled deposits | Cash that reached the bank | Every gap between sales and deposits explained at month end |
+| Cash reporting deadlines | Compliance risk | No Form 8300 deadline missed |
+
+Every accept, reject and override is stored, so these numbers come from the system itself rather than a survey.
+
+## Holiday pilot
+
+The weeks before Black Friday decide a jeweler's year, so that is when KaratOS has to prove itself. We are running an open testing weekend on **November 21–22, 2026**, the weekend before Black Friday, with sign-ups open from November 16.
+
+- **For jewelers:** connect your store, POS or bank in read-only mode and get your first list of recommendations before the holiday rush. Nothing in your systems is changed.
+- **For developers:** every connector runs against recorded vendor responses, so you can run the full suite offline with `npm test` and help us break things before stores rely on them.
+
+Sign up with the pilot form on the KaratOS website, or open an issue here to join as a tester.
+
 ## Progress
 
 This section updates itself as work lands: it is generated from [docs/milestones.json](docs/milestones.json) and the [integration catalog](docs/integrations.md), and a test fails if it falls behind. Targets are estimates and move as priorities change.
@@ -29,7 +128,7 @@ This section updates itself as work lands: it is generated from [docs/milestones
 <!-- progress:start -->
 <!-- Generated from docs/milestones.json and the integration catalog by npm run progress:write. Edit those, not this block. -->
 
-**Overall: 50% complete**, 19 of 38 roadmap items done. 10 of the 75 systems in the integration catalog are connected.
+**Overall: 68% complete**, 26 of 38 roadmap items done. 31 of the 232 systems in the integration catalog are connected.
 
 | Milestone | What it gives a jeweler | Progress | Target |
 | --- | --- | --- | --- |
@@ -40,7 +139,7 @@ This section updates itself as work lands: it is generated from [docs/milestones
 | AI reasoning | Claude explains each recommendation in plain language and learns from the owner's decisions. | ░░░░░░░░░░ 0% | Jan 2027 |
 | Self-serve AI dashboards | Owners ask a question and get a dashboard, without a developer. | ███░░░░░░░ 33% | Mar 2027 |
 | Self-hosted and managed plans | Run it yourself for free, or let us host it on the premium plan. | ███░░░░░░░ 33% | Mar 2027 |
-| Integrations, next wave | Jewelry POS, CRM, messaging, marketing and diamond feeds join the catalog. | █░░░░░░░░░ 11% | Jun 2027 |
+| Integrations, next wave | Jewelry POS, CRM, messaging, marketing and diamond feeds join the catalog. | █████████░ 89% | Jun 2027 |
 | Manufacturing departments | Bench, casting and setting work tracked with metal loss and labor cost per piece. | ░░░░░░░░░░ 0% | Jun 2027 |
 
 ### Up next
@@ -112,6 +211,8 @@ Some insights appear only when departments share signals. These are built today:
 - **A gold price move becomes a pricing review.** Metals sees the spot change, inventory values aged gold pieces at melt, and gold buying flags offers that are too close to melt.
 - **An anniversary becomes a sale.** Clienteling knows the date and the customer's wish list, and reaches out only to customers who agreed to marketing.
 - **Sell-through drives reorders.** Sales feeds inventory, which recommends reordering what moves and marking down what sits.
+- **Late invoices become a follow-up list.** Finance reads open invoices from the books, totals what is more than 30 days past due, and lists the customers to call, oldest first.
+- **A missed call gets a callback.** Clienteling sees calls and texts from Twilio and flags callers nobody got back to within the week.
 
 These come next, as more connectors and reasoners are built:
 
@@ -168,6 +269,7 @@ The instance API:
 | `GET /v1/recommendations` | Latest recommendations, with provenance |
 | `POST /v1/recommendations/:id/feedback` | Record an accept, reject or override |
 | `GET /v1/entities/:kind/:id` | One canonical entity |
+| `GET /v1/signals` | The latest signals, filtered by kind, such as each bank balance or open invoice |
 | `GET /v1/integrations` | Each catalog integration and whether this instance has its settings, by name only |
 
 ## Connectors
@@ -192,7 +294,7 @@ The Shopify connector is the first one built. See [docs/integrations.md](docs/in
 | `@karatos/core` | Event envelope, layer contracts, pipeline, connector contract and `runSync`, write gate, integration catalog, in-memory store, jewelry math (karat purity, melt value), config validation |
 | `@karatos/retail` | Retail jewelry departments: sales, inventory, clienteling, repairs, custom orders, appraisals, buying, metals, marketing, finance, compliance. See [departments](docs/departments/README.md) |
 | `@karatos/store-postgres` | Postgres/Supabase `MemoryStore`, ingestion log and write audit, migration runner |
-| `@karatos/connectors` | Built connectors, starting with Shopify |
+| `@karatos/connectors` | Every built connector, one folder each, from Shopify and QuickBooks to IDEX, Nivoda and Stuller |
 | `@karatos/connector-testkit` | Shared connector test helpers: fixtures, replay, the `runSync` harness, webhook signing, doc mocks |
 | `@karatos/server` | HTTP API for one client instance, shipped as the `ghcr.io/aasimsayani/karatos-brain` image |
 
@@ -210,6 +312,7 @@ This repository is public. Treat everything you commit here as published.
 - Every secret and setting an instance needs is described, without its value, in [`secrets/manifest.json`](secrets/manifest.json), generated from [`secrets/manifest/`](secrets/manifest/). Follow [docs/secrets.md](docs/secrets.md) to add one.
 - Use test-only sandbox accounts for connector tests, never a client's.
 - CI runs `npm run secrets:scan` on every push.
+- Raw vendor payloads are cleared after 30 days; the facts drawn from them, and the links back to their source, stay. See [docs/security.md](docs/security.md).
 - How the code, the instance API, the website and CI are protected, and what each guard is for, is in [docs/security.md](docs/security.md). Report a vulnerability privately as [SECURITY.md](SECURITY.md) describes.
 
 ## Contributing
@@ -226,7 +329,7 @@ npm run test:coverage        # fails under 90% lines, functions and statements, 
 - Every behavior change needs a test. A database change needs a migration and a test that runs it against PGlite.
 - Add a changelog fragment, `changelog.d/<branch>.md`, and update the relevant doc in the same PR. Don't edit `CHANGELOG.md` directly; see [changelog.d/README.md](changelog.d/README.md).
 - When a change finishes a roadmap item, mark it done in [docs/milestones.json](docs/milestones.json) and run `npm run progress:write`. Items tied to an integration update on their own once the catalog marks it built.
-- After a PR merges, run `scripts/sync-open-prs.sh` to bring main into every other open PR. It merges rather than rebases, regenerates the progress section and the connector registry, and pushes only after the checks pass.
+- `npm run prs:plan` prints the order to merge the open PRs in and what each waits on. After a PR merges, run `scripts/sync-open-prs.sh` to bring main into every other open PR, base PRs before the PRs stacked on them. It merges rather than rebases, regenerates the progress section and the connector registry, and pushes only after the checks pass. See [CONTRIBUTING.md](CONTRIBUTING.md#merging-prs-in-order).
 - Adding a connector touches only its own files; `npm run registry:write` regenerates every shared list. See [CONTRIBUTING.md](CONTRIBUTING.md#adding-a-connector).
 
 AI agents working in this repo must read [AGENTS.md](AGENTS.md) first.

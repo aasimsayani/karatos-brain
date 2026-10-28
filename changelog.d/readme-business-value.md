@@ -1,0 +1,1 @@
+- The README explains who KaratOS is for, the question each kind of connection answers for the owner, the measures the first pilots are judged by, and the holiday testing weekend on November 21–22. Its "Connected today" table is generated from the integration catalog by `npm run progress:write`, and a test fails if it falls behind.

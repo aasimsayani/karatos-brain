@@ -1,0 +1,3 @@
+- README: "Landing next" now names what comes after the connectors already built (the owner's money view, live checks with pilot stores, jewelry POS exports and plain-language reasoning), two more cross-department insights are listed as built (late invoices and missed calls), and the 30-day raw data retention is noted under Security.
+- Website: the memo play reads diamond prices from RapNet, IDEX and Nivoda, and a new play follows up invoices more than 30 days past due beside the cash on hand.
+- Clover's customer reference exports are named after Clover, and Nivoda's event builders after Nivoda, so the connectors package can export every connector at once. The message schema accepts Gmail's received and sent directions, and a doc page two mocks share is watched once.

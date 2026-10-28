@@ -30,7 +30,9 @@ export interface DocMockRequest {
 
 export interface DocMockResponse {
   status: number;
-  body: unknown;
+  body?: unknown;
+  /** A body sent as written instead of as JSON, such as a CSV file. Its content type goes in `headers`. */
+  text?: string;
   headers?: Record<string, string>;
 }
 
@@ -187,6 +189,7 @@ export function docMockFetch(mock: DocMock): DocMockFetch {
 
     const body = method === "GET" || method === "HEAD" ? "" : await request.text();
     const response = found.route.respond({ method, url, headers: request.headers, body }, found.params);
+    if (response.text !== undefined) return new Response(response.text, { status: response.status, headers: { "content-type": "text/plain; charset=utf-8", ...response.headers } });
     return json(response.status, response.body, response.headers);
   };
   return Object.assign(fetch, { calls });

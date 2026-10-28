@@ -108,6 +108,14 @@ describe("docMockFetch", () => {
     expect(await gone.text()).toBe("");
   });
 
+  it("sends a text body as written, such as a CSV file, with its own content type or plain text", async () => {
+    const route = (headers?: Record<string, string>) => ({ method: "GET" as const, path: "/export", documentedAt: "https://docs.vendor.example/api/export", respond: () => ({ status: 200, text: "a,b\n1,2\n", ...(headers ? { headers } : {}) }) });
+    const csv = await docMockFetch(exampleMock({ routes: [route({ "content-type": "text/csv" })] }))("https://api.vendor.example/v1/export", { headers: bearer });
+    expect([csv.headers.get("content-type"), await csv.text()]).toEqual(["text/csv", "a,b\n1,2\n"]);
+    const plain = await docMockFetch(exampleMock({ routes: [route()] }))("https://api.vendor.example/v1/export", { headers: bearer });
+    expect(plain.headers.get("content-type")).toBe("text/plain; charset=utf-8");
+  });
+
   it("refuses anything the docs don't list", async () => {
     const fetch = docMockFetch(exampleMock());
     for (const [url, method] of [
@@ -158,7 +166,8 @@ describe("docMockWatchTargets", () => {
       expect(docMockWatchTargets(module.docMocks()).map((t) => t.url), module.integration).toEqual(module.watchPages);
       for (const mock of module.docMocks()) expect(mock.integration, module.integration).toBe(module.integration);
     }
-    expect(docMockWatchTargets(allDocMocks()).map((t) => t.url)).toEqual(DOC_MOCK_MODULES.flatMap((m) => m.watchPages));
+    // A page two mocks share, such as Google's OAuth guide for Gmail and Workspace, is watched once.
+    expect(docMockWatchTargets(allDocMocks()).map((t) => t.url)).toEqual([...new Set(DOC_MOCK_MODULES.flatMap((m) => m.watchPages))]);
   });
 });
 
@@ -237,15 +246,15 @@ describe("Stuller doc mock", () => {
 describe("docMockVendorDocsTargets", () => {
   it("gives each mock page its own watch key, named after the catalog entry", () => {
     const targets = docMockVendorDocsTargets(allDocMocks());
-    const pages = DOC_MOCK_MODULES.flatMap((m) => m.watchPages);
-    expect(targets).toHaveLength(pages.length);
+    const pages = new Set(DOC_MOCK_MODULES.flatMap((m) => m.watchPages));
+    expect(targets).toHaveLength(pages.size);
     expect(targets.find((t) => t.url === "https://api.stuller.com/help")).toEqual({
       integration: "stuller:api-stuller-com-help",
       name: "Stuller",
       url: "https://api.stuller.com/help",
       mock: { integration: "stuller", retrievedOn: "2026-10-15" },
     });
-    expect(new Set(targets.map((t) => t.integration)).size).toBe(pages.length);
+    expect(new Set(targets.map((t) => t.integration)).size).toBe(pages.size);
   });
 
   it("falls back to the integration id for a mock outside the catalog", () => {

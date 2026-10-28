@@ -111,7 +111,9 @@ describe("KaratOS website", () => {
 
   it("only uses Mono at a weight it ships", () => {
     const monoWeights = FONTS.filter((f) => f.family === "IBM Plex Mono").map((f) => `font-weight:${f.weight}`);
-    const rules = html.match(/[^{}]+\{[^{}]*font-family:var\(--mono\)[^{}]*\}/g) ?? [];
+    // Only the stylesheet: scanning the whole page backtracks across every card and grows with the catalog.
+    const css = html.slice(html.indexOf("<style>"), html.indexOf("</style>"));
+    const rules = css.match(/[^{}]+\{[^{}]*font-family:var\(--mono\)[^{}]*\}/g) ?? [];
     expect(rules.length).toBeGreaterThan(4);
     for (const rule of rules) {
       const w = rule.match(/font-weight:\d{3}/)?.[0];

@@ -335,6 +335,11 @@ describe("QuickBooks sync", () => {
     const types = memory.events.map((e) => e.type);
     expect(types.filter((t) => t === "customer.profile_updated")).toHaveLength(3);
     expect(new Set(types)).toEqual(new Set(["accounting.account_updated", "customer.profile_updated", "accounting.vendor_updated", "accounting.invoice_updated", "accounting.bill_updated", "accounting.payment_updated", "accounting.journal_entry_updated"]));
+    // Finance keeps each invoice and what is still owed on it, for receivables.
+    expect(memory.signals.filter((s) => s.kind.startsWith("receivable.")).map((s) => [s.kind, s.subject.id, (s.value as { balanceCents: number }).balanceCents])).toEqual([
+      ["receivable.invoice", "quickbooks:invoice:101", 125_050],
+      ["receivable.invoice", "quickbooks:invoice:102", 125_050],
+    ]);
   });
 
   it("leaves a finished import finished", async () => {

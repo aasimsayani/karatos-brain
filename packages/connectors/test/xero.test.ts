@@ -523,6 +523,12 @@ describe("Xero sync", () => {
         "accounting.journal_entry_updated",
       ]),
     );
+    // Finance keeps each sales invoice, and drops a deleted one from receivables.
+    expect(memory.signals.filter((s) => s.kind.startsWith("receivable.")).map((s) => [s.kind, s.subject.id])).toEqual([
+      ["receivable.invoice", "xero:invoice:00000000-0000-4000-8000-100000000001"],
+      ["receivable.invoice", "xero:invoice:00000000-0000-4000-8000-100000000002"],
+      ["receivable.removed", "xero:invoice:00000000-0000-4000-8000-190000000001"],
+    ]);
   });
 
   it("leaves a finished import finished", async () => {

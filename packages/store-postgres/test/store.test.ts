@@ -110,6 +110,27 @@ describe("PostgresMemoryStore", () => {
     expect(signals[0]).toMatchObject({ confidence: 1, value: 125_000, observedAt: "2026-10-01T12:00:00.000Z" });
   });
 
+  it("reads the latest signals of given kinds, using an index on kind", async () => {
+    const { client, store } = await setup();
+    const signal = (id: string, kind: string) => ({
+      id,
+      organizationId: ORG,
+      kind,
+      subject: { kind: "invoice" as const, id },
+      value: { id },
+      confidence: 1,
+      derivedFromEventIds: [],
+      observedAt: "2026-10-01T12:00:00.000Z",
+    });
+    await store.appendSignals([signal("s1", "bank.balance"), signal("s2", "receivable.invoice"), signal("s3", "bank.balance"), signal("s4", "sale.line")]);
+    expect((await store.recentSignals(ORG, 10, ["bank.balance"])).map((s) => s.id)).toEqual(["s1", "s3"]);
+    expect((await store.recentSignals(ORG, 2, ["bank.balance", "receivable.invoice"])).map((s) => s.id)).toEqual(["s2", "s3"]);
+    expect(await store.recentSignals(ORG, 10, [])).toEqual([]);
+    expect((await store.recentSignals(ORG, 10)).map((s) => s.id)).toEqual(["s1", "s2", "s3", "s4"]);
+    const { rows } = await client.query<{ indexdef: string }>("select indexdef from pg_indexes where indexname = 'signals_org_kind_recent_idx'");
+    expect(rows[0]?.indexdef).toMatch(/\(organization_id, kind, seq DESC\)/);
+  });
+
   it("does not let an older entity version overwrite a newer one", async () => {
     const { client, store } = await setup();
     const base = { ref: { kind: "order" as const, id: "1" }, organizationId: ORG };
