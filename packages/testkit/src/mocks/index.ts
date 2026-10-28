@@ -13,6 +13,7 @@ import quickbooks from "./quickbooks.js";
 import slack from "./slack.js";
 import square from "./square.js";
 import stuller from "./stuller.js";
+import woocommerce from "./woocommerce.js";
 import xero from "./xero.js";
 
 export * from "./affirm.js";
@@ -28,10 +29,11 @@ export * from "./quickbooks.js";
 export * from "./slack.js";
 export * from "./square.js";
 export * from "./stuller.js";
+export * from "./woocommerce.js";
 export * from "./xero.js";
 
 /** Every mock module, one per catalog integration. */
-export const DOC_MOCK_MODULES: readonly DocMockModule[] = [affirm, authorize_net, clover, custom_forms, gmail, google_workspace, hubspot, monday, plaid, quickbooks, slack, square, stuller, xero];
+export const DOC_MOCK_MODULES: readonly DocMockModule[] = [affirm, authorize_net, clover, custom_forms, gmail, google_workspace, hubspot, monday, plaid, quickbooks, slack, square, stuller, woocommerce, xero];
 
 /** Every doc-derived mock, with empty data, for checks and the vendor docs watch. */
 export function allDocMocks(): DocMock[] {
