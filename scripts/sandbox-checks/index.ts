@@ -4,6 +4,7 @@ import affirm from "./affirm.js";
 import authorize_net from "./authorize_net.js";
 import avalara from "./avalara.js";
 import bigcommerce from "./bigcommerce.js";
+import calendly from "./calendly.js";
 import clover from "./clover.js";
 import custom_forms from "./custom_forms.js";
 import gia from "./gia.js";
@@ -25,4 +26,4 @@ import woocommerce from "./woocommerce.js";
 import xero from "./xero.js";
 
 /** Every connector's nightly sandbox check. */
-export const SANDBOX_CHECKS: SandboxCheck[] = [affirm, authorize_net, avalara, bigcommerce, clover, custom_forms, gia, gmail, google_workspace, hubspot, klaviyo, metals_api, monday, plaid, quickbooks, shopify, slack, square, stripe, twilio, wix, woocommerce, xero];
+export const SANDBOX_CHECKS: SandboxCheck[] = [affirm, authorize_net, avalara, bigcommerce, calendly, clover, custom_forms, gia, gmail, google_workspace, hubspot, klaviyo, metals_api, monday, plaid, quickbooks, shopify, slack, square, stripe, twilio, wix, woocommerce, xero];

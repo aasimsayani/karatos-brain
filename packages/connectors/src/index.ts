@@ -4,6 +4,7 @@ export * from "./authorize_net/index.js";
 export * from "./avalara/index.js";
 export * from "./bank_statements/index.js";
 export * from "./bigcommerce/index.js";
+export * from "./calendly/index.js";
 export * from "./chase/index.js";
 export * from "./clover/index.js";
 export * from "./custom_forms/index.js";

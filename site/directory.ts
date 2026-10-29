@@ -304,6 +304,7 @@ export const CONNECTED_ON: Readonly<Record<string, string>> = {
   stuller: "2026-10-26",
   avalara: "2026-10-28",
   bigcommerce: "2026-10-28",
+  calendly: "2026-10-28",
   clover: "2026-10-28",
   custom_forms: "2026-10-28",
   gmail: "2026-10-28",
