@@ -88,6 +88,19 @@ const FeedbackBody = z.object({
 });
 
 /** Signal kinds are lowercase dotted names, such as bank.balance or receivable.invoice. */
+/**
+ * A path segment as the id it encodes. Clients encode ids (recommendation
+ * ids carry colons, entity ids spaces), so the route has to decode them
+ * before looking anything up; a malformed escape is the caller's mistake.
+ */
+function idFrom(segment: string): string {
+  try {
+    return decodeURIComponent(segment);
+  } catch {
+    throw new HttpError(400, "the id in the path isn't validly encoded");
+  }
+}
+
 const SIGNAL_KIND = /^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*){0,3}$/;
 
 type Handler = (req: IncomingMessage, params: string[], url: URL) => Promise<[number, unknown]>;
@@ -142,7 +155,7 @@ export function createBrainApp(options: BrainAppOptions): RequestListener {
       "POST",
       /^\/v1\/recommendations\/([^/]+)\/feedback$/,
       async (req, [id]) => {
-        const recommendation = await options.memory.getRecommendation(options.organizationId, id!);
+        const recommendation = await options.memory.getRecommendation(options.organizationId, idFrom(id!));
         if (!recommendation) throw new HttpError(404, "recommendation not found");
         const parsed = FeedbackBody.safeParse(await readJson(req, limit));
         if (!parsed.success) {
@@ -177,7 +190,7 @@ export function createBrainApp(options: BrainAppOptions): RequestListener {
       "GET",
       /^\/v1\/entities\/([a-z][a-z0-9_]*)\/([^/]+)$/,
       async (_req, [kind, id]) => {
-        const entity = await options.memory.getEntity(options.organizationId, kind!, decodeURIComponent(id!));
+        const entity = await options.memory.getEntity(options.organizationId, kind!, idFrom(id!));
         if (!entity) throw new HttpError(404, "entity not found");
         return [200, { entity }];
       },

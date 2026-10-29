@@ -1,0 +1,1 @@
+- Brain server: `POST /v1/recommendations/:id/feedback` decodes the id in the path, so Accept and Dismiss in the console work on recommendations whose ids carry colons (most of them), which the console sends encoded. A path id with a broken escape now gets 400 instead of 500, on that route and on `GET /v1/entities/:kind/:id`.
