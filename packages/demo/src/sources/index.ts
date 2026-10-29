@@ -41,6 +41,7 @@ export const DEMO_NOT_YET: Readonly<Record<string, string>> = {
   slack: NEXT,
   hubspot: NEXT,
   stripe: NEXT,
+  refiner_statements: NEXT,
   affirm: NOT_READ_YET,
   authorize_net: NOT_READ_YET,
   avalara: NOT_READ_YET,
