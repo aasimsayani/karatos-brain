@@ -2,6 +2,7 @@
 import type { ConnectorCatalogEntry } from "../integrations.js";
 import affirm from "./affirm.js";
 import authorize_net from "./authorize_net.js";
+import avalara from "./avalara.js";
 import bank_statements from "./bank_statements.js";
 import bigcommerce from "./bigcommerce.js";
 import calendly from "./calendly.js";
@@ -35,4 +36,4 @@ import woocommerce from "./woocommerce.js";
 import xero from "./xero.js";
 
 /** Each built connector's own catalog fields, by catalog id. */
-export const CONNECTOR_CATALOG: Readonly<Record<string, ConnectorCatalogEntry>> = { affirm, authorize_net, bank_statements, bigcommerce, calendly, chase, clover, custom_forms, edi_x12, gia, gmail, google_workspace, hubspot, idex, inventory_pos, klaviyo, metals_api, monday, nivoda, piro, plaid, quickbooks, rapnet, shopify, slack, square, stripe, stuller, twilio, watchsearch, wix, woocommerce, xero };
+export const CONNECTOR_CATALOG: Readonly<Record<string, ConnectorCatalogEntry>> = { affirm, authorize_net, avalara, bank_statements, bigcommerce, calendly, chase, clover, custom_forms, edi_x12, gia, gmail, google_workspace, hubspot, idex, inventory_pos, klaviyo, metals_api, monday, nivoda, piro, plaid, quickbooks, rapnet, shopify, slack, square, stripe, stuller, twilio, watchsearch, wix, woocommerce, xero };
