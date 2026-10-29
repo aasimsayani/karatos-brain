@@ -56,6 +56,7 @@ An instance holds a slim copy of a client's data. Raw vendor records (event payl
 - The font route serves only file names it loaded at start-up; nothing under `/fonts/` can reach other files.
 - The inquiry form refuses posts a browser marks as coming from another site, caps the body, drops honeypot submissions, and limits each address to five an hour. The address is the last `X-Forwarded-For` entry, the one Railway's proxy adds, so a sender can't dodge the limit by inventing addresses. The limiter sweeps stale addresses so it can't be grown without bound.
 - Visitor text is fenced before it becomes a GitHub issue, so it can't inject markdown or mention people. The website's GitHub token is fine-grained: Issues read and write on the private inquiry repository only.
+- `/demo` is passed only to a demo console on Railway's private network (`http://` to a host ending `.railway.internal`, with no path or credentials); any other `DEMO_CONSOLE_URL` leaves the route off. Paths with dot segments or encoded slashes are blocked before they leave the site, bodies are capped at 64 KB, connection-only headers are dropped both ways, and the console is sent only the address Railway's proxy saw. The demo itself is read-only and holds only made-up data.
 
 ### The supply chain is compromised
 

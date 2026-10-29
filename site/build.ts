@@ -586,7 +586,7 @@ footer .wrap{display:flex;flex-wrap:wrap;justify-content:space-between;gap:var(-
 <body>
 <header class="nav"><div class="wrap">
   <a class="brand" href="#top"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M16 3 28 12 16 29 4 12Z" fill="#c9a45c"/><path d="M4 12h24M16 3l-5 9 5 17 5-17-5-9" fill="none" stroke="#16140f" stroke-opacity=".35" stroke-width="1.2"/></svg>KaratOS</a>
-  <nav><a href="#how">How it works</a><a href="#together">Systems together</a><a href="#write-back">Write-back</a><a href="#integrations">Integrations</a><a href="#partners">Partners</a><a href="#pilot">Holiday pilot</a><a href="#services">Pricing</a><a href="#broken">What's broken</a></nav>
+  <nav><a href="#how">How it works</a><a href="#together">Systems together</a><a href="#write-back">Write-back</a><a href="#integrations">Integrations</a><a href="#partners">Partners</a><a href="#pilot">Holiday pilot</a><a href="#services">Pricing</a><a href="#broken">What's broken</a><a href="/demo/">Demo</a></nav>
   <a class="btn primary small" href="#services">Custom services</a>
 </div></header>
 
@@ -595,7 +595,8 @@ footer .wrap{display:flex;flex-wrap:wrap;justify-content:space-between;gap:var(-
   <span class="eyebrow">For jewelers, watch dealers, wholesalers, manufacturers and the businesses that serve them</span>
   <h1>The operating brain for jewelry businesses.</h1>
   <p class="lede">KaratOS connects the many systems your business already runs, from the POS and the books to diamond feeds and the repair bench, reads them together and turns them into a short list of things to act on today. Every suggestion shows the evidence behind it, and when you allow it, KaratOS writes back carefully, one approved change at a time.</p>
-  <div class="actions"><a class="btn primary" href="#pilot">Join the holiday pilot</a><a class="btn ghost" href="#services">Custom services</a><a class="btn ghost" href="#together">See the systems work together</a></div>
+  <div class="actions"><a class="btn primary" href="#pilot">Join the holiday pilot</a><a class="btn ghost" href="#services">Custom services</a><a class="btn ghost" href="/demo/">Try the live demo</a></div>
+  <p class="note">The <a href="/demo/">live demo</a> is a made-up store running on the real connectors, so you can click through the dashboard before connecting anything. It resets every night.</p>
   <ul class="proof" aria-label="KaratOS today">
     <li><strong>${builtCount}</strong><span>systems connected</span></li>
     <li><strong>${dataSources.length}</strong><span>systems mapped</span></li>

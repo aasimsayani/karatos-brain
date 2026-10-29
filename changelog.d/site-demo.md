@@ -1,0 +1,1 @@
+- Website: `/demo` is passed to the demo console on Railway's private network (`DEMO_CONSOLE_URL`), so karatos.app/demo shows the live demo store, and the hero and nav link to it. Only `http://` to a `.railway.internal` host is taken; paths that could step outside `/demo` are blocked and bodies are capped at 64 KB. Without the setting, `/demo` says the demo isn't running yet.
