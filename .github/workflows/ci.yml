@@ -81,6 +81,22 @@ jobs:
           curl -fs http://127.0.0.1:8080/healthz >/dev/null || { docker logs site; echo "::error title=Website image::the container did not start"; exit 1; }
           SITE_URL=http://127.0.0.1:8080/ npm run site:freshness -- --dry-run --strict
 
+  demo-docker:
+    # The demo store image must start, seed through the real connectors and answer with recommendations.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - run: docker build -f packages/demo/Dockerfile -t karatos-demo .
+      - run: |
+          key=$(openssl rand -hex 24)
+          docker run -d --name demo -p 8080:8080 -e PORT=8080 -e DEMO_API_KEY="$key" karatos-demo
+          for i in $(seq 1 60); do curl -fs http://127.0.0.1:8080/healthz >/dev/null && break; sleep 0.5; done
+          curl -fs http://127.0.0.1:8080/healthz >/dev/null || { docker logs demo; echo "::error title=Demo image::the container did not start"; exit 1; }
+          count=$(curl -fs -H "authorization: Bearer $key" http://127.0.0.1:8080/v1/recommendations | jq '.recommendations | length')
+          [ "$count" -ge 10 ] || { docker logs demo; echo "::error title=Demo image::expected at least 10 recommendations, got $count"; exit 1; }
+
   instance-smoke-test:
     runs-on: ubuntu-latest
     services:

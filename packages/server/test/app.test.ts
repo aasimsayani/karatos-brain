@@ -255,6 +255,33 @@ describe("Brain API: memory endpoints", () => {
     expect(((await bad.json()) as { details: { path: string }[] }).details.map((d) => d.path)).toEqual(["outcome", "actor"]);
   });
 
+  it("finds a recommendation whose id the client encoded, as the console does", async () => {
+    // Real ids carry colons, such as rec_compliance_structuring_pos:generic:customer:C-1004_2026-10-29.
+    const id = "rec_compliance_x_pos:generic:customer:C 1_2026-10-29";
+    const { call, memory } = await start(undefined, undefined, { name: "colon", reason: async (input) => (await echoReasoner.reason(input)).map((r) => ({ ...r, id })) });
+    await call("/v1/reason", { method: "POST", body: "{}" });
+    const res = await call(`/v1/recommendations/${encodeURIComponent(id)}/feedback`, {
+      method: "POST",
+      body: JSON.stringify({ outcome: "accepted", actor: "owner" }),
+    });
+    expect(res.status).toBe(201);
+    expect(memory.feedback[0]).toMatchObject({ recommendationId: id, outcome: "accepted" });
+    // Left unencoded, the colons still reach the same recommendation.
+    expect((await call("/v1/recommendations/rec_compliance_x_pos:generic:customer:C%201_2026-10-29/feedback", { method: "POST", body: JSON.stringify({ outcome: "accepted", actor: "owner" }) })).status).toBe(201);
+  });
+
+  it("answers 400, not 500, for an id with a broken escape", async () => {
+    const { call } = await start();
+    const answers = [
+      await call("/v1/recommendations/%E0%A4%A/feedback", { method: "POST", body: "{}" }),
+      await call("/v1/entities/repair_ticket/%E0%A4%A"),
+    ];
+    for (const res of answers) {
+      expect(res.status).toBe(400);
+      expect(await res.json()).toEqual({ error: "the id in the path isn't validly encoded" });
+    }
+  });
+
   it("returns entities by kind and id", async () => {
     const { call, memory } = await start();
     await memory.upsertEntities([
