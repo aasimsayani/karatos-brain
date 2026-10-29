@@ -1,0 +1,1 @@
+- Demo store: PIRO is listed among the connectors joining the demo next, so the demo's coverage test passes again on main.
