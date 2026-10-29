@@ -372,6 +372,77 @@ describe("metals", () => {
   });
 });
 
+describe("metals: refiner settlements", () => {
+  const line = (lot: string, over: Record<string, unknown> = {}) => ({
+    lineId: `refiner:test_refinery:${lot}:gold:0`,
+    refiner: "test_refinery",
+    lot,
+    settledOn: "2026-09-10",
+    metal: "gold",
+    meltGrams: 100,
+    fineness: 0.585,
+    fineGrams: 58.5,
+    fineTroyOunces: 1.8808,
+    creditCents: 470_000,
+    fineWeightCheck: "matches",
+    expectedFineGrams: 58.5,
+    currency: "USD",
+    ...over,
+  });
+  const spot = (s: ReturnType<typeof store>, cents: number, at: string) => s.send("metal.price_updated", { metal: "gold", spotPerTroyOunceCents: cents }, at);
+
+  it("asks for a recheck when a lot is credited less fine metal than its weight and assay", async () => {
+    const s = store();
+    await s.send("refining.settlement_line_imported", line("TEST-LOT-1", { fineGrams: 55, fineWeightCheck: "differs" }), "2026-09-10T00:00:00Z");
+    await s.send("refining.settlement_line_imported", line("TEST-LOT-2", { fineGrams: 60, fineWeightCheck: "differs" }), "2026-09-10T00:00:00Z");
+    await s.send("refining.settlement_line_imported", line("TEST-LOT-3"), "2026-09-10T00:00:00Z");
+    const recs = about(await s.ask(NOW), "recheck");
+    expect(recs.map((r) => r.summary)).toEqual([
+      "Lot TEST-LOT-1 from test_refinery credits 55.00 g of fine gold, but 100.00 g at 58.5% is 58.50 g. Ask the refiner to recheck the assay on the 3.50 g short.",
+    ]);
+  });
+
+  it("follows a corrected statement, so a lot fixed since stops being flagged", async () => {
+    const s = store();
+    await s.send("refining.settlement_line_imported", line("TEST-LOT-1", { fineGrams: 55, fineWeightCheck: "differs" }), "2026-09-10T00:00:00Z");
+    await s.send("refining.settlement_line_imported", line("TEST-LOT-1"), "2026-09-11T00:00:00Z");
+    expect(about(await s.ask(NOW), "recheck")).toEqual([]);
+  });
+
+  it("compares what a lot paid per fine ounce with spot on the day it settled", async () => {
+    const s = store();
+    await spot(s, 270_000, "2026-09-09T21:00:00Z");
+    // $4,700 for 1.8808 oz is $2,498.94, 92.6% of spot: fine.
+    await s.send("refining.settlement_line_imported", line("TEST-LOT-1"), "2026-09-10T00:00:00Z");
+    await s.send("refining.settlement_line_imported", line("TEST-LOT-2", { creditCents: 420_000, feeCents: 9_000 }), "2026-09-10T00:00:00Z");
+    await s.send("refining.settlement_line_imported", line("TEST-LOT-3", { creditCents: 420_000 }), "2026-09-10T00:00:00Z");
+    // Spot moved after these settled; the later price isn't the one they settled against.
+    await spot(s, 200_000, "2026-09-20T21:00:00Z");
+    const recs = about(await s.ask(NOW), "second quote");
+    expect(recs.map((r) => r.summary)).toEqual([
+      "Lot TEST-LOT-2 from test_refinery paid $4,200.00 for 1.8808 oz of fine gold, 82.7% of spot on 2026-09-10, before $90.00 in fees. Get a second quote on payable rates and fees.",
+      "Lot TEST-LOT-3 from test_refinery paid $4,200.00 for 1.8808 oz of fine gold, 82.7% of spot on 2026-09-10. Get a second quote on payable rates and fees.",
+    ]);
+  });
+
+  it("says nothing about payable rates without a credit or a spot price from that week", async () => {
+    const s = store();
+    await spot(s, 270_000, "2026-09-01T21:00:00Z");
+    await s.send("refining.settlement_line_imported", line("TEST-LOT-1", { creditCents: 100_000 }), "2026-09-10T00:00:00Z");
+    await s.send("refining.settlement_line_imported", line("TEST-LOT-2", { creditCents: undefined, settledOn: "2026-09-02" }), "2026-09-02T00:00:00Z");
+    await s.send("refining.settlement_line_imported", line("TEST-LOT-3", { creditCents: 0, settledOn: "2026-09-02" }), "2026-09-02T00:00:00Z");
+    expect(about(await s.ask(NOW), "second quote")).toEqual([]);
+  });
+
+  it("dead-letters a settlement line missing its lot or fine metal", async () => {
+    const s = store();
+    await expect(s.send("refining.settlement_line_imported", line("TEST-LOT-1", { lot: null }))).rejects.toThrow(/dead-lettered/);
+    await expect(s.send("refining.settlement_line_imported", line("TEST-LOT-1", { fineGrams: null }))).rejects.toThrow(/dead-lettered/);
+    await expect(s.send("refining.settlement_line_imported", line("TEST-LOT-1", { fineness: 1.2 }))).rejects.toThrow(/dead-lettered/);
+    expect(s.memory.deadLetters).toHaveLength(3);
+  });
+});
+
 describe("compliance", () => {
   it("reminds you to file Form 8300 for cash over $10,000", async () => {
     const s = store();

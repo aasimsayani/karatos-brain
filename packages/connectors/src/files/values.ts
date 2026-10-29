@@ -112,9 +112,9 @@ export function parseDate(text: string | undefined, order: DateOrder, utcOffset 
 
 /** Grams in one of each weight unit exports use. */
 export const GRAMS_PER_UNIT = { grams: 1, dwt: 1.55517384, ozt: 31.1034768 } as const;
-export type WeightUnit = keyof typeof GRAMS_PER_UNIT;
+export type ExportWeightUnit = keyof typeof GRAMS_PER_UNIT;
 
-const UNIT_WORDS: Readonly<Record<WeightUnit, RegExp>> = {
+const UNIT_WORDS: Readonly<Record<ExportWeightUnit, RegExp>> = {
   grams: /^(?:g|gr|grams?|gms?)$/i,
   dwt: /^(?:dwt|dwts|pennyweights?)$/i,
   ozt: /^(?:oz|ozs|ozt|toz|troy oz|troy ounces?|ounces?)$/i,
@@ -126,7 +126,7 @@ const UNIT_WORDS: Readonly<Record<WeightUnit, RegExp>> = {
  * another unit ("12.5 g" in a pennyweight column) is null, so a mislabeled
  * column is caught instead of read in the wrong unit.
  */
-export function parseWeightGrams(text: string | undefined, unit: WeightUnit): number | null {
+export function parseWeightGrams(text: string | undefined, unit: ExportWeightUnit): number | null {
   const t = (text ?? "").trim();
   const m = /^(\d{1,3}(?:,\d{3})+|\d+)(\.\d+)?\s*([A-Za-z][A-Za-z ]*)?$/.exec(t);
   if (!m) return null;

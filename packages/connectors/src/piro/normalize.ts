@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import type { ColumnGetter } from "../files/columns.js";
 import type { CsvRow } from "../files/csv.js";
 import type { SourceFile } from "../files/source.js";
-import { parseDate, parseInteger, parseWeightGrams, type WeightUnit } from "../files/values.js";
+import { parseDate, parseInteger, parseWeightGrams, type ExportWeightUnit } from "../files/values.js";
 import type { JobStatus, PiroProfile } from "./profile.js";
 
 /**
@@ -92,7 +92,7 @@ export function piroKarat(text: string | undefined): number | null {
 
 /** A measure's weight from whichever unit's column is filled: undefined when none is, null when it can't be read. */
 function weight(get: ColumnGetter, row: CsvRow, measure: string): number | null | undefined {
-  const units: [string, WeightUnit][] = [
+  const units: [string, ExportWeightUnit][] = [
     [`${measure}Grams`, "grams"],
     [`${measure}Dwt`, "dwt"],
   ];
