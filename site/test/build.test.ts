@@ -324,6 +324,14 @@ describe("KaratOS website", () => {
     }
   });
 
+  it("links the hero and the nav to the live demo", () => {
+    const hero = html.slice(html.indexOf('<div class="wrap hero">'), html.indexOf('<ul class="proof"'));
+    expect(hero).toContain('<a class="btn ghost" href="/demo/">Try the live demo</a>');
+    expect(hero).toContain("made-up store running on the real connectors");
+    const nav = html.slice(html.indexOf("<nav>"), html.indexOf("</nav>"));
+    expect(nav).toContain('<a href="/demo/">Demo</a>');
+  });
+
   it("hides the nav links before they would crowd the header", () => {
     expect(html).toContain(".nav nav a{text-decoration:none;white-space:nowrap}");
     expect(html).toContain("@media (max-width:1120px){.nav nav{display:none}}");

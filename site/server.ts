@@ -6,7 +6,7 @@
  */
 import { createHash } from "node:crypto";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
-import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
+import { createServer, request as httpRequest, type IncomingMessage, type ServerResponse } from "node:http";
 import { gzipSync } from "node:zlib";
 
 export const INTERESTS = ["pilot", "brain_console", "maintenance", "custom_services", "broken_system"] as const;
@@ -125,7 +125,44 @@ export interface ServerOptions {
   rateLimit?: number;
   /** The site's own font files by file name, served under /fonts/. Nothing else there is served. */
   fonts?: Readonly<Record<string, Buffer>>;
+  /** Where the demo console listens on Railway's private network; /demo is passed through to it. */
+  demoUrl?: string | undefined;
+  /** How long the demo console has to answer before the visitor is told it isn't available. */
+  demoTimeoutMs?: number;
 }
+
+export const DEMO_PATH = "/demo";
+const MAX_DEMO_BODY_BYTES = 64_000;
+/** Headers that belong to one connection and are never passed through. */
+const HOP_BY_HOP = new Set(["connection", "keep-alive", "proxy-authenticate", "proxy-authorization", "proxy-connection", "te", "trailer", "transfer-encoding", "upgrade"]);
+
+/**
+ * The demo console's address, or null when it isn't one the site will send
+ * visitors to: plain http on Railway's private network (or this machine, for
+ * tests), with no path, query or credentials. Anything else would send
+ * visitor cookies across the public internet or to a host nobody chose.
+ */
+export function demoTarget(value: string | undefined): URL | null {
+  if (!value) return null;
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    return null;
+  }
+  const privateHost = url.hostname.endsWith(".railway.internal") || url.hostname === "localhost" || url.hostname === "127.0.0.1";
+  if (url.protocol !== "http:" || !privateHost || url.username || url.password || url.pathname !== "/" || url.search || url.hash) return null;
+  return url;
+}
+
+/** True for /demo and anything under /demo/, but not /demonstration. */
+export const isDemoPath = (path: string) => path === DEMO_PATH || path.startsWith(`${DEMO_PATH}/`);
+
+/**
+ * A dot segment, written plainly or encoded, or an encoded slash or
+ * backslash, could step outside /demo once something downstream decodes it.
+ */
+const ESCAPES_BASE = /(^|\/)(\.|%2e){1,2}(\/|$|\?)|%2f|%5c|\\/i;
 
 const BASE_HEADERS = {
   "X-Content-Type-Options": "nosniff",
@@ -229,6 +266,64 @@ export function createSiteHandler(options: ServerOptions) {
     sendWith(res, status, body, type, headers, security);
   const json = (res: ServerResponse, status: number, body: unknown) => send(res, status, JSON.stringify(body), "application/json");
   const fonts = options.fonts ?? {};
+  const demo = demoTarget(options.demoUrl);
+  const demoTimeoutMs = options.demoTimeoutMs ?? 15_000;
+
+  /**
+   * Passes a /demo request to the demo console unchanged, path included,
+   * since the console serves under the same base path. Host goes through as
+   * the visitor sent it, so the console's same-origin check sees the site's
+   * own address; X-Forwarded-For carries only the address Railway's proxy
+   * saw, so a visitor can't put a made-up one first.
+   */
+  async function proxyDemo(req: IncomingMessage, res: ServerResponse, url: string): Promise<void> {
+    if (!demo) return send(res, 503, "The demo isn't running yet.", "text/plain; charset=utf-8", { "Retry-After": "3600" });
+    if (ESCAPES_BASE.test(url)) return send(res, 400, "Bad request", "text/plain; charset=utf-8");
+    let body: Buffer | undefined;
+    if (req.method !== "GET" && req.method !== "HEAD") {
+      const chunks: Buffer[] = [];
+      let size = 0;
+      for await (const chunk of req) {
+        size += (chunk as Buffer).length;
+        if (size > MAX_DEMO_BODY_BYTES) return send(res, 413, "Too large", "text/plain; charset=utf-8");
+        chunks.push(chunk as Buffer);
+      }
+      body = Buffer.concat(chunks);
+    }
+    const headers: Record<string, string | string[]> = {};
+    for (const [name, value] of Object.entries(req.headers)) {
+      if (value === undefined || HOP_BY_HOP.has(name) || name === "x-forwarded-for" || name === "content-length") continue;
+      headers[name] = value;
+    }
+    headers["x-forwarded-for"] = clientAddress(req);
+    headers["x-forwarded-proto"] = "https";
+    if (body) headers["content-length"] = String(body.length);
+    await new Promise<void>((resolve) => {
+      const upstream = httpRequest(
+        { hostname: demo.hostname, port: demo.port || 80, method: req.method, path: url, headers, timeout: demoTimeoutMs },
+        (answer) => {
+          const out: Record<string, string | string[]> = {};
+          for (const [name, value] of Object.entries(answer.headers)) if (value !== undefined && !HOP_BY_HOP.has(name)) out[name] = value;
+          res.writeHead(answer.statusCode ?? 502, out);
+          answer.pipe(res);
+          answer.on("end", resolve);
+          answer.on("error", () => {
+            res.destroy();
+            resolve();
+          });
+        },
+      );
+      const unavailable = () => {
+        upstream.destroy();
+        if (!res.headersSent) send(res, 502, "The demo isn't available right now. Try again in a minute.", "text/plain; charset=utf-8");
+        else res.destroy();
+        resolve();
+      };
+      upstream.on("timeout", unavailable);
+      upstream.on("error", unavailable);
+      upstream.end(body);
+    });
+  }
 
   async function handleInquiry(req: IncomingMessage, res: ServerResponse): Promise<void> {
     if (crossSite(req)) return json(res, 403, { error: "cross_site" });
@@ -275,6 +370,7 @@ export function createSiteHandler(options: ServerOptions) {
 
   async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> {
     const path = (req.url ?? "/").split("?")[0] ?? "/";
+    if (isDemoPath(path)) return proxyDemo(req, res, req.url ?? path);
     if (req.method === "POST" && path === "/api/inquiry") return handleInquiry(req, res);
     if (req.method === "GET" && path === "/healthz") return json(res, 200, { ok: true });
     if ((req.method === "GET" || req.method === "HEAD") && path.startsWith("/fonts/")) {
@@ -305,7 +401,11 @@ if (process.argv[1] && import.meta.url === new URL(`file://${process.argv[1]}`).
     fonts,
     token: process.env.INQUIRY_GITHUB_TOKEN,
     repo: process.env.INQUIRY_REPO,
+    demoUrl: process.env.DEMO_CONSOLE_URL,
   });
+  if (process.env.DEMO_CONSOLE_URL && !demoTarget(process.env.DEMO_CONSOLE_URL)) {
+    console.error("DEMO_CONSOLE_URL must be http:// on Railway's private network (a host ending .railway.internal) with no path; /demo stays off");
+  }
   const port = Number(process.env.PORT ?? 8080);
   createServer((req, res) => {
     handler(req, res).catch((error) => {
@@ -314,6 +414,7 @@ if (process.argv[1] && import.meta.url === new URL(`file://${process.argv[1]}`).
     });
   }).listen(port, () => {
     const configured = process.env.INQUIRY_GITHUB_TOKEN && process.env.INQUIRY_REPO ? "inquiries on" : "inquiries off (set INQUIRY_GITHUB_TOKEN and INQUIRY_REPO)";
-    console.log(`KaratOS website listening on :${port}, ${configured}`);
+    const demoState = demoTarget(process.env.DEMO_CONSOLE_URL) ? "demo on" : "demo off (set DEMO_CONSOLE_URL)";
+    console.log(`KaratOS website listening on :${port}, ${configured}, ${demoState}`);
   });
 }

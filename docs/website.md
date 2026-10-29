@@ -59,6 +59,16 @@ Quote and Brain Console requests use a private form on the page. `site/server.ts
 
 Without both, the form answers that it isn't connected yet and the rest of the site works normally. The repository needs the labels `inquiry`, `broken-system` and `pilot`.
 
+## Live demo
+
+The hero's "Try the live demo" button and the nav's "Demo" link open `/demo/`. The site passes everything under `/demo` to the demo console (the KaratOS console in demo mode, reading a demo store of made-up data; see [docs/demo.md](demo.md)), path and query unchanged, since the console serves under `BASE_PATH=/demo`. Host goes through as the visitor sent it, so the console's same-origin check sees `karatos.app`.
+
+| Variable | What it is |
+| --- | --- |
+| `DEMO_CONSOLE_URL` | The demo console on Railway's private network, such as `http://demo-console.railway.internal:8080` |
+
+Only plain `http://` to a `.railway.internal` host is taken (or `localhost` for local runs), so the console needs no public domain. Without it `/demo` answers 503 "The demo isn't running yet." and the rest of the site works normally; a console that is down or takes over 15 seconds gets a 502.
+
 ## Broken-systems campaign
 
 "Is a system in your jewelry business broken? Tell us." sends people to the same private form with "Reporting a broken system" ticked, plus an optional field naming the system. Those issues are titled `Broken system: <system>` and labelled `broken-system` as well as `inquiry`. The public [integration request form](../.github/ISSUE_TEMPLATE/integration-request.yml) stays as the alternative for people happy to post in the open. Each report is triaged within a week into a catalog change, a vote on an existing entry, or a partnership ask; the triage steps and outreach copy live in the private commercial runbook.
