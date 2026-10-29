@@ -42,7 +42,7 @@ describe("system details", () => {
   it("names a company only when it makes more than one system on the map, or it is a household name", () => {
     const counts = new Map<string, number>();
     for (const d of Object.values(SYSTEM_DETAILS)) if (d.company) counts.set(d.company, (counts.get(d.company) ?? 0) + 1);
-    expect(counts.get("Google")).toBe(5);
+    expect(counts.get("Google")).toBe(6);
     expect(counts.get("Microsoft")).toBe(3);
     expect(counts.get("Meta")).toBe(2);
     expect(counts.get("Jewelers Mutual")).toBe(4);
