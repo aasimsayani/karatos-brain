@@ -46,6 +46,31 @@ describe("integration catalog", () => {
     expect(missing).toEqual([]);
   });
 
+  it("covers the jewelry trade's own systems, from the JCK and JIS exhibitor lists to the services jewelers report using", () => {
+    const ids = new Set(INTEGRATIONS.map((i) => i.id));
+    const trade = [
+      // Insurance, credit and security
+      "jewelers_mutual", "jm_zing_appraisal", "jm_shipping_solution", "briteco", "jbt", "jsa_crime_alerts",
+      // Grading labs and diamond networks
+      "gia", "igi", "gsi_gem_experience", "hrd", "gcal", "agl", "ogitech_diatrue", "sarine", "tracr", "rapnet", "idex", "nivoda", "vdb",
+      // Jewelry point of sale, ERP and websites
+      "the_edge", "jewel360", "luxare_diaspark", "adaptive_erp", "smart_age_solutions", "thinkspace", "punchmark", "gemfind", "valigara",
+      // Suppliers, buying groups and metals
+      "stuller", "quality_gold", "rio_grande", "rjo", "ijo", "kitco", "nfusion", "refiner_statements",
+      // Payments, financing and the trade's training and benchmarks
+      "aurora_payments", "synchrony", "acima", "progressive_leasing", "snap_finance", "edge_retail_academy", "jewelry_sales_academy",
+      // Compliance and secure shipping
+      "leadsonline", "fincen_8300", "ofac_sanctions", "malca_amit", "brinks_connect", "parcel_pro",
+    ];
+    expect(trade.filter((id) => !ids.has(id))).toEqual([]);
+  });
+
+  it("keeps the systems stores run beside the trade's own: other carts, payments, payroll, fraud checks and listings", () => {
+    const ids = new Set(INTEGRATIONS.map((i) => i.id));
+    const general = ["adobe_commerce", "paypal", "sezzle", "signifyd", "clearsale", "quickbooks_desktop", "adp_workforce_now", "paychex_flex", "google_merchant_center", "yelp", "the_knot_pro", "shoppertrak"];
+    expect(general.filter((id) => !ids.has(id))).toEqual([]);
+  });
+
   it("filters the catalog by kind of business", () => {
     const wholesale = integrationsFor("wholesale").map((i) => i.id);
     expect(wholesale).toContain("rapnet");
