@@ -315,4 +315,5 @@ export const CONNECTED_ON: Readonly<Record<string, string>> = {
   square: "2026-10-28",
   wix: "2026-10-28",
   woocommerce: "2026-10-28",
+  refiner_statements: "2026-10-29",
 };
