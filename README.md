@@ -84,6 +84,7 @@ These are built, tested against recorded vendor responses or mocks built from ea
 | Plaid | Imports up to two years of bank and card transactions from a bank linked through Plaid | Finance, Compliance |
 | Authorize.net | Imports five years of settlement batches and the card and eCheck transactions in them, then keeps them current | Sales, Finance |
 | Affirm | Imports five years of Affirm financed orders, refunds, disputes and daily settlements, then keeps them current | Sales, Finance |
+| PIRO | Imports five years of PIRO manufacturing jobs: status, stage, style, order number, metal, dates and weights | Manufacturing, Inventory, Wholesale |
 | EDI with retail partners (X12 850, 855, 856, 810, 846, 852) | Imports two years of purchase orders (850), inventory reports (846) and sell-through (852) from retail partners | Inventory, Sales, Wholesale |
 | Calendly | Imports two years of appointments and the year ahead, such as bridal consultations, repair drop-offs and pickups, then keeps them current | Clienteling, Custom orders, Repairs |
 | Avalara AvaTax | Imports five years of sales tax for every sale, return and purchase, then keeps it current as transactions are committed, voided or adjusted | Compliance, Finance |
@@ -131,7 +132,7 @@ This section updates itself as work lands: it is generated from [docs/milestones
 <!-- progress:start -->
 <!-- Generated from docs/milestones.json and the integration catalog by npm run progress:write. Edit those, not this block. -->
 
-**Overall: 68% complete**, 26 of 38 roadmap items done. 34 of the 253 systems in the integration catalog are connected.
+**Overall: 68% complete**, 26 of 38 roadmap items done. 35 of the 253 systems in the integration catalog are connected.
 
 | Milestone | What it gives a jeweler | Progress | Target |
 | --- | --- | --- | --- |

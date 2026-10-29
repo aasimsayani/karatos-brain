@@ -20,6 +20,7 @@ export * from "./klaviyo/index.js";
 export * from "./metals_api/index.js";
 export * from "./monday/index.js";
 export * from "./nivoda/index.js";
+export * from "./piro/index.js";
 export * from "./plaid/index.js";
 export * from "./quickbooks/index.js";
 export * from "./rapnet/index.js";
