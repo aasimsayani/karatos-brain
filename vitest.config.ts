@@ -10,8 +10,8 @@ export default defineConfig({
     coverage: {
       provider: "v8",
       include: ["packages/*/src/**/*.ts"],
-      // Process entry point: exercised by the Docker smoke test, not unit tests.
-      exclude: ["packages/server/src/main.ts", "packages/*/src/index.ts"],
+      // Process entry points: exercised by the Docker smoke test, not unit tests.
+      exclude: ["packages/server/src/main.ts", "packages/demo/src/main.ts", "packages/*/src/index.ts"],
       thresholds: { lines: 90, functions: 90, branches: 85, statements: 90 },
     },
   },
@@ -23,6 +23,7 @@ export default defineConfig({
       "@karatos/retail": src("./packages/retail/src/index.ts"),
       "@karatos/connector-testkit": src("./packages/testkit/src/index.ts"),
       "@karatos/connectors": src("./packages/connectors/src/index.ts"),
+      "@karatos/server": src("./packages/server/src/index.ts"),
     },
   },
 });
