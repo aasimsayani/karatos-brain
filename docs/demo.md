@@ -34,10 +34,10 @@ The image is `packages/demo/Dockerfile`, built from the repo root. CI builds it,
 
 ## Hosting
 
-The demo runs in its own Railway project, apart from every client's instance and from the site:
+The demo runs as two services in the website's Railway project, apart from every client's instance. They share the website's project because Railway's private network stops at the project, and the website has to reach the console over it:
 
-1. A `demo-store` service built from this repo with `packages/demo/Dockerfile`. Generate `DEMO_API_KEY` in Railway. It needs no public domain, because only the console calls it, over Railway's private network.
-2. A `demo-console` service from the private console image, in demo mode, pointed at `demo-store` and referencing the same `DEMO_API_KEY`.
-3. The site's own service gets the `demo-console` service's address, so karatos.app/demo is served from it.
+1. A `demo-store` service built from this repo with `packages/demo/Dockerfile` (`RAILWAY_DOCKERFILE_PATH=packages/demo/Dockerfile`, `PORT=8080`). Generate `DEMO_API_KEY` in Railway. It needs no public domain, because only the console calls it.
+2. A `demo-console` service from the console repo in demo mode: `CONSOLE_DEMO=true`, `BASE_PATH=/demo`, `STORE_NAME=Example Street Jewelers`, `PORT=8080`, `INSTANCE_URL=http://demo-store.railway.internal:8080` and `INSTANCE_API_KEY=${{demo-store.DEMO_API_KEY}}`. It needs no public domain either.
+3. The website service gets `DEMO_CONSOLE_URL=http://demo-console.railway.internal:8080`, so karatos.app/demo is served from the console ([docs/website.md](website.md#live-demo)).
 
 The console's demo mode and the site's /demo route are separate changes.
