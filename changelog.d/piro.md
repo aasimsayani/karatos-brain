@@ -1,0 +1,7 @@
+- PIRO connector (`@karatos/connectors`): imports five years of PIRO job and casting tree reports exported as CSV.
+  - Jobs keep their status (mapped from the shop's labels), stage, style, order number, metal, karat, dates and weights, and each change is stored once, so a daily export builds a history.
+  - Casting trees keep the metal issued, returned and lost, in grams. Weights are read in grams or pennyweight from columns named for their unit, never by guessing.
+  - Customer names are never read.
+  - PIRO's EDI documents go through the EDI X12 connector.
+  - Turn it on with `piro` in `ENABLED_INTEGRATIONS` and `PIRO_IMPORT_DIR`.
+- Shared file values: `parseWeightGrams` reads a weight in grams, pennyweight or troy ounces and rejects one labeled with another unit.
