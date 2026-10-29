@@ -218,7 +218,7 @@ export const SYSTEM_DETAILS: Readonly<Record<string, SystemDetail>> = {
   perfect_corp_tryon: { about: "Virtual try-on sessions for rings, necklaces and earrings." },
 
   // Manufacturing and ERP
-  piro: { about: "Inventory, memo, production and sales from PIRO." },
+  piro: { about: "Manufacturing jobs, and the metal each casting tree took and gave back, from PIRO." },
   adaptive_erp: { about: "Items, production, memo and sales from Adaptive's jewelry ERP." },
   acumatica_jewelshop: { about: "Inventory, production, memo and the books from JewelShop." },
   diamtrade: { about: "Diamond and jewelry inventory, memo and trading records." },
@@ -315,4 +315,5 @@ export const CONNECTED_ON: Readonly<Record<string, string>> = {
   square: "2026-10-28",
   wix: "2026-10-28",
   woocommerce: "2026-10-28",
+  piro: "2026-10-29",
 };
