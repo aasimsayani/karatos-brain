@@ -3,6 +3,7 @@ import type { DocMock, DocMockModule } from "../doc-mock.js";
 import affirm from "./affirm.js";
 import authorize_net from "./authorize_net.js";
 import bigcommerce from "./bigcommerce.js";
+import calendly from "./calendly.js";
 import clover from "./clover.js";
 import custom_forms from "./custom_forms.js";
 import gia from "./gia.js";
@@ -26,6 +27,7 @@ import xero from "./xero.js";
 export * from "./affirm.js";
 export * from "./authorize_net.js";
 export * from "./bigcommerce.js";
+export * from "./calendly.js";
 export * from "./clover.js";
 export * from "./custom_forms.js";
 export * from "./gia.js";
@@ -47,7 +49,7 @@ export * from "./woocommerce.js";
 export * from "./xero.js";
 
 /** Every mock module, one per catalog integration. */
-export const DOC_MOCK_MODULES: readonly DocMockModule[] = [affirm, authorize_net, bigcommerce, clover, custom_forms, gia, gmail, google_workspace, hubspot, idex, klaviyo, monday, nivoda, plaid, quickbooks, rapnet, slack, square, stuller, wix, woocommerce, xero];
+export const DOC_MOCK_MODULES: readonly DocMockModule[] = [affirm, authorize_net, bigcommerce, calendly, clover, custom_forms, gia, gmail, google_workspace, hubspot, idex, klaviyo, monday, nivoda, plaid, quickbooks, rapnet, slack, square, stuller, wix, woocommerce, xero];
 
 /** Every doc-derived mock, with empty data, for checks and the vendor docs watch. */
 export function allDocMocks(): DocMock[] {
