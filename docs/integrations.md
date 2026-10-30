@@ -178,7 +178,7 @@ Used by: R is retail, W is wholesale, M is manufacturing. Test with says how we 
 | Mailchimp | R | Public API | Free sandbox | Yes | Planned |
 | Google Analytics 4 | R, W | Public API | Free sandbox | No | Planned |
 | Google Ads | R | Public API | Free sandbox | No | Planned (Test accounts for development; production needs an approved developer token) |
-| Meta Ads | R | Public API | Free sandbox | No | Planned |
+| Meta Ads | R | Public API | Free sandbox | No | Built (Connects with a system user token holding ads_read only, and stops if the token holds anything more. Its only API requests are the permissions check and the insights read for the one ad account in the settings, built from one fixed report) |
 | Google Business Profile | R | Partner | Partner | No | Planned (Reviews and local listings; Google approves API access on request) |
 | Google Merchant Center | R | Public API | Free sandbox | No | Planned (Product listings, disapprovals and free listing clicks through the Merchant API, which replaced the Content API for Shopping in 2026) |
 | Microsoft 365 Outlook mail and calendar | R, W, M | Public API | Paid account | Yes | Planned (Customer and vendor email and appointments for stores on Microsoft 365, read-only. Microsoft's free developer tenant now goes only to Visual Studio subscribers) |
@@ -402,6 +402,7 @@ A request for a path or method the docs don't list throws `UndocumentedRequestEr
 - HubSpot's CRM search, archived list, batch association and token info endpoints (date version 2026-09)
 - IDEX's Onsite feeds: the natural full feed and the lab-grown full file
 - Klaviyo's mock covers its profile, list, segment, campaign, flow and metric reads and the campaign and flow values reports (revision 2026-10-15). Plaid's accounts, transactions sync, Item and webhook verification key endpoints (API version 2020-09-14), with webhooks signed the way Plaid signs them
+- Meta's Marketing API ad account insights and `/me/permissions` (Graph API v26.0), enforcing the token, ads_read, the ad account, campaign level by day, the fields and cursors tied to their read
 - monday.com's GraphQL API: boards, items, activity logs and updates
 - Nivoda's GraphQL diamond search: sign-in, diamonds_by_query and get_diamond_by_id
 - Plaid's accounts, transactions sync, Item and webhook verification key endpoints (API version 2020-09-14), with webhooks signed the way Plaid signs them
@@ -414,7 +415,7 @@ A request for a path or method the docs don't list throws `UndocumentedRequestEr
 - A WooCommerce store's REST API v3 read endpoints with its key permissions and page headers
 - Xero's Accounting API endpoints with its token refresh
 
-Where a vendor has a free sandbox (Affirm, Authorize.net, Avalara AvaTax, BigCommerce, Calendly, Clover, Custom forms, GIA Report Results, Gmail, Google Workspace and Drive, HubSpot, Klaviyo, Monday.com, Plaid, QuickBooks Online, Slack, Square, Wix, WooCommerce and Xero so far), its mock is a stand-in until a developer account is set up for the nightly run.
+Where a vendor has a free sandbox (Affirm, Authorize.net, Avalara AvaTax, BigCommerce, Calendly, Clover, Custom forms, GIA Report Results, Gmail, Google Workspace and Drive, HubSpot, Klaviyo, Meta Ads, Monday.com, Plaid, QuickBooks Online, Slack, Square, Wix, WooCommerce and Xero so far), its mock is a stand-in until a developer account is set up for the nightly run.
 
 <!-- registry:mocks:end -->
 
@@ -1029,6 +1030,27 @@ Reads Klaviyo's JSON:API (`https://a.klaviyo.com/api/...`) with a private API ke
 **Webhooks.** Only Advanced KDP customers and Klaviyo app partners can create system webhooks, so most accounts rely on the scheduled sync. `verifyKlaviyoWebhook` checks `Klaviyo-Signature`, the hex HMAC-SHA256 keyed with the webhook's secret over the raw body followed directly by the `Klaviyo-Timestamp` header, in constant time. It rejects a timestamp more than five minutes off, so a captured delivery can't be replayed later, and a body whose `meta.klaviyo_webhook_id` doesn't match `Klaviyo-Webhook-Id`, as Klaviyo advises. `KlaviyoReplayGuard` handles each event's `external_id` once, and the event keys make a redelivery a duplicate. Email and SMS consent topics become `marketing.consent_changed`; other topics are per-person activity and are dropped. The instance doesn't take webhooks yet.
 
 **Testing.** Until a Klaviyo account is set up for the nightly run, the tests run against a mock built from Klaviyo's API reference (`packages/testkit/src/mocks/klaviyo.ts`). It answers 401 without the key and 400 without a revision, applies sparse fieldsets, binds each cursor to its query, and checks report bodies the way the reference describes. Its assumptions are listed in the mock and checked on the first sandbox run. For the nightly run, create a free Klaviyo account for testing only, add a few synthetic profiles, a list, a campaign and a flow, make a private key with the read scopes above, and add it as the `SANDBOX_KLAVIYO_PRIVATE_API_KEY` GitHub Actions secret. The writes it may do later (add profiles to lists, trigger flows) are declared, and the write-gate test shows each one is stopped.
+
+### Meta Ads
+
+Reads one ad account's Facebook and Instagram campaign insights by day through Meta's Marketing API (Graph API v26.0). Read-only three ways over: the token holds `ads_read` and nothing else, which the client checks against `/me/permissions` before its first read; its only other request is the insights read for the ad account in the settings, with parameters built from one fixed report; and it never follows a link Meta returns, rebuilding each next page from the cursor instead.
+
+| Setting | What it is |
+| --- | --- |
+| `META_ADS_ACCESS_TOKEN` | A system user token from the store's Meta Business account, with `ads_read` only and the ad account assigned |
+| `META_ADS_ACCOUNT_ID` | The ad account's numeric id, with or without `act_` |
+
+**What it reads.** One report at campaign level, a 31-day window at a time, by day, 500 rows a page: for each campaign, its objective and the account's currency, and the spend, impressions, reach, clicks, purchases and purchase value. The historical import reads two years up to today. Each incremental sync reads again from two weeks before the last day the previous pass read, since Meta keeps attributing purchases to past views and clicks.
+
+**Privacy.** Insights are totals by campaign and day, so nothing names a person. Campaign names are cut short, and one holding an @ is dropped.
+
+**Rate limits.** Meta throttles by app, user and ad account, answering Graph error codes 4, 17, 32, 613, 80000 or 80004 (or HTTP 429). The client sends one request at a time and waits, doubling from a second, three tries, before the error goes to the sync runner, which resumes from its checkpoint next time. Error 190 means the token expired or was revoked; 200 or 10 means the ad account isn't assigned to the system user.
+
+**Writes.** Pausing a campaign and changing its daily budget are declared, so they can be gated and audited, and both are turned off. Each needs a named person's approval and is capped at five a day. Turning them on would also need a token with `ads_management`, which the connector stops on today.
+
+**Events.** `ads.campaign_reported`, the same event Google Ads gives, one per campaign and day, with money in cents and purchases counted from Meta's `purchase` action. Each is keyed by its day, its campaign and a digest of its numbers, so a revised row is stored as a new version and an unchanged one is a duplicate.
+
+**Testing.** The tests run against a mock built from Meta's docs (`packages/testkit/src/mocks/meta_ads.ts`), which checks the token, `ads_read`, the ad account, campaign level by day, the fields, the time range and that a cursor belongs to its read. For the nightly run, create a sandbox ad account from a Meta developer app (Marketing API > Tools), make a system user token for it with `ads_read` only, and add `SANDBOX_META_ADS_ACCESS_TOKEN` and `SANDBOX_META_ADS_ACCOUNT_ID` as GitHub Actions secrets.
 
 ### Metals-API
 
