@@ -174,7 +174,7 @@ export function googleAdsDocMock(data: GoogleAdsMockData): GoogleAdsMock {
   function denied(request: { headers: Headers }, customer: string): DocMockResponse | null {
     if (!access.has(request.headers.get("authorization")?.replace(/^Bearer /, "") ?? "")) return adsError(401, "UNAUTHENTICATED", "Request is missing required authentication credential.");
     if (request.headers.get("developer-token") !== data.developerToken) return adsError(401, "UNAUTHENTICATED", "The developer token is not valid.", { authenticationError: "DEVELOPER_TOKEN_INVALID" });
-    if (!scopes().includes(GOOGLE_ADS_MOCK_SCOPE)) return adsError(403, "PERMISSION_DENIED", "Request had insufficient authentication scopes.");
+    if (!scopes().some((s) => s === GOOGLE_ADS_MOCK_SCOPE)) return adsError(403, "PERMISSION_DENIED", "Request had insufficient authentication scopes.");
     const login = request.headers.get("login-customer-id");
     if (login !== null && !/^\d{10}$/.test(login)) return adsError(400, "INVALID_ARGUMENT", "Invalid login-customer-id header.", { requestError: "INVALID_LOGIN_CUSTOMER_ID" });
     if (customer !== data.customerId || (data.managerId ? login !== data.managerId : login !== null && login !== data.customerId)) {

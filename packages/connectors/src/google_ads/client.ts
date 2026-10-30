@@ -154,7 +154,8 @@ export function googleAdsScopeProblem(scope: unknown): string | null {
   const known = [ADWORDS_SCOPE, ...GOOGLE_IDENTITY_SCOPES] as readonly string[];
   const extra = scopes.filter((s) => !known.includes(s));
   if (extra.length) return `the Google Ads connection holds more than the Google Ads scope (${extra.slice(0, 5).join(", ")})`;
-  if (!scopes.includes(ADWORDS_SCOPE)) return `the Google Ads connection doesn't hold ${ADWORDS_SCOPE}`;
+  // Compared whole, scope by scope: a scope is a name, not a URL to match inside.
+  if (!scopes.some((s) => s === ADWORDS_SCOPE)) return `the Google Ads connection doesn't hold ${ADWORDS_SCOPE}`;
   return null;
 }
 
