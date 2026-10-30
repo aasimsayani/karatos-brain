@@ -1,7 +1,7 @@
 import { z } from "zod";
 import type { Signal } from "@karatos/core";
 import type { DepartmentModule } from "../department.js";
-import { calendarDaysSince, daysBetween, dollars, extractor, latestBySubject, recommend, signalFrom, value } from "../department.js";
+import { ASSUMPTIONS, calendarDaysSince, daysBetween, dollars, estimate, extractor, latestBySubject, pct, recommend, signalFrom, value } from "../department.js";
 
 const MemoReceived = z.object({
   memoId: z.string().min(1),
@@ -120,6 +120,10 @@ export const buying: DepartmentModule = {
               summary: `Memo ${m.memoId} (${m.sku}) from ${m.vendorId} ${when}. ${action}`,
               confidence: 0.9,
               expectedImpact: "Keeps vendor terms and avoids paying for goods by default",
+              // A piece that sold is owed either way; one that hasn't would be bought by default.
+              impact: sold.has(m.sku)
+                ? undefined
+                : estimate("protects", `The ${dollars(m.costCents)} cost of a piece that hasn't sold, owed if the memo runs past its due date.`, () => m.costCents),
               basedOn: [s],
               now,
             }),
@@ -166,6 +170,8 @@ export const buying: DepartmentModule = {
             const { brand, reference } = offers[0]!;
             const asks = lowestAsks(offers);
             const market = asks ? ` Dealers in the same groups are asking from ${asks}.` : "";
+            const usdAsks = offers.filter((o) => o.side === "selling" && o.currency === "USD" && o.priceMinor).map((o) => o.priceMinor!);
+            const lowest = usdAsks.length ? Math.min(...usdAsks) : undefined;
             return [
               recommend({
                 department: "buying",
@@ -174,6 +180,14 @@ export const buying: DepartmentModule = {
                 summary: `${dealers.size} dealers in your WhatsApp groups have asked for the ${brand} ${reference} in the last ${WATCH_MARKET_DAYS} days.${market} If you have one, or can source one, offer it to them.`,
                 confidence: 0.7,
                 expectedImpact: "Sells to dealers already looking, at today's trade price",
+                impact:
+                  lowest === undefined
+                    ? undefined
+                    : estimate(
+                        "makes",
+                        `A ${pct(ASSUMPTIONS.tradeMargin.likely)} dealer margin on one sale at the lowest US dollar ask of ${dollars(lowest)}.`,
+                        (a) => lowest * a("tradeMargin"),
+                      ),
                 basedOn: offerSignals,
                 now,
               }),

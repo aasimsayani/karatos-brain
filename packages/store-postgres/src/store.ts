@@ -63,6 +63,7 @@ interface RecommendationRow {
   summary: string;
   confidence: string | number;
   expected_impact: string;
+  impact: Recommendation["impact"] | null;
   provenance: Recommendation["provenance"];
   degraded: boolean;
   created_at: Date | string;
@@ -283,10 +284,20 @@ export class PostgresMemoryStore implements MemoryStore, RawDataRetention {
   async saveRecommendations(recommendations: Recommendation[]): Promise<void> {
     for (const r of recommendations) {
       await this.db.query(
-        `insert into recommendations (id, organization_id, summary, confidence, expected_impact, provenance, degraded, created_at)
-         values ($1, $2, $3, $4, $5, $6, $7, $8)
+        `insert into recommendations (id, organization_id, summary, confidence, expected_impact, impact, provenance, degraded, created_at)
+         values ($1, $2, $3, $4, $5, $6, $7, $8, $9)
          on conflict (id) do nothing`,
-        [r.id, r.organizationId, r.summary, r.confidence, r.expectedImpact, JSON.stringify(r.provenance), r.degraded, r.createdAt],
+        [
+          r.id,
+          r.organizationId,
+          r.summary,
+          r.confidence,
+          r.expectedImpact,
+          r.impact ? JSON.stringify(r.impact) : null,
+          JSON.stringify(r.provenance),
+          r.degraded,
+          r.createdAt,
+        ],
       );
     }
   }
@@ -364,6 +375,7 @@ function toRecommendation(row: RecommendationRow): Recommendation {
     summary: row.summary,
     confidence: Number(row.confidence),
     expectedImpact: row.expected_impact,
+    ...(row.impact ? { impact: row.impact } : {}),
     provenance: row.provenance,
     degraded: row.degraded,
     createdAt: iso(row.created_at),

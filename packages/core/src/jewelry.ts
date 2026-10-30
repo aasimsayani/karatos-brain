@@ -1,6 +1,6 @@
 import type { Metal } from "./entities.js";
 
-const TROY_OUNCE_GRAMS = 31.1034768;
+export const TROY_OUNCE_GRAMS = 31.1034768;
 
 /** Fineness of common precious-metal alloys, as a fraction of pure metal. */
 export function purity(metal: Metal, karat?: number): number {

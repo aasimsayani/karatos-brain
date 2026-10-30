@@ -1,6 +1,6 @@
 import { z } from "zod";
 import type { DepartmentModule } from "../department.js";
-import { entityFrom, extractor, recommend, signalFrom, value } from "../department.js";
+import { ASSUMPTIONS, dollars, entityFrom, estimate, extractor, recommend, signalFrom, value } from "../department.js";
 
 export const PAYMENT_METHODS = ["card", "cash", "check", "financing", "trade_in", "gift_card", "wire", "other"] as const;
 
@@ -113,6 +113,11 @@ export const sales: DepartmentModule = {
               summary: `${sku} has been returned ${r.returned} of ${r.sold} times (${Math.round((r.returned / r.sold) * 100)}%). Check its photos, description, sizing and build quality before restocking.`,
               confidence: Math.min(0.95, 0.5 + r.sold / 40),
               expectedImpact: "Fewer refunds and restocking costs",
+              impact: estimate(
+                "saves",
+                `Handling ${r.returned} ${r.returned === 1 ? "return" : "returns"} again over the next ${r.sold} sold, at ${dollars(ASSUMPTIONS.returnCostCents.likely)} each for shipping, repacking, card fees and staff time, if the cause is fixed.`,
+                (a) => r.returned * a("returnCostCents"),
+              ),
               basedOn: r.basedOn,
               now,
             }),

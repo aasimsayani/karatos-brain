@@ -1,0 +1,3 @@
+- Recommendations carry a dollar `impact`: whether acting makes money, saves money or protects money already owed, with a likely amount, a low to high range and how it was worked out.
+- 18 retail rules put a number on their recommendations, from the store's own data and shared planning figures that match the website's payback estimate. Rules with no honest number, such as compliance reminders, carry none.
+- The pipeline drops an impact whose amounts don't add up and keeps the recommendation. Postgres stores it in a new `recommendations.impact` column.

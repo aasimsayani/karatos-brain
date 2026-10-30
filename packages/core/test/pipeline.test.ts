@@ -3,8 +3,10 @@ import { z } from "zod";
 import {
   BrainPipeline,
   DeadLetteredError,
+  impactProblem,
   InMemoryStore,
   type EventEnvelope,
+  type Impact,
   type Normalizer,
   type Reasoner,
   type SignalExtractor,
@@ -191,5 +193,58 @@ describe("BrainPipeline", () => {
     await pipeline.ingest(orderEvent());
     const recs = await pipeline.reason(ORG);
     expect(recs[0]?.degraded).toBe(true);
+  });
+
+  it("keeps a sound dollar impact and drops one that doesn't add up, keeping the recommendation", async () => {
+    const good: Impact = { kind: "makes", lowCents: 100, cents: 200, highCents: 300, basis: "Profit on one sale" };
+    const impacts: (Impact | undefined)[] = [good, { ...good, cents: 400 }, undefined];
+    const memory = new InMemoryStore();
+    const pipeline = new BrainPipeline({
+      memory,
+      normalizers: [],
+      extractors: [],
+      reasoners: [
+        {
+          name: "dollars",
+          reason: ({ organizationId }) =>
+            impacts.map((impact, i) => ({
+              id: `rec_${i}`,
+              organizationId,
+              summary: `Recommendation ${i}`,
+              confidence: 0.5,
+              expectedImpact: "",
+              ...(impact ? { impact } : {}),
+              provenance: { eventIds: [], signalIds: [], documentIds: [] },
+              degraded: false,
+              createdAt: "2026-10-01T12:00:00Z",
+            })),
+        },
+      ],
+      documentation: { current: () => ({ documentIds: [], stale: false }) },
+    });
+    const recs = await pipeline.reason(ORG);
+    expect(recs.map((r) => r.impact)).toEqual([good, undefined, undefined]);
+    expect(recs.map((r) => "impact" in r)).toEqual([true, false, false]);
+    expect(memory.recommendations.map((r) => r.impact)).toEqual([good, undefined, undefined]);
+  });
+});
+
+describe("impactProblem", () => {
+  const good: Impact = { kind: "saves", lowCents: 0, cents: 0, highCents: 100, basis: "A cost cut" };
+
+  it("accepts sound impacts of every kind, including equal and zero amounts", () => {
+    for (const kind of ["makes", "saves", "protects"] as const) expect(impactProblem({ ...good, kind })).toBeNull();
+    expect(impactProblem({ ...good, lowCents: 100, cents: 100 })).toBeNull();
+  });
+
+  it("names what's wrong with one that isn't", () => {
+    expect(impactProblem({ ...good, kind: "earns" as Impact["kind"] })).toBe("unknown impact kind earns");
+    for (const bad of [{ cents: -1, lowCents: -1 }, { highCents: 100.5 }, { lowCents: Number.NaN }, { highCents: Number.MAX_SAFE_INTEGER + 1 }]) {
+      expect(impactProblem({ ...good, ...bad })).toBe("impact amounts must be whole cents, zero or more");
+    }
+    expect(impactProblem({ ...good, lowCents: 50, cents: 40 })).toBe("impact amounts must run low, likely, high");
+    expect(impactProblem({ ...good, cents: 101 })).toBe("impact amounts must run low, likely, high");
+    expect(impactProblem({ ...good, basis: "  " })).toBe("an impact needs a basis");
+    expect(impactProblem({ ...good, basis: undefined as unknown as string })).toBe("an impact needs a basis");
   });
 });
