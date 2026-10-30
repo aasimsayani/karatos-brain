@@ -1,0 +1,2 @@
+- The value ledger: record what acting on a recommendation brought back (`POST /v1/recommendations/:id/result`), and read a period's report of what was shown, approved, dismissed, returned and still to come, in cents by kind (`GET /v1/value`).
+- A result keeps the kind of its recommendation's estimate. A result measured again replaces the earlier one in the report; every recording is kept in a new `value_results` table under row-level security.
