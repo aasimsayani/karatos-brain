@@ -12,6 +12,7 @@ export * from "./edi_x12/index.js";
 export * from "./files/index.js";
 export * from "./gia/index.js";
 export * from "./gmail/index.js";
+export * from "./google_ads/index.js";
 export * from "./google_workspace/index.js";
 export * from "./hubspot/index.js";
 export * from "./idex/index.js";

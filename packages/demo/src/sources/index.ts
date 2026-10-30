@@ -43,6 +43,7 @@ export const DEMO_NOT_YET: Readonly<Record<string, string>> = {
   stripe: NEXT,
   refiner_statements: NEXT,
   piro: NEXT,
+  google_ads: NEXT,
   affirm: NOT_READ_YET,
   authorize_net: NOT_READ_YET,
   avalara: NOT_READ_YET,
