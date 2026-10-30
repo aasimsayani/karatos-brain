@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { contentSecurityPolicy } from "../server.js";
 import { INTEGRATIONS, selfServeIntegrations } from "../../packages/core/src/index.js";
 import { RETAIL_DEPARTMENTS } from "../../packages/retail/src/index.js";
+import { PAYBACK_INPUTS, PAYBACK_LINES, VALUE_LABELS, corePriceDollars, dollars, paybackDefaults, paybackLine } from "../build.js";
 import { CONTACT_ANCHOR, CORE_PRICE, DOMAIN_LABELS, DOMAIN_VALUE, FONTS, HOLIDAY_PILOT, MANAGED_PRICE, PLAYS, REPORT_URL, WRITE_RULES, buildingNow, domainLabel, renderValueCards, earlyAccessNote, escapeHtml, renderSite } from "../build.js";
 
 const html = renderSite();
@@ -163,15 +164,88 @@ describe("KaratOS website", () => {
       expect(named).toBe(play.systems.map((id) => `<li>${escapeHtml(byId.get(id)!.name)}</li>`).join(""));
       expect(card.match(/<p class="play-action">/g)).toHaveLength(1);
       expect(card).toContain(`<strong>Result:</strong> ${escapeHtml(play.action)}`);
+      expect(card).toContain(`<p class="play-value"><strong>${VALUE_LABELS[play.value.kind]}:</strong> ${escapeHtml(play.value.how)}</p>`);
     });
+    // Each kind of value appears, so the section sells both money made and money saved.
+    expect(new Set(PLAYS.map((p) => p.value.kind))).toEqual(new Set(["makes", "saves", "protects"]));
     expect(together.match(/<span class="tag">Illustrative<\/span>/g)).toHaveLength(PLAYS.length);
+  });
+
+  it("shows what it puts back: an estimate from the visitor's own numbers, set against the price", () => {
+    const payback = sectionOf("payback");
+    expect(payback).toContain("<h2>You pay us. We show you, in dollars, what we put back.</h2>");
+    expect(payback).toContain(`Core costs ${CORE_PRICE} a store a month.`);
+    expect(payback).toContain("the result is an estimate, not a promise");
+    expect(payback).toContain("That report is being built now.");
+    expect(html).toContain('<a href="#payback">Payback</a>');
+    // Every input is labeled, starts at its guess and can't go below zero.
+    for (const i of PAYBACK_INPUTS) {
+      const unit = i.unit === "%" ? " (%)" : i.unit === "$" ? " ($)" : "";
+      expect(payback).toContain(`<label>${escapeHtml(i.label)}${unit}<input type="number" inputmode="decimal" min="0" max="${i.max}" step="any" name="${i.id}" value="${i.value}" data-unit="${i.unit}"></label>`);
+    }
+    expect(new Set(PAYBACK_INPUTS.map((i) => i.id)).size).toBe(PAYBACK_INPUTS.length);
+    // Each line multiplies only real inputs, and the page prints what the code works out.
+    const start = paybackDefaults();
+    let total = 0;
+    for (const l of PAYBACK_LINES) {
+      expect(l.factors.every((f) => PAYBACK_INPUTS.some((i) => i.id === f))).toBe(true);
+      const value = paybackLine(l, start);
+      expect(value).toBeGreaterThan(0);
+      total += value;
+      expect(payback).toContain(`<li data-factors="${l.factors.join(" ")}" data-per="${l.per}"><span class="pb-kind">${VALUE_LABELS[l.kind]}</span><strong>${escapeHtml(l.title)}</strong><span class="pb-how">${escapeHtml(l.how)}</span><output>${dollars(value)}</output></li>`);
+    }
+    expect(new Set(PAYBACK_LINES.map((l) => l.kind))).toEqual(new Set(["makes", "saves"]));
+    expect(payback).toContain(`About <output id="pb-total">${dollars(total)}</output> a month, or <output id="pb-times">${(total / corePriceDollars()).toFixed(1)}</output>× what Core costs.`);
+    expect(corePriceDollars()).toBe(299);
+  });
+
+  it("works a line out the same way on the page as in the build", () => {
+    const winback = PAYBACK_LINES.find((l) => l.id === "winback")!;
+    // 10 clients × 10% × $1,500 × 45% = $675 a month.
+    expect(paybackLine(winback, paybackDefaults())).toBeCloseTo(675);
+    expect(paybackLine(PAYBACK_LINES.find((l) => l.id === "aged")!, paybackDefaults())).toBeCloseTo((50000 * 0.2 * 0.3) / 12);
+    expect(paybackLine(winback, { ...paybackDefaults(), lapsed: 0 })).toBe(0);
+    expect(() => paybackLine({ ...winback, factors: ["nope"] }, {})).toThrow("nope, which is not an input");
+    expect(dollars(1234.5)).toBe("$1,235");
+
+    // Run the page's own script against a small stand-in for the form, with new numbers typed in.
+    const script = html.slice(html.indexOf("<script>") + 8, html.indexOf("</script>"));
+    const from = script.lastIndexOf("(function(){", script.indexOf("getElementById('payback-form')"));
+    const block = script.slice(from, script.indexOf("(function(){\n  var form=document.getElementById('inquiry')"));
+    const typed: Record<string, number> = { ...paybackDefaults(), lapsed: 40, margin: 50, goldLag: -5, agedStock: 80000 };
+    const elements = PAYBACK_INPUTS.map((i) => ({ name: i.id, value: String(typed[i.id]), dataset: { unit: i.unit } }));
+    const outputs = new Map<string, { textContent: string }>();
+    const lines = PAYBACK_LINES.map((l) => {
+      const out = { textContent: "" };
+      outputs.set(l.id, out);
+      return { dataset: { factors: l.factors.join(" "), per: String(l.per) }, querySelector: () => out };
+    });
+    const total = { textContent: "" };
+    const times = { textContent: "" };
+    let onInput: (() => void) | undefined;
+    const form = { elements, addEventListener: (type: string, fn: () => void) => void (type === "input" && (onInput = fn)) };
+    const document = {
+      getElementById: (id: string) => ({ "payback-form": form, "pb-total": total, "pb-times": times })[id],
+      querySelectorAll: () => lines,
+    };
+    new Function("document", block)(document);
+    onInput!();
+    const expected = { ...typed, goldLag: 0 };
+    let sum = 0;
+    for (const l of PAYBACK_LINES) {
+      const value = paybackLine(l, expected);
+      sum += value;
+      expect(outputs.get(l.id)!.textContent, l.id).toBe(dollars(value));
+    }
+    expect(total.textContent).toBe(dollars(sum));
+    expect(times.textContent).toBe((sum / 299).toFixed(1));
   });
 
   it("names only systems that are in the integrations catalog", () => {
     const ids = new Set(INTEGRATIONS.map((i) => i.id));
     expect(PLAYS.flatMap((p) => p.systems).filter((id) => !ids.has(id))).toEqual([]);
     // The build stops rather than publish a play naming a system we don't have.
-    expect(() => renderSite([{ title: "Made up", systems: ["shopify", "not_a_system", "stripe"], action: "Nothing." }])).toThrow(/not_a_system/);
+    expect(() => renderSite([{ title: "Made up", systems: ["shopify", "not_a_system", "stripe"], action: "Nothing.", value: { kind: "makes", how: "nothing." } }])).toThrow(/not_a_system/);
   });
 
   it("explains careful write-back in plain language, with every safeguard named", () => {
