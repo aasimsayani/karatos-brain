@@ -324,3 +324,92 @@ describe("Brain API: integrations", () => {
     expect(await (await call("/v1/integrations")).json()).toEqual({ integrations: [] });
   });
 });
+
+describe("value ledger API", () => {
+  const priced: Reasoner = {
+    name: "priced",
+    reason: async (context) => {
+      const [base] = await echoReasoner.reason(context);
+      return [
+        { ...base!, id: "rec_priced", impact: { kind: "saves", lowCents: 100, cents: 200, highCents: 300, basis: "test" } },
+        { ...base!, id: "rec_plain" },
+      ];
+    },
+  };
+  const post = (call: Awaited<ReturnType<typeof start>>["call"], id: string, body: unknown) =>
+    call(`/v1/recommendations/${id}/result`, { method: "POST", body: JSON.stringify(body) });
+
+  it("records what a recommendation brought back, taking its kind from the estimate", async () => {
+    const { call, memory } = await start(undefined, undefined, priced);
+    await call("/v1/reason", { method: "POST" });
+    const res = await post(call, "rec_priced", { cents: 450, actor: "owner", note: "Sold the chain" });
+    expect(res.status).toBe(201);
+    expect(memory.valueResults).toEqual([
+      { recommendationId: "rec_priced", organizationId: ORG, kind: "saves", cents: 450, source: "reported", actor: "owner", note: "Sold the chain", recordedAt: expect.any(String) },
+    ]);
+    expect(Date.parse(memory.valueResults[0]!.recordedAt)).not.toBeNaN();
+    expect((await post(call, "rec_priced", { cents: 0, actor: "owner", kind: "saves" })).status).toBe(201);
+    expect(memory.valueResults[1]).not.toHaveProperty("note");
+  });
+
+  it("needs a kind when there is no estimate, and the estimate's kind when there is", async () => {
+    const { call, memory } = await start(undefined, undefined, priced);
+    await call("/v1/reason", { method: "POST" });
+    const none = await post(call, "rec_plain", { cents: 100, actor: "owner" });
+    expect(none.status).toBe(400);
+    expect(((await none.json()) as { error: string }).error).toContain("say whether the result made, saved or protected money");
+    expect((await post(call, "rec_plain", { cents: 100, actor: "owner", kind: "protects" })).status).toBe(201);
+    const mismatch = await post(call, "rec_priced", { cents: 100, actor: "owner", kind: "makes" });
+    expect(mismatch.status).toBe(400);
+    expect(((await mismatch.json()) as { error: string }).error).toBe("this recommendation's estimate saves money, so its result must too");
+    expect(memory.valueResults.map((r) => r.kind)).toEqual(["protects"]);
+  });
+
+  it("turns down a result that isn't whole cents or has no actor, and 404s unknown recommendations", async () => {
+    const { call, memory } = await start(undefined, undefined, priced);
+    await call("/v1/reason", { method: "POST" });
+    for (const body of [{ cents: -1, actor: "o" }, { cents: 1.5, actor: "o" }, { cents: "5", actor: "o" }, { cents: 2 ** 53, actor: "o" }, { cents: 1 }, { cents: 1, actor: "  " }, { cents: 1, actor: "o", kind: "earns" }, { cents: 1, actor: "o", note: "n".repeat(2001) }]) {
+      const res = await post(call, "rec_priced", body);
+      expect(res.status, JSON.stringify(body).slice(0, 60)).toBe(400);
+      expect(((await res.json()) as { error: string }).error).toBe("invalid result");
+    }
+    expect((await post(call, "nope", { cents: 1, actor: "o" })).status).toBe(404);
+    expect((await call("/v1/recommendations/rec_priced/result", { method: "POST", body: JSON.stringify({ cents: 1, actor: "o" }), auth: false })).status).toBe(401);
+    expect(memory.valueResults).toEqual([]);
+  });
+
+  it("reports a period's ledger, defaulting to this month", async () => {
+    const { call, memory } = await start(undefined, undefined, priced);
+    await call("/v1/reason", { method: "POST" });
+    await call("/v1/recommendations/rec_priced/feedback", { method: "POST", body: JSON.stringify({ outcome: "accepted", actor: "owner" }) });
+    await post(call, "rec_priced", { cents: 450, actor: "owner" });
+    const res = await call("/v1/value?from=2026-10-01&to=2026-11-01");
+    expect(res.status).toBe(200);
+    const { report } = (await res.json()) as { report: { from: string; to: string; shown: { count: number }; approved: { count: number }; returned: { cents: { saves: number } } } };
+    expect(report).toMatchObject({ from: "2026-10-01T00:00:00.000Z", to: "2026-11-01T00:00:00.000Z", shown: { count: 2 }, approved: { count: 1 }, returned: { cents: { saves: 450 } } });
+    // The echo reasoner dates its recommendations 2026-10-01, so a later month is empty.
+    memory.recommendations.forEach((r) => (r.createdAt = new Date().toISOString()));
+    const now = (await (await call("/v1/value")).json()) as { report: { from: string; shown: { count: number } } };
+    expect(now.report.shown.count).toBe(2);
+    expect(now.report.from).toBe(`${new Date().toISOString().slice(0, 7)}-01T00:00:00.000Z`);
+  });
+
+  it("explains a period it can't report on", async () => {
+    const { call } = await start();
+    for (const [query, error] of [
+      ["from=2026-10-01", "from and to must both be days, such as 2026-10-01 and 2026-11-01"],
+      ["to=2026-11-01", "from and to must both be days, such as 2026-10-01 and 2026-11-01"],
+      ["from=2026-02-30&to=2026-03-01", "from and to must both be days, such as 2026-10-01 and 2026-11-01"],
+      ["from=2026-10-01T00:00&to=2026-11-01", "from and to must both be days, such as 2026-10-01 and 2026-11-01"],
+      ["from=2026-11-01&to=2026-11-01", "from must be before to; to is the day after the period"],
+      ["from=2026-11-01&to=2026-10-01", "from must be before to; to is the day after the period"],
+      ["from=2025-01-01&to=2026-01-03", "a report covers at most 366 days"],
+    ] as const) {
+      const res = await call(`/v1/value?${query}`);
+      expect(res.status, query).toBe(400);
+      expect(((await res.json()) as { error: string }).error).toBe(error);
+    }
+    expect((await call("/v1/value?from=2024-01-01&to=2025-01-01")).status).toBe(200);
+    expect((await call("/v1/value", { auth: false })).status).toBe(401);
+  });
+});

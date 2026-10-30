@@ -1,7 +1,7 @@
 import { timingSafeEqual } from "node:crypto";
 import type { IncomingMessage, RequestListener, ServerResponse } from "node:http";
 import { z } from "zod";
-import { DeadLetteredError, type BrainPipeline, type IntegrationStatus, type MemoryStore } from "@karatos/core";
+import { DeadLetteredError, monthOf, readValueReport, type BrainPipeline, type IntegrationStatus, type MemoryStore } from "@karatos/core";
 
 export interface BrainAppOptions {
   pipeline: BrainPipeline;
@@ -87,6 +87,24 @@ const FeedbackBody = z.object({
   note: z.string().max(2000).optional(),
 });
 
+const ResultBody = z.object({
+  /** What came back, in whole cents. Zero records that it was done and brought nothing back. */
+  cents: z.number().int().nonnegative(),
+  /** Needed only when the recommendation carries no impact to take it from. */
+  kind: z.enum(["makes", "saves", "protects"]).optional(),
+  actor: z.string().trim().min(1),
+  note: z.string().max(2000).optional(),
+});
+
+/** The longest period one value report covers. */
+const MAX_REPORT_DAYS = 366;
+
+/** A YYYY-MM-DD day as the instant it starts, in UTC, or NaN when it isn't a real day: it must read back as itself. */
+function dayStart(value: string): number {
+  const ms = Date.parse(`${value}T00:00:00Z`);
+  return !Number.isNaN(ms) && new Date(ms).toISOString().slice(0, 10) === value ? ms : Number.NaN;
+}
+
 /** Signal kinds are lowercase dotted names, such as bank.balance or receivable.invoice. */
 /**
  * A path segment as the id it encodes. Clients encode ids (recommendation
@@ -170,6 +188,51 @@ export function createBrainApp(options: BrainAppOptions): RequestListener {
           recordedAt: new Date().toISOString(),
         });
         return [201, { recorded: true }];
+      },
+    ],
+    [
+      "POST",
+      /^\/v1\/recommendations\/([^/]+)\/result$/,
+      async (req, [id]) => {
+        const recommendation = await options.memory.getRecommendation(options.organizationId, idFrom(id!));
+        if (!recommendation) throw new HttpError(404, "recommendation not found");
+        const parsed = ResultBody.safeParse(await readJson(req, limit));
+        if (!parsed.success) {
+          throw new HttpError(400, "invalid result", parsed.error.issues.map((i) => ({ path: i.path.join("."), message: i.message })));
+        }
+        const kind = parsed.data.kind ?? recommendation.impact?.kind;
+        if (!kind) throw new HttpError(400, "this recommendation has no dollar estimate, so say whether the result made, saved or protected money");
+        if (recommendation.impact && kind !== recommendation.impact.kind) {
+          throw new HttpError(400, `this recommendation's estimate ${recommendation.impact.kind} money, so its result must too`);
+        }
+        await options.memory.recordValueResult({
+          recommendationId: recommendation.id,
+          organizationId: options.organizationId,
+          kind,
+          cents: parsed.data.cents,
+          source: "reported",
+          actor: parsed.data.actor,
+          ...(parsed.data.note ? { note: parsed.data.note } : {}),
+          recordedAt: new Date().toISOString(),
+        });
+        return [201, { recorded: true }];
+      },
+    ],
+    [
+      "GET",
+      /^\/v1\/value$/,
+      async (_req, _params, url) => {
+        const fromDay = url.searchParams.get("from");
+        const toDay = url.searchParams.get("to");
+        // With no period, the month so far.
+        if (fromDay === null && toDay === null) return [200, { report: await readValueReport(options.memory, options.organizationId, monthOf(new Date().toISOString())) }];
+        const from = dayStart(fromDay ?? "");
+        const to = dayStart(toDay ?? "");
+        if (Number.isNaN(from) || Number.isNaN(to)) throw new HttpError(400, "from and to must both be days, such as 2026-10-01 and 2026-11-01");
+        if (from >= to) throw new HttpError(400, "from must be before to; to is the day after the period");
+        if (to - from > MAX_REPORT_DAYS * 86_400_000) throw new HttpError(400, `a report covers at most ${MAX_REPORT_DAYS} days`);
+        const period = { from: new Date(from).toISOString(), to: new Date(to).toISOString() };
+        return [200, { report: await readValueReport(options.memory, options.organizationId, period) }];
       },
     ],
     [
