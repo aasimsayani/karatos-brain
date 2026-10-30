@@ -176,7 +176,7 @@ Used by: R is retail, W is wholesale, M is manufacturing. Test with says how we 
 | Calendly | R | Public API | Free sandbox | No | Built (Read-only: a personal access token with only the users:read and scheduled_events:read scopes, and the client sends only its three listed reads. No webhooks, since subscribing needs a paid plan and the webhooks:write scope; the sync polls instead) |
 | Acuity Scheduling | R | Public API | Paid account | Yes | Planned |
 | Mailchimp | R | Public API | Free sandbox | Yes | Planned |
-| Google Analytics 4 | R, W | Public API | Free sandbox | No | Planned |
+| Google Analytics 4 | R, W | Public API | Free sandbox | No | Built (Connects with analytics.readonly only and stops if the token holds anything more. Its only API request is runReport for the one property in the settings, built from two fixed reports) |
 | Google Ads | R | Public API | Free sandbox | No | Planned (Test accounts for development; production needs an approved developer token) |
 | Meta Ads | R | Public API | Free sandbox | No | Planned |
 | Google Business Profile | R | Partner | Partner | No | Planned (Reviews and local listings; Google approves API access on request) |
@@ -398,6 +398,7 @@ A request for a path or method the docs don't list throws `UndocumentedRequestEr
 - Typeform's Create API (a form's definition) and Responses API
 - GIA's Report Results API: getReport and getChangedReports
 - Gmail's message, label and history reads with Google's token refresh (API v1)
+- The Google Analytics Data API's `runReport` (v1beta) with Google's token refresh, enforcing analytics scopes, date ranges and the rule that item-scoped fields can't be mixed with session ones
 - Google Drive (files and changes, v3), Sheets (`values:batchGet`, v4) and Calendar (`events.list` with sync tokens, v3) with Google's token refresh, enforcing each API's documented scopes so `drive.metadata.readonly` can't read Sheets values
 - HubSpot's CRM search, archived list, batch association and token info endpoints (date version 2026-09)
 - IDEX's Onsite feeds: the natural full feed and the lab-grown full file
@@ -414,7 +415,7 @@ A request for a path or method the docs don't list throws `UndocumentedRequestEr
 - A WooCommerce store's REST API v3 read endpoints with its key permissions and page headers
 - Xero's Accounting API endpoints with its token refresh
 
-Where a vendor has a free sandbox (Affirm, Authorize.net, Avalara AvaTax, BigCommerce, Calendly, Clover, Custom forms, GIA Report Results, Gmail, Google Workspace and Drive, HubSpot, Klaviyo, Monday.com, Plaid, QuickBooks Online, Slack, Square, Wix, WooCommerce and Xero so far), its mock is a stand-in until a developer account is set up for the nightly run.
+Where a vendor has a free sandbox (Affirm, Authorize.net, Avalara AvaTax, BigCommerce, Calendly, Clover, Custom forms, GIA Report Results, Gmail, Google Analytics 4, Google Workspace and Drive, HubSpot, Klaviyo, Monday.com, Plaid, QuickBooks Online, Slack, Square, Wix, WooCommerce and Xero so far), its mock is a stand-in until a developer account is set up for the nightly run.
 
 <!-- registry:mocks:end -->
 
@@ -875,6 +876,31 @@ Reads one mailbox's message metadata, threads and labels through the Gmail API, 
 **Push.** Gmail can push changes through Cloud Pub/Sub (`users.watch`), which needs a Pub/Sub topic in the owner's Google Cloud project, publish rights for `gmail-api-push@system.gserviceaccount.com` and a renewal at least every seven days. It isn't built; the scheduled sync reads the same history.
 
 **Testing.** Until a test account is set up, the tests run against a mock built from Google's docs (`packages/testkit/src/mocks/gmail.ts`), which holds the metadata scope to its documented limits (no `q`, no `full` or `raw`), answers 401 without a valid access token, pages lists and history, expires history below a floor, and answers 404 for deleted messages. Every docs fact it relies on is listed with its URL, and what the docs leave out is in its assumptions, checked on the first live run. Google has no Gmail sandbox: for the nightly run, make a Google account for testing that holds only synthetic mail, create an OAuth client in a test Cloud project with the consent screen in Testing and that account as a test user, connect it with `gmail.metadata` only, and add `SANDBOX_GMAIL_CLIENT_ID`, `SANDBOX_GMAIL_CLIENT_SECRET` and `SANDBOX_GMAIL_REFRESH_TOKEN` as GitHub Actions secrets. Tokens in Testing expire after seven days, so when the run fails with `invalid_grant`, reconnect the test account and update the secret.
+
+### Google Analytics 4
+
+Reads one GA4 property's reports through the Google Analytics Data API (v1beta). Read-only three ways over: the connection holds `analytics.readonly` and nothing else, which the client checks on every new access token; the only API request it sends is `runReport` for the property in the settings, with a body built from two fixed reports; and the Admin API is never called. Analytics has nothing to write, so no write is declared.
+
+| Setting | What it is |
+| --- | --- |
+| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | The instance's Google OAuth client, shared with Gmail and Google Workspace. Turn on the Google Analytics Data API in its Cloud project |
+| `GOOGLE_ANALYTICS_REFRESH_TOKEN` | A refresh token from a Google account with Viewer access to the property, granted `analytics.readonly` only |
+| `GOOGLE_ANALYTICS_PROPERTY_ID` | The property's numeric id from Admin > Property details (not the `G-` measurement id) |
+
+**What it reads.** Two reports, a 31-day window at a time, 10,000 rows a page, sorted on every dimension so paging is stable:
+
+- Traffic: by day, default channel group and source / medium, the sessions, total users, new users, engaged sessions, key events (GA4's conversions), ecommerce purchases and total revenue.
+- Products: by day and item, the items viewed, added to cart and purchased, and item revenue.
+
+The historical import reads two years up to today. Each incremental sync reads again from three days before the last day the previous pass read, since GA4 keeps adding late hits to recent days.
+
+**Privacy.** Reports are totals by day, so nothing names a visitor. Source, medium and item names are cut short, and one holding an @ is dropped in case a campaign tag carried an email address. When GA4 withholds small rows (thresholding), the events say so.
+
+**Rate limits.** The Data API meters each property in tokens per hour and per day. The client sends one request at a time and waits out a 429 (`Retry-After` when sent, otherwise doubling from a second, three tries) before the error goes to the sync runner, which resumes from its checkpoint next time. A 403 means the connected account can't read the property.
+
+**Events.** `analytics.traffic_reported` and `analytics.product_views_reported`, one per row, with the day, the property's currency and time zone, and money in cents. Each is keyed by its day, its dimensions and a digest of its numbers, so a revised row is stored as a new version and an unchanged one is a duplicate.
+
+**Testing.** The tests run against a mock built from Google's docs (`packages/testkit/src/mocks/google_analytics.ts`), which checks the token's scopes, the property, the date range, that item-scoped and session-scoped fields aren't mixed, and pages and sorts. For the nightly run, give a test Google account Viewer access to Google's public GA4 demo account (the Google Merchandise Store), connect it to a test OAuth client with `analytics.readonly`, and add `SANDBOX_GOOGLE_ANALYTICS_CLIENT_ID`, `SANDBOX_GOOGLE_ANALYTICS_CLIENT_SECRET`, `SANDBOX_GOOGLE_ANALYTICS_REFRESH_TOKEN` and `SANDBOX_GOOGLE_ANALYTICS_PROPERTY_ID` as GitHub Actions secrets.
 
 ### Google Workspace and Drive
 
