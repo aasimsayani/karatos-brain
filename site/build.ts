@@ -108,40 +108,121 @@ export interface Play {
   title: string;
   systems: string[];
   action: string;
+  /** Whether it makes money, saves money or keeps the business out of trouble, and how that is worked out. */
+  value: { kind: "makes" | "saves" | "protects"; how: string };
 }
+
+/** The label each kind of value gets on a play. */
+export const VALUE_LABELS: Readonly<Record<Play["value"]["kind"], string>> = { makes: "Makes money", saves: "Saves money", protects: "Avoids a loss" };
 
 export const PLAYS: readonly Play[] = [
   {
     title: "An anniversary nobody has to remember",
     systems: ["inventory_pos", "clientbook", "klaviyo", "calendly"],
     action: "Three years after a band sold, the client's salesperson gets a nudge, the matching earrings are flagged in stock, and an invitation to book a fitting is drafted for the right day.",
+    value: { kind: "makes", how: "clients reached on their date × the share who come back × your average order." },
   },
   {
     title: "A late repair that doesn't become a bad review",
     systems: ["monday", "twilio", "google_business_profile"],
     action: "A ring past its promised date gets a text drafted to the customer before they ask, and the review request waits until it's picked up happy.",
+    value: { kind: "protects", how: "a bad review kept off the page, and a good one asked for at the right moment." },
   },
   {
     title: "Pieces priced below what they cost to replace",
     systems: ["metals_api", "stuller", "shopify"],
     action: "When gold moves, every item whose shelf or website price is now under its replacement cost is listed for a reprice.",
+    value: { kind: "saves", how: "grams of gold sold before the reprice × how far the price moved." },
   },
   {
     title: "Which memo stones to send back",
     systems: ["rapnet", "idex", "nivoda", "quickbooks"],
     action: "When diamond prices move on the Rapaport list and the trading networks, buying sees which stones on memo to return before the memo is due.",
+    value: { kind: "saves", how: "stones returned instead of bought × what they would have lost against the new price." },
   },
   {
     title: "A reportable cash sale, caught",
     systems: ["inventory_pos", "bank_statements", "fincen_8300"],
     action: "Cash sales are matched to bank deposits, and any buyer who paid over $10,000 in cash gets a Form 8300 ready to file on time.",
+    value: { kind: "protects", how: "the IRS penalty for each Form 8300 filed late or not at all." },
   },
   {
     title: "Money owed, followed up before it goes stale",
     systems: ["quickbooks", "plaid", "twilio"],
     action: "Invoices more than 30 days past due are totalled, oldest first, beside the cash the bank shows on hand, and a reminder to each customer is drafted for a person to send.",
+    value: { kind: "makes", how: "overdue money collected sooner, instead of written off." },
   },
 ];
+
+/** One number the payback estimate asks for. Percentages are entered as whole numbers, such as 45 for 45%. */
+export interface PaybackInput {
+  id: string;
+  label: string;
+  unit: "$" | "%" | "count" | "g";
+  /** The starting guess, shown until the visitor types their own. */
+  value: number;
+  max: number;
+}
+
+/** One line of the estimate: the product of its inputs, divided by `per` to make it monthly. */
+export interface PaybackLine {
+  id: string;
+  title: string;
+  kind: Play["value"]["kind"];
+  factors: string[];
+  per: number;
+  how: string;
+}
+
+/**
+ * The "what's possible" estimate. Every figure is the visitor's own number
+ * or a starting guess they can change; nothing here is a measured result.
+ */
+export const PAYBACK_INPUTS: readonly PaybackInput[] = [
+  { id: "averageOrder", label: "Average sale", unit: "$", value: 1500, max: 1_000_000 },
+  { id: "margin", label: "Gross margin", unit: "%", value: 45, max: 100 },
+  { id: "lapsed", label: "Lapsed clients you could reach a month", unit: "count", value: 10, max: 100_000 },
+  { id: "winBack", label: "Share of them who buy again", unit: "%", value: 10, max: 100 },
+  { id: "occasions", label: "Client anniversaries and birthdays a month", unit: "count", value: 10, max: 100_000 },
+  { id: "occasionRate", label: "Share who buy for the occasion", unit: "%", value: 10, max: 100 },
+  { id: "missedCalls", label: "Missed calls nobody returns, a month", unit: "count", value: 8, max: 100_000 },
+  { id: "callClose", label: "Share of those that become a sale", unit: "%", value: 15, max: 100 },
+  { id: "goldGrams", label: "Gold sold a month, in grams", unit: "g", value: 300, max: 10_000_000 },
+  { id: "goldLag", label: "Price rise not yet on the tag, per gram", unit: "$", value: 2, max: 1000 },
+  { id: "agedStock", label: "Stock on hand over a year", unit: "$", value: 50000, max: 1_000_000_000 },
+  { id: "carrying", label: "Yearly cost of holding stock", unit: "%", value: 20, max: 100 },
+  { id: "cleared", label: "Share of aged stock sold in a year", unit: "%", value: 30, max: 100 },
+];
+
+export const PAYBACK_LINES: readonly PaybackLine[] = [
+  { id: "winback", title: "Lapsed clients won back", kind: "makes", factors: ["lapsed", "winBack", "averageOrder", "margin"], per: 1, how: "clients reached × share who buy × average sale × margin" },
+  { id: "occasions", title: "Occasions nobody forgets", kind: "makes", factors: ["occasions", "occasionRate", "averageOrder", "margin"], per: 1, how: "occasions × share who buy × average sale × margin" },
+  { id: "calls", title: "Missed calls returned", kind: "makes", factors: ["missedCalls", "callClose", "averageOrder", "margin"], per: 1, how: "missed calls × share that sell × average sale × margin" },
+  { id: "reprice", title: "Gold repriced on time", kind: "saves", factors: ["goldGrams", "goldLag"], per: 1, how: "grams sold × price rise not yet on the tag" },
+  { id: "aged", title: "Aged stock cleared", kind: "saves", factors: ["agedStock", "carrying", "cleared"], per: 12, how: "aged stock × yearly holding cost × share sold, by month" },
+];
+
+/** A line's monthly dollars from a set of inputs; percentages count as fractions. */
+export function paybackLine(line: PaybackLine, values: Readonly<Record<string, number>>): number {
+  const units = new Map(PAYBACK_INPUTS.map((i) => [i.id, i.unit]));
+  let total = 1;
+  for (const f of line.factors) {
+    const unit = units.get(f);
+    if (!unit) throw new Error(`payback line ${line.id} uses ${f}, which is not an input`);
+    const v = values[f] ?? 0;
+    total *= unit === "%" ? v / 100 : v;
+  }
+  return total / line.per;
+}
+
+/** The starting guesses, by input id. */
+export const paybackDefaults = (): Record<string, number> => Object.fromEntries(PAYBACK_INPUTS.map((i) => [i.id, i.value]));
+
+/** Whole dollars with thousands separators, the way the page prints them. */
+export const dollars = (n: number) => `$${Math.round(n).toLocaleString("en-US")}`;
+
+/** The plan price as a number, for the "times what it costs" figure. */
+export const corePriceDollars = () => Number(CORE_PRICE.replace(/[^0-9.]/g, ""));
 
 /** The write-back rules the site promises, in the order it lists them. */
 export const WRITE_RULES: readonly { title: string; body: string }[] = [
@@ -365,8 +446,17 @@ export function renderSite(plays: readonly Play[] = PLAYS): string {
   <h3>${escapeHtml(play.title)}</h3>
   <ul class="play-systems" aria-label="Systems combined">${systems.join("")}</ul>
   <p class="play-action"><strong>Result:</strong> ${escapeHtml(play.action)}</p>
+  <p class="play-value"><strong>${VALUE_LABELS[play.value.kind]}:</strong> ${escapeHtml(play.value.how)}</p>
 </li>`;
   }).join("\n");
+  const start = paybackDefaults();
+  const paybackFields = PAYBACK_INPUTS.map(
+    (i) => `<label>${escapeHtml(i.label)}${i.unit === "%" ? " (%)" : i.unit === "$" ? " ($)" : ""}<input type="number" inputmode="decimal" min="0" max="${i.max}" step="any" name="${i.id}" value="${i.value}" data-unit="${i.unit}"></label>`,
+  ).join("\n");
+  const paybackRows = PAYBACK_LINES.map(
+    (l) => `<li data-factors="${l.factors.join(" ")}" data-per="${l.per}"><span class="pb-kind">${VALUE_LABELS[l.kind]}</span><strong>${escapeHtml(l.title)}</strong><span class="pb-how">${escapeHtml(l.how)}</span><output>${dollars(paybackLine(l, start))}</output></li>`,
+  ).join("\n");
+  const paybackTotal = PAYBACK_LINES.reduce((sum, l) => sum + paybackLine(l, start), 0);
   const writeRules = WRITE_RULES.map((r) => `<li><h3>${escapeHtml(r.title)}</h3><p>${escapeHtml(r.body)}</p></li>`).join("\n");
 
   const valueCards = renderValueCards(dataSources, selfServe);
@@ -446,6 +536,20 @@ section{padding:var(--section) 0;border-top:1px solid var(--line);scroll-margin-
 .play-systems li+li::before{content:"+ ";color:var(--gold-text)}
 .play-action{margin:auto 0 0;padding-top:var(--space-2);border-top:1px solid var(--line);color:var(--ink-2);font-size:15px}
 .play-action strong{color:var(--ink)}
+.play-value{margin:var(--space-1) 0 0;color:var(--ink-2);font-size:15px}
+.play-value strong{color:var(--gold-text)}
+.payback{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:var(--space-4);align-items:start}
+@media (max-width:860px){.payback{grid-template-columns:1fr}}
+.pb-inputs{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:var(--space-2);background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:var(--space-3)}
+.pb-inputs label{display:flex;flex-direction:column;justify-content:space-between;gap:8px;font-size:14px;color:var(--ink-2)}
+.pb-inputs input{font:inherit;font-variant-numeric:tabular-nums;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px 16px;min-height:44px}
+.pb-lines{list-style:none;padding:0;margin:0;display:grid;gap:var(--space-1)}
+.pb-lines li{display:grid;grid-template-columns:1fr auto;column-gap:var(--space-2);background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:var(--space-2) var(--space-3)}
+.pb-kind{grid-column:1 / -1;font-family:var(--mono);font-size:12px;font-weight:500;text-transform:uppercase;letter-spacing:.06em;color:var(--gold-text)}
+.pb-how{grid-column:1;font-size:14px;color:var(--muted)}
+.pb-lines output{grid-column:2;grid-row:2 / span 2;align-self:center;font-family:var(--mono);font-size:20px;font-variant-numeric:tabular-nums;color:var(--ink)}
+.pb-total{margin:var(--space-3) 0 var(--space-1);font-size:20px;color:var(--ink)}
+.pb-total output{font-family:var(--mono);font-weight:500;font-variant-numeric:tabular-nums}
 .rules{display:grid;grid-template-columns:repeat(3,1fr);gap:var(--space-3);list-style:none;padding:0;margin:0}
 .rules li{padding-top:var(--space-2);border-top:2px solid var(--gold)}
 .rules h3{margin:0 0 8px;font-size:18px}
@@ -586,7 +690,7 @@ footer .wrap{display:flex;flex-wrap:wrap;justify-content:space-between;gap:var(-
 <body>
 <header class="nav"><div class="wrap">
   <a class="brand" href="#top"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M16 3 28 12 16 29 4 12Z" fill="#c9a45c"/><path d="M4 12h24M16 3l-5 9 5 17 5-17-5-9" fill="none" stroke="#16140f" stroke-opacity=".35" stroke-width="1.2"/></svg>KaratOS</a>
-  <nav><a href="#how">How it works</a><a href="#together">Systems together</a><a href="#write-back">Write-back</a><a href="#integrations">Integrations</a><a href="#partners">Partners</a><a href="#pilot">Holiday pilot</a><a href="#services">Pricing</a><a href="#broken">What's broken</a><a href="/demo/">Demo</a></nav>
+  <nav><a href="#how">How it works</a><a href="#together">Systems together</a><a href="#payback">Payback</a><a href="#write-back">Write-back</a><a href="#integrations">Integrations</a><a href="#partners">Partners</a><a href="#pilot">Holiday pilot</a><a href="#services">Pricing</a><a href="#broken">What's broken</a><a href="/demo/">Demo</a></nav>
   <a class="btn primary small" href="#services">Custom services</a>
 </div></header>
 
@@ -627,6 +731,24 @@ footer .wrap{display:flex;flex-wrap:wrap;justify-content:space-between;gap:var(-
   <ul class="plays">
 ${playCards}
   </ul>
+</div></section>
+
+<section id="payback"><div class="wrap">
+  <span class="eyebrow">What it puts back</span>
+  <h2>You pay us. We show you, in dollars, what we put back.</h2>
+  <p class="section-intro">Core costs ${CORE_PRICE} a store a month. The connections are there to make you money and save you money, so every play is measured in dollars. Put in your own numbers and see what's possible. Every rate below is a starting guess you can change, and the result is an estimate, not a promise.</p>
+  <div class="payback">
+    <form id="payback-form" class="pb-inputs" aria-label="Your numbers">
+${paybackFields}
+    </form>
+    <div class="pb-result">
+      <ul class="pb-lines">
+${paybackRows}
+      </ul>
+      <p class="pb-total">About <output id="pb-total">${dollars(paybackTotal)}</output> a month, or <output id="pb-times">${(paybackTotal / corePriceDollars()).toFixed(1)}</output>× what Core costs.</p>
+      <p class="fine">An estimate from the numbers above. Once you're running, each recommendation in the Brain Console will carry its own dollar figure and how it was worked out, and a monthly report will add up what each play actually returned. That report is being built now.</p>
+    </div>
+  </div>
 </div></section>
 
 <section id="value"><div class="wrap">
@@ -848,6 +970,24 @@ ${directory}
   function openFromHash(){var g=document.getElementById(location.hash.slice(1));if(g&&g.classList.contains('group')){g.open=true;g.scrollIntoView()}}
   window.addEventListener('hashchange',openFromHash);openFromHash();
   q.addEventListener('input',apply);seg.addEventListener('change',apply);dep.addEventListener('change',apply);cat.addEventListener('change',apply);
+})();
+(function(){
+  var form=document.getElementById('payback-form'),price=${corePriceDollars()};
+  if(!form) return;
+  function money(n){return '$'+Math.round(n).toLocaleString('en-US')}
+  function update(){
+    var v={};
+    [].forEach.call(form.elements,function(el){var n=Math.max(0,Number(el.value)||0);v[el.name]=el.dataset.unit==='%'?n/100:n});
+    var total=0;
+    [].forEach.call(document.querySelectorAll('.pb-lines li'),function(li){
+      var x=1;li.dataset.factors.split(' ').forEach(function(f){x*=v[f]||0});x/=Number(li.dataset.per);
+      total+=x;li.querySelector('output').textContent=money(x);
+    });
+    document.getElementById('pb-total').textContent=money(total);
+    document.getElementById('pb-times').textContent=(total/price).toFixed(1);
+  }
+  form.addEventListener('input',update);
+  form.addEventListener('submit',function(e){e.preventDefault()});
 })();
 (function(){
   var form=document.getElementById('inquiry'),status=document.getElementById('inquiry-status');

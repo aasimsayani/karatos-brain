@@ -1,0 +1,2 @@
+- Website: every "Systems that work together" play now says whether it makes money, saves money or avoids a loss, and how that is worked out.
+- Website: a new "What it puts back" section. A jeweler types in their own numbers (average sale, margin, lapsed clients, missed calls, gold sold, aged stock) and sees an estimate of what each play is worth a month, the total, and how many times over it covers the Core price. Every rate is shown and can be changed, and the page labels the result an estimate.
