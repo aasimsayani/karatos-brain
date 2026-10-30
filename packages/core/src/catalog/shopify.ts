@@ -10,5 +10,6 @@ export default {
     "Inventory sees every product and variant with its price and stock on hand",
     "Clienteling sees each customer and whether they agreed to email marketing",
     "Read-only: KaratOS never changes anything in your store",
+    "Changing a price and creating a discount code for one customer are declared but turned off; each would need a named person's approval",
   ],
 } satisfies ConnectorCatalogEntry;
