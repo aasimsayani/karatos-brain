@@ -10,6 +10,7 @@ import custom_forms from "./custom_forms.js";
 import gia from "./gia.js";
 import gmail from "./gmail.js";
 import google_workspace from "./google_workspace.js";
+import gusto from "./gusto.js";
 import hubspot from "./hubspot.js";
 import idex from "./idex.js";
 import klaviyo from "./klaviyo.js";
@@ -35,6 +36,7 @@ export * from "./custom_forms.js";
 export * from "./gia.js";
 export * from "./gmail.js";
 export * from "./google_workspace.js";
+export * from "./gusto.js";
 export * from "./hubspot.js";
 export * from "./idex.js";
 export * from "./klaviyo.js";
@@ -51,7 +53,7 @@ export * from "./woocommerce.js";
 export * from "./xero.js";
 
 /** Every mock module, one per catalog integration. */
-export const DOC_MOCK_MODULES: readonly DocMockModule[] = [affirm, authorize_net, avalara, bigcommerce, calendly, clover, custom_forms, gia, gmail, google_workspace, hubspot, idex, klaviyo, monday, nivoda, plaid, quickbooks, rapnet, slack, square, stuller, wix, woocommerce, xero];
+export const DOC_MOCK_MODULES: readonly DocMockModule[] = [affirm, authorize_net, avalara, bigcommerce, calendly, clover, custom_forms, gia, gmail, google_workspace, gusto, hubspot, idex, klaviyo, monday, nivoda, plaid, quickbooks, rapnet, slack, square, stuller, wix, woocommerce, xero];
 
 /** Every doc-derived mock, with empty data, for checks and the vendor docs watch. */
 export function allDocMocks(): DocMock[] {
