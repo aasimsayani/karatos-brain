@@ -340,4 +340,5 @@ export const CONNECTED_ON: Readonly<Record<string, string>> = {
   woocommerce: "2026-10-28",
   piro: "2026-10-29",
   refiner_statements: "2026-10-29",
+  meta_ads: "2026-10-30",
 };
