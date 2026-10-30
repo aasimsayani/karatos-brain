@@ -12,6 +12,7 @@ import custom_forms from "./custom_forms.js";
 import edi_x12 from "./edi_x12.js";
 import gia from "./gia.js";
 import gmail from "./gmail.js";
+import google_ads from "./google_ads.js";
 import google_workspace from "./google_workspace.js";
 import hubspot from "./hubspot.js";
 import idex from "./idex.js";
@@ -37,4 +38,4 @@ import woocommerce from "./woocommerce.js";
 import xero from "./xero.js";
 
 /** Each built connector's own catalog fields, by catalog id. */
-export const CONNECTOR_CATALOG: Readonly<Record<string, ConnectorCatalogEntry>> = { affirm, authorize_net, avalara, bank_statements, bigcommerce, calendly, chase, clover, custom_forms, edi_x12, gia, gmail, google_workspace, hubspot, idex, inventory_pos, klaviyo, metals_api, monday, nivoda, piro, plaid, quickbooks, rapnet, refiner_statements, shopify, slack, square, stripe, stuller, twilio, watchsearch, wix, woocommerce, xero };
+export const CONNECTOR_CATALOG: Readonly<Record<string, ConnectorCatalogEntry>> = { affirm, authorize_net, avalara, bank_statements, bigcommerce, calendly, chase, clover, custom_forms, edi_x12, gia, gmail, google_ads, google_workspace, hubspot, idex, inventory_pos, klaviyo, metals_api, monday, nivoda, piro, plaid, quickbooks, rapnet, refiner_statements, shopify, slack, square, stripe, stuller, twilio, watchsearch, wix, woocommerce, xero };

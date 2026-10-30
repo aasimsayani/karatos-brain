@@ -177,7 +177,7 @@ Used by: R is retail, W is wholesale, M is manufacturing. Test with says how we 
 | Acuity Scheduling | R | Public API | Paid account | Yes | Planned |
 | Mailchimp | R | Public API | Free sandbox | Yes | Planned |
 | Google Analytics 4 | R, W | Public API | Free sandbox | No | Planned |
-| Google Ads | R | Public API | Free sandbox | No | Planned (Test accounts for development; production needs an approved developer token) |
+| Google Ads | R | Public API | Free sandbox | No | Built (Google Ads has one scope, which can change campaigns, so the client keeps the connection read-only: its only API request is googleAds:search for the one account in the settings, built from one fixed report, and it never calls mutate. Connect it as a Google Ads user with Read only access. Production accounts need a developer token with Basic access) |
 | Meta Ads | R | Public API | Free sandbox | No | Planned |
 | Google Business Profile | R | Partner | Partner | No | Planned (Reviews and local listings; Google approves API access on request) |
 | Google Merchant Center | R | Public API | Free sandbox | No | Planned (Product listings, disapprovals and free listing clicks through the Merchant API, which replaced the Content API for Shopping in 2026) |
@@ -398,6 +398,7 @@ A request for a path or method the docs don't list throws `UndocumentedRequestEr
 - Typeform's Create API (a form's definition) and Responses API
 - GIA's Report Results API: getReport and getChangedReports
 - Gmail's message, label and history reads with Google's token refresh (API v1)
+- The Google Ads API's `googleAds:search` and `googleAds:mutate` (REST, v26) with Google's token refresh, enforcing the developer token, the adwords scope, the account and manager headers, GAQL fields and page tokens tied to their query
 - Google Drive (files and changes, v3), Sheets (`values:batchGet`, v4) and Calendar (`events.list` with sync tokens, v3) with Google's token refresh, enforcing each API's documented scopes so `drive.metadata.readonly` can't read Sheets values
 - HubSpot's CRM search, archived list, batch association and token info endpoints (date version 2026-09)
 - IDEX's Onsite feeds: the natural full feed and the lab-grown full file
@@ -414,7 +415,7 @@ A request for a path or method the docs don't list throws `UndocumentedRequestEr
 - A WooCommerce store's REST API v3 read endpoints with its key permissions and page headers
 - Xero's Accounting API endpoints with its token refresh
 
-Where a vendor has a free sandbox (Affirm, Authorize.net, Avalara AvaTax, BigCommerce, Calendly, Clover, Custom forms, GIA Report Results, Gmail, Google Workspace and Drive, HubSpot, Klaviyo, Monday.com, Plaid, QuickBooks Online, Slack, Square, Wix, WooCommerce and Xero so far), its mock is a stand-in until a developer account is set up for the nightly run.
+Where a vendor has a free sandbox (Affirm, Authorize.net, Avalara AvaTax, BigCommerce, Calendly, Clover, Custom forms, GIA Report Results, Gmail, Google Ads, Google Workspace and Drive, HubSpot, Klaviyo, Monday.com, Plaid, QuickBooks Online, Slack, Square, Wix, WooCommerce and Xero so far), its mock is a stand-in until a developer account is set up for the nightly run.
 
 <!-- registry:mocks:end -->
 
@@ -875,6 +876,30 @@ Reads one mailbox's message metadata, threads and labels through the Gmail API, 
 **Push.** Gmail can push changes through Cloud Pub/Sub (`users.watch`), which needs a Pub/Sub topic in the owner's Google Cloud project, publish rights for `gmail-api-push@system.gserviceaccount.com` and a renewal at least every seven days. It isn't built; the scheduled sync reads the same history.
 
 **Testing.** Until a test account is set up, the tests run against a mock built from Google's docs (`packages/testkit/src/mocks/gmail.ts`), which holds the metadata scope to its documented limits (no `q`, no `full` or `raw`), answers 401 without a valid access token, pages lists and history, expires history below a floor, and answers 404 for deleted messages. Every docs fact it relies on is listed with its URL, and what the docs leave out is in its assumptions, checked on the first live run. Google has no Gmail sandbox: for the nightly run, make a Google account for testing that holds only synthetic mail, create an OAuth client in a test Cloud project with the consent screen in Testing and that account as a test user, connect it with `gmail.metadata` only, and add `SANDBOX_GMAIL_CLIENT_ID`, `SANDBOX_GMAIL_CLIENT_SECRET` and `SANDBOX_GMAIL_REFRESH_TOKEN` as GitHub Actions secrets. Tokens in Testing expire after seven days, so when the run fails with `invalid_grant`, reconnect the test account and update the secret.
+
+### Google Ads
+
+Reads one Google Ads account's campaign figures by day through the Google Ads API (REST, v26). Google Ads has one OAuth scope, `adwords`, and it can change campaigns, so the scope can't keep the connection read-only. The client does: its only API request is `googleAds:search` for the account in the settings, with a query built from one fixed report, and it never calls a mutate method. Connect it as a Google Ads user with Read only access, so Google would turn down a change even if one were sent.
+
+| Setting | What it is |
+| --- | --- |
+| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | The instance's Google OAuth client, shared with the other Google connectors. Turn on the Google Ads API in its Cloud project |
+| `GOOGLE_ADS_REFRESH_TOKEN` | A refresh token from a Google account with Read only access to the Google Ads account, granted `adwords` only |
+| `GOOGLE_ADS_DEVELOPER_TOKEN` | From a manager account's API Center. A new token reads test accounts only; a store's real account needs Basic access |
+| `GOOGLE_ADS_CUSTOMER_ID` | The account's 10-digit customer id, with or without dashes |
+| `GOOGLE_ADS_LOGIN_CUSTOMER_ID` | Optional. The manager account's customer id, when the user reaches the store's account through one |
+
+**What it reads.** One report, a 31-day window at a time, in Google's fixed pages of 10,000 rows: for each campaign and day, its status, channel and daily budget, and the impressions, clicks, cost, conversions and conversion value. The historical import reads two years up to today. Each incremental sync reads again from two weeks before the last day the previous pass read, since Google keeps attributing conversions to past clicks.
+
+**Privacy.** The report is totals by campaign and day, so nothing names a person. Campaign names are cut short, and one holding an @ is dropped.
+
+**Rate limits.** Google Ads meters each developer token in operations per day. The client sends one request at a time and waits out a 429 (`Retry-After` when sent, otherwise doubling from a second, three tries) before the error goes to the sync runner, which resumes from its checkpoint next time. A 403 means the connected user can't reach the account, or needs `GOOGLE_ADS_LOGIN_CUSTOMER_ID`; `DEVELOPER_TOKEN_NOT_APPROVED` means the token has test access only.
+
+**Writes.** Pausing a campaign and changing its daily budget are declared, so they can be gated and audited, and both are turned off. Each needs a named person's approval and is capped at five a day. Turning them on would also need a user with Standard access in Google Ads.
+
+**Events.** `ads.campaign_reported`, one per campaign and day, with the account's currency and time zone, and money in cents (Google gives cost and budget in micros). Each is keyed by its day, its campaign and a digest of its numbers, so a revised row is stored as a new version and an unchanged one is a duplicate.
+
+**Testing.** The tests run against a mock built from Google's docs (`packages/testkit/src/mocks/google_ads.ts`), which checks the access token, the developer token, the scope, the account and manager headers, the GAQL fields, and that a page token belongs to its query, and counts any mutate call. For the nightly run, create a Google Ads test manager account with a test client account under it, connect a test Google account to a test OAuth client with `adwords`, and add `SANDBOX_GOOGLE_ADS_CLIENT_ID`, `SANDBOX_GOOGLE_ADS_CLIENT_SECRET`, `SANDBOX_GOOGLE_ADS_REFRESH_TOKEN`, `SANDBOX_GOOGLE_ADS_DEVELOPER_TOKEN`, `SANDBOX_GOOGLE_ADS_CUSTOMER_ID` and `SANDBOX_GOOGLE_ADS_LOGIN_CUSTOMER_ID` as GitHub Actions secrets. Any developer token reads test accounts.
 
 ### Google Workspace and Drive
 
