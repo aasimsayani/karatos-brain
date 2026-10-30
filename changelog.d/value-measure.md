@@ -1,0 +1,1 @@
+- KaratOS measures what approved recommendations brought back, at 30, 60 and 90 days, from the store's own data: the margin on what a reminded or lapsed customer buys, and the payments on a ready custom order. Each reasoning run records the results now due, once per checkpoint.

@@ -412,4 +412,29 @@ describe("value ledger API", () => {
     expect((await call("/v1/value?from=2024-01-01&to=2025-01-01")).status).toBe(200);
     expect((await call("/v1/value", { auth: false })).status).toBe(401);
   });
+
+  it("measures what approved recommendations brought back on each reasoning run", async () => {
+    const created = new Date(Date.now() - 31 * 86_400_000).toISOString();
+    const measuring: Reasoner = {
+      name: "measuring",
+      reason: async (context) => {
+        const [base] = await echoReasoner.reason(context);
+        const measure = { signalKind: "sale.customer_purchase", subject: { kind: "customer", id: "c1" }, centsField: "totalCents", share: 0.5, windowDays: 30 as const, label: "purchases" };
+        return [{ ...base!, id: "rec_measured", createdAt: created, impact: { kind: "makes" as const, lowCents: 1, cents: 2, highCents: 3, basis: "b", measure } }];
+      },
+    };
+    const { call, memory } = await start(undefined, undefined, measuring);
+    const first = (await (await call("/v1/reason", { method: "POST", body: "{}" })).json()) as { measured: number };
+    expect(first.measured).toBe(0);
+    await call("/v1/recommendations/rec_measured/feedback", { method: "POST", body: JSON.stringify({ outcome: "accepted", actor: "owner" }) });
+    await memory.appendSignals([
+      { id: "s1", organizationId: ORG, kind: "sale.customer_purchase", subject: { kind: "customer", id: "c1" }, value: { totalCents: 10_000 }, confidence: 1, derivedFromEventIds: [], observedAt: new Date(Date.now() - 20 * 86_400_000).toISOString() },
+    ]);
+    const second = (await (await call("/v1/reason", { method: "POST", body: "{}" })).json()) as { measured: number; recommendations: unknown[] };
+    expect(second.measured).toBe(1);
+    expect(second.recommendations).toHaveLength(1);
+    expect(memory.valueResults).toEqual([expect.objectContaining({ recommendationId: "rec_measured", cents: 5_000, measuredDays: 30, source: "measured", actor: "karatos" })]);
+    expect(((await (await call("/v1/reason", { method: "POST", body: "{}" })).json()) as { measured: number }).measured).toBe(0);
+  });
 });
+

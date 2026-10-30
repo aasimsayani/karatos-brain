@@ -86,6 +86,7 @@ interface ValueResultRow {
   kind: ValueResult["kind"];
   cents: string | number;
   source: ValueResult["source"];
+  measured_days: number | null;
   note: string | null;
   actor: string;
   recorded_at: Date | string;
@@ -391,9 +392,19 @@ export class PostgresMemoryStore implements MemoryStore, RawDataRetention {
     const problem = valueResultProblem(result);
     if (problem) throw new RangeError(problem);
     await this.db.query(
-      `insert into value_results (organization_id, recommendation_id, kind, cents, source, note, actor, recorded_at)
-       values ($1, $2, $3, $4, $5, $6, $7, $8)`,
-      [result.organizationId, result.recommendationId, result.kind, result.cents, result.source, result.note ?? null, result.actor, result.recordedAt],
+      `insert into value_results (organization_id, recommendation_id, kind, cents, source, measured_days, note, actor, recorded_at)
+       values ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+      [
+        result.organizationId,
+        result.recommendationId,
+        result.kind,
+        result.cents,
+        result.source,
+        result.measuredDays ?? null,
+        result.note ?? null,
+        result.actor,
+        result.recordedAt,
+      ],
     );
   }
 
@@ -408,6 +419,7 @@ export class PostgresMemoryStore implements MemoryStore, RawDataRetention {
       kind: row.kind,
       cents: Number(row.cents),
       source: row.source,
+      ...(row.measured_days === null ? {} : { measuredDays: row.measured_days as NonNullable<ValueResult["measuredDays"]> }),
       ...(row.note === null ? {} : { note: row.note }),
       actor: row.actor,
       recordedAt: iso(row.recorded_at),

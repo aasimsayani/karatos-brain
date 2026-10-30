@@ -124,4 +124,29 @@ describe("the value ledger in Postgres", () => {
     expect(report.returned.cents.makes).toBe(250);
     expect(report.awaiting.count).toBe(0);
   });
+
+  it("keeps a measured result's checkpoint, once per recommendation, and only on measured results", async () => {
+    const { client, store } = await setup();
+    const thirty = result("first", 100, "2026-10-20T00:00:00.000Z", { measuredDays: 30 });
+    await store.recordValueResult(thirty);
+    await store.recordValueResult(result("first", 200, "2026-11-20T00:00:00.000Z", { measuredDays: 60 }));
+    await store.recordValueResult(result("a_last", 100, "2026-10-20T00:00:00.000Z", { measuredDays: 30 }));
+    await store.recordValueResult(result("first", 5, "2026-10-21T00:00:00.000Z", { source: "reported" }));
+    await store.recordValueResult(result("first", 5, "2026-10-22T00:00:00.000Z", { source: "reported" }));
+    await expect(store.recordValueResult({ ...thirty, cents: 999 })).rejects.toThrow();
+    expect((await store.listValueResults(ORG, ["first"])).map((r) => [r.cents, r.measuredDays])).toEqual([
+      [100, 30],
+      [5, undefined],
+      [5, undefined],
+      [200, 60],
+    ]);
+    const insert = (source: string, days: number) =>
+      client.query(
+        "insert into value_results (organization_id, recommendation_id, kind, cents, source, measured_days, actor, recorded_at) values ($1, 'a_last', 'makes', 1, $2, $3, 'x', now())",
+        [ORG, source, days],
+      );
+    await expect(insert("reported", 60)).rejects.toThrow();
+    await expect(insert("measured", 45)).rejects.toThrow();
+    await insert("measured", 90);
+  });
 });
