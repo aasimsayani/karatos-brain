@@ -1,7 +1,7 @@
 import type { Signal } from "@karatos/core";
 import { z } from "zod";
 import type { DepartmentModule } from "../department.js";
-import { daysBetween, dollars, extractor, recommend, signalFrom, value } from "../department.js";
+import { ASSUMPTIONS, daysBetween, dollars, estimate, extractor, pct, recommend, signalFrom, value } from "../department.js";
 
 const CampaignSent = z.object({
   campaignId: z.string().min(1),
@@ -54,6 +54,19 @@ export const marketing: DepartmentModule = {
               ratio >= 3
                 ? `"${c.name}" (${c.channel}) returned ${dollars(revenue)} on ${dollars(c.costCents)}, ${ratio.toFixed(1)}x. Run it again or scale it up.`
                 : `"${c.name}" (${c.channel}) returned ${dollars(revenue)} on ${dollars(c.costCents)}. Rework or drop it before spending more.`;
+            const profit = (margin: number) => revenue * margin;
+            const impact =
+              ratio >= 3
+                ? estimate(
+                    "makes",
+                    `One more run with the same result: ${dollars(revenue)} in sales at a ${pct(ASSUMPTIONS.margin.likely)} margin, less its ${dollars(c.costCents)} cost.`,
+                    (a) => profit(a("margin")) - c.costCents,
+                  )
+                : estimate(
+                    "saves",
+                    `Not running it again: its ${dollars(c.costCents)} cost, less the profit on its ${dollars(revenue)} in sales at a ${pct(ASSUMPTIONS.margin.likely)} margin.`,
+                    (a) => c.costCents - profit(a("margin")),
+                  );
             return [
               recommend({
                 department: "marketing",
@@ -62,6 +75,7 @@ export const marketing: DepartmentModule = {
                 summary,
                 confidence: Math.min(0.85, 0.5 + attributed.length * 0.05),
                 expectedImpact: "Moves marketing spend to what sells",
+                impact,
                 basedOn: [s, ...attributed],
                 now,
               }),

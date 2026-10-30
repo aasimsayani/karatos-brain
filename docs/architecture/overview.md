@@ -8,7 +8,7 @@ Brain A is the core intelligence engine for Fuse Jewelry and KaratOS. It has sev
 | 2 | Entity Normalization | `Normalizer` | Map source records onto canonical entities. |
 | 3 | Signal Extraction | `SignalExtractor` | Every signal lists the event ids it came from. |
 | 4 | Memory + State | `MemoryStore` | Events are append-only. Entities are upserted. |
-| 5 | Reasoning | `Reasoner` | Every recommendation carries confidence, expected impact and provenance. |
+| 5 | Reasoning | `Reasoner` | Every recommendation carries confidence, expected impact and provenance, and a dollar `impact` where there is an honest way to put a number on it. |
 | 6 | Feedback + Learning | `Feedback` | Human overrides are recorded, not discarded. |
 | 7 | Documentation | `DocumentationSource` | Stale docs force `degraded: true` on every recommendation. |
 

@@ -1,6 +1,6 @@
 import { z } from "zod";
 import type { DepartmentModule } from "../department.js";
-import { daysBetween, dollars, entityFrom, extractor, recommend, signalFrom, value } from "../department.js";
+import { ASSUMPTIONS, daysBetween, dollars, entityFrom, estimate, extractor, pct, recommend, signalFrom, value } from "../department.js";
 
 const AppraisalCompleted = z.object({
   appraisalId: z.string().min(1),
@@ -50,6 +50,11 @@ export const appraisals: DepartmentModule = {
                 summary: `The insurance appraisal for ${a.itemDescription} (${dollars(a.appraisedValueCents)}) is ${Math.floor(age / 365)} years old. Offer the customer an update so they aren't underinsured.`,
                 confidence: 0.7,
                 expectedImpact: "Appraisal fee, and a reason for the customer to visit",
+                impact: estimate(
+                  "makes",
+                  `A ${dollars(ASSUMPTIONS.appraisalFeeCents.likely)} update fee, which is mostly the appraiser's time, taken by ${pct(ASSUMPTIONS.appraisalTakeUp.likely)} of customers offered one.`,
+                  (a) => a("appraisalFeeCents") * a("appraisalTakeUp"),
+                ),
                 basedOn: [s],
                 now,
               }),
