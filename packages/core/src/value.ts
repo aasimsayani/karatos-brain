@@ -1,4 +1,5 @@
-import { IMPACT_KINDS, type Feedback, type Impact, type Recommendation } from "./reasoning.js";
+import { IMPACT_KINDS, MEASURE_DAYS, type Feedback, type Impact, type Recommendation } from "./reasoning.js";
+import type { Signal } from "./signals.js";
 import type { MemoryStore } from "./layers.js";
 
 /**
@@ -18,6 +19,8 @@ export interface ValueResult {
   cents: number;
   /** `measured` was worked out from the store's own data; `reported` is what a person entered. */
   source: "measured" | "reported";
+  /** For a measured result, the checkpoint it was measured at, days after the recommendation. */
+  measuredDays?: (typeof MEASURE_DAYS)[number];
   note?: string;
   actor: string;
   recordedAt: string;
@@ -32,6 +35,9 @@ export function valueResultProblem(result: ValueResult): string | null {
   if (!VALUE_SOURCES.includes(result.source)) return `unknown result source ${String(result.source)}`;
   if (typeof result.actor !== "string" || !result.actor.trim()) return "a result needs the person or process that recorded it";
   if (Number.isNaN(Date.parse(result.recordedAt))) return "a result needs the time it was recorded";
+  if (result.measuredDays !== undefined && (result.source !== "measured" || !MEASURE_DAYS.includes(result.measuredDays))) {
+    return `only a measured result has a checkpoint, of ${MEASURE_DAYS.join(", ")} days`;
+  }
   return null;
 }
 
@@ -171,4 +177,95 @@ export async function readValueReport(
     ? await Promise.all([memory.listFeedback(organizationId, ids), memory.listValueResults(organizationId, ids)])
     : [[], []];
   return valueReport({ organizationId, ...period, recommendations, feedback, results });
+}
+
+const DAY_MS = 86_400_000;
+
+/** Who records measured results. */
+export const MEASURER = "karatos";
+
+/**
+ * The measured results now due: for each approved recommendation whose
+ * impact says how to measure it, one result at each checkpoint (30, 60 and
+ * 90 days, up to its window) that has passed and isn't yet recorded. Only
+ * approved recommendations are measured, so a customer who would have come
+ * back anyway isn't counted for a reminder nobody acted on. Each result
+ * sums what came in from the recommendation up to its checkpoint, so a
+ * later one replaces an earlier one in the report.
+ */
+export function dueMeasurements(input: {
+  organizationId: string;
+  recommendations: Recommendation[];
+  feedback: Feedback[];
+  results: ValueResult[];
+  signals: Signal[];
+  now: string;
+}): ValueResult[] {
+  const now = Date.parse(input.now);
+  const words = latest(input.feedback.filter((f) => f.organizationId === input.organizationId), now + 1);
+  // Only measured results carry a checkpoint, so a reported one never matches.
+  const recorded = new Set(input.results.filter((r) => r.organizationId === input.organizationId).map((r) => `${r.recommendationId}:${r.measuredDays}`));
+  const due: ValueResult[] = [];
+  const seen = new Set<string>();
+  for (const rec of input.recommendations) {
+    const m = rec.impact?.measure;
+    // A store may hand the same recommendation back more than once.
+    if (seen.has(rec.id)) continue;
+    seen.add(rec.id);
+    if (rec.organizationId !== input.organizationId || !m || words.get(rec.id)?.outcome !== "accepted") continue;
+    const start = Date.parse(rec.createdAt);
+    for (const days of MEASURE_DAYS) {
+      if (days > m.windowDays || now < start + days * DAY_MS) break;
+      if (recorded.has(`${rec.id}:${days}`)) continue;
+      const end = start + days * DAY_MS;
+      const matched = input.signals.filter((s) => {
+        const at = Date.parse(s.observedAt);
+        return s.organizationId === input.organizationId && s.kind === m.signalKind && s.subject.kind === m.subject.kind && s.subject.id === m.subject.id && at > start && at <= end;
+      });
+      // Only whole, non-negative cents count; anything else in the field is ignored.
+      const gross = matched.reduce((sum, s) => {
+        const v = (s.value as Record<string, unknown> | null)?.[m.centsField];
+        return typeof v === "number" && Number.isSafeInteger(v) && v >= 0 ? sum + v : sum;
+      }, 0);
+      due.push({
+        recommendationId: rec.id,
+        organizationId: input.organizationId,
+        kind: rec.impact!.kind,
+        cents: Math.round(gross * m.share),
+        source: "measured",
+        measuredDays: days,
+        note: `${m.label} within ${days} days: ${matched.length}`,
+        actor: MEASURER,
+        recordedAt: new Date(now).toISOString(),
+      });
+    }
+  }
+  return due;
+}
+
+/** How far back measuring looks: the longest checkpoint, and a day to spare. */
+export const MEASURE_LOOKBACK_DAYS = Math.max(...MEASURE_DAYS) + 1;
+
+/** Records every measured result now due, from what memory holds. Returns them. */
+export async function measureValue(
+  memory: Pick<MemoryStore, "recommendationsBetween" | "listFeedback" | "listValueResults" | "recordValueResult" | "recentSignals">,
+  organizationId: string,
+  now: string,
+  options: { signalLimit?: number } = {},
+): Promise<ValueResult[]> {
+  const at = Date.parse(now);
+  const recommendations = (await memory.recommendationsBetween(organizationId, new Date(at - MEASURE_LOOKBACK_DAYS * DAY_MS).toISOString(), new Date(at + 1).toISOString())).filter(
+    (r) => r.impact?.measure,
+  );
+  if (recommendations.length === 0) return [];
+  const ids = recommendations.map((r) => r.id);
+  const kinds = [...new Set(recommendations.map((r) => r.impact!.measure!.signalKind))];
+  const [feedback, results, signals] = await Promise.all([
+    memory.listFeedback(organizationId, ids),
+    memory.listValueResults(organizationId, ids),
+    memory.recentSignals(organizationId, options.signalLimit ?? 10_000, kinds),
+  ]);
+  const due = dueMeasurements({ organizationId, recommendations, feedback, results, signals, now });
+  for (const result of due) await memory.recordValueResult(result);
+  return due;
 }
