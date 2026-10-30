@@ -175,7 +175,7 @@ Used by: R is retail, W is wholesale, M is manufacturing. Test with says how we 
 | The Knot Pro | R | Unknown | Paid account | No | Planned (Leads and reviews from engaged couples on The Knot and WeddingWire vendor listings. No public API found; start with the lead notification emails) |
 | Calendly | R | Public API | Free sandbox | No | Built (Read-only: a personal access token with only the users:read and scheduled_events:read scopes, and the client sends only its three listed reads. No webhooks, since subscribing needs a paid plan and the webhooks:write scope; the sync polls instead) |
 | Acuity Scheduling | R | Public API | Paid account | Yes | Planned |
-| Mailchimp | R | Public API | Free sandbox | Yes | Planned |
+| Mailchimp | R | Public API | Free sandbox | Yes | Built (A Mailchimp API key can't be limited to reading, so the client sends its five listed GET reads only and throws before anything else. Every read names the fields it wants, so names, phone numbers, addresses and merge fields never leave Mailchimp) |
 | Google Analytics 4 | R, W | Public API | Free sandbox | No | Planned |
 | Google Ads | R | Public API | Free sandbox | No | Planned (Test accounts for development; production needs an approved developer token) |
 | Meta Ads | R | Public API | Free sandbox | No | Planned |
@@ -402,6 +402,7 @@ A request for a path or method the docs don't list throws `UndocumentedRequestEr
 - HubSpot's CRM search, archived list, batch association and token info endpoints (date version 2026-09)
 - IDEX's Onsite feeds: the natural full feed and the lab-grown full file
 - Klaviyo's mock covers its profile, list, segment, campaign, flow and metric reads and the campaign and flow values reports (revision 2026-10-15). Plaid's accounts, transactions sync, Item and webhook verification key endpoints (API version 2020-09-14), with webhooks signed the way Plaid signs them
+- Mailchimp's ping, audience, member, campaign and campaign report reads (Marketing API 3.0)
 - monday.com's GraphQL API: boards, items, activity logs and updates
 - Nivoda's GraphQL diamond search: sign-in, diamonds_by_query and get_diamond_by_id
 - Plaid's accounts, transactions sync, Item and webhook verification key endpoints (API version 2020-09-14), with webhooks signed the way Plaid signs them
@@ -414,7 +415,7 @@ A request for a path or method the docs don't list throws `UndocumentedRequestEr
 - A WooCommerce store's REST API v3 read endpoints with its key permissions and page headers
 - Xero's Accounting API endpoints with its token refresh
 
-Where a vendor has a free sandbox (Affirm, Authorize.net, Avalara AvaTax, BigCommerce, Calendly, Clover, Custom forms, GIA Report Results, Gmail, Google Workspace and Drive, HubSpot, Klaviyo, Monday.com, Plaid, QuickBooks Online, Slack, Square, Wix, WooCommerce and Xero so far), its mock is a stand-in until a developer account is set up for the nightly run.
+Where a vendor has a free sandbox (Affirm, Authorize.net, Avalara AvaTax, BigCommerce, Calendly, Clover, Custom forms, GIA Report Results, Gmail, Google Workspace and Drive, HubSpot, Klaviyo, Mailchimp, Monday.com, Plaid, QuickBooks Online, Slack, Square, Wix, WooCommerce and Xero so far), its mock is a stand-in until a developer account is set up for the nightly run.
 
 <!-- registry:mocks:end -->
 
@@ -1029,6 +1030,28 @@ Reads Klaviyo's JSON:API (`https://a.klaviyo.com/api/...`) with a private API ke
 **Webhooks.** Only Advanced KDP customers and Klaviyo app partners can create system webhooks, so most accounts rely on the scheduled sync. `verifyKlaviyoWebhook` checks `Klaviyo-Signature`, the hex HMAC-SHA256 keyed with the webhook's secret over the raw body followed directly by the `Klaviyo-Timestamp` header, in constant time. It rejects a timestamp more than five minutes off, so a captured delivery can't be replayed later, and a body whose `meta.klaviyo_webhook_id` doesn't match `Klaviyo-Webhook-Id`, as Klaviyo advises. `KlaviyoReplayGuard` handles each event's `external_id` once, and the event keys make a redelivery a duplicate. Email and SMS consent topics become `marketing.consent_changed`; other topics are per-person activity and are dropped. The instance doesn't take webhooks yet.
 
 **Testing.** Until a Klaviyo account is set up for the nightly run, the tests run against a mock built from Klaviyo's API reference (`packages/testkit/src/mocks/klaviyo.ts`). It answers 401 without the key and 400 without a revision, applies sparse fieldsets, binds each cursor to its query, and checks report bodies the way the reference describes. Its assumptions are listed in the mock and checked on the first sandbox run. For the nightly run, create a free Klaviyo account for testing only, add a few synthetic profiles, a list, a campaign and a flow, make a private key with the read scopes above, and add it as the `SANDBOX_KLAVIYO_PRIVATE_API_KEY` GitHub Actions secret. The writes it may do later (add profiles to lists, trigger flows) are declared, and the write-gate test shows each one is stopped.
+
+### Mailchimp
+
+Reads one Mailchimp account through the Marketing API (3.0) on the data center its API key names. A Mailchimp API key can't be limited to reading, so read-only is enforced in the client: it sends GET requests for five listed reads only (ping, audiences, audience members, campaigns and campaign reports), with parameters it checked, and throws before sending anything else. The one write it may do later (add a contact to an audience) is declared and stays behind the write gate.
+
+| Setting | What it is |
+| --- | --- |
+| `MAILCHIMP_API_KEY` | An API key from Profile > Extras > API keys, ending in the account's data center (such as `-us21`) |
+| `CUSTOMER_REF_KEY` | The instance's customer reference key, shared with custom forms, Calendly and Klaviyo |
+| `MAILCHIMP_WEBHOOK_SECRET` | Optional. A random secret for the webhook URL, for when webhooks are turned on |
+
+**Privacy.** Every read names the fields it wants (`fields=`), so names, phone numbers, addresses, birthdays, merge fields, tags, locations and subject lines never leave Mailchimp. A member's email address comes back only to become the same keyed reference custom forms makes for it, so a subscriber lines up with the same person's form submissions, Calendly bookings and Klaviyo profile. Mailchimp's member id is the MD5 of the email address, which anyone can recompute from a guess, so it is never kept.
+
+**What it reads.** The historical import reads every audience, every member of each (1000 a page, oldest change first), and the campaigns sent in the last five years with each one's report. Incremental syncs read the audiences again, the members changed since the previous pass started (less five minutes), and the campaigns sent from 30 days before that, since a report keeps growing as opens and clicks come in.
+
+**Rate limits.** Mailchimp allows 10 requests at once. The client sends one at a time and waits out a 429 (`Retry-After` when sent, at most a minute, three tries) before the error goes to the sync runner.
+
+**Events.** The same types as Klaviyo: `marketing.list_updated` for audiences, `customer.profile_updated` with `marketingConsent` true only for subscribed members, `marketing.group_membership_seen`, `marketing.campaign_updated`, `marketing.campaign_metrics_reported` with sends, bounces, opens, clicks, orders, revenue in cents, unsubscribes and abuse reports, and marketing's `campaign.sent` once emails went out (cost 0, as Mailchimp has none per campaign). Members are keyed by audience, reference and last change, and reports by a digest of their numbers, so a replay is a duplicate.
+
+**Webhooks.** Mailchimp doesn't sign deliveries. `verifyMailchimpWebhook` checks the `key` query parameter the instance put in the webhook URL against `MAILCHIMP_WEBHOOK_SECRET`, in constant time. `mailchimpWebhookEvent` reads a delivery's type, audience and time from its form body and nothing about the member. A delivery is a prompt to sync. The instance doesn't take webhooks yet; the scheduled sync picks every change up.
+
+**Testing.** The tests run against a mock built from Mailchimp's docs (`packages/testkit/src/mocks/mailchimp.ts`), which needs Basic auth, applies `fields`, filters by `since_last_changed` and `since_send_time`, sorts and pages. For the nightly run, make a free Mailchimp account with one audience of `example.test` addresses and a test campaign, and add its key as the `SANDBOX_MAILCHIMP_API_KEY` GitHub Actions secret.
 
 ### Metals-API
 
