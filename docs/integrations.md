@@ -195,7 +195,7 @@ Used by: R is retail, W is wholesale, M is manufacturing. Test with says how we 
 | Judge.me | R | Public API | Unknown | Yes | Planned (Shopify product reviews and ratings) |
 | Smile.io | R | Public API | Paid account | No | Planned (Loyalty points, VIP tiers and referrals. The API needs the Plus or Enterprise plan) |
 | Trustpilot | R, W | Public API | Paid account | No | Planned (Company reviews and trust score. The API needs Trustpilot's API module add-on) |
-| Pinterest | R, M | Public API | Free sandbox | No | Planned (Organic pins, boards and pin analytics, where bridal shoppers save ideas) |
+| Pinterest | R, M | Public API | Free sandbox | No | Built (Connects a Pinterest business account through an app the store owns, holding boards:read, pins:read and user_accounts:read only; the connector stops if the token holds anything more. Its only API requests are the Pin list and two analytics reads. Pinterest's analytics reach back 90 days, so the first import reads 90 days of metrics and every Pin) |
 | TikTok | R | Public API | Free sandbox | No | Planned (The store's own videos and how they perform) |
 | TikTok Ads | R | Public API | Free sandbox | No | Planned (Ad spend and results from TikTok's API for Business. No public API changelog found; the nightly sandbox run catches API changes) |
 | Yext | R | Public API | Free sandbox | No | Planned (Local listings and reviews from many sites in one place, including Yelp, whose own API shows only a few reviews. No public API changelog found; the nightly sandbox run catches API changes) |
@@ -404,6 +404,7 @@ A request for a path or method the docs don't list throws `UndocumentedRequestEr
 - Klaviyo's mock covers its profile, list, segment, campaign, flow and metric reads and the campaign and flow values reports (revision 2026-10-15). Plaid's accounts, transactions sync, Item and webhook verification key endpoints (API version 2020-09-14), with webhooks signed the way Plaid signs them
 - monday.com's GraphQL API: boards, items, activity logs and updates
 - Nivoda's GraphQL diamond search: sign-in, diamonds_by_query and get_diamond_by_id
+- Pinterest's API v5 Pin list, account analytics, top Pins and Pin creation with its OAuth refresh, enforcing the client credentials, each token's scopes, the 90-day analytics window, page sizes, metrics and bookmarks tied to their list
 - Plaid's accounts, transactions sync, Item and webhook verification key endpoints (API version 2020-09-14), with webhooks signed the way Plaid signs them
 - QuickBooks Online's query and change data capture endpoints with Intuit's token refresh (minor version 75)
 - Rapaport's token service and Price List API: the full list and its changes
@@ -414,7 +415,7 @@ A request for a path or method the docs don't list throws `UndocumentedRequestEr
 - A WooCommerce store's REST API v3 read endpoints with its key permissions and page headers
 - Xero's Accounting API endpoints with its token refresh
 
-Where a vendor has a free sandbox (Affirm, Authorize.net, Avalara AvaTax, BigCommerce, Calendly, Clover, Custom forms, GIA Report Results, Gmail, Google Workspace and Drive, HubSpot, Klaviyo, Monday.com, Plaid, QuickBooks Online, Slack, Square, Wix, WooCommerce and Xero so far), its mock is a stand-in until a developer account is set up for the nightly run.
+Where a vendor has a free sandbox (Affirm, Authorize.net, Avalara AvaTax, BigCommerce, Calendly, Clover, Custom forms, GIA Report Results, Gmail, Google Workspace and Drive, HubSpot, Klaviyo, Monday.com, Pinterest, Plaid, QuickBooks Online, Slack, Square, Wix, WooCommerce and Xero so far), its mock is a stand-in until a developer account is set up for the nightly run.
 
 <!-- registry:mocks:end -->
 
@@ -1113,6 +1114,30 @@ A listing's time is when KaratOS saw it, since Nivoda doesn't say when a diamond
 **Writes.** Declared and turned off: putting a diamond on hold and ordering one, which are Nivoda's Pro API mutations.
 
 **Testing.** The tests run against a mock built from Nivoda's API help pages (`packages/testkit/src/mocks/nivoda.ts`), which signs in, pages a search and expires tokens with synthetic diamonds. The fields past Nivoda's installation guide are listed as the mock's assumptions and checked on the first staging run.
+
+### Pinterest
+
+Reads one Pinterest business account's Pins and analytics through Pinterest's API (v5). Read-only two ways over: the connection holds `boards:read`, `pins:read` and `user_accounts:read` and nothing else, which the client checks on every token refresh before reading anything; and its only requests are the Pin list and two analytics reads for the connected account, with parameters it builds and checks itself.
+
+| Setting | What it is |
+| --- | --- |
+| `PINTEREST_CLIENT_ID` | The App id of a Pinterest developer app the store owns |
+| `PINTEREST_CLIENT_SECRET` | The same app's App secret key |
+| `PINTEREST_REFRESH_TOKEN` | The business account's refresh token, with the three read scopes only |
+
+**What it reads.** Every pass reads every Pin the account owns, 250 a page, with its title, the page it links to, its board and its 90-day and lifetime metrics. Then the account's daily impressions, saves, Pin clicks, outbound clicks and engagements: 90 days on the first import, which is as far back as Pinterest's analytics reach, and the last 30 days on each sync after, since Pinterest keeps refining recent days. Last, the 50 Pins saved most over the last 30 days, ranked.
+
+**Events.** `social.pin_updated` for each Pin, `social.account_reported` for each day and `social.top_pin_reported` for each ranked Pin. Each is keyed by a digest of its numbers, so a revised day or Pin is stored as a new version and an unchanged one is a duplicate.
+
+**Privacy.** Pins are the store's own posts and analytics are totals, so nothing names a customer. A Pin's description isn't kept, a title holding an @ is dropped, and a link keeps its address without the query string or fragment.
+
+**Tokens.** Pinterest replaces the refresh token on every refresh (continuous refresh tokens, 60 days each). The newest is kept in the instance's database, sealed with a key derived from the client secret, so a daily sync keeps the connection alive indefinitely.
+
+**Rate limits.** The client sends one request at a time and waits out a 429 (honoring `Retry-After` up to a minute, doubling from a second otherwise), three tries, before the error goes to the sync runner, which resumes from its checkpoint next time. A 401 renews the access token once. A 403 on analytics means the account isn't a business account.
+
+**Writes.** Creating a Pin for a product, with its photo and a link to its page, is declared so it can be gated and audited, and is turned off. It needs a named person's approval. Turning it on would also need a token with `pins:write` and `boards:write`, which the connector stops on today.
+
+**Testing.** The tests run against a mock built from Pinterest's OpenAPI description (`packages/testkit/src/mocks/pinterest.ts`), which checks the client credentials, the refresh token rotation, each token's scopes, the 90-day analytics window, page sizes, metrics and that a bookmark belongs to its list. Pinterest's sandbox doesn't serve analytics, so for the nightly run connect a test business account to a developer app with the three read scopes and add `SANDBOX_PINTEREST_CLIENT_ID`, `SANDBOX_PINTEREST_CLIENT_SECRET` and `SANDBOX_PINTEREST_REFRESH_TOKEN` as GitHub Actions secrets.
 
 ### PIRO
 
