@@ -23,7 +23,7 @@ export const SYSTEM_DETAILS: Readonly<Record<string, SystemDetail>> = {
   adobe_commerce: { about: "Orders, products, stock and customers from an Adobe Commerce or Magento store.", company: "Adobe" },
   punchmark: { about: "Website orders, product listings and leads from a Punchmark jewelry website." },
   etsy: { about: "Etsy orders, listings and shop payments." },
-  ebay: { about: "eBay orders and listings, often estate and pre-owned pieces." },
+  ebay: { about: "eBay orders, often estate and pre-owned pieces." },
   amazon: { about: "Amazon orders, listings, stock, fees and settlements.", company: "Amazon" },
   tiktok_shop: { about: "Orders, products and returns from TikTok's in-app shop.", company: "TikTok" },
   faire: { about: "Wholesale orders from independent boutiques through the Faire marketplace." },
@@ -340,4 +340,5 @@ export const CONNECTED_ON: Readonly<Record<string, string>> = {
   woocommerce: "2026-10-28",
   piro: "2026-10-29",
   refiner_statements: "2026-10-29",
+  ebay: "2026-10-30",
 };

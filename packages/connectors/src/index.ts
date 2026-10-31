@@ -8,6 +8,7 @@ export * from "./calendly/index.js";
 export * from "./chase/index.js";
 export * from "./clover/index.js";
 export * from "./custom_forms/index.js";
+export * from "./ebay/index.js";
 export * from "./edi_x12/index.js";
 export * from "./files/index.js";
 export * from "./gia/index.js";
