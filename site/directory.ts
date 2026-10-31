@@ -228,7 +228,7 @@ export const SYSTEM_DETAILS: Readonly<Record<string, SystemDetail>> = {
   judgeme: { about: "Product reviews and ratings on a Shopify store." },
   smile_io: { about: "Loyalty points, VIP tiers and referrals." },
   trustpilot: { about: "Company reviews and the store's trust score." },
-  pinterest: { about: "Pins, boards and pin analytics, where bridal shoppers save ideas." },
+  pinterest: { about: "Pins and pin analytics, where bridal shoppers save ideas." },
   tiktok: { about: "The store's own TikTok videos and how they perform.", company: "TikTok" },
   tiktok_ads: { about: "TikTok ad spend and results.", company: "TikTok" },
   yext: { about: "Local listings and reviews from many sites in one place, including Yelp." },
@@ -340,4 +340,5 @@ export const CONNECTED_ON: Readonly<Record<string, string>> = {
   woocommerce: "2026-10-28",
   piro: "2026-10-29",
   refiner_statements: "2026-10-29",
+  pinterest: "2026-10-31",
 };
