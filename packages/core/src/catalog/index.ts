@@ -35,6 +35,7 @@ import watchsearch from "./watchsearch.js";
 import wix from "./wix.js";
 import woocommerce from "./woocommerce.js";
 import xero from "./xero.js";
+import yext from "./yext.js";
 
 /** Each built connector's own catalog fields, by catalog id. */
-export const CONNECTOR_CATALOG: Readonly<Record<string, ConnectorCatalogEntry>> = { affirm, authorize_net, avalara, bank_statements, bigcommerce, calendly, chase, clover, custom_forms, edi_x12, gia, gmail, google_workspace, hubspot, idex, inventory_pos, klaviyo, metals_api, monday, nivoda, piro, plaid, quickbooks, rapnet, refiner_statements, shopify, slack, square, stripe, stuller, twilio, watchsearch, wix, woocommerce, xero };
+export const CONNECTOR_CATALOG: Readonly<Record<string, ConnectorCatalogEntry>> = { affirm, authorize_net, avalara, bank_statements, bigcommerce, calendly, chase, clover, custom_forms, edi_x12, gia, gmail, google_workspace, hubspot, idex, inventory_pos, klaviyo, metals_api, monday, nivoda, piro, plaid, quickbooks, rapnet, refiner_statements, shopify, slack, square, stripe, stuller, twilio, watchsearch, wix, woocommerce, xero, yext };

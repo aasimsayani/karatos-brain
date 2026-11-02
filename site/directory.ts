@@ -231,7 +231,7 @@ export const SYSTEM_DETAILS: Readonly<Record<string, SystemDetail>> = {
   pinterest: { about: "Pins, boards and pin analytics, where bridal shoppers save ideas." },
   tiktok: { about: "The store's own TikTok videos and how they perform.", company: "TikTok" },
   tiktok_ads: { about: "TikTok ad spend and results.", company: "TikTok" },
-  yext: { about: "Local listings and reviews from many sites in one place, including Yelp." },
+  yext: { about: "Reviews from many sites in one place, including Yelp, and the store's locations." },
   amptive: { about: "Campaign results, website leads and ad reports from the store's marketing agency." },
   smart_age_solutions: { about: "Website and SEO results, and care plans sold through the Smart Care app." },
   gemiq_gemlightbox: { about: "Product photos, 360 videos and descriptions for each item." },
@@ -340,4 +340,5 @@ export const CONNECTED_ON: Readonly<Record<string, string>> = {
   woocommerce: "2026-10-28",
   piro: "2026-10-29",
   refiner_statements: "2026-10-29",
+  yext: "2026-11-02",
 };

@@ -24,6 +24,7 @@ import twilio from "./twilio.js";
 import wix from "./wix.js";
 import woocommerce from "./woocommerce.js";
 import xero from "./xero.js";
+import yext from "./yext.js";
 
 /** Every connector's nightly sandbox check. */
-export const SANDBOX_CHECKS: SandboxCheck[] = [affirm, authorize_net, avalara, bigcommerce, calendly, clover, custom_forms, gia, gmail, google_workspace, hubspot, klaviyo, metals_api, monday, plaid, quickbooks, shopify, slack, square, stripe, twilio, wix, woocommerce, xero];
+export const SANDBOX_CHECKS: SandboxCheck[] = [affirm, authorize_net, avalara, bigcommerce, calendly, clover, custom_forms, gia, gmail, google_workspace, hubspot, klaviyo, metals_api, monday, plaid, quickbooks, shopify, slack, square, stripe, twilio, wix, woocommerce, xero, yext];
