@@ -66,20 +66,25 @@ function event(key: string, type: string, occurredAt: string | undefined, receiv
   return { id: `yext_${key.replace(/[^A-Za-z0-9_.:-]/g, "_")}`, type, occurredAt, receivedAt, idempotencyKey: `yext:${key}`, payload };
 }
 
-/** A word that is an email address. */
-const EMAIL = /^[^@]+@[^@]+\.[^@]+$/;
+/** Whether a word is an email address: one @ with something before it, and a dot after it with something on each side. */
+function isEmail(word: string): boolean {
+  const at = word.indexOf("@");
+  if (at < 1 || word.indexOf("@", at + 1) !== -1) return false;
+  const dot = word.indexOf(".", at + 2);
+  return dot !== -1 && dot < word.length - 1;
+}
 /** Seven or more digits, each apart from the next by at most two spaces, brackets, dots or dashes. */
 const PHONE = /\+?\(?\d(?:[\s().-]{0,2}\d){6,}/g;
 
 /** Text a customer wrote, with email addresses and phone numbers masked and cut to `max`. */
 export function yextMasked(value: unknown, max = YEXT_EXCERPT_CHARS): string | undefined {
   if (typeof value !== "string") return undefined;
-  // Each word is checked on its own against an anchored pattern, and the phone pattern can't match one stretch
+  // Each word is checked for an email address without a pattern, and the phone pattern can't match one stretch
   // two ways, so masking takes time in step with the text's length.
   const masked = value
     .split(/\s+/)
     .filter(Boolean)
-    .map((w) => (EMAIL.test(w) ? "[email]" : w))
+    .map((w) => (isEmail(w) ? "[email]" : w))
     .join(" ")
     .replace(PHONE, "[phone]");
   return masked ? masked.slice(0, max) : undefined;

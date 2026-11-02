@@ -74,10 +74,11 @@ describe("Yext normalizer", () => {
     expect(yextMasked("lovely\n\n   ring")).toBe("lovely ring");
     // A full date has as many digits as a phone number, and masking errs that way.
     expect(yextMasked("ring #12345, 1.5 ct, 2026-11-02")).toBe("ring #12345, 1.5 ct, [phone]");
-    expect(yextMasked("me@shop")).toBe("me@shop");
+    expect(["me@shop", "@shop.test", "a@@b.test", "a@b@c.test", "a@.test", "a@b.", "a@b."].map((w) => yextMasked(w))).toEqual(["me@shop", "@shop.test", "a@@b.test", "a@b@c.test", "a@.test", "a@b.", "a@b."]);
+    expect(["a@b.c", "a@b.c.", "x.y@shop.example.test,"].map((w) => yextMasked(w))).toEqual(["[email]", "[email]", "[email]"]);
     // Long runs of what the patterns look for take time in step with the text, not its square.
     const started = performance.now();
-    for (const filler of ["!".repeat(50_000), "1 ".repeat(50_000), `${"a@".repeat(25_000)}.`, `${"!".repeat(30_000)}@${"!".repeat(30_000)}`]) expect(yextMasked(filler)!.length).toBeLessThanOrEqual(YEXT_EXCERPT_CHARS);
+    for (const filler of ["!".repeat(50_000), "1 ".repeat(50_000), `${"a@".repeat(25_000)}.`, `${"!".repeat(30_000)}@${"!".repeat(30_000)}`, `a@b.${"a.".repeat(30_000)}@`]) expect(yextMasked(filler)!.length).toBeLessThanOrEqual(YEXT_EXCERPT_CHARS);
     expect(performance.now() - started).toBeLessThan(500);
     expect([" ", 5, null].map((v) => yextMasked(v))).toEqual([undefined, undefined, undefined]);
   });
