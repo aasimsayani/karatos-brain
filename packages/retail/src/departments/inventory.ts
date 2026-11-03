@@ -1,7 +1,7 @@
 import { meltValueCents, type Metal, type Signal } from "@karatos/core";
 import { z } from "zod";
 import type { DepartmentModule } from "../department.js";
-import { daysBetween, dollars, entityFrom, extractor, recommend, signalFrom, value } from "../department.js";
+import { ASSUMPTIONS, daysBetween, dollars, entityFrom, estimate, extractor, pct, recommend, signalFrom, value } from "../department.js";
 
 export const CATEGORIES = ["ring", "engagement_ring", "wedding_band", "necklace", "pendant", "earrings", "bracelet", "watch", "loose_stone", "other"] as const;
 export const METALS = ["gold", "silver", "platinum", "palladium"] as const;
@@ -148,6 +148,7 @@ export const inventory: DepartmentModule = {
                   : ` Metal value is about ${dollars(melt)}.`;
             }
           }
+          const tied = p.costCents * line.onHand;
           return [
             recommend({
               department: "inventory",
@@ -155,7 +156,12 @@ export const inventory: DepartmentModule = {
               organizationId,
               summary: `${p.title} (${line.sku}) has sat for ${sinceSale} days with ${line.onHand} on hand. Feature it, move it to another case or channel, or mark it down.${meltNote}`,
               confidence: 0.7,
-              expectedImpact: `Frees ${dollars(p.costCents * line.onHand)} of cost tied up in slow stock`,
+              expectedImpact: `Frees ${dollars(tied)} of cost tied up in slow stock`,
+              impact: estimate(
+                "saves",
+                `A year of carrying cost on ${dollars(tied)} of stock at cost, at ${pct(ASSUMPTIONS.carryingRate.likely)} a year for insurance, capital and case space, saved once it sells or is remade.`,
+                (a) => tied * a("carryingRate"),
+              ),
               basedOn,
               now,
             }),
@@ -178,6 +184,11 @@ export const inventory: DepartmentModule = {
                 summary: `Reorder ${p.title} (${line.sku}): ${line.soldRecently} sold in the last 60 days and ${Math.max(line.onHand, 0)} left.`,
                 confidence: Math.min(0.9, 0.55 + line.soldRecently * 0.05),
                 expectedImpact: `Avoids missing sales at ${dollars(p.retailPriceCents)} each`,
+                impact: estimate(
+                  "makes",
+                  `Profit on a month of sales at the last 60 days' pace (${line.soldRecently / 2} a month at ${dollars(p.retailPriceCents)}) and a ${pct(ASSUMPTIONS.margin.likely)} margin, which an empty case would miss.`,
+                  (a) => (line.soldRecently / 2) * p.retailPriceCents * a("margin"),
+                ),
                 basedOn: line.basedOn,
                 now,
               }),

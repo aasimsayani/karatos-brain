@@ -163,4 +163,30 @@ describe("PostgresMemoryStore", () => {
     await store.saveCheckpoint(ORG, "shopify", "orders", "cursor-2");
     expect(await store.getCheckpoint(ORG, "shopify", "orders")).toBe("cursor-2");
   });
+
+  it("stores a recommendation's dollar impact, and reads one without it back without one", async () => {
+    const { client } = await setup();
+    const store = new PostgresMemoryStore(client);
+    const base = {
+      organizationId: ORG,
+      summary: "Reorder studs",
+      confidence: 0.7,
+      expectedImpact: "Avoids missing sales",
+      provenance: { eventIds: [], signalIds: [], documentIds: [] },
+      degraded: false,
+      createdAt: "2026-10-01T12:00:00.000Z",
+    };
+    const impact = { kind: "makes" as const, lowCents: 35_000, cents: 45_000, highCents: 55_000, basis: "Profit on a month of sales" };
+    await store.saveRecommendations([
+      { ...base, id: "rec_with", impact },
+      { ...base, id: "rec_without", createdAt: "2026-10-01T11:00:00.000Z" },
+    ]);
+    expect(await store.getRecommendation(ORG, "rec_with")).toEqual({ ...base, id: "rec_with", impact });
+    const without = await store.getRecommendation(ORG, "rec_without");
+    expect(without && "impact" in without).toBe(false);
+    expect((await store.listRecommendations(ORG, 10)).map((r) => r.impact)).toEqual([impact, undefined]);
+    const { rows } = await client.query<{ impact: unknown }>("select impact from recommendations order by id");
+    expect(rows).toEqual([{ impact }, { impact: null }]);
+  });
 });
+
