@@ -1,6 +1,6 @@
 import { z } from "zod";
 import type { DepartmentModule } from "../department.js";
-import { calendarDaysSince, daysBetween, dollars, extractor, latestBySubject, recommend, signalFrom, value } from "../department.js";
+import { ASSUMPTIONS, calendarDaysSince, daysBetween, dollars, estimate, extractor, latestBySubject, pct, recommend, signalFrom, value } from "../department.js";
 
 const BankTransactionImported = z.object({
   transactionId: z.string().min(1),
@@ -113,6 +113,7 @@ export const finance: DepartmentModule = {
             summary: `${dollars(received)} in cash sales over the last ${WINDOW_DAYS} days but only ${dollars(deposited)} in cash deposits. Reconcile the drawer logs and deposits.`,
             confidence: 0.7,
             expectedImpact: `Accounts for ${dollars(received - deposited)} of cash`,
+            impact: estimate("protects", `The ${dollars(received - deposited)} of cash sales with no matching deposit.`, () => received - deposited),
             basedOn: [...taken, ...deposits],
             now,
           }),
@@ -145,6 +146,11 @@ export const finance: DepartmentModule = {
             summary: `${dollars(owed)} across ${overdue.length} ${overdue.length === 1 ? "invoice is" : "invoices are"} more than ${OVERDUE_DAYS} days past due. Follow up with those customers, oldest first.`,
             confidence: 0.8,
             expectedImpact: `Brings in up to ${dollars(owed)} owed`,
+            impact: estimate(
+              "protects",
+              `${pct(ASSUMPTIONS.collectRate.likely)} of the ${dollars(owed)} past due, brought in by following up.`,
+              (a) => owed * a("collectRate"),
+            ),
             basedOn: overdue,
             now,
           }),

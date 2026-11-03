@@ -592,6 +592,7 @@ describe("finance balances and receivables", () => {
       id: "rec_finance_overdue_receivables_2026-10-02",
       summary: "$650.00 across 2 invoices are more than 30 days past due. Follow up with those customers, oldest first.",
       expectedImpact: "Brings in up to $650.00 owed",
+      impact: { kind: "protects", lowCents: 32_500, cents: 52_000, highCents: 61_750, basis: "80% of the $650.00 past due, brought in by following up." },
       confidence: 0.8,
     });
     expect(rec!.provenance.signalIds).toHaveLength(2);
