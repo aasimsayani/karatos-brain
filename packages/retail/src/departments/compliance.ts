@@ -1,10 +1,21 @@
 import type { Signal } from "@karatos/core";
 import type { DepartmentModule } from "../department.js";
-import { daysBetween, dollars, recommend, value } from "../department.js";
+import { calendarDaysSince, daysBetween, dollars, latestBySubject, recommend, value } from "../department.js";
 
 const FORM_8300_THRESHOLD_CENTS = 1_000_000;
 const RELATED_WINDOW_MS = 24 * 3_600_000;
 const REVIEW_WINDOW_DAYS = 30;
+/** Invoices and memos from this many days back are checked for their warranty statement. */
+const WARRANTY_WINDOW_DAYS = 90;
+
+type SupplierLine = {
+  supplier: string;
+  documentType: "invoice" | "memo";
+  documentNumber: string;
+  documentDate: string;
+  diamond: "natural" | "lab_grown" | "none";
+  warrantyStatement: "current" | "earlier" | "none";
+};
 
 type CashPayment = {
   saleId: string;
@@ -35,6 +46,9 @@ function largestDayTotal(payments: Signal[]): number {
  * - Dealers in precious metals and stones must run an AML program, including
  *   watching for payments split to stay under reporting thresholds.
  * - Most states require ID and records when buying jewelry from the public.
+ * - Natural diamonds are bought with the World Diamond Council's System of
+ *   Warranties statement on each invoice and memo, the paper trail the
+ *   trade keeps under the Kimberley Process.
  */
 export const compliance: DepartmentModule = {
   id: "compliance",
@@ -108,6 +122,37 @@ export const compliance: DepartmentModule = {
               confidence: 0.6,
               expectedImpact: "Meets AML program duties for dealers in precious metals",
               basedOn: list,
+              now,
+            }),
+          ];
+        });
+      },
+    },
+    {
+      name: "compliance.diamond-warranty",
+      reason: ({ organizationId, signals, now }) => {
+        // The latest version of each line, grouped by its document.
+        const documents = new Map<string, Signal[]>();
+        for (const s of latestBySubject(signals, ["supplier.line"]).values()) {
+          const l = value<SupplierLine>(s);
+          if (l.diamond !== "natural" || calendarDaysSince(l.documentDate, now) > WARRANTY_WINDOW_DAYS) continue;
+          const key = `${l.supplier}|${l.documentType}|${l.documentNumber}`;
+          documents.set(key, [...(documents.get(key) ?? []), s]);
+        }
+        return [...documents.values()].flatMap((lines) => {
+          // A document is one statement: if any of its lines carries it, they all do.
+          if (lines.some((s) => value<SupplierLine>(s).warrantyStatement !== "none")) return [];
+          const l = value<SupplierLine>(lines[0]!);
+          const kind = l.documentType === "memo" ? "Memo" : "Invoice";
+          return [
+            recommend({
+              department: "compliance",
+              key: `warranty_${l.supplier}_${l.documentType}_${l.documentNumber}`,
+              organizationId,
+              summary: `${kind} ${l.documentNumber} from ${l.supplier} (${l.documentDate}) lists ${lines.length === 1 ? "a natural diamond" : `${lines.length} natural diamond lines`} but no System of Warranties statement was found on it. Ask ${l.supplier} for a copy that carries the statement, and keep it with the purchase records.`,
+              confidence: 0.7,
+              expectedImpact: "Keeps the conflict-free paper trail the diamond trade expects on every purchase",
+              basedOn: lines,
               now,
             }),
           ];

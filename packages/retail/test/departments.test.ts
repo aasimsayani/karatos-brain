@@ -487,6 +487,83 @@ describe("compliance", () => {
   });
 });
 
+describe("compliance: diamond warranty statements", () => {
+  const line = (documentNumber: string, n: number, over: Record<string, unknown> = {}) => ({
+    lineId: `supplier:test_supplier:invoice:${documentNumber}:${n}`,
+    supplier: "test_supplier",
+    documentType: "invoice",
+    documentNumber,
+    documentDate: "2026-09-15",
+    sku: `TEST-${documentNumber}-${n}`,
+    amountCents: 100_000,
+    diamond: "natural",
+    warrantyStatement: "none",
+    kimberleyProcess: false,
+    currency: "USD",
+    ...over,
+  });
+  const send = (s: ReturnType<typeof store>, l: ReturnType<typeof line>) => s.send("supplier_invoice.line_imported", l, `${l.documentDate}T00:00:00Z`);
+
+  it("flags each recent document for natural diamonds with no statement, once, counting its diamond lines", async () => {
+    const s = store();
+    await send(s, line("INV-1", 0));
+    await send(s, line("INV-1", 1));
+    await send(s, line("INV-1", 2, { diamond: "none" }));
+    await send(s, line("M-7", 0, { documentType: "memo", lineId: "supplier:test_supplier:memo:M-7:0" }));
+    const recs = about(await s.ask(NOW), "System of Warranties");
+    expect(recs.map((r) => r.summary)).toEqual([
+      "Invoice INV-1 from test_supplier (2026-09-15) lists 2 natural diamond lines but no System of Warranties statement was found on it. Ask test_supplier for a copy that carries the statement, and keep it with the purchase records.",
+      "Memo M-7 from test_supplier (2026-09-15) lists a natural diamond but no System of Warranties statement was found on it. Ask test_supplier for a copy that carries the statement, and keep it with the purchase records.",
+    ]);
+    expect(recs[0]!.confidence).toBe(0.7);
+    expect(recs[0]!.provenance.signalIds).toHaveLength(2);
+  });
+
+  it("keeps the same number from two suppliers, or as a memo and an invoice, apart", async () => {
+    const s = store();
+    await send(s, line("X-1", 0));
+    await send(s, line("X-1", 0, { supplier: "other_supplier", lineId: "supplier:other_supplier:invoice:X-1:0" }));
+    await send(s, line("X-1", 0, { documentType: "memo", lineId: "supplier:test_supplier:memo:X-1:0" }));
+    const recs = about(await s.ask(NOW), "System of Warranties");
+    expect(new Set(recs.map((r) => r.id)).size).toBe(3);
+  });
+
+  it("says nothing for a document with the statement, lab-grown stones, no diamonds, or one older than 90 days", async () => {
+    const s = store();
+    await send(s, line("A", 0, { warrantyStatement: "current" }));
+    await send(s, line("B", 0, { warrantyStatement: "earlier" }));
+    await send(s, line("C", 0, { diamond: "lab_grown" }));
+    await send(s, line("D", 0, { diamond: "none" }));
+    await send(s, line("E", 0, { documentDate: "2026-07-03" }));
+    // 91 days before is too old; 90 is still checked.
+    await send(s, line("F", 0, { documentDate: "2026-07-04" }));
+    // A statement anywhere on the document covers all of it.
+    await send(s, line("G", 0));
+    await send(s, line("G", 1, { warrantyStatement: "current" }));
+    expect(about(await s.ask(NOW), "System of Warranties").map((r) => r.summary.split(" from")[0])).toEqual(["Invoice F"]);
+  });
+
+  it("follows a corrected document, so one that gained its statement stops being flagged", async () => {
+    const s = store();
+    await s.send("supplier_invoice.line_imported", line("INV-2", 0), "2026-09-15T00:00:00Z");
+    await s.send("supplier_invoice.line_imported", line("INV-2", 0, { warrantyStatement: "current" }), "2026-09-16T00:00:00Z");
+    expect(about(await s.ask(NOW), "System of Warranties")).toEqual([]);
+    // A line read again with a new amount is one line, not two.
+    await s.send("supplier_invoice.line_imported", line("INV-3", 0), "2026-09-15T00:00:00Z");
+    await s.send("supplier_invoice.line_imported", line("INV-3", 0, { amountCents: 120_000 }), "2026-09-16T00:00:00Z");
+    expect(about(await s.ask(NOW), "System of Warranties").map((r) => r.summary)).toEqual([expect.stringContaining("Invoice INV-3 from test_supplier (2026-09-15) lists a natural diamond but")]);
+  });
+
+  it("dead-letters a line it can't read", async () => {
+    const s = store();
+    for (const over of [{ documentType: null }, { documentNumber: "" }, { documentDate: null }, { amountCents: null }, { quantity: null }, { unitCostCents: -1 }, { due: null }, { diamond: "maybe" }, { warrantyStatement: "yes" }, { kimberleyProcess: "no" }, { currency: "usd" }]) {
+      await expect(s.send("supplier_invoice.line_imported", line("BAD", 0, over))).rejects.toThrow(/dead-lettered/);
+    }
+    expect(s.memory.deadLetters).toHaveLength(11);
+    await s.send("supplier_invoice.line_imported", line("OK", 0, { quantity: 2, unitCostCents: 0, due: "2026-10-15", terms: "Net 30", stone: "Diamond", description: "Ring", amountCents: -500 }));
+  });
+});
+
 describe("marketing", () => {
   it("separates campaigns worth repeating from ones losing money", async () => {
     const s = store();
