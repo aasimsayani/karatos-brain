@@ -88,6 +88,7 @@ These are built, tested against recorded vendor responses or mocks built from ea
 | EDI with retail partners (X12 850, 855, 856, 810, 846, 852) | Imports two years of purchase orders (850), inventory reports (846) and sell-through (852) from retail partners | Inventory, Sales, Wholesale |
 | Calendly | Imports two years of appointments and the year ahead, such as bridal consultations, repair drop-offs and pickups, then keeps them current | Clienteling, Custom orders, Repairs |
 | Avalara AvaTax | Imports five years of sales tax for every sale, return and purchase, then keeps it current as transactions are committed, voided or adjusted | Compliance, Finance |
+| FinCEN Form 8300 cash reporting | Imports five years of Form 8300 filings: date filed, sales covered, cash, and the BSA Tracking ID or BSA ID | Compliance |
 | Refiner and scrap settlement statements | Imports five years of refiner and scrap settlements: lots, metals, weights, assays, metal credited and fees | Metals, Finance |
 | TheWatchSearch (by TheWatchCloud) | Turns the dealer WhatsApp groups the store is in into a feed of offers: brand, reference, buy or sell, price, year, condition and set | Buying, Sales, Inventory |
 <!-- connected:end -->
@@ -132,7 +133,7 @@ This section updates itself as work lands: it is generated from [docs/milestones
 <!-- progress:start -->
 <!-- Generated from docs/milestones.json and the integration catalog by npm run progress:write. Edit those, not this block. -->
 
-**Overall: 68% complete**, 26 of 38 roadmap items done. 35 of the 253 systems in the integration catalog are connected.
+**Overall: 68% complete**, 26 of 38 roadmap items done. 36 of the 253 systems in the integration catalog are connected.
 
 | Milestone | What it gives a jeweler | Progress | Target |
 | --- | --- | --- | --- |
