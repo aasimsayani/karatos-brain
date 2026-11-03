@@ -121,7 +121,7 @@ Every accept, reject and override is stored, so these numbers come from the syst
 The weeks before Black Friday decide a jeweler's year, so that is when KaratOS has to prove itself. We are running an open testing weekend on **November 21–22, 2026**, the weekend before Black Friday, with sign-ups open from November 16.
 
 - **For jewelers:** connect your store, POS or bank in read-only mode and get your first list of recommendations before the holiday rush. Nothing in your systems is changed.
-- **For developers:** every connector runs against recorded vendor responses, so you can run the full suite offline with `npm test` and help us break things before stores rely on them.
+- **For developers:** every connector runs against recorded vendor responses or mocks built from the vendor's own docs, so you can run the full suite offline with `npm test` and help us break things before stores rely on them.
 
 Sign up with the pilot form on the KaratOS website, or open an issue here to join as a tester.
 

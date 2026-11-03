@@ -3,7 +3,7 @@
  * department list come straight from the code, so the site never drifts from
  * what the engine actually supports.
  */
-import { copyFileSync, mkdirSync, writeFileSync } from "node:fs";
+import { copyFileSync, mkdirSync, readdirSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import { INTEGRATIONS, selfServeIntegrations, type IntegrationSpec } from "../packages/core/src/index.js";
@@ -346,8 +346,18 @@ export function directoryCategories(dataSources: readonly IntegrationSpec[]): st
   return domains.map((d, n) => ({ d, n, b: built(d) })).sort((a, b) => b.b - a.b || a.n - b.n).map((x) => x.d);
 }
 
+/** The catalog ids with a public write-up of what their vendor's docs say, at docs/research/<id>.md. */
+export function researchedIds(dir: URL = new URL("../docs/research/", import.meta.url)): Set<string> {
+  return new Set(readdirSync(dir).filter((f) => f.endsWith(".md") && f !== "README.md").map((f) => f.slice(0, -3)));
+}
+
+/** Where a system's research write-up is read on GitHub. */
+export function researchUrl(id: string): string {
+  return `${REPO_URL}/blob/main/docs/research/${encodeURIComponent(id)}.md`;
+}
+
 /** One directory card, with the system's details folded under a disclosure. */
-export function renderCard(i: IntegrationSpec, selfServe: ReadonlySet<string>, deptName: ReadonlyMap<string, string>): string {
+export function renderCard(i: IntegrationSpec, selfServe: ReadonlySet<string>, deptName: ReadonlyMap<string, string>, researched: ReadonlySet<string> = new Set()): string {
   const status = statusOf(i, selfServe as Set<string>);
   const detail = systemDetail(i.id);
   const depts = i.departments.map((d) => deptName.get(d) ?? d);
@@ -364,6 +374,7 @@ export function renderCard(i: IntegrationSpec, selfServe: ReadonlySet<string>, d
     ["Stage", STAGE_DETAIL[status.label] ?? status.label],
   ];
   if (CONNECTED_ON[i.id]) rows.push(["Connected", formatDay(CONNECTED_ON[i.id]!)]);
+  const found = researched.has(i.id) ? `<dt>What we found</dt><dd><a href="${escapeHtml(researchUrl(i.id))}">How ${escapeHtml(i.name)} can be reached, from its own docs</a></dd>` : "";
   return `<li class="card" data-domain="${i.domain}" data-segments="${i.segments.join(" ")}" data-departments="${i.departments.join(" ")}" data-search="${escapeHtml(search)}">
   <div class="card-top"><span class="domain">${escapeHtml(detail.company ? `By ${detail.company}` : domainLabel(i.domain))}</span><span class="pill ${status.tone}">${status.label}</span></div>
   <h3>${escapeHtml(i.name)}</h3>
@@ -373,7 +384,7 @@ export function renderCard(i: IntegrationSpec, selfServe: ReadonlySet<string>, d
       ? `\n  <ul class="caps" aria-label="What you get with ${escapeHtml(i.name)}">${i.capabilities.map((c) => `<li>${escapeHtml(c)}</li>`).join("")}</ul>`
       : ""
   }
-  <details class="more"><summary>Details</summary><dl>${rows.map(([k, v]) => `<dt>${k}</dt><dd>${escapeHtml(v)}</dd>`).join("")}</dl></details>
+  <details class="more"><summary>Details</summary><dl>${rows.map(([k, v]) => `<dt>${k}</dt><dd>${escapeHtml(v)}</dd>`).join("")}${found}</dl></details>
 </li>`;
 }
 
@@ -383,7 +394,7 @@ export function renderCard(i: IntegrationSpec, selfServe: ReadonlySet<string>, d
  * laid out, so the page stays quick as the catalog grows, and links further
  * down the page land where they point.
  */
-export function renderDirectory(dataSources: readonly IntegrationSpec[], selfServe: ReadonlySet<string>, deptName: ReadonlyMap<string, string>): string {
+export function renderDirectory(dataSources: readonly IntegrationSpec[], selfServe: ReadonlySet<string>, deptName: ReadonlyMap<string, string>, researched: ReadonlySet<string> = new Set()): string {
   return directoryCategories(dataSources)
     .map((domain, n) => {
       const systems = dataSources.filter((i) => i.domain === domain);
@@ -392,7 +403,7 @@ export function renderDirectory(dataSources: readonly IntegrationSpec[], selfSer
       return `<details class="group" data-group="${domain}" id="cat-${domain}"${n === 0 ? " open" : ""}>
   <summary class="group-head"><h3>${escapeHtml(domainLabel(domain))}</h3><span class="count">${counts}</span></summary>
   <ul class="cards">
-${systems.map((i) => renderCard(i, selfServe, deptName)).join("\n")}
+${systems.map((i) => renderCard(i, selfServe, deptName, researched)).join("\n")}
   </ul>
 </details>`;
     })
@@ -426,7 +437,7 @@ export function renderSite(plays: readonly Play[] = PLAYS): string {
   const dataSources = INTEGRATIONS.filter((i) => i.departments.length > 0).sort((a, b) => rank(b) - rank(a));
   const deptName = new Map(departments.map((d) => [d.id, d.name]));
 
-  const directory = renderDirectory(dataSources, selfServe, deptName);
+  const directory = renderDirectory(dataSources, selfServe, deptName, researchedIds());
   const categories = directoryCategories(dataSources);
   const categoryOptions = categories.map((d) => `<option value="${d}">${escapeHtml(domainLabel(d))}</option>`).join("");
   const builtCount = dataSources.filter((i) => i.status === "built").length;
