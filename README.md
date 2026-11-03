@@ -242,6 +242,8 @@ See [docs/architecture/overview.md](docs/architecture/overview.md) for details.
 
 [Integrations](docs/integrations.md) lists all the systems in the catalog, and [the website guide](docs/website.md) covers the public site.
 
+[Integration research](docs/research/README.md) records what each vendor's own docs say about API access, sign-up and test environments, checked before a connector is planned, with a source for every claim.
+
 ## Quick start
 
 You need Node 22 or later.
