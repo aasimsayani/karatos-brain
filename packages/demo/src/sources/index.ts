@@ -44,6 +44,8 @@ export const DEMO_NOT_YET: Readonly<Record<string, string>> = {
   refiner_statements: NEXT,
   piro: NEXT,
   mailchimp: NEXT,
+  fincen_8300: NEXT,
+  gusto: NEXT,
   affirm: NOT_READ_YET,
   authorize_net: NOT_READ_YET,
   avalara: NOT_READ_YET,
