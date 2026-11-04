@@ -1,7 +1,7 @@
 import type { Signal } from "@karatos/core";
 import { z } from "zod";
 import type { DepartmentModule } from "../department.js";
-import { daysBetween, dollars, entityFrom, extractor, latestBySubject, recommend, signalFrom, value } from "../department.js";
+import { ASSUMPTIONS, daysBetween, dollars, entityFrom, estimate, extractor, latestBySubject, pct, recommend, signalFrom, value } from "../department.js";
 
 const ProfileUpdated = z.object({
   customerId: z.string().min(1),
@@ -60,6 +60,16 @@ export function daysUntilNext(month: number, day: number, now: string): number {
   const start = Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate());
   const next = thisYear >= start ? thisYear : Date.UTC(today.getUTCFullYear() + 1, month - 1, day);
   return Math.round((next - start) / 86_400_000);
+}
+
+/** The likely profit on a sale to one customer, at their own average order when they have bought before. */
+function saleProfit(kind: "occasionRate" | "winBackRate", averageCents: number | undefined, how: string) {
+  const order = averageCents === undefined ? `an average order of ${dollars(ASSUMPTIONS.averageOrderCents.likely)}` : `their average order of ${dollars(averageCents)}`;
+  return estimate(
+    "makes",
+    `${pct(ASSUMPTIONS[kind].likely)} of ${how} buy, at ${order} and a ${pct(ASSUMPTIONS.margin.likely)} margin.`,
+    (a) => a(kind) * (averageCents ?? a("averageOrderCents")) * a("margin"),
+  );
 }
 
 function consentByCustomer(signals: Signal[]): Map<string, { consent: boolean; name: string; signal: Signal }> {
@@ -129,6 +139,7 @@ export const clienteling: DepartmentModule = {
       reason: ({ organizationId, signals, now }) => {
         const consent = consentByCustomer(signals);
         const wishlists = signals.filter((s) => s.kind === "customer.wishlist");
+        const purchases = signals.filter((s) => s.kind === "sale.customer_purchase");
         return signals
           .filter((s) => s.kind === "customer.occasion")
           .flatMap((s) => {
@@ -140,6 +151,8 @@ export const clienteling: DepartmentModule = {
             const wishes = wishlists.filter((w) => w.subject.id === o.customerId);
             const skus = wishes.map((w) => value<{ sku: string }>(w).sku);
             const who = o.forPerson ? ` (${o.forPerson})` : "";
+            const bought = purchases.filter((p) => p.subject.id === o.customerId);
+            const average = bought.length ? bought.reduce((sum, p) => sum + value<{ totalCents: number }>(p).totalCents, 0) / bought.length : undefined;
             return [
               recommend({
                 department: "clienteling",
@@ -148,7 +161,8 @@ export const clienteling: DepartmentModule = {
                 summary: `${profile.name}'s ${o.occasion}${who} is in ${days} days. Reach out${skus.length ? `; their wish list has ${skus.join(", ")}` : ""}.`,
                 confidence: skus.length ? 0.8 : 0.6,
                 expectedImpact: "Occasion-driven sale",
-                basedOn: [s, profile.signal, ...wishes],
+                impact: saleProfit("occasionRate", average, "customers reminded of an occasion"),
+                basedOn: [s, profile.signal, ...wishes, ...bought],
                 now,
               }),
             ];
@@ -179,6 +193,7 @@ export const clienteling: DepartmentModule = {
               summary: `${profile.name} has spent ${dollars(lifetime)} with you but hasn't bought in ${idle} days. Invite them in personally.`,
               confidence: 0.65,
               expectedImpact: "Win back a high-value customer",
+              impact: saleProfit("winBackRate", lifetime / list.length, "lapsed customers invited back in person"),
               basedOn: [...list, profile.signal],
               now,
             }),
@@ -218,6 +233,11 @@ export const clienteling: DepartmentModule = {
             summary: `${people} rang the store ${calls === 1 ? "once" : `${calls} times`} in the last ${MISSED_CALL_DAYS} days without getting through, and nobody has called or texted them back. The oldest missed call was ${when}. Return them from the call log.`,
             confidence: 0.75,
             expectedImpact: "Wins back customers who tried to reach the store",
+            impact: estimate(
+              "makes",
+              `${pct(ASSUMPTIONS.callCloseRate.likely)} of returned calls become a sale: ${people} at an average order of ${dollars(ASSUMPTIONS.averageOrderCents.likely)} and a ${pct(ASSUMPTIONS.margin.likely)} margin.`,
+              (a) => unanswered.length * a("callCloseRate") * a("averageOrderCents") * a("margin"),
+            ),
             basedOn: unanswered.flatMap((u) => u.missed),
             now,
           }),

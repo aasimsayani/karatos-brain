@@ -3,6 +3,7 @@ import type { EntityKind, EntityRef, NormalizedEntity } from "./entities.js";
 import { IdentityCollisionError, type IdentityLink } from "./identity.js";
 import type { Signal } from "./signals.js";
 import type { Feedback, ReasoningRun, Recommendation } from "./reasoning.js";
+import { valueResultProblem, type ValueResult } from "./value.js";
 import type { MemoryStore } from "./layers.js";
 import {
   clearedPayload,
@@ -33,6 +34,7 @@ export class InMemoryStore implements MemoryStore, RawDataRetention {
   readonly recommendations: Recommendation[] = [];
   readonly reasoningRuns: ReasoningRun[] = [];
   readonly feedback: Feedback[] = [];
+  readonly valueResults: ValueResult[] = [];
   readonly checkpoints = new Map<string, string>();
   /** Every purgeRawData run, so the owner can see retention ran. */
   readonly retentionRuns: PurgeResult[] = [];
@@ -149,6 +151,27 @@ export class InMemoryStore implements MemoryStore, RawDataRetention {
 
   async recordFeedback(feedback: Feedback): Promise<void> {
     this.feedback.push(feedback);
+  }
+
+  async recommendationsBetween(organizationId: string, from: string, to: string): Promise<Recommendation[]> {
+    const [start, end] = [Date.parse(from), Date.parse(to)];
+    return this.recommendations
+      .filter((r) => r.organizationId === organizationId && Date.parse(r.createdAt) >= start && Date.parse(r.createdAt) < end)
+      .sort((a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt));
+  }
+
+  async listFeedback(organizationId: string, recommendationIds: readonly string[]): Promise<Feedback[]> {
+    return this.feedback.filter((f) => f.organizationId === organizationId && recommendationIds.includes(f.recommendationId));
+  }
+
+  async recordValueResult(result: ValueResult): Promise<void> {
+    const problem = valueResultProblem(result);
+    if (problem) throw new RangeError(problem);
+    this.valueResults.push(result);
+  }
+
+  async listValueResults(organizationId: string, recommendationIds: readonly string[]): Promise<ValueResult[]> {
+    return this.valueResults.filter((r) => r.organizationId === organizationId && recommendationIds.includes(r.recommendationId));
   }
 
   async saveCheckpoint(organizationId: string, source: string, stream: string, cursor: string): Promise<void> {
