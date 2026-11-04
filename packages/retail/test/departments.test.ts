@@ -472,6 +472,87 @@ describe("compliance", () => {
     expect(recs[0]!.summary).toContain("Customer c9 paid $12,000.00 in cash across 2 payments");
   });
 
+  const filing = (overrides: Record<string, unknown> = {}) => ({
+    filingId: "7700124",
+    filedOn: "2026-09-30",
+    cashReceivedOn: "2026-09-28",
+    saleIds: ["S1"],
+    cashCents: 1_050_000,
+    status: "submitted",
+    trackingId: "7700124",
+    customerId: "c1",
+    ...overrides,
+  });
+
+  it("stops the Form 8300 reminder once the filings log covers the sale", async () => {
+    const s = store();
+    await s.send("sale.completed", sale("S1", "ROLEX-1", { price: 1_200_000, cash: 1_050_000, customerId: "c1" }), "2026-09-28T15:00:00Z");
+    await s.send("sale.completed", sale("S9", "ROLEX-2", { price: 1_200_000, cash: 1_100_000 }), "2026-09-28T16:00:00Z");
+    await s.send("compliance.form_8300_filing_recorded", filing(), "2026-09-30T00:00:00Z");
+    expect(about(await s.ask(NOW), "Form 8300").map((r) => r.summary)).toEqual([
+      "$11,000.00 in cash was received for sale S9. File IRS Form 8300 within 12 days and keep a copy for 5 years.",
+    ]);
+  });
+
+  it("matches the receipt number in the log to the POS connector's full sale id", async () => {
+    const s = store();
+    await s.send("sale.completed", sale("pos:generic:sale:S-4015", "RING", { price: 1_490_000, cash: 1_490_000, customerId: "c7" }), "2026-09-28T15:00:00Z");
+    await s.send("sale.completed", sale("pos:generic:sale:AS-4015", "RING", { price: 1_490_000, cash: 1_490_000, customerId: "c8" }), "2026-09-28T15:00:00Z");
+    await s.send("compliance.form_8300_filing_recorded", filing({ saleIds: ["S-4015"], customerId: "c7" }), "2026-09-30T00:00:00Z");
+    expect(about(await s.ask(NOW), "File IRS Form 8300").map((r) => r.summary)).toEqual([
+      "$14,900.00 in cash was received for sale pos:generic:sale:AS-4015. File IRS Form 8300 within 11 days and keep a copy for 5 years.",
+    ]);
+  });
+
+  it("raises the reminder again when FinCEN rejects the filing, until a new one is accepted", async () => {
+    const s = store();
+    await s.send("sale.completed", sale("S1", "ROLEX-1", { price: 1_200_000, cash: 1_050_000, customerId: "c1" }), "2026-09-28T15:00:00Z");
+    await s.send("compliance.form_8300_filing_recorded", filing(), "2026-09-30T00:00:00Z");
+    await s.send("compliance.form_8300_filing_recorded", filing({ status: "rejected" }), "2026-09-30T00:00:00Z");
+    // A later "submitted" row for the same tracking ID doesn't undo the rejection.
+    await s.send("compliance.form_8300_filing_recorded", filing({ statementSentOn: "2026-10-01" }), "2026-09-30T00:00:00Z");
+    const [rec] = about(await s.ask(NOW), "Form 8300");
+    expect(rec!.summary).toBe("FinCEN rejected the Form 8300 for sale S1 (BSA Tracking ID 7700124). Correct it and file again within 11 days, then add the new filing to the log.");
+    expect(rec!.provenance.signalIds.some((id) => id.startsWith("sig_compliance.form_8300_filing_"))).toBe(true);
+    await s.send("compliance.form_8300_filing_recorded", filing({ filingId: "31000000123465", bsaId: "31000000123465", trackingId: "7700199", status: "accepted" }), "2026-10-01T00:00:00Z");
+    expect(about(await s.ask(NOW), "Form 8300")).toEqual([]);
+  });
+
+  it("reminds you to send each customer their Form 8300 statement by January 31", async () => {
+    const s = store();
+    await s.send("compliance.form_8300_filing_recorded", filing({ status: "accepted", bsaId: "31000000123457", filingId: "31000000123457" }), "2026-09-30T00:00:00Z");
+    await s.send("compliance.form_8300_filing_recorded", filing({ filingId: "7700125", trackingId: "7700125", saleIds: ["S2"], customerId: undefined, cashCents: 1_200_000 }), "2026-09-30T00:00:00Z");
+    await s.send("compliance.form_8300_filing_recorded", filing({ filingId: "7700126", trackingId: "7700126", saleIds: ["S3"], statementSentOn: "2026-10-01" }), "2026-09-30T00:00:00Z");
+    await s.send("compliance.form_8300_filing_recorded", filing({ filingId: "7700127", trackingId: "7700127", saleIds: ["S4"], status: "rejected" }), "2026-09-30T00:00:00Z");
+    // Filed voluntarily as suspicious, or for $10,000 or less: the customer must not be told.
+    await s.send("compliance.form_8300_filing_recorded", filing({ filingId: "7700128", trackingId: "7700128", saleIds: ["S5"], suspicious: true }), "2026-09-30T00:00:00Z");
+    await s.send("compliance.form_8300_filing_recorded", filing({ filingId: "7700129", trackingId: "7700129", saleIds: ["S6"], cashCents: 1_000_000 }), "2026-09-30T00:00:00Z");
+    // The log saved again with the statement sent: the newer row doesn't need a higher status to count.
+    await s.send("compliance.form_8300_filing_recorded", filing({ filingId: "7700130", trackingId: "7700130", saleIds: ["S7"] }), "2026-09-30T00:00:00Z");
+    await s.send("compliance.form_8300_filing_recorded", filing({ filingId: "7700130", trackingId: "7700130", saleIds: ["S7"], statementSentOn: "2026-10-01" }), "2026-09-30T00:00:00Z");
+    // Too early in the year to be worth a reminder.
+    expect(about(await s.ask(NOW), "statement")).toEqual([]);
+    expect(about(await s.ask("2026-11-30T23:00:00.000Z"), "statement")).toEqual([]);
+    const january = about(await s.ask("2027-01-10T15:00:00.000Z"), "statement").map((r) => r.summary);
+    expect(january).toEqual([
+      "Send customer c1 the written Form 8300 statement for sale S1 ($10,500.00 in cash, BSA ID 31000000123457). It is due by January 31, 2027 and must give the store's contact name, phone number and address, the total cash reported, and that it was reported to the IRS. Note the date sent in the log.",
+      "Send each person named on it the written Form 8300 statement for sale S2 ($12,000.00 in cash, BSA Tracking ID 7700125). It is due by January 31, 2027 and must give the store's contact name, phone number and address, the total cash reported, and that it was reported to the IRS. Note the date sent in the log.",
+    ]);
+    expect(about(await s.ask("2026-12-01T00:00:00.000Z"), "statement")).toHaveLength(2);
+    expect(about(await s.ask("2027-01-31T23:00:00.000Z"), "is due by January 31, 2027")).toHaveLength(2);
+    expect(about(await s.ask("2027-02-01T15:00:00.000Z"), "was due January 31, 2027; send it now")).toHaveLength(2);
+    expect(about(await s.ask("2027-12-31T15:00:00.000Z"), "statement")).toHaveLength(2);
+    expect(about(await s.ask("2028-01-01T15:00:00.000Z"), "statement")).toEqual([]);
+  });
+
+  it("dead-letters a filing row it can't use", async () => {
+    const s = store();
+    await expect(s.send("compliance.form_8300_filing_recorded", filing({ saleIds: [] }))).rejects.toThrow(/dead-lettered/);
+    await expect(s.send("compliance.form_8300_filing_recorded", filing({ status: "lost" }))).rejects.toThrow(/dead-lettered/);
+    await expect(s.send("compliance.form_8300_filing_recorded", filing({ filedOn: "09/30/2026" }))).rejects.toThrow(/dead-lettered/);
+    expect(s.memory.deadLetters).toHaveLength(3);
+  });
+
   it("requires seller ID on gold bought from the public", async () => {
     const s = store();
     await s.send("gold_purchase.completed", {

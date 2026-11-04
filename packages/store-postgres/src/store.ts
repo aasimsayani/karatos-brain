@@ -18,6 +18,8 @@ import {
   type Recommendation,
   type Signal,
   type StoredEvent,
+  type ValueResult,
+  valueResultProblem,
 } from "@karatos/core";
 import type { SqlClient } from "./client.js";
 
@@ -67,6 +69,26 @@ interface RecommendationRow {
   provenance: Recommendation["provenance"];
   degraded: boolean;
   created_at: Date | string;
+}
+
+interface FeedbackRow {
+  recommendation_id: string;
+  organization_id: string;
+  outcome: Feedback["outcome"];
+  note: string | null;
+  actor: string;
+  recorded_at: Date | string;
+}
+
+interface ValueResultRow {
+  recommendation_id: string;
+  organization_id: string;
+  kind: ValueResult["kind"];
+  cents: string | number;
+  source: ValueResult["source"];
+  note: string | null;
+  actor: string;
+  recorded_at: Date | string;
 }
 
 const iso = (value: Date | string) => (value instanceof Date ? value.toISOString() : new Date(value).toISOString());
@@ -342,6 +364,56 @@ export class PostgresMemoryStore implements MemoryStore, RawDataRetention {
       [feedback.recommendationId, feedback.organizationId, feedback.outcome, feedback.note ?? null, feedback.actor, feedback.recordedAt],
     );
   }
+  async recommendationsBetween(organizationId: string, from: string, to: string): Promise<Recommendation[]> {
+    const { rows } = await this.db.query<RecommendationRow>(
+      "select * from recommendations where organization_id = $1 and created_at >= $2 and created_at < $3 order by created_at, id",
+      [organizationId, from, to],
+    );
+    return rows.map(toRecommendation);
+  }
+
+  async listFeedback(organizationId: string, recommendationIds: readonly string[]): Promise<Feedback[]> {
+    const { rows } = await this.db.query<FeedbackRow>(
+      "select * from feedback where organization_id = $1 and recommendation_id = any($2) order by recorded_at, id",
+      [organizationId, [...recommendationIds]],
+    );
+    return rows.map((row) => ({
+      recommendationId: row.recommendation_id,
+      organizationId: row.organization_id,
+      outcome: row.outcome,
+      ...(row.note === null ? {} : { note: row.note }),
+      actor: row.actor,
+      recordedAt: iso(row.recorded_at),
+    }));
+  }
+
+  async recordValueResult(result: ValueResult): Promise<void> {
+    const problem = valueResultProblem(result);
+    if (problem) throw new RangeError(problem);
+    await this.db.query(
+      `insert into value_results (organization_id, recommendation_id, kind, cents, source, note, actor, recorded_at)
+       values ($1, $2, $3, $4, $5, $6, $7, $8)`,
+      [result.organizationId, result.recommendationId, result.kind, result.cents, result.source, result.note ?? null, result.actor, result.recordedAt],
+    );
+  }
+
+  async listValueResults(organizationId: string, recommendationIds: readonly string[]): Promise<ValueResult[]> {
+    const { rows } = await this.db.query<ValueResultRow>(
+      "select * from value_results where organization_id = $1 and recommendation_id = any($2) order by recorded_at, id",
+      [organizationId, [...recommendationIds]],
+    );
+    return rows.map((row) => ({
+      recommendationId: row.recommendation_id,
+      organizationId: row.organization_id,
+      kind: row.kind,
+      cents: Number(row.cents),
+      source: row.source,
+      ...(row.note === null ? {} : { note: row.note }),
+      actor: row.actor,
+      recordedAt: iso(row.recorded_at),
+    }));
+  }
+
 
   async saveCheckpoint(organizationId: string, source: string, stream: string, cursor: string): Promise<void> {
     await this.db.query(
