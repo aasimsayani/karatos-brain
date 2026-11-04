@@ -302,7 +302,7 @@ Used by: R is retail, W is wholesale, M is manufacturing. Test with says how we 
 | RFID and barcode tray counts | R, W, M | File export | Sample files | No | Planned (Tray and case scan exports, so the nightly count is checked against what should be there) |
 | Homebase | R | Partner | Partner | No | Planned (Staff schedules and time clock, so labor can be set against sales. API keys need the Enterprise plan and a request to Homebase support) |
 | Deputy | R, W, M | Public API | Unknown | Yes | Planned (Staff rosters and timesheets, so labor can be set against sales or bench work) |
-| Asana | R, W, M | Public API | Free sandbox | Yes | Planned (Tasks and projects used to track repairs, custom orders and buying trips) |
+| Asana | R, W, M | Public API | Free sandbox | No | Built (Read-only: the client sends only its five listed GETs and names every field it reads. A personal access token can do whatever its user can, so make it as a user with access to only the projects to sync, or use an OAuth app limited to read scopes. No webhooks yet; the sync polls) |
 | Trello | R, W, M | Public API | Free sandbox | Yes | Planned (Boards and cards used to track repairs, custom orders and buying) |
 | Airtable | R, W, M | Public API | Free sandbox | Yes | Planned (Bases many stores use for memo logs, repair intake and custom order tracking) |
 | Notion | R, W, M | Public API | Free sandbox | Yes | Planned (Databases and pages used for job tracking, procedures and buying notes) |
@@ -390,6 +390,7 @@ A request for a path or method the docs don't list throws `UndocumentedRequestEr
 <!-- Generated from the mock modules in packages/testkit/src/mocks/ by npm run registry:write. Edit those, not this block. -->
 
 - Affirm's transaction, transaction event, daily settlement and dispute reads
+- Asana's current user, project, section, task and story endpoints (REST API 1.0)
 - Authorize.net's Transaction Reporting requests on its JSON API
 - AvaTax's connection check, company and transaction endpoints (REST API v2)
 - BigCommerce's v2 order and store paths and v3 catalog, inventory, customer, refund and price list paths
@@ -414,7 +415,7 @@ A request for a path or method the docs don't list throws `UndocumentedRequestEr
 - A WooCommerce store's REST API v3 read endpoints with its key permissions and page headers
 - Xero's Accounting API endpoints with its token refresh
 
-Where a vendor has a free sandbox (Affirm, Authorize.net, Avalara AvaTax, BigCommerce, Calendly, Clover, Custom forms, GIA Report Results, Gmail, Google Workspace and Drive, HubSpot, Klaviyo, Monday.com, Plaid, QuickBooks Online, Slack, Square, Wix, WooCommerce and Xero so far), its mock is a stand-in until a developer account is set up for the nightly run.
+Where a vendor has a free sandbox (Affirm, Asana, Authorize.net, Avalara AvaTax, BigCommerce, Calendly, Clover, Custom forms, GIA Report Results, Gmail, Google Workspace and Drive, HubSpot, Klaviyo, Monday.com, Plaid, QuickBooks Online, Slack, Square, Wix, WooCommerce and Xero so far), its mock is a stand-in until a developer account is set up for the nightly run.
 
 <!-- registry:mocks:end -->
 
@@ -503,6 +504,35 @@ Canadian accounts are on Affirm's global hosts (`api.global.affirm.com`), which 
 **Webhooks.** Affirm sets webhooks up itself, on request through its support widget; the events its docs describe are about checkouts and prequalification, and a failed delivery isn't resent. `verifyAffirmWebhook` checks the `Affirm-Signature` header (the docs also call it `X-Affirm-Signature`): `t=<timestamp>` and one or more `v0=<hex>` signatures, each the HMAC-SHA512 of `<timestamp>.<raw body>` keyed with the signing secret, compared in constant time. Only `v0` counts, so a downgrade is refused, and a timestamp more than five minutes off is refused as stale, so an old delivery can't be replayed. A delivery is a prompt to sync, never data; the instance doesn't take webhooks yet, and the scheduled sync picks every change up. The docs don't say whether the timestamp is in seconds; the check assumes Unix seconds, as Stripe's scheme does, until a live delivery shows otherwise.
 
 **Testing.** The tests run against a mock built from Affirm's docs (`packages/testkit/src/mocks/affirm.ts`), which answers the sandbox or production host only, checks the key pair, refuses parameters the docs don't list, pages each list as its page describes, and throws for any POST. Its assumptions (the list order, `next_page`'s shape, date formats the docs leave out) are listed in the mock and checked on the first sandbox run. For the nightly run, take the sandbox key pair from sandbox.affirm.com/dashboard/apikeys (an Affirm merchant account comes with sandbox access) and the Merchant ID from Affirm support, and add them as the `SANDBOX_AFFIRM_PUBLIC_API_KEY`, `SANDBOX_AFFIRM_PRIVATE_API_KEY` and `SANDBOX_AFFIRM_MERCHANT_ID` GitHub Actions secrets.
+
+### Asana
+
+Reads Asana's REST API (`https://app.asana.com/api/1.0`) with an access token: the workspaces the token's user belongs to, each workspace's projects (archived ones too) with their sections, each project's tasks, and the comments on each task read.
+
+| Setting | What it is |
+| --- | --- |
+| `ASANA_ACCESS_TOKEN` | A personal access token made by a user who sees only the projects to sync, or an OAuth app's token limited to read scopes |
+| `ASANA_WORKSPACE_GID` | Optional. The one workspace to read; unset reads every workspace the user belongs to |
+
+**Read-only.** The client sends only five GETs: `/users/me`, `/projects`, `/projects/{gid}/sections`, `/tasks` and `/tasks/{gid}/stories`, with parameters it builds itself. Ids and page offsets are checked before they go into a request, and the next page is asked for by its `offset`, never by following the `next_page` URI, so a reply can't send the token to another host. A personal access token can do anything its user can and can't be limited, so make it as a user added only to the projects to sync. Creating a task and commenting on one are declared behind the write gate, and the test shows each one is stopped.
+
+**What it reads.** Every request names its fields with `opt_fields`, and none of them is a task's name or notes, a comment's text or a custom field's text. The first import reads tasks changed in the last five years, 100 a page. Each later sync asks only for tasks changed since the last pass started, less five minutes of overlap (`modified_since`). Each batch's checkpoint records the workspace, the project and the page offset it got to, so a resumed sync carries on. Asana's offsets expire; a resumed list whose offset Asana turns down is read again from its start, once, and what was already stored is a duplicate. A project deleted part way through a pass is skipped. A 429 is waited out for `Retry-After` seconds, up to a minute, three times, then left to `runSync`, which retries from the checkpoint. A 401 stops the sync saying the token was turned down; a 402 says the read needs a paid plan.
+
+Asana doesn't count a new comment as a change to its task, so a comment on a task that otherwise didn't change is read with the task's next change. Subtasks aren't listed in a project unless they were added to it, so they aren't read.
+
+**Events.** The same vendor-neutral work-tracking events monday.com sends, so a department reads both the same way.
+
+| Event | From | Key |
+| --- | --- | --- |
+| `work.board_updated` | A project: its name, whether it's archived, start and due days, owner and team as `asana:user:<gid>` and `asana:team:<gid>`, its custom fields as columns and its sections as groups | project and `modified_at` |
+| `work.item_updated` | A task: its project and section, kind (task, milestone or approval), whether it's done and when, created and modified times, start and due days and due time, assignee, parent task, and its custom field values | task and `modified_at` |
+| `work.comment_updated` | A comment on a task: who wrote it and when | story and `created_at` |
+
+Custom fields are kept only for types that hold no free text: number, single select and multi select (their option labels), date and people (as user ids). Text fields aren't asked for. Stories that aren't comments, such as a task being moved, are dropped. A record whose time doesn't read is dead-lettered.
+
+**Webhooks.** None yet. The scheduled sync polls.
+
+**Testing.** The tests run against a mock built from Asana's API reference (`packages/testkit/src/mocks/asana.ts`). Like Asana, it returns only the fields `opt_fields` names, so the tests show a task's name and notes never come back. It answers 401 for the wrong token, filters tasks by project and `modified_since`, pages with `offset`, and can answer 429 with `Retry-After` and 400 for an expired offset. Its assumptions are listed in the mock and checked on the first sandbox run. For the nightly run, make a free Asana workspace for testing only, add a project or two of synthetic tasks, make a personal access token as a user who belongs only to that workspace, and add it as the `SANDBOX_ASANA_ACCESS_TOKEN` GitHub Actions secret.
 
 ### Authorize.net
 
