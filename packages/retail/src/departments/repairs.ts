@@ -1,6 +1,6 @@
 import { z } from "zod";
 import type { DepartmentModule } from "../department.js";
-import { calendarDaysSince, daysBetween, entityFrom, extractor, latestBySubject, recommend, signalFrom, value } from "../department.js";
+import { calendarDaysSince, daysBetween, dollars, entityFrom, estimate, extractor, latestBySubject, recommend, signalFrom, value } from "../department.js";
 
 export const REPAIR_STATUSES = ["received", "at_bench", "sent_out", "ready", "picked_up", "cancelled"] as const;
 type RepairStatus = (typeof REPAIR_STATUSES)[number];
@@ -99,6 +99,7 @@ export const repairs: DepartmentModule = {
                   summary: `Repair ${t.ticketId} (${t.itemDescription}) has been ready for ${waiting} days. Remind the customer to pick it up.`,
                   confidence: 0.85,
                   expectedImpact: "Collects the repair payment and frees safe space",
+                  impact: estimate("protects", `The repair's ${dollars(t.estimateCents)} estimate, collected at pickup.`, () => t.estimateCents),
                 }),
               ];
             }

@@ -11,6 +11,8 @@ export interface Recommendation {
   /** 0 to 1. */
   confidence: number;
   expectedImpact: string;
+  /** What acting on it is worth, in dollars. Absent when there is no honest way to put a number on it. */
+  impact?: Impact;
   provenance: {
     eventIds: string[];
     signalIds: string[];
@@ -19,6 +21,34 @@ export interface Recommendation {
   /** True when reasoning ran against stale or mismatched documentation. */
   degraded: boolean;
   createdAt: string;
+}
+
+/**
+ * What acting on a recommendation is worth to the business. `makes` is
+ * profit on new sales (after the cost of the goods, not the sale price),
+ * `saves` is a cost cut, and `protects` is money owed or at risk that the
+ * action keeps. Every amount is in cents, low <= likely <= high.
+ */
+export interface Impact {
+  kind: "makes" | "saves" | "protects";
+  /** The likely amount. */
+  cents: number;
+  lowCents: number;
+  highCents: number;
+  /** How the number was worked out, with the figures used, so the owner can check it. */
+  basis: string;
+}
+
+export const IMPACT_KINDS: readonly Impact["kind"][] = ["makes", "saves", "protects"];
+
+/** Why an impact can't be stored or shown, or null when it's sound. */
+export function impactProblem(impact: Impact): string | null {
+  if (!IMPACT_KINDS.includes(impact.kind)) return `unknown impact kind ${String(impact.kind)}`;
+  const amounts = [impact.lowCents, impact.cents, impact.highCents];
+  if (!amounts.every((n) => Number.isSafeInteger(n) && n >= 0)) return "impact amounts must be whole cents, zero or more";
+  if (impact.lowCents > impact.cents || impact.cents > impact.highCents) return "impact amounts must run low, likely, high";
+  if (typeof impact.basis !== "string" || !impact.basis.trim()) return "an impact needs a basis";
+  return null;
 }
 
 export interface ReasoningContext {

@@ -1,7 +1,7 @@
 import type { Signal } from "@karatos/core";
 import { z } from "zod";
 import type { DepartmentModule } from "../department.js";
-import { calendarDaysSince, daysBetween, dollars, entityFrom, extractor, latestBySubject, recommend, signalFrom, value } from "../department.js";
+import { calendarDaysSince, daysBetween, dollars, entityFrom, estimate, extractor, latestBySubject, recommend, signalFrom, value } from "../department.js";
 
 export const CUSTOM_STAGES = ["design", "cad", "approval", "casting", "setting", "finishing", "ready", "delivered", "cancelled"] as const;
 type Stage = (typeof CUSTOM_STAGES)[number];
@@ -115,6 +115,7 @@ export const customOrders: DepartmentModule = {
                 summary: `Custom order ${o.orderId} is ready with ${dollars(o.quotedCents - paid)} still due. Collect the balance when the customer picks it up.`,
                 confidence: 0.9,
                 expectedImpact: `Collects ${dollars(o.quotedCents - paid)}`,
+                impact: estimate("protects", `The ${dollars(o.quotedCents - paid)} balance, collected at pickup.`, () => o.quotedCents - paid),
               }),
             );
           }
