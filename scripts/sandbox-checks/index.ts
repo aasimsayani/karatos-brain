@@ -10,6 +10,7 @@ import custom_forms from "./custom_forms.js";
 import gia from "./gia.js";
 import gmail from "./gmail.js";
 import google_workspace from "./google_workspace.js";
+import gusto from "./gusto.js";
 import hubspot from "./hubspot.js";
 import klaviyo from "./klaviyo.js";
 import metals_api from "./metals_api.js";
@@ -26,4 +27,4 @@ import woocommerce from "./woocommerce.js";
 import xero from "./xero.js";
 
 /** Every connector's nightly sandbox check. */
-export const SANDBOX_CHECKS: SandboxCheck[] = [affirm, authorize_net, avalara, bigcommerce, calendly, clover, custom_forms, gia, gmail, google_workspace, hubspot, klaviyo, metals_api, monday, plaid, quickbooks, shopify, slack, square, stripe, twilio, wix, woocommerce, xero];
+export const SANDBOX_CHECKS: SandboxCheck[] = [affirm, authorize_net, avalara, bigcommerce, calendly, clover, custom_forms, gia, gmail, google_workspace, gusto, hubspot, klaviyo, metals_api, monday, plaid, quickbooks, shopify, slack, square, stripe, twilio, wix, woocommerce, xero];
