@@ -19,6 +19,7 @@ import hubspot from "./hubspot.js";
 import idex from "./idex.js";
 import inventory_pos from "./inventory_pos.js";
 import klaviyo from "./klaviyo.js";
+import mailchimp from "./mailchimp.js";
 import metals_api from "./metals_api.js";
 import monday from "./monday.js";
 import nivoda from "./nivoda.js";
@@ -39,4 +40,4 @@ import woocommerce from "./woocommerce.js";
 import xero from "./xero.js";
 
 /** How each built connector is made from an instance's settings, by catalog id. */
-export const FACTORIES: Readonly<Record<string, ConnectorFactory>> = { affirm, authorize_net, avalara, bank_statements, bigcommerce, calendly, chase, clover, custom_forms, edi_x12, fincen_8300, gia, gmail, google_workspace, gusto, hubspot, idex, inventory_pos, klaviyo, metals_api, monday, nivoda, piro, plaid, quickbooks, rapnet, refiner_statements, shopify, slack, square, stripe, stuller, twilio, watchsearch, wix, woocommerce, xero };
+export const FACTORIES: Readonly<Record<string, ConnectorFactory>> = { affirm, authorize_net, avalara, bank_statements, bigcommerce, calendly, chase, clover, custom_forms, edi_x12, fincen_8300, gia, gmail, google_workspace, gusto, hubspot, idex, inventory_pos, klaviyo, mailchimp, metals_api, monday, nivoda, piro, plaid, quickbooks, rapnet, refiner_statements, shopify, slack, square, stripe, stuller, twilio, watchsearch, wix, woocommerce, xero };

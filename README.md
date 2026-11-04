@@ -91,6 +91,7 @@ These are built, tested against recorded vendor responses or mocks built from ea
 | FinCEN Form 8300 cash reporting | Imports five years of Form 8300 filings: date filed, sales covered, cash, and the BSA Tracking ID or BSA ID | Compliance |
 | Refiner and scrap settlement statements | Imports five years of refiner and scrap settlements: lots, metals, weights, assays, metal credited and fees | Metals, Finance |
 | Gusto | Imports three years of processed payrolls with their gross pay, taxes, benefits and company debit | Finance, Compliance |
+| Mailchimp | Imports every audience and subscriber, and five years of sent campaigns with their reports, then keeps them current | Marketing, Clienteling |
 | TheWatchSearch (by TheWatchCloud) | Turns the dealer WhatsApp groups the store is in into a feed of offers: brand, reference, buy or sell, price, year, condition and set | Buying, Sales, Inventory |
 <!-- connected:end -->
 
@@ -134,7 +135,7 @@ This section updates itself as work lands: it is generated from [docs/milestones
 <!-- progress:start -->
 <!-- Generated from docs/milestones.json and the integration catalog by npm run progress:write. Edit those, not this block. -->
 
-**Overall: 68% complete**, 26 of 38 roadmap items done. 37 of the 253 systems in the integration catalog are connected.
+**Overall: 68% complete**, 26 of 38 roadmap items done. 38 of the 253 systems in the integration catalog are connected.
 
 | Milestone | What it gives a jeweler | Progress | Target |
 | --- | --- | --- | --- |
