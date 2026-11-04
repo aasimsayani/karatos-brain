@@ -472,6 +472,87 @@ describe("compliance", () => {
     expect(recs[0]!.summary).toContain("Customer c9 paid $12,000.00 in cash across 2 payments");
   });
 
+  const filing = (overrides: Record<string, unknown> = {}) => ({
+    filingId: "7700124",
+    filedOn: "2026-09-30",
+    cashReceivedOn: "2026-09-28",
+    saleIds: ["S1"],
+    cashCents: 1_050_000,
+    status: "submitted",
+    trackingId: "7700124",
+    customerId: "c1",
+    ...overrides,
+  });
+
+  it("stops the Form 8300 reminder once the filings log covers the sale", async () => {
+    const s = store();
+    await s.send("sale.completed", sale("S1", "ROLEX-1", { price: 1_200_000, cash: 1_050_000, customerId: "c1" }), "2026-09-28T15:00:00Z");
+    await s.send("sale.completed", sale("S9", "ROLEX-2", { price: 1_200_000, cash: 1_100_000 }), "2026-09-28T16:00:00Z");
+    await s.send("compliance.form_8300_filing_recorded", filing(), "2026-09-30T00:00:00Z");
+    expect(about(await s.ask(NOW), "Form 8300").map((r) => r.summary)).toEqual([
+      "$11,000.00 in cash was received for sale S9. File IRS Form 8300 within 12 days and keep a copy for 5 years.",
+    ]);
+  });
+
+  it("matches the receipt number in the log to the POS connector's full sale id", async () => {
+    const s = store();
+    await s.send("sale.completed", sale("pos:generic:sale:S-4015", "RING", { price: 1_490_000, cash: 1_490_000, customerId: "c7" }), "2026-09-28T15:00:00Z");
+    await s.send("sale.completed", sale("pos:generic:sale:AS-4015", "RING", { price: 1_490_000, cash: 1_490_000, customerId: "c8" }), "2026-09-28T15:00:00Z");
+    await s.send("compliance.form_8300_filing_recorded", filing({ saleIds: ["S-4015"], customerId: "c7" }), "2026-09-30T00:00:00Z");
+    expect(about(await s.ask(NOW), "File IRS Form 8300").map((r) => r.summary)).toEqual([
+      "$14,900.00 in cash was received for sale pos:generic:sale:AS-4015. File IRS Form 8300 within 11 days and keep a copy for 5 years.",
+    ]);
+  });
+
+  it("raises the reminder again when FinCEN rejects the filing, until a new one is accepted", async () => {
+    const s = store();
+    await s.send("sale.completed", sale("S1", "ROLEX-1", { price: 1_200_000, cash: 1_050_000, customerId: "c1" }), "2026-09-28T15:00:00Z");
+    await s.send("compliance.form_8300_filing_recorded", filing(), "2026-09-30T00:00:00Z");
+    await s.send("compliance.form_8300_filing_recorded", filing({ status: "rejected" }), "2026-09-30T00:00:00Z");
+    // A later "submitted" row for the same tracking ID doesn't undo the rejection.
+    await s.send("compliance.form_8300_filing_recorded", filing({ statementSentOn: "2026-10-01" }), "2026-09-30T00:00:00Z");
+    const [rec] = about(await s.ask(NOW), "Form 8300");
+    expect(rec!.summary).toBe("FinCEN rejected the Form 8300 for sale S1 (BSA Tracking ID 7700124). Correct it and file again within 11 days, then add the new filing to the log.");
+    expect(rec!.provenance.signalIds.some((id) => id.startsWith("sig_compliance.form_8300_filing_"))).toBe(true);
+    await s.send("compliance.form_8300_filing_recorded", filing({ filingId: "31000000123465", bsaId: "31000000123465", trackingId: "7700199", status: "accepted" }), "2026-10-01T00:00:00Z");
+    expect(about(await s.ask(NOW), "Form 8300")).toEqual([]);
+  });
+
+  it("reminds you to send each customer their Form 8300 statement by January 31", async () => {
+    const s = store();
+    await s.send("compliance.form_8300_filing_recorded", filing({ status: "accepted", bsaId: "31000000123457", filingId: "31000000123457" }), "2026-09-30T00:00:00Z");
+    await s.send("compliance.form_8300_filing_recorded", filing({ filingId: "7700125", trackingId: "7700125", saleIds: ["S2"], customerId: undefined, cashCents: 1_200_000 }), "2026-09-30T00:00:00Z");
+    await s.send("compliance.form_8300_filing_recorded", filing({ filingId: "7700126", trackingId: "7700126", saleIds: ["S3"], statementSentOn: "2026-10-01" }), "2026-09-30T00:00:00Z");
+    await s.send("compliance.form_8300_filing_recorded", filing({ filingId: "7700127", trackingId: "7700127", saleIds: ["S4"], status: "rejected" }), "2026-09-30T00:00:00Z");
+    // Filed voluntarily as suspicious, or for $10,000 or less: the customer must not be told.
+    await s.send("compliance.form_8300_filing_recorded", filing({ filingId: "7700128", trackingId: "7700128", saleIds: ["S5"], suspicious: true }), "2026-09-30T00:00:00Z");
+    await s.send("compliance.form_8300_filing_recorded", filing({ filingId: "7700129", trackingId: "7700129", saleIds: ["S6"], cashCents: 1_000_000 }), "2026-09-30T00:00:00Z");
+    // The log saved again with the statement sent: the newer row doesn't need a higher status to count.
+    await s.send("compliance.form_8300_filing_recorded", filing({ filingId: "7700130", trackingId: "7700130", saleIds: ["S7"] }), "2026-09-30T00:00:00Z");
+    await s.send("compliance.form_8300_filing_recorded", filing({ filingId: "7700130", trackingId: "7700130", saleIds: ["S7"], statementSentOn: "2026-10-01" }), "2026-09-30T00:00:00Z");
+    // Too early in the year to be worth a reminder.
+    expect(about(await s.ask(NOW), "statement")).toEqual([]);
+    expect(about(await s.ask("2026-11-30T23:00:00.000Z"), "statement")).toEqual([]);
+    const january = about(await s.ask("2027-01-10T15:00:00.000Z"), "statement").map((r) => r.summary);
+    expect(january).toEqual([
+      "Send customer c1 the written Form 8300 statement for sale S1 ($10,500.00 in cash, BSA ID 31000000123457). It is due by January 31, 2027 and must give the store's contact name, phone number and address, the total cash reported, and that it was reported to the IRS. Note the date sent in the log.",
+      "Send each person named on it the written Form 8300 statement for sale S2 ($12,000.00 in cash, BSA Tracking ID 7700125). It is due by January 31, 2027 and must give the store's contact name, phone number and address, the total cash reported, and that it was reported to the IRS. Note the date sent in the log.",
+    ]);
+    expect(about(await s.ask("2026-12-01T00:00:00.000Z"), "statement")).toHaveLength(2);
+    expect(about(await s.ask("2027-01-31T23:00:00.000Z"), "is due by January 31, 2027")).toHaveLength(2);
+    expect(about(await s.ask("2027-02-01T15:00:00.000Z"), "was due January 31, 2027; send it now")).toHaveLength(2);
+    expect(about(await s.ask("2027-12-31T15:00:00.000Z"), "statement")).toHaveLength(2);
+    expect(about(await s.ask("2028-01-01T15:00:00.000Z"), "statement")).toEqual([]);
+  });
+
+  it("dead-letters a filing row it can't use", async () => {
+    const s = store();
+    await expect(s.send("compliance.form_8300_filing_recorded", filing({ saleIds: [] }))).rejects.toThrow(/dead-lettered/);
+    await expect(s.send("compliance.form_8300_filing_recorded", filing({ status: "lost" }))).rejects.toThrow(/dead-lettered/);
+    await expect(s.send("compliance.form_8300_filing_recorded", filing({ filedOn: "09/30/2026" }))).rejects.toThrow(/dead-lettered/);
+    expect(s.memory.deadLetters).toHaveLength(3);
+  });
+
   it("requires seller ID on gold bought from the public", async () => {
     const s = store();
     await s.send("gold_purchase.completed", {
@@ -605,6 +686,102 @@ describe("finance balances and receivables", () => {
     const quiet = store();
     await quiet.send("accounting.invoice_updated", invoice("1", { balanceCents: 49_999 }));
     expect(about(await quiet.ask(NOW), "past due")).toEqual([]);
+  });
+});
+
+const payroll = (n: number, checkDate: string, extra: Record<string, unknown> = {}) => ({
+  payrollId: `gusto:payroll:${n}`,
+  checkDate,
+  payScheduleId: "gusto:pay_schedule:1",
+  kind: "regular",
+  grossPayCents: 450_000,
+  netPayCents: 355_000,
+  companyDebitCents: 495_000,
+  employeeCount: 2,
+  ...extra,
+});
+
+describe("finance payroll", () => {
+  it("keeps payrolls and each employee's pay as signals, by id only", async () => {
+    const s = store();
+    await s.send("payroll.payroll_processed", payroll(1, "2026-09-18"));
+    await s.send("payroll.employee_paid", { payrollId: "gusto:payroll:1", employeeId: "gusto:employee:e1", checkDate: "2026-09-18", kind: "regular", grossPayCents: 160_000, netPayCents: 122_500, hours: 82.5, overtimeCents: 5_000, commissionCents: 5_000, bonusCents: 0, tipsCents: 0 });
+    expect(s.memory.signals.filter((x) => x.kind.startsWith("payroll.")).map((x) => [x.kind, x.subject])).toEqual([
+      ["payroll.run", { kind: "payroll", id: "gusto:payroll:1" }],
+      ["payroll.employee_pay", { kind: "employee_pay", id: "gusto:payroll:1/gusto:employee:e1" }],
+    ]);
+  });
+
+  it("dead-letters a payroll with no kind or an amount that isn't whole cents, and employee pay with no employee", async () => {
+    const s = store();
+    await expect(s.send("payroll.payroll_processed", payroll(1, "2026-09-18", { kind: "bonus" }))).rejects.toThrow();
+    await expect(s.send("payroll.payroll_processed", payroll(2, "2026-09-18", { grossPayCents: 10.5 }))).rejects.toThrow();
+    await expect(s.send("payroll.employee_paid", { payrollId: "p", kind: "regular", hours: 1, overtimeCents: 0, commissionCents: 0, bonusCents: 0, tipsCents: 0 })).rejects.toThrow();
+    expect(s.memory.deadLetters.map((d) => d.issues[0]?.path)).toEqual(["payload.kind", "payload.grossPayCents", "payload.employeeId"]);
+  });
+
+  it("asks for a second look at a regular payroll well above the three before it", async () => {
+    const s = store();
+    await s.send("payroll.payroll_processed", payroll(1, "2026-08-21", { grossPayCents: 450_000 }));
+    await s.send("payroll.payroll_processed", payroll(2, "2026-09-04", { grossPayCents: 440_000 }));
+    await s.send("payroll.payroll_processed", payroll(3, "2026-09-18", { grossPayCents: 460_000 }));
+    await s.send("payroll.payroll_processed", payroll(4, "2026-10-02", { grossPayCents: 620_000 }));
+    // An off-cycle bonus run and another pay schedule's payroll don't count toward the average.
+    await s.send("payroll.payroll_processed", payroll(5, "2026-09-25", { kind: "off_cycle", grossPayCents: 2_000_000 }));
+    await s.send("payroll.payroll_processed", payroll(6, "2026-09-26", { payScheduleId: "gusto:pay_schedule:2", grossPayCents: 10_000 }));
+    const [rec, ...rest] = about(await s.ask(NOW), "gross");
+    expect(rest).toEqual([]);
+    expect(rec).toMatchObject({
+      id: "rec_finance_payroll_jump_gusto:payroll:4_2026-10-02",
+      summary: "The payroll for 2026-10-02 came to $6,200.00 gross, 38% more than the $4,500.00 average of the 3 before it. Check its hours, overtime, commissions and bonuses before the next payroll runs.",
+      expectedImpact: "Catches up to $1,700.00 of payroll errors",
+      confidence: 0.6,
+    });
+    expect(rec!.provenance.signalIds).toHaveLength(4);
+  });
+
+  it("uses the latest version of each payroll, and its own pay schedule", async () => {
+    const s = store();
+    for (const [n, day] of [[1, "2026-08-21"], [2, "2026-09-04"], [3, "2026-09-18"]] as const) await s.send("payroll.payroll_processed", payroll(n, day));
+    await s.send("payroll.payroll_processed", payroll(4, "2026-10-02", { grossPayCents: 620_000 }));
+    // Gusto corrected it before the check date.
+    await s.send("payroll.payroll_processed", payroll(4, "2026-10-02", { grossPayCents: 470_000 }));
+    expect(about(await s.ask(NOW), "gross")).toEqual([]);
+    // An earlier payroll entered far too high and then corrected counts at its corrected amount.
+    const corrected = store();
+    for (const [n, day] of [[1, "2026-08-21"], [2, "2026-09-04"]] as const) await corrected.send("payroll.payroll_processed", payroll(n, day));
+    await corrected.send("payroll.payroll_processed", payroll(3, "2026-09-18", { grossPayCents: 900_000 }));
+    await corrected.send("payroll.payroll_processed", payroll(3, "2026-09-18"));
+    await corrected.send("payroll.payroll_processed", payroll(4, "2026-10-02", { grossPayCents: 600_000 }));
+    expect(about(await corrected.ask(NOW), "gross").map((r) => r.summary)).toEqual([expect.stringContaining("$6,000.00 gross, 33% more than the $4,500.00 average")]);
+    const unscheduled = store();
+    for (const n of [1, 2, 3]) await unscheduled.send("payroll.payroll_processed", payroll(n, `2026-09-0${n}`, { payScheduleId: undefined }));
+    await unscheduled.send("payroll.payroll_processed", payroll(4, "2026-09-10", { payScheduleId: undefined, grossPayCents: 700_000 }));
+    expect(about(await unscheduled.ask(NOW), "gross").map((r) => r.summary)).toEqual([expect.stringContaining("The payroll for 2026-09-10 came to $7,000.00 gross, 56% more")]);
+  });
+
+  it("is quiet with fewer than three payrolls before, a rise of 25% or less, under $500 more, or a payroll over 30 days old", async () => {
+    const cases: [number[], string][] = [
+      [[450_000, 450_000, 900_000], "2026-10-02"],
+      [[450_000, 450_000, 450_000, 562_500], "2026-10-02"],
+      [[100_000, 100_000, 100_000, 149_999], "2026-10-02"],
+      [[450_000, 450_000, 450_000, 900_000], "2026-09-01"],
+    ];
+    for (const [gross, last] of cases) {
+      const s = store();
+      for (const [i, cents] of gross.entries()) await s.send("payroll.payroll_processed", payroll(i + 1, i === gross.length - 1 ? last : `2026-08-0${i + 1}`, { grossPayCents: cents }));
+      expect(about(await s.ask(NOW), "gross")).toEqual([]);
+    }
+    // Exactly 30 days old still counts.
+    const s = store();
+    for (const n of [1, 2, 3]) await s.send("payroll.payroll_processed", payroll(n, `2026-08-0${n}`));
+    await s.send("payroll.payroll_processed", payroll(4, "2026-09-02", { grossPayCents: 900_000 }));
+    expect(about(await s.ask(NOW), "gross")).toHaveLength(1);
+    const missing = store();
+    for (const n of [1, 2, 3]) await missing.send("payroll.payroll_processed", payroll(n, `2026-09-0${n}`));
+    await missing.send("payroll.payroll_processed", payroll(4, "2026-09-10", { grossPayCents: null }));
+    await missing.send("payroll.payroll_processed", payroll(5, undefined as never, { grossPayCents: 900_000 }));
+    expect(about(await missing.ask(NOW), "gross")).toEqual([]);
   });
 });
 

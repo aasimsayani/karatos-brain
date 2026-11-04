@@ -383,6 +383,8 @@ describe("value ledger API", () => {
     await call("/v1/reason", { method: "POST" });
     await call("/v1/recommendations/rec_priced/feedback", { method: "POST", body: JSON.stringify({ outcome: "accepted", actor: "owner" }) });
     await post(call, "rec_priced", { cents: 450, actor: "owner" });
+    // Feedback and results are stamped with the real clock; date them inside the period so the test doesn't depend on today.
+    for (const r of [...memory.feedback, ...memory.valueResults]) r.recordedAt = "2026-10-15T00:00:00.000Z";
     const res = await call("/v1/value?from=2026-10-01&to=2026-11-01");
     expect(res.status).toBe(200);
     const { report } = (await res.json()) as { report: { from: string; to: string; shown: { count: number }; approved: { count: number }; returned: { cents: { saves: number } } } };
