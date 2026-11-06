@@ -22,6 +22,7 @@ import idex from "./idex.js";
 import inventory_pos from "./inventory_pos.js";
 import klaviyo from "./klaviyo.js";
 import mailchimp from "./mailchimp.js";
+import meta_ads from "./meta_ads.js";
 import metals_api from "./metals_api.js";
 import monday from "./monday.js";
 import nivoda from "./nivoda.js";
@@ -42,4 +43,4 @@ import woocommerce from "./woocommerce.js";
 import xero from "./xero.js";
 
 /** Each built connector's own catalog fields, by catalog id. */
-export const CONNECTOR_CATALOG: Readonly<Record<string, ConnectorCatalogEntry>> = { affirm, authorize_net, avalara, bank_statements, bigcommerce, calendly, chase, clover, custom_forms, edi_x12, fincen_8300, gia, gmail, google_ads, google_analytics, google_workspace, gusto, hubspot, idex, inventory_pos, klaviyo, mailchimp, metals_api, monday, nivoda, piro, plaid, quickbooks, rapnet, refiner_statements, shopify, slack, square, stripe, stuller, twilio, watchsearch, wix, woocommerce, xero };
+export const CONNECTOR_CATALOG: Readonly<Record<string, ConnectorCatalogEntry>> = { affirm, authorize_net, avalara, bank_statements, bigcommerce, calendly, chase, clover, custom_forms, edi_x12, fincen_8300, gia, gmail, google_ads, google_analytics, google_workspace, gusto, hubspot, idex, inventory_pos, klaviyo, mailchimp, meta_ads, metals_api, monday, nivoda, piro, plaid, quickbooks, rapnet, refiner_statements, shopify, slack, square, stripe, stuller, twilio, watchsearch, wix, woocommerce, xero };

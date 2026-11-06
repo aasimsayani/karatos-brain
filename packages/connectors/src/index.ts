@@ -22,6 +22,7 @@ export * from "./idex/index.js";
 export * from "./inventory_pos/index.js";
 export * from "./klaviyo/index.js";
 export * from "./mailchimp/index.js";
+export * from "./meta_ads/index.js";
 export * from "./metals_api/index.js";
 export * from "./monday/index.js";
 export * from "./nivoda/index.js";
