@@ -340,6 +340,7 @@ export const CONNECTED_ON: Readonly<Record<string, string>> = {
   woocommerce: "2026-10-28",
   piro: "2026-10-29",
   refiner_statements: "2026-10-29",
+  tiktok: "2026-11-01",
   pinterest: "2026-10-31",
   ebay: "2026-10-30",
   meta_ads: "2026-10-30",

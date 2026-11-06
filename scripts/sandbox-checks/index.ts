@@ -27,10 +27,11 @@ import shopify from "./shopify.js";
 import slack from "./slack.js";
 import square from "./square.js";
 import stripe from "./stripe.js";
+import tiktok from "./tiktok.js";
 import twilio from "./twilio.js";
 import wix from "./wix.js";
 import woocommerce from "./woocommerce.js";
 import xero from "./xero.js";
 
 /** Every connector's nightly sandbox check. */
-export const SANDBOX_CHECKS: SandboxCheck[] = [affirm, authorize_net, avalara, bigcommerce, calendly, clover, custom_forms, ebay, gia, gmail, google_ads, google_analytics, google_workspace, gusto, hubspot, klaviyo, mailchimp, meta_ads, metals_api, monday, pinterest, plaid, quickbooks, shopify, slack, square, stripe, twilio, wix, woocommerce, xero];
+export const SANDBOX_CHECKS: SandboxCheck[] = [affirm, authorize_net, avalara, bigcommerce, calendly, clover, custom_forms, ebay, gia, gmail, google_ads, google_analytics, google_workspace, gusto, hubspot, klaviyo, mailchimp, meta_ads, metals_api, monday, pinterest, plaid, quickbooks, shopify, slack, square, stripe, tiktok, twilio, wix, woocommerce, xero];
