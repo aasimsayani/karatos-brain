@@ -9,6 +9,7 @@ import calendly from "./calendly.js";
 import chase from "./chase.js";
 import clover from "./clover.js";
 import custom_forms from "./custom_forms.js";
+import ebay from "./ebay.js";
 import edi_x12 from "./edi_x12.js";
 import fincen_8300 from "./fincen_8300.js";
 import gia from "./gia.js";
@@ -43,4 +44,4 @@ import woocommerce from "./woocommerce.js";
 import xero from "./xero.js";
 
 /** How each built connector is made from an instance's settings, by catalog id. */
-export const FACTORIES: Readonly<Record<string, ConnectorFactory>> = { affirm, authorize_net, avalara, bank_statements, bigcommerce, calendly, chase, clover, custom_forms, edi_x12, fincen_8300, gia, gmail, google_ads, google_analytics, google_workspace, gusto, hubspot, idex, inventory_pos, klaviyo, mailchimp, meta_ads, metals_api, monday, nivoda, piro, plaid, quickbooks, rapnet, refiner_statements, shopify, slack, square, stripe, stuller, twilio, watchsearch, wix, woocommerce, xero };
+export const FACTORIES: Readonly<Record<string, ConnectorFactory>> = { affirm, authorize_net, avalara, bank_statements, bigcommerce, calendly, chase, clover, custom_forms, ebay, edi_x12, fincen_8300, gia, gmail, google_ads, google_analytics, google_workspace, gusto, hubspot, idex, inventory_pos, klaviyo, mailchimp, meta_ads, metals_api, monday, nivoda, piro, plaid, quickbooks, rapnet, refiner_statements, shopify, slack, square, stripe, stuller, twilio, watchsearch, wix, woocommerce, xero };
