@@ -2,6 +2,7 @@
 import type { ConnectorCatalogEntry } from "../integrations.js";
 import affirm from "./affirm.js";
 import amazon from "./amazon.js";
+import asana from "./asana.js";
 import authorize_net from "./authorize_net.js";
 import avalara from "./avalara.js";
 import bank_statements from "./bank_statements.js";
@@ -49,4 +50,4 @@ import xero from "./xero.js";
 import yext from "./yext.js";
 
 /** Each built connector's own catalog fields, by catalog id. */
-export const CONNECTOR_CATALOG: Readonly<Record<string, ConnectorCatalogEntry>> = { affirm, amazon, authorize_net, avalara, bank_statements, bigcommerce, calendly, chase, clover, custom_forms, ebay, edi_x12, fincen_8300, gia, gmail, google_ads, google_analytics, google_workspace, gusto, hubspot, idex, inventory_pos, klaviyo, mailchimp, meta_ads, metals_api, monday, nivoda, pinterest, piro, plaid, quickbooks, rapnet, refiner_statements, shopify, slack, square, stripe, stuller, supplier_invoices, tiktok, twilio, watchsearch, wix, woocommerce, xero, yext };
+export const CONNECTOR_CATALOG: Readonly<Record<string, ConnectorCatalogEntry>> = { affirm, amazon, asana, authorize_net, avalara, bank_statements, bigcommerce, calendly, chase, clover, custom_forms, ebay, edi_x12, fincen_8300, gia, gmail, google_ads, google_analytics, google_workspace, gusto, hubspot, idex, inventory_pos, klaviyo, mailchimp, meta_ads, metals_api, monday, nivoda, pinterest, piro, plaid, quickbooks, rapnet, refiner_statements, shopify, slack, square, stripe, stuller, supplier_invoices, tiktok, twilio, watchsearch, wix, woocommerce, xero, yext };

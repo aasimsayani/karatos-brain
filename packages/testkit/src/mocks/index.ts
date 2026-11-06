@@ -2,6 +2,7 @@
 import type { DocMock, DocMockModule } from "../doc-mock.js";
 import affirm from "./affirm.js";
 import amazon from "./amazon.js";
+import asana from "./asana.js";
 import authorize_net from "./authorize_net.js";
 import avalara from "./avalara.js";
 import bigcommerce from "./bigcommerce.js";
@@ -37,6 +38,7 @@ import yext from "./yext.js";
 
 export * from "./affirm.js";
 export * from "./amazon.js";
+export * from "./asana.js";
 export * from "./authorize_net.js";
 export * from "./avalara.js";
 export * from "./bigcommerce.js";
@@ -71,7 +73,7 @@ export * from "./xero.js";
 export * from "./yext.js";
 
 /** Every mock module, one per catalog integration. */
-export const DOC_MOCK_MODULES: readonly DocMockModule[] = [affirm, amazon, authorize_net, avalara, bigcommerce, calendly, clover, custom_forms, ebay, gia, gmail, google_ads, google_analytics, google_workspace, gusto, hubspot, idex, klaviyo, mailchimp, meta_ads, monday, nivoda, pinterest, plaid, quickbooks, rapnet, slack, square, stuller, tiktok, wix, woocommerce, xero, yext];
+export const DOC_MOCK_MODULES: readonly DocMockModule[] = [affirm, amazon, asana, authorize_net, avalara, bigcommerce, calendly, clover, custom_forms, ebay, gia, gmail, google_ads, google_analytics, google_workspace, gusto, hubspot, idex, klaviyo, mailchimp, meta_ads, monday, nivoda, pinterest, plaid, quickbooks, rapnet, slack, square, stuller, tiktok, wix, woocommerce, xero, yext];
 
 /** Every doc-derived mock, with empty data, for checks and the vendor docs watch. */
 export function allDocMocks(): DocMock[] {

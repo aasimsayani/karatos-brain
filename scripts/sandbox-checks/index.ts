@@ -2,6 +2,7 @@
 import type { SandboxCheck } from "@karatos/core";
 import affirm from "./affirm.js";
 import amazon from "./amazon.js";
+import asana from "./asana.js";
 import authorize_net from "./authorize_net.js";
 import avalara from "./avalara.js";
 import bigcommerce from "./bigcommerce.js";
@@ -36,4 +37,4 @@ import xero from "./xero.js";
 import yext from "./yext.js";
 
 /** Every connector's nightly sandbox check. */
-export const SANDBOX_CHECKS: SandboxCheck[] = [affirm, amazon, authorize_net, avalara, bigcommerce, calendly, clover, custom_forms, ebay, gia, gmail, google_ads, google_analytics, google_workspace, gusto, hubspot, klaviyo, mailchimp, meta_ads, metals_api, monday, pinterest, plaid, quickbooks, shopify, slack, square, stripe, tiktok, twilio, wix, woocommerce, xero, yext];
+export const SANDBOX_CHECKS: SandboxCheck[] = [affirm, amazon, asana, authorize_net, avalara, bigcommerce, calendly, clover, custom_forms, ebay, gia, gmail, google_ads, google_analytics, google_workspace, gusto, hubspot, klaviyo, mailchimp, meta_ads, metals_api, monday, pinterest, plaid, quickbooks, shopify, slack, square, stripe, tiktok, twilio, wix, woocommerce, xero, yext];
