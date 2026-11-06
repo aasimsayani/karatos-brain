@@ -1,0 +1,5 @@
+- Form 8300 connector (`@karatos/connectors`, `fincen_8300`): imports five years of the store's Form 8300 filings log, kept as CSV, since FinCEN's BSA E-Filing System has no API.
+  - Each filing keeps its filing date, the date the cash came in, the sales, the cash, the status (submitted, accepted, accepted with warnings or rejected), the days it took to file, and its BSA Tracking ID or BSA ID. A log saved again stores only what changed.
+  - Names, addresses and taxpayer numbers are never read.
+  - Turn it on with `fincen_8300` in `ENABLED_INTEGRATIONS` and `FINCEN_8300_IMPORT_DIR`.
+- Compliance: the Form 8300 reminder stops once the log covers the sale, comes back if FinCEN rejects the filing, and a new reminder asks for the written customer statement due by January 31, except for filings made voluntarily as suspicious or for $10,000 or less.

@@ -1,7 +1,7 @@
-import { meltValueCents, type Signal } from "@karatos/core";
+import { meltValueCents, TROY_OUNCE_GRAMS, type Signal } from "@karatos/core";
 import { z } from "zod";
 import type { DepartmentModule } from "../department.js";
-import { dollars, extractor, latestBySubject, recommend, signalFrom, value } from "../department.js";
+import { ASSUMPTIONS, dollars, estimate, extractor, latestBySubject, pct, recommend, signalFrom, value } from "../department.js";
 import { METALS } from "./inventory.js";
 
 const MetalPriceUpdated = z.object({ metal: z.enum(METALS), spotPerTroyOunceCents: z.number().int().positive() });
@@ -105,6 +105,13 @@ export const metals: DepartmentModule = {
           if (Math.abs(change) < PRICE_MOVE) return [];
           const pieces = signals.filter((s) => s.kind === "inventory.received" && value<{ metal?: string }>(s).metal === metal);
           const direction = change > 0 ? "up" : "down";
+          // On a rise, the added metal value of the pieces in stock is margin to keep by repricing.
+          const added = pieces.reduce((sum, s) => {
+            const p = value<{ karat?: number; weightGrams?: number; quantity?: number }>(s);
+            if (!p.weightGrams || (metal === "gold" && !p.karat)) return sum;
+            const melt = (spot: number) => meltValueCents({ metal, ...(p.karat ? { karat: p.karat } : {}), weightGrams: p.weightGrams!, spotPerTroyOunceCents: spot });
+            return sum + (melt(to) - melt(from)) * (p.quantity ?? 1);
+          }, 0);
           return [
             recommend({
               department: "metals",
@@ -113,6 +120,10 @@ export const metals: DepartmentModule = {
               summary: `${metal[0]!.toUpperCase()}${metal.slice(1)} is ${direction} ${Math.abs(Math.round(change * 1000) / 10)}% (${dollars(from)} to ${dollars(to)} per ounce). Review prices on ${pieces.length} ${metal} pieces and your buy-from-public rates.`,
               confidence: 0.8,
               expectedImpact: change > 0 ? "Protects margin on metal-heavy pieces" : "Keeps prices competitive",
+              impact:
+                change > 0
+                  ? estimate("makes", `The ${dollars(added)} rise in metal value of the ${metal} pieces received with a weight, kept by raising their prices with the metal.`, () => added)
+                  : undefined,
               basedOn: [before, after, ...pieces],
               now,
             }),
@@ -149,6 +160,11 @@ export const metals: DepartmentModule = {
                 summary: `Gold purchase ${p.purchaseId} paid ${dollars(p.paidCents)} for metal worth about ${dollars(melt)} at spot (${Math.round((p.paidCents / melt) * 100)}%). Check your buy rates and scale calibration.`,
                 confidence: 0.75,
                 expectedImpact: "Protects margin on scrap and refining",
+                impact: estimate(
+                  "saves",
+                  `Paid ${dollars(p.paidCents - Math.round(melt * THIN_MARGIN))} above ${pct(THIN_MARGIN)} of melt, saved on the next purchase like it.`,
+                  () => p.paidCents - melt * THIN_MARGIN,
+                ),
                 basedOn: [...new Set(basedOn)],
                 now,
               }),
@@ -164,6 +180,9 @@ export const metals: DepartmentModule = {
           if (p.fineWeightCheck !== "differs" || basis === undefined || p.fineness === undefined || p.expectedFineGrams === undefined) return [];
           // Credited more than the assay says is the refiner's loss, not the store's.
           if (p.fineGrams >= p.expectedFineGrams) return [];
+          // The short metal at the rate this settlement paid, when it says what that was.
+          const perGram = p.pricePerTroyOunceCents ? p.pricePerTroyOunceCents / TROY_OUNCE_GRAMS : p.creditCents ? p.creditCents / p.fineGrams : undefined;
+          const short = p.expectedFineGrams - p.fineGrams;
           return [
             recommend({
               department: "metals",
@@ -172,6 +191,10 @@ export const metals: DepartmentModule = {
               summary: `Lot ${p.lot} from ${p.refiner} credits ${g(p.fineGrams)} of fine ${p.metal}, but ${g(basis)} at ${percent(p.fineness)} is ${g(p.expectedFineGrams)}. Ask the refiner to recheck the assay on the ${g(p.expectedFineGrams - p.fineGrams)} short.`,
               confidence: 0.8,
               expectedImpact: "Recovers metal credited short on a settlement",
+              impact:
+                perGram === undefined
+                  ? undefined
+                  : estimate("protects", `${g(short)} of fine ${p.metal} at the ${dollars(perGram)} a gram this settlement paid.`, () => short * perGram),
               basedOn: [s],
               now,
             }),
@@ -199,6 +222,11 @@ export const metals: DepartmentModule = {
               summary: `Lot ${p.lot} from ${p.refiner} paid ${dollars(p.creditCents)} for ${p.fineTroyOunces} oz of fine ${p.metal}, ${percent(paid)} of spot on ${p.settledOn}${fees}. Get a second quote on payable rates and fees.`,
               confidence: 0.7,
               expectedImpact: "Raises what scrap and refining bring in",
+              impact: estimate(
+                "makes",
+                `This lot at ${pct(ASSUMPTIONS.targetPayable.likely)} of spot instead of ${percent(paid)}: ${p.fineTroyOunces} oz of fine ${p.metal} at ${dollars(spotCents)} an ounce.`,
+                (a) => (a("targetPayable") - paid) * p.fineTroyOunces * spotCents,
+              ),
               basedOn: [s, spot],
               now,
             }),
