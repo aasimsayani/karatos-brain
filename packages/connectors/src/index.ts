@@ -13,6 +13,7 @@ export * from "./files/index.js";
 export * from "./fincen_8300/index.js";
 export * from "./gia/index.js";
 export * from "./gmail/index.js";
+export * from "./google_ads/index.js";
 export * from "./google_analytics/index.js";
 export * from "./google_workspace/index.js";
 export * from "./gusto/index.js";
