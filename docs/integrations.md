@@ -198,7 +198,7 @@ Used by: R is retail, W is wholesale, M is manufacturing. Test with says how we 
 | Pinterest | R, M | Public API | Free sandbox | No | Built (Connects a Pinterest business account through an app the store owns, holding boards:read, pins:read and user_accounts:read only; the connector stops if the token holds anything more. Its only API requests are the Pin list and two analytics reads. Pinterest's analytics reach back 90 days, so the first import reads 90 days of metrics and every Pin) |
 | TikTok | R | Public API | Free sandbox | No | Built (Connects the store's own TikTok account through an app the store owns, holding user.info.basic, user.info.stats and video.list only; the connector stops if the token holds anything more. Its only API requests are the profile read and the video list) |
 | TikTok Ads | R | Public API | Free sandbox | No | Planned (Ad spend and results from TikTok's API for Business. No public API changelog found; the nightly sandbox run catches API changes) |
-| Yext | R | Public API | Free sandbox | No | Planned (Local listings and reviews from many sites in one place, including Yelp, whose own API shows only a few reviews. No public API changelog found; the nightly sandbox run catches API changes) |
+| Yext | R | Public API | Free sandbox | No | Built (Connects with an API key of a Yext app the store owns, which should hold read access to Entities and Reviews only. Its only API requests are two GETs, the location list and the review list. Listing status and analytics are a follow-up. No public API changelog found; the docs watch follows the three doc pages the mock was built from) |
 | Docusign | R, W, M | Public API | Free sandbox | Yes | Planned (Signed appraisal, consignment, memo and custom order agreements, and who has yet to sign) |
 | Dropbox | R, W, M | Public API | Free sandbox | Yes | Planned (Files such as invoices, appraisals and design files. Dropbox publishes no API changelog; changes are announced on its developer blog) |
 | Microsoft OneDrive and SharePoint files | R, W, M | Public API | Free sandbox | Yes | Planned (Files kept in OneDrive or SharePoint, read through Microsoft Graph, whose one changelog is watched through the Outlook entry) |
@@ -421,8 +421,9 @@ A request for a path or method the docs don't list throws `UndocumentedRequestEr
 - A Wix site's read endpoints (eCommerce orders, Catalog V3 and V1, Contacts V5) with the app token, its permissions and cursor paging
 - A WooCommerce store's REST API v3 read endpoints with its key permissions and page headers
 - Xero's Accounting API endpoints with its token refresh
+- Yext's Management API v2 location and review lists, enforcing the API key header, the version date, the account, the app's access, page sizes, update-date ranges and page tokens tied to their query
 
-Where a vendor has a free sandbox (Affirm, Authorize.net, Avalara AvaTax, BigCommerce, Calendly, Clover, Custom forms, eBay, GIA Report Results, Gmail, Google Ads, Google Analytics 4, Google Workspace and Drive, Gusto, HubSpot, Klaviyo, Mailchimp, Meta Ads, Monday.com, Pinterest, Plaid, QuickBooks Online, Slack, Square, TikTok, Wix, WooCommerce and Xero so far), its mock is a stand-in until a developer account is set up for the nightly run.
+Where a vendor has a free sandbox (Affirm, Authorize.net, Avalara AvaTax, BigCommerce, Calendly, Clover, Custom forms, eBay, GIA Report Results, Gmail, Google Ads, Google Analytics 4, Google Workspace and Drive, Gusto, HubSpot, Klaviyo, Mailchimp, Meta Ads, Monday.com, Pinterest, Plaid, QuickBooks Online, Slack, Square, TikTok, Wix, WooCommerce, Xero and Yext so far), its mock is a stand-in until a developer account is set up for the nightly run.
 
 <!-- registry:mocks:end -->
 
@@ -1902,6 +1903,28 @@ Reads the Xero Accounting API (`api.xro/2.0`) for one organisation. Read-only is
 **Webhooks.** `verifyXeroWebhook` checks `x-xero-signature`, the base64 HMAC-SHA256 of the raw body keyed with the webhooks key. Anything but a match must be answered 401, which is also what Xero's intent-to-receive check expects. `xeroWebhookChanges` lists the invoice, contact and credit note changes for this organisation. A delivery names what changed without the record, so it is a prompt to sync, not data. The instance doesn't take webhooks yet; the scheduled sync picks every change up.
 
 **Testing.** The tests run against a mock built from Xero's docs (`packages/testkit/src/mocks/xero.ts`), which rotates refresh tokens, rejects the old one, issues access tokens carrying their scopes, answers 401 without a valid token, needs the tenant header and enforces paging, date filters and `If-Modified-Since`. For the nightly run, create a free Xero developer account, connect the Demo Company to an app with the read scopes above, and add `SANDBOX_XERO_CLIENT_ID`, `SANDBOX_XERO_CLIENT_SECRET`, `SANDBOX_XERO_TENANT_ID` and `SANDBOX_XERO_REFRESH_TOKEN` as GitHub Actions secrets. The nightly run can't save the token Xero rotates to, so expect it to fail with `invalid_grant` after its first use until the run can store tokens; reconnect and update the secret to check again.
+
+### Yext
+
+Reads the store's Yext account through Yext's Management API (v2): its locations and the reviews Yext gathers from Google, Yelp, Facebook and the other publishers it watches. Read-only by request: its only requests are two GETs, the location list and the review list, with parameters it builds and checks itself. Yext API keys carry no scopes the connector could check, so give the app the key belongs to read access to Entities and Reviews and nothing else.
+
+| Setting | What it is |
+| --- | --- |
+| `YEXT_API_KEY` | An API key of a Yext app the store owns, with read access to Entities and Reviews |
+| `YEXT_ACCOUNT_ID` | The account to read; unset reads the key's own account |
+| `YEXT_ENVIRONMENT` | `production` (default) or `sandbox` |
+
+**What it reads.** Each pass reads every location, 50 a page, with its name, address, time zone and whether it is closed. Then the reviews Yext last updated in a range of days, 100 a page: the last two years on the first import, and on each sync after, the days since the last pass ended, starting two days early so a review updated late on a day already read is read again.
+
+**Events.** `location.updated` for each location and `review.updated` for each review, with its location, publisher, rating, an excerpt, its status, when it was published and last updated, a link to it, how many comments it has, how many are the store's replies, and whether it is still awaiting one. Each is keyed by a digest of what was kept, so an edited or newly answered review is stored as a new version and an unchanged one is a duplicate.
+
+**Privacy.** A review is written by a customer, so it keeps no author name or email, and its title and excerpt (the first 500 characters) have email addresses and phone numbers masked. Replies are counted, not copied. A link keeps its address without the query string.
+
+**Rate limits.** Yext allows 5,000 Management API requests an hour. The client sends one request at a time and waits out a 429, a 500 or a 504, doubling from a second, three tries, before the error goes to the sync runner, which resumes from its checkpoint next time. A 401 means the key is wrong, and a 403 that the app lacks read access.
+
+**Writes.** Replying to a review and changing a location's hours are declared so they can be gated and audited, and are turned off. Each needs a named person's approval, and the client has no request to send either.
+
+**Testing.** The tests run against a mock built from Yext's Management API docs (`packages/testkit/src/mocks/yext.ts`), which checks the API key header, the version date, the account, the app's access, page sizes, update-date ranges and that a page token belongs to its query. For the nightly run, add an app in a Yext sandbox account with read access to Entities and Reviews and add its key as the GitHub Actions secret `SANDBOX_YEXT_API_KEY`.
 
 <!-- registry:connector-docs:end -->
 
