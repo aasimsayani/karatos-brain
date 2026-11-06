@@ -1,0 +1,1 @@
+- Asana connector (read-only): projects with their sections and custom fields, tasks with their dates, assignee, section and safe custom fields, and who commented when. It never asks Asana for task names, notes, comment text or text fields. Creating a task and commenting are declared behind the write gate and turned down.

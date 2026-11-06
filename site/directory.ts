@@ -340,6 +340,7 @@ export const CONNECTED_ON: Readonly<Record<string, string>> = {
   woocommerce: "2026-10-28",
   piro: "2026-10-29",
   refiner_statements: "2026-10-29",
+  supplier_invoices: "2026-11-03",
   amazon: "2026-11-03",
   yext: "2026-11-02",
   tiktok: "2026-11-01",
@@ -350,5 +351,6 @@ export const CONNECTED_ON: Readonly<Record<string, string>> = {
   google_analytics: "2026-10-30",
   mailchimp: "2026-10-30",
   fincen_8300: "2026-10-30",
+  asana: "2026-11-03",
   gusto: "2026-10-30",
 };
