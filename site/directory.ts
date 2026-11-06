@@ -351,6 +351,7 @@ export const CONNECTED_ON: Readonly<Record<string, string>> = {
   google_analytics: "2026-10-30",
   mailchimp: "2026-10-30",
   fincen_8300: "2026-10-30",
+  trello: "2026-11-04",
   asana: "2026-11-03",
   gusto: "2026-10-30",
 };
