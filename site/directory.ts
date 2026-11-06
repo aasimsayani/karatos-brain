@@ -341,4 +341,10 @@ export const CONNECTED_ON: Readonly<Record<string, string>> = {
   piro: "2026-10-29",
   refiner_statements: "2026-10-29",
   ebay: "2026-10-30",
+  meta_ads: "2026-10-30",
+  google_ads: "2026-10-30",
+  google_analytics: "2026-10-30",
+  mailchimp: "2026-10-30",
+  fincen_8300: "2026-10-30",
+  gusto: "2026-10-30",
 };
