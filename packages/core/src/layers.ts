@@ -4,6 +4,7 @@ import type { EntityKind, EntityRef, NormalizedEntity } from "./entities.js";
 import type { IdentityLink } from "./identity.js";
 import type { Signal } from "./signals.js";
 import type { DocumentationState, Feedback, ReasoningRun, Recommendation, ReasoningContext } from "./reasoning.js";
+import type { ValueResult } from "./value.js";
 
 /** Layer 2. Turns one event into zero or more canonical entities. */
 export interface Normalizer {
@@ -37,6 +38,14 @@ export interface MemoryStore {
   getRecommendation(organizationId: string, id: string): Promise<Recommendation | null>;
   recordReasoningRun(run: ReasoningRun): Promise<void>;
   recordFeedback(feedback: Feedback): Promise<void>;
+  /** Recommendations raised in [from, to), oldest first. */
+  recommendationsBetween(organizationId: string, from: string, to: string): Promise<Recommendation[]>;
+  /** Every piece of feedback on these recommendations, oldest first. */
+  listFeedback(organizationId: string, recommendationIds: readonly string[]): Promise<Feedback[]>;
+  /** Throws when the result isn't sound (see valueResultProblem). */
+  recordValueResult(result: ValueResult): Promise<void>;
+  /** Every result recorded for these recommendations, oldest first. */
+  listValueResults(organizationId: string, recommendationIds: readonly string[]): Promise<ValueResult[]>;
   saveCheckpoint(organizationId: string, source: string, stream: string, cursor: string): Promise<void>;
   getCheckpoint(organizationId: string, source: string, stream: string): Promise<string | null>;
 }

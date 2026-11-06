@@ -1,0 +1,1 @@
+- Shopify connector: two more writes are declared behind the write gate and turned off, changing a variant's price (such as after a move in the metal price) and creating a single-use discount code for one customer. Each needs a named person's approval and is capped at ten a day. No write scope is requested.
