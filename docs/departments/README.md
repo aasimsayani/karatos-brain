@@ -55,9 +55,45 @@ See [compounding value](../vision/compounding-value.md) for why these links matt
 1. Create `packages/retail/src/departments/<name>.ts` exporting a `DepartmentModule`.
 2. Give every event a zod schema. Event types must be unique across departments; `combineDepartments` refuses duplicates.
 3. Use the helpers in `department.ts` (`entityFrom`, `signalFrom`, `latestBySubject`, `recommend`) so recommendation ids are stable per day and confidence stays explicit.
+   Give each recommendation a dollar `impact` with `estimate` when its number can be worked out from the store's data and `ASSUMPTIONS`; leave it out when it can't.
 4. Add it to `RETAIL_DEPARTMENTS` in `src/index.ts`.
 5. Write tests in `packages/retail/test/departments.test.ts` for each rule: the case that fires, the case that doesn't, and its edges. Coverage must stay above the thresholds in `vitest.config.ts`.
 6. Add a row to the table above.
+
+## What each recommendation is worth
+
+A recommendation can carry an `impact`: what acting on it is worth, in cents. Its `kind` says how the money comes back:
+
+- `makes`: profit on new sales, after the cost of the goods. A sale price is never counted as if it were profit.
+- `saves`: a cost cut, such as a year of carrying cost on stock that finally sells.
+- `protects`: money owed or at risk that the action keeps, such as a balance collected at pickup.
+
+Each has a likely amount and a low to high range, and a `basis` that says how it was worked out with the figures used, so an owner can check it. `estimate` works the figure out three times, with every planning figure in `ASSUMPTIONS` at its low, likely and high value. The store's own numbers win where it has them: an occasion reminder uses that customer's own average order once they have bought before.
+
+The likely values in `ASSUMPTIONS` are the same as the defaults of the payback estimate on the website. They are starting points; as KaratOS learns how each business works, its own figures replace them.
+
+A recommendation with no honest number carries no `impact`: compliance reminders, late purchase orders, stalled custom work, late or unclaimed repairs, and metal price falls. The pipeline drops an `impact` that doesn't add up (amounts out of order, not whole cents, or no basis) and keeps the recommendation. Postgres keeps it in `recommendations.impact`.
+
+| Reasoner | Kind | Worked out as |
+| --- | --- | --- |
+| `inventory.aged-stock` | saves | Cost on hand times a year's carrying rate |
+| `inventory.reorder` | makes | A month of sales at the last 60 days' pace, times margin |
+| `clienteling.upcoming-occasions` | makes | Occasion sale rate times average order times margin |
+| `clienteling.lapsed-vip` | makes | Win-back rate times their average order times margin |
+| `clienteling.missed-calls` | makes | Callers times close rate times average order times margin |
+| `sales.high-return-rate` | saves | Returns so far times the cost of handling one |
+| `finance.cash-deposits` | protects | Cash taken with no matching deposit |
+| `finance.overdue-receivables` | protects | Past-due balance times the share follow-up collects |
+| `appraisals.insurance-update` | makes | Update fee times the share who take one |
+| `repairs.follow-up` (pickup) | protects | The repair estimate |
+| `custom-orders.progress` (balance) | protects | The balance still due |
+| `buying.memo-due` (unsold) | protects | The memo cost owed if it runs past due |
+| `buying.watch-wanted` | makes | Dealer margin on the lowest US dollar ask |
+| `metals.price-move` (rise) | makes | Added metal value of pieces with a weight |
+| `metals.buy-margin` | saves | Paid above 85% of melt |
+| `metals.refiner-assay` | protects | Short fine metal at the settlement's own rate |
+| `metals.refiner-payable` | makes | The lot at a fair share of spot, less what it paid |
+| `marketing.campaign-return` | makes or saves | One more run of a winner, or the loss of a loser not repeated |
 
 ## Sending department events
 
