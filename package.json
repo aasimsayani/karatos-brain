@@ -34,10 +34,10 @@
     "prs:plan": "node --import tsx scripts/pr-queue-cli.ts plan"
   },
   "devDependencies": {
-    "@electric-sql/pglite": "^0.5.11",
+    "@electric-sql/pglite": "^0.5.13",
     "@fontsource/ibm-plex-mono": "5.3.0",
     "@fontsource/ibm-plex-sans": "5.3.0",
-    "@types/node": "^26.6.5",
+    "@types/node": "^26.6.6",
     "@types/pg": "^8.23.1",
     "@vitest/coverage-v8": "^5.0.5",
     "tsx": "^4.23.15",
