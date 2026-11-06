@@ -102,11 +102,12 @@ export function airtableSafeFields(table: AirtableTable): AirtableField[] {
 }
 
 function event(key: string, type: string, occurredAt: string | undefined, receivedAt: string, payload: Record<string, unknown>): AirtableBrainEvent {
-  return { id: `airtable_${key.replace(/[^A-Za-z0-9_.:-]/g, "_")}`, type, occurredAt, receivedAt, idempotencyKey: `airtable:${key}`, payload };
+  // Keys hold only checked ids and hex hashes, so they are safe in an id as they are.
+  return { id: `airtable_${key}`, type, occurredAt, receivedAt, idempotencyKey: `airtable:${key}`, payload };
 }
 
 /** A table, with every field's definition as a column and whether it is read, so departments can map them. */
-export function airtableTableEvents(table: AirtableTable, baseName: string | undefined, receivedAt: string): AirtableBrainEvent[] {
+export function airtableTableEvents(table: AirtableTable, baseName: unknown, receivedAt: string): AirtableBrainEvent[] {
   const read = new Set(airtableSafeFields(table).map((f) => f.id));
   const payload = defined({
     boardId: airtableRef("table", table.id),

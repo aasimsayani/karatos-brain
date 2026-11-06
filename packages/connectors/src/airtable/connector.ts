@@ -117,13 +117,13 @@ export function airtableConnector(options: AirtableOptions): Connector {
   }
 
   /** Every base the token can see, by id, with its name. */
-  async function listBases(): Promise<Map<string, string | undefined>> {
-    const out = new Map<string, string | undefined>();
+  async function listBases(): Promise<Map<string, unknown>> {
+    const out = new Map<string, unknown>();
     let offset: string | null = null;
     do {
       const page = await client.bases(offset);
       for (const b of page.data) {
-        if (typeof b.id === "string" && AIRTABLE_ID.base.test(b.id) && out.size < MAX_BASES) out.set(b.id, typeof b.name === "string" ? b.name : undefined);
+        if (typeof b.id === "string" && AIRTABLE_ID.base.test(b.id) && out.size < MAX_BASES) out.set(b.id, b.name);
       }
       offset = page.next;
     } while (offset);
@@ -140,7 +140,7 @@ export function airtableConnector(options: AirtableOptions): Connector {
     }
   }
 
-  async function start(mode: "historical" | "incremental", saved: AirtableCursor | null, at: Date, visible: Map<string, string | undefined>): Promise<AirtableCursor> {
+  async function start(mode: "historical" | "incremental", saved: AirtableCursor | null, at: Date, visible: Map<string, unknown>): Promise<AirtableCursor> {
     let since: string;
     if (mode === "historical") {
       const from = new Date(at);
@@ -164,7 +164,7 @@ export function airtableConnector(options: AirtableOptions): Connector {
     // A finished import stays finished (no bases left) and reads nothing.
     if (mode === "historical" && saved?.pass === "historical" && saved.bases.length === 0) return;
     await checkReadOnly();
-    let names: Map<string, string | undefined> | null = null;
+    let names: Map<string, unknown> | null = null;
     const resume = mode === "historical" ? saved?.pass === "historical" : saved?.pass === "incremental" && saved.bases.length > 0;
     let c: AirtableCursor;
     if (resume) {

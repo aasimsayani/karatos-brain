@@ -340,6 +340,8 @@ describe("the Airtable normalizer", () => {
     const first = one({ [F.quote]: 250 });
     expect(airtableRecordEvents({ id: rec("One"), createdTime: "2026-01-01T09:00:00.000Z", fields: { [F.quote]: 250 } }, table, "2026-11-07T00:00:00.000Z")[0]!.idempotencyKey).toBe(first.idempotencyKey);
     expect(one({ [F.quote]: 300 }).idempotencyKey).not.toBe(first.idempotencyKey);
+    // A record made again with the same values is a new record version.
+    expect(airtableRecordEvents({ id: rec("One"), createdTime: "2026-02-01T09:00:00.000Z", fields: { [F.quote]: 250 } }, table, RECEIVED)[0]!.idempotencyKey).not.toBe(first.idempotencyKey);
     // A text field changing isn't read, so it isn't a new version.
     expect(one({ [F.quote]: 250, [F.notes]: "Test Customer called" }).idempotencyKey).toBe(first.idempotencyKey);
   });
@@ -350,6 +352,10 @@ describe("the Airtable normalizer", () => {
     expect(both.occurredAt).toBe("2026-11-03T10:00:00.000Z");
     const reversed = airtableRecordEvents({ id: rec("One"), createdTime: "2026-01-01T09:00:00.000Z", fields: { [F.changed]: "2026-11-04T10:00:00.000Z", [aid("fld", "Changed2")]: "2026-11-03T10:00:00.000Z" } }, table, RECEIVED)[0]!;
     expect(reversed.occurredAt).toBe("2026-11-04T10:00:00.000Z");
+    // Other time fields, such as when a repair is due back, aren't when the record changed.
+    const times: AirtableTable = { ...table, fields: [...table.fields, { id: aid("fld", "Back"), name: "Back at", type: "dateTime" }, { id: aid("fld", "Made"), name: "Made", type: "createdTime" }] };
+    const due = airtableRecordEvents({ id: rec("One"), createdTime: "2026-01-01T09:00:00.000Z", fields: { [F.changed]: "2026-11-01T10:00:00.000Z", [aid("fld", "Back")]: "2026-12-01T10:00:00.000Z", [aid("fld", "Made")]: "2026-12-02T10:00:00.000Z" } }, times, RECEIVED)[0]!;
+    expect(due.occurredAt).toBe("2026-11-01T10:00:00.000Z");
     const none = airtableRecordEvents({ id: rec("One"), createdTime: "2026-01-01T09:00:00.000Z", fields: {} }, table, RECEIVED)[0]!;
     expect(none).toMatchObject({ occurredAt: "2026-01-01T09:00:00.000Z", payload: { updatedAt: "2026-01-01T09:00:00.000Z" } });
   });
@@ -431,6 +437,8 @@ describe("the Airtable client", () => {
     await expect(client.tables(REPAIRS)).rejects.toThrow(/base id/);
     await expect(client.records(REPAIRS, REPAIRS, [F.quote], null)).rejects.toThrow(/base id/);
     await expect(client.records(SHOP, "Repairs", [F.quote], null)).rejects.toThrow(/table id/);
+    await expect(client.records(SHOP, `${REPAIRS}/x`, [F.quote], null)).rejects.toThrow(/table id/);
+    await expect(client.records(SHOP, `x${REPAIRS}`, [F.quote], null)).rejects.toThrow(/table id/);
     await expect(client.records(SHOP, REPAIRS, ["Quote"], null)).rejects.toThrow(/field id/);
     await expect(client.records(SHOP, REPAIRS, [], null)).rejects.toThrow(/must name its fields/);
     await expect(client.records(SHOP, REPAIRS, Array.from({ length: 201 }, (_, i) => aid("fld", `N${i}`)), null)).rejects.toThrow(/at most 200 fields/);
@@ -687,6 +695,14 @@ describe("the Airtable connector", () => {
     const out = await batches(c.historicalImport({ organizationId: TEST_ORG, cursor: JSON.stringify(saved) }));
     expect(paths(fetch).slice(0, 3)).toEqual(["/meta/whoami", "/meta/bases", `/meta/bases/${SHOP}/tables`]);
     expect(out[0]!.events.map((e) => e.payload.baseName)).toEqual(["Test Shop", "Test Shop", "Test Shop"]);
+  });
+
+  it("keeps at most 1,000 tables of a base, so the checkpoint stays bounded", async () => {
+    const many = Array.from({ length: 1001 }, (_, i) => ({ id: aid("tbl", `T${i}`), name: `T${i}`, primaryFieldId: F.text, fields: [{ id: F.text, name: "Note", type: "multilineText" }] }));
+    const { c } = connector(account({ tables: { [SHOP]: many } }));
+    const out = await batches(c.historicalImport({ organizationId: TEST_ORG, cursor: null }));
+    expect(out[0]!.events).toHaveLength(1000);
+    expect(parseAirtableCursor(out[0]!.cursor)!.tables).toHaveLength(1000);
   });
 
   it("skips a table deleted since the checkpoint", async () => {
