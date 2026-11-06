@@ -13,6 +13,8 @@ COPY packages/testkit/package.json packages/testkit/
 RUN npm ci --ignore-scripts
 COPY packages packages
 COPY site site
+# The directory links each system's research write-up, so the build reads their names.
+COPY docs/research docs/research
 RUN npm run build -w @karatos/core && node --import tsx site/build.ts
 
 FROM node:26-alpine
