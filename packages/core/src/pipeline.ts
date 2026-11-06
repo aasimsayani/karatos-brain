@@ -3,7 +3,7 @@ import { ZodError, type ZodType } from "zod";
 import { parseEvent, type EventEnvelope } from "./events.js";
 import type { NormalizedEntity } from "./entities.js";
 import type { Signal } from "./signals.js";
-import type { Recommendation } from "./reasoning.js";
+import { impactProblem, type Recommendation } from "./reasoning.js";
 import type { DocumentationSource, MemoryStore, Normalizer, Reasoner, SignalExtractor } from "./layers.js";
 
 export interface BrainPipelineOptions {
@@ -124,8 +124,10 @@ export class BrainPipeline {
     for (const reasoner of this.options.reasoners) {
       const produced = await reasoner.reason({ organizationId, signals, documentation, now: startedAt });
       recommendations.push(
-        ...produced.map((r) => ({
+        ...produced.map(({ impact, ...r }) => ({
           ...r,
+          // A dollar figure that doesn't add up is dropped rather than shown; the recommendation stands.
+          ...(impact && !impactProblem(impact) ? { impact } : {}),
           // A reasoner cannot claim fresh docs when the documentation layer says otherwise.
           degraded: r.degraded || documentation.stale,
           provenance: {
