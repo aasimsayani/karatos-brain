@@ -1,0 +1,1 @@
+- Vendor docs watch: the watch issue stays under GitHub's body limit. Each vendor's row lists its three newest pages and counts the rest, the saved state is compressed, and if the rows still don't fit, the body shows rows without pages, then the top rows with a count of the ones below

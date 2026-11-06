@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { deflateRawSync, inflateRawSync } from "node:zlib";
 import { CONNECTOR_CATALOG } from "./catalog/index.js";
 import { INTEGRATIONS, type IntegrationSpec } from "./integrations.js";
 import type { IssueTracker } from "./issue-tracker.js";
@@ -145,6 +146,10 @@ export interface VendorDocsWatchOptions {
 export const WATCH_MARKER = "<!-- vendor-docs-watch -->";
 export const WATCH_TITLE = "Vendor docs watch";
 const STATE_PREFIX = "<!-- vendor-docs-state:";
+/** GitHub rejects an issue body over 65,536 characters; this leaves room to spare. */
+export const WATCH_BODY_LIMIT = 60_000;
+/** Pages listed under a vendor's row; the rest are counted. */
+const PAGES_SHOWN = 3;
 const ROW_MARKER = (vendor: string) => `<!-- row:${vendor} -->`;
 /** Evidence links kept per page; older ones stay in the issue's comments. */
 const EVIDENCE_KEPT = 3;
@@ -208,7 +213,10 @@ export function readWatchBody(body: string): WatchState {
   const end = body.indexOf(" -->", start);
   let state: WatchState;
   try {
-    state = JSON.parse(Buffer.from(body.slice(start + STATE_PREFIX.length, end), "base64").toString("utf8")) as WatchState;
+    const packed = Buffer.from(body.slice(start + STATE_PREFIX.length, end), "base64");
+    // Deflated since bodies hit GitHub's size limit; a plain JSON state is read too.
+    const json = packed[0] === 0x7b ? packed.toString("utf8") : inflateRawSync(packed).toString("utf8");
+    state = JSON.parse(json) as WatchState;
   } catch {
     return {};
   }
@@ -231,7 +239,7 @@ export function rankVendors(state: WatchState, inUse: ReadonlySet<string>, built
   );
 }
 
-function row(vendor: string, v: VendorState, built: boolean): string[] {
+function row(vendor: string, v: VendorState, built: boolean, withPages: boolean): string[] {
   const pages = Object.values(v.pages);
   const changed = pages.filter((p) => p.status === "changed").length;
   const moved = pages.length - changed;
@@ -240,18 +248,21 @@ function row(vendor: string, v: VendorState, built: boolean): string[] {
   const last = pages.reduce((a, p) => (p.lastSeen > a ? p.lastSeen : a), pages[0]!.lastSeen);
   const seen = day(first) === day(last) ? `seen ${day(last)}` : `first seen ${day(first)}, last ${day(last)}`;
   const lines = [`- [ ] **${v.name}** (${built ? "built" : "not built yet"}): ${counts}, ${seen} ${ROW_MARKER(vendor)}`];
-  for (const p of Object.values(v.pages).sort((a, b) => a.url.localeCompare(b.url))) {
+  if (!withPages) return lines;
+  const newest = pages.sort((a, b) => b.lastSeen.localeCompare(a.lastSeen) || a.url.localeCompare(b.url));
+  for (const p of newest.slice(0, PAGES_SHOWN)) {
     const what = p.mock ? `doc mock page, read ${p.mock}` : "changelog";
     const status = p.status === "moved" ? "moved" : p.times > 1 ? `changed ${p.times} times` : "changed";
     const links = p.evidence.map((url, i) => `[${i === 0 ? "evidence" : i + 1}](${url})`).join(" ");
     lines.push(`  - ${status}: ${p.url} (${what})${links ? ` ${links}` : ""}`);
   }
+  if (newest.length > PAGES_SHOWN) lines.push(`  - and ${newest.length - PAGES_SHOWN} more, in the comments`);
   return lines;
 }
 
 export function renderWatchBody(state: WatchState, inUse: ReadonlySet<string>, built: ReadonlySet<string>, at: string): string {
   const vendors = rankVendors(state, inUse, built);
-  return [
+  const head = [
     WATCH_MARKER,
     "Every vendor whose API changelog, or a page its doc mock was built from, changed or moved since its row was last ticked. Vendors our clients use come first, then built connectors, then the rest of the catalog, newest change first.",
     "",
@@ -259,11 +270,24 @@ export function renderWatchBody(state: WatchState, inUse: ReadonlySet<string>, b
     "",
     vendors.length === 0 ? "Nothing waiting." : `**${vendors.length} ${vendors.length === 1 ? "vendor" : "vendors"} waiting**`,
     "",
-    ...vendors.flatMap((v) => row(v, state[v]!, built.has(v))),
-    "",
-    `Updated ${at} by the daily vendor docs watch.`,
-    `${STATE_PREFIX}${Buffer.from(JSON.stringify(state), "utf8").toString("base64")} -->`,
-  ].join("\n");
+  ];
+  const tail = ["", `Updated ${at} by the daily vendor docs watch.`, `${STATE_PREFIX}${deflateRawSync(Buffer.from(JSON.stringify(state), "utf8")).toString("base64")} -->`];
+  const size = (lines: string[]) => lines.reduce((n, l) => n + l.length + 1, 0);
+  const room = WATCH_BODY_LIMIT - size(head) - size(tail);
+  // Rows with their pages if they fit; else bare rows; else the top rows, saying how many wait below.
+  let rows = vendors.flatMap((v) => row(v, state[v]!, built.has(v), true));
+  if (size(rows) > room) rows = vendors.flatMap((v) => row(v, state[v]!, built.has(v), false));
+  if (size(rows) > room) {
+    const shown: string[] = [];
+    let i = 0;
+    for (; i < vendors.length; i++) {
+      const next = row(vendors[i]!, state[vendors[i]!]!, built.has(vendors[i]!), false);
+      if (size(shown) + size(next) + 100 > room) break;
+      shown.push(...next);
+    }
+    rows = [...shown, `- and ${vendors.length - i} more ${vendors.length - i === 1 ? "vendor" : "vendors"}, listed here as the ones above are ticked`];
+  }
+  return [...head, ...rows, ...tail].join("\n");
 }
 
 function findingNote(f: Finding): string {
