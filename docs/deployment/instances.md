@@ -60,6 +60,8 @@ curl -X POST https://<instance-host>/v1/events \
 | `POST /v1/reason` | API key | Run the reasoners and return recommendations |
 | `GET /v1/recommendations` | API key | Latest recommendations, with provenance and the degraded flag (`?limit=`, up to 200) |
 | `POST /v1/recommendations/:id/feedback` | API key | Record `accepted`, `rejected` or `overridden`, with the actor and an optional note |
+| `POST /v1/recommendations/:id/result` | API key | Record what acting on it brought back: `cents` (whole, zero or more), the actor and an optional note. The kind comes from its estimate; one with no estimate needs `kind` (`makes`, `saves` or `protects`) |
+| `GET /v1/value` | API key | The value ledger for the recommendations raised in a period: shown, approved, dismissed, overridden, returned and still to come, in cents by kind (`?from=2026-10-01&to=2026-11-01`, up to 366 days; this month by default). See [the value ledger](../value-ledger.md) |
 | `GET /v1/entities/:kind/:id` | API key | One canonical entity |
 | `GET /v1/signals` | API key | The latest signals, oldest first (`?kind=` up to 10 comma-separated kinds such as `bank.balance,receivable.invoice`; `?limit=`, 200 by default, up to 1,000). The console reads cash position and receivables this way |
 | `GET /v1/integrations` | API key | Every catalog integration and whether this instance has all its settings (`configured`, `missingSettings`). Names settings, never their values |
