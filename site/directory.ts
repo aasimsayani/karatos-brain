@@ -341,4 +341,5 @@ export const CONNECTED_ON: Readonly<Record<string, string>> = {
   piro: "2026-10-29",
   refiner_statements: "2026-10-29",
   fincen_8300: "2026-10-30",
+  trello: "2026-11-04",
 };

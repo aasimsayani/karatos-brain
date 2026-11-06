@@ -57,4 +57,5 @@ export const DEMO_NOT_YET: Readonly<Record<string, string>> = {
   nivoda: NOT_READ_YET,
   rapnet: NOT_READ_YET,
   stuller: NOT_READ_YET,
+  trello: NOT_READ_YET,
 };
