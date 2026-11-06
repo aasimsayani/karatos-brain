@@ -167,6 +167,13 @@ export class InMemoryStore implements MemoryStore, RawDataRetention {
   async recordValueResult(result: ValueResult): Promise<void> {
     const problem = valueResultProblem(result);
     if (problem) throw new RangeError(problem);
+    // As in Postgres: one measured result per recommendation and checkpoint.
+    if (
+      result.measuredDays !== undefined &&
+      this.valueResults.some((r) => r.organizationId === result.organizationId && r.recommendationId === result.recommendationId && r.measuredDays === result.measuredDays)
+    ) {
+      throw new RangeError(`${result.recommendationId} already has a result measured at ${result.measuredDays} days`);
+    }
     this.valueResults.push(result);
   }
 

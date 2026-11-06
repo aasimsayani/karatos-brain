@@ -1,7 +1,11 @@
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { pathToFileURL } from "node:url";
 import { describe, expect, it } from "vitest";
 import { INTEGRATIONS, type IntegrationSpec } from "../../packages/core/src/index.js";
 import { CONNECTED_ON, SYSTEM_DETAILS } from "../directory.js";
-import { DOMAIN_LABELS, SITE_URL, directoryCategories, escapeHtml, formatDay, newestConnections, renderCard, renderDirectory, renderSite, systemDetail } from "../build.js";
+import { DOMAIN_LABELS, REPO_URL, SITE_URL, directoryCategories, escapeHtml, formatDay, newestConnections, renderCard, renderDirectory, renderSite, researchUrl, researchedIds, systemDetail } from "../build.js";
 
 const html = renderSite();
 const dataSources = INTEGRATIONS.filter((i) => i.departments.length > 0);
@@ -119,6 +123,35 @@ describe("the directory, grouped by category", () => {
   });
 });
 
+describe("research write-ups", () => {
+  const researched = researchedIds();
+  const ids = new Set(INTEGRATIONS.map((i) => i.id));
+
+  it("names a catalog system in every write-up's file name, and leaves the index out", () => {
+    expect(researched.size).toBeGreaterThan(0);
+    expect(researched.has("README")).toBe(false);
+    for (const id of researched) expect(ids.has(id), id).toBe(true);
+  });
+
+  it("reads only Markdown write-ups from a folder, by file name", () => {
+    const dir = mkdtempSync(join(tmpdir(), "research-"));
+    for (const f of ["README.md", "etsy.md", "notes.txt"]) writeFileSync(join(dir, f), "x");
+    expect([...researchedIds(pathToFileURL(`${dir}/`))]).toEqual(["etsy"]);
+    rmSync(dir, { recursive: true });
+  });
+
+  it("copies the write-ups into the site's image, since the build reads their names", () => {
+    expect(readFileSync(new URL("../Dockerfile", import.meta.url), "utf8")).toMatch(/^COPY docs\/research docs\/research$/m);
+  });
+
+  it("links every write-up from its system's card on the site", () => {
+    for (const id of researched) {
+      if (!dataSources.some((i) => i.id === id)) continue;
+      expect(html, id).toContain(`href="${researchUrl(id)}"`);
+    }
+  });
+});
+
 describe("renderCard", () => {
   const dept = new Map([["sales", "Sales <floor>"]]);
 
@@ -149,6 +182,14 @@ describe("renderCard", () => {
     expect(renderCard(spec({ id: "arms" }), new Set(), dept)).toContain("<dt>Stage</dt><dd>On the map.");
     expect(renderCard(spec({ id: "arms", status: "deferred" }), new Set(), dept)).toContain("<dt>Stage</dt><dd>On hold");
     expect(renderCard(spec({ id: "arms", status: "built", capabilities: ["Sees <it>."] }), new Set(), dept)).toContain("<li>Sees &lt;it&gt;.</li>");
+  });
+
+  it("links a system's research write-up when there is one, and adds nothing when there isn't", () => {
+    const card = renderCard(spec({ id: "arms", name: "Arms <x>" }), new Set(), dept, new Set(["arms"]));
+    expect(card).toContain(`<dt>What we found</dt><dd><a href="${REPO_URL}/blob/main/docs/research/arms.md">How Arms &lt;x&gt; can be reached, from its own docs</a></dd></dl>`);
+    expect(renderCard(spec({ id: "arms" }), new Set(), dept, new Set(["etsy"]))).not.toContain("What we found");
+    expect(renderCard(spec({ id: "arms" }), new Set(), dept)).not.toContain("What we found");
+    expect(researchUrl("a b")).toBe(`${REPO_URL}/blob/main/docs/research/a%20b.md`);
   });
 
   it("puts the company and detail line in the search text", () => {

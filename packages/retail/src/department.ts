@@ -2,6 +2,7 @@ import type {
   EntityRef,
   EventEnvelope,
   Impact,
+  ImpactMeasure,
   NormalizedEntity,
   Normalizer,
   Reasoner,
@@ -201,6 +202,11 @@ export function estimate(
   const [lowCents, highCents] = [Math.min(...points), Math.max(...points)];
   if (highCents < 100) return undefined;
   return { kind, cents: likely, lowCents, highCents, basis };
+}
+
+/** An estimate that also says how to measure what acting on it brought back. */
+export function measured(impact: Impact | undefined, measure: ImpactMeasure): Impact | undefined {
+  return impact && { ...impact, measure };
 }
 
 /** A whole percentage, for a basis: 0.45 is "45%". */

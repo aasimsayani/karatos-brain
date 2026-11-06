@@ -1,0 +1,3 @@
+- Integration research (`docs/research`): what each vendor's own docs say about API access, sign-up and test environments for 23 integrations still marked `needs-research` (Etsy, Lightspeed Retail, Klarna, Faire, TikTok Shop, Judge.me, Yotpo, Zoom, Quo, TaxJar, Ramp, Deputy, Katana, Podium, Birdeye, Attentive, Formlabs, NuORDER, IGI, HRD Antwerp, GCAL, RepairShopr and the Art Loss Register), with a source for every claim and an index saying which can move to the next open week and which go to Phase 2.
+- The website's directory links each researched system's write-up from its card, under "What we found".
+- The README says connectors are tested against recorded responses or mocks built from each vendor's docs, which is what the suite does.

@@ -568,6 +568,83 @@ describe("compliance", () => {
   });
 });
 
+describe("compliance: diamond warranty statements", () => {
+  const line = (documentNumber: string, n: number, over: Record<string, unknown> = {}) => ({
+    lineId: `supplier:test_supplier:invoice:${documentNumber}:${n}`,
+    supplier: "test_supplier",
+    documentType: "invoice",
+    documentNumber,
+    documentDate: "2026-09-15",
+    sku: `TEST-${documentNumber}-${n}`,
+    amountCents: 100_000,
+    diamond: "natural",
+    warrantyStatement: "none",
+    kimberleyProcess: false,
+    currency: "USD",
+    ...over,
+  });
+  const send = (s: ReturnType<typeof store>, l: ReturnType<typeof line>) => s.send("supplier_invoice.line_imported", l, `${l.documentDate}T00:00:00Z`);
+
+  it("flags each recent document for natural diamonds with no statement, once, counting its diamond lines", async () => {
+    const s = store();
+    await send(s, line("INV-1", 0));
+    await send(s, line("INV-1", 1));
+    await send(s, line("INV-1", 2, { diamond: "none" }));
+    await send(s, line("M-7", 0, { documentType: "memo", lineId: "supplier:test_supplier:memo:M-7:0" }));
+    const recs = about(await s.ask(NOW), "System of Warranties");
+    expect(recs.map((r) => r.summary)).toEqual([
+      "Invoice INV-1 from test_supplier (2026-09-15) lists 2 natural diamond lines but no System of Warranties statement was found on it. Ask test_supplier for a copy that carries the statement, and keep it with the purchase records.",
+      "Memo M-7 from test_supplier (2026-09-15) lists a natural diamond but no System of Warranties statement was found on it. Ask test_supplier for a copy that carries the statement, and keep it with the purchase records.",
+    ]);
+    expect(recs[0]!.confidence).toBe(0.7);
+    expect(recs[0]!.provenance.signalIds).toHaveLength(2);
+  });
+
+  it("keeps the same number from two suppliers, or as a memo and an invoice, apart", async () => {
+    const s = store();
+    await send(s, line("X-1", 0));
+    await send(s, line("X-1", 0, { supplier: "other_supplier", lineId: "supplier:other_supplier:invoice:X-1:0" }));
+    await send(s, line("X-1", 0, { documentType: "memo", lineId: "supplier:test_supplier:memo:X-1:0" }));
+    const recs = about(await s.ask(NOW), "System of Warranties");
+    expect(new Set(recs.map((r) => r.id)).size).toBe(3);
+  });
+
+  it("says nothing for a document with the statement, lab-grown stones, no diamonds, or one older than 90 days", async () => {
+    const s = store();
+    await send(s, line("A", 0, { warrantyStatement: "current" }));
+    await send(s, line("B", 0, { warrantyStatement: "earlier" }));
+    await send(s, line("C", 0, { diamond: "lab_grown" }));
+    await send(s, line("D", 0, { diamond: "none" }));
+    await send(s, line("E", 0, { documentDate: "2026-07-03" }));
+    // 91 days before is too old; 90 is still checked.
+    await send(s, line("F", 0, { documentDate: "2026-07-04" }));
+    // A statement anywhere on the document covers all of it.
+    await send(s, line("G", 0));
+    await send(s, line("G", 1, { warrantyStatement: "current" }));
+    expect(about(await s.ask(NOW), "System of Warranties").map((r) => r.summary.split(" from")[0])).toEqual(["Invoice F"]);
+  });
+
+  it("follows a corrected document, so one that gained its statement stops being flagged", async () => {
+    const s = store();
+    await s.send("supplier_invoice.line_imported", line("INV-2", 0), "2026-09-15T00:00:00Z");
+    await s.send("supplier_invoice.line_imported", line("INV-2", 0, { warrantyStatement: "current" }), "2026-09-16T00:00:00Z");
+    expect(about(await s.ask(NOW), "System of Warranties")).toEqual([]);
+    // A line read again with a new amount is one line, not two.
+    await s.send("supplier_invoice.line_imported", line("INV-3", 0), "2026-09-15T00:00:00Z");
+    await s.send("supplier_invoice.line_imported", line("INV-3", 0, { amountCents: 120_000 }), "2026-09-16T00:00:00Z");
+    expect(about(await s.ask(NOW), "System of Warranties").map((r) => r.summary)).toEqual([expect.stringContaining("Invoice INV-3 from test_supplier (2026-09-15) lists a natural diamond but")]);
+  });
+
+  it("dead-letters a line it can't read", async () => {
+    const s = store();
+    for (const over of [{ documentType: null }, { documentNumber: "" }, { documentDate: null }, { amountCents: null }, { quantity: null }, { unitCostCents: -1 }, { due: null }, { diamond: "maybe" }, { warrantyStatement: "yes" }, { kimberleyProcess: "no" }, { currency: "usd" }]) {
+      await expect(s.send("supplier_invoice.line_imported", line("BAD", 0, over))).rejects.toThrow(/dead-lettered/);
+    }
+    expect(s.memory.deadLetters).toHaveLength(11);
+    await s.send("supplier_invoice.line_imported", line("OK", 0, { quantity: 2, unitCostCents: 0, due: "2026-10-15", terms: "Net 30", stone: "Diamond", description: "Ring", amountCents: -500 }));
+  });
+});
+
 describe("marketing", () => {
   it("separates campaigns worth repeating from ones losing money", async () => {
     const s = store();
@@ -686,6 +763,102 @@ describe("finance balances and receivables", () => {
     const quiet = store();
     await quiet.send("accounting.invoice_updated", invoice("1", { balanceCents: 49_999 }));
     expect(about(await quiet.ask(NOW), "past due")).toEqual([]);
+  });
+});
+
+const payroll = (n: number, checkDate: string, extra: Record<string, unknown> = {}) => ({
+  payrollId: `gusto:payroll:${n}`,
+  checkDate,
+  payScheduleId: "gusto:pay_schedule:1",
+  kind: "regular",
+  grossPayCents: 450_000,
+  netPayCents: 355_000,
+  companyDebitCents: 495_000,
+  employeeCount: 2,
+  ...extra,
+});
+
+describe("finance payroll", () => {
+  it("keeps payrolls and each employee's pay as signals, by id only", async () => {
+    const s = store();
+    await s.send("payroll.payroll_processed", payroll(1, "2026-09-18"));
+    await s.send("payroll.employee_paid", { payrollId: "gusto:payroll:1", employeeId: "gusto:employee:e1", checkDate: "2026-09-18", kind: "regular", grossPayCents: 160_000, netPayCents: 122_500, hours: 82.5, overtimeCents: 5_000, commissionCents: 5_000, bonusCents: 0, tipsCents: 0 });
+    expect(s.memory.signals.filter((x) => x.kind.startsWith("payroll.")).map((x) => [x.kind, x.subject])).toEqual([
+      ["payroll.run", { kind: "payroll", id: "gusto:payroll:1" }],
+      ["payroll.employee_pay", { kind: "employee_pay", id: "gusto:payroll:1/gusto:employee:e1" }],
+    ]);
+  });
+
+  it("dead-letters a payroll with no kind or an amount that isn't whole cents, and employee pay with no employee", async () => {
+    const s = store();
+    await expect(s.send("payroll.payroll_processed", payroll(1, "2026-09-18", { kind: "bonus" }))).rejects.toThrow();
+    await expect(s.send("payroll.payroll_processed", payroll(2, "2026-09-18", { grossPayCents: 10.5 }))).rejects.toThrow();
+    await expect(s.send("payroll.employee_paid", { payrollId: "p", kind: "regular", hours: 1, overtimeCents: 0, commissionCents: 0, bonusCents: 0, tipsCents: 0 })).rejects.toThrow();
+    expect(s.memory.deadLetters.map((d) => d.issues[0]?.path)).toEqual(["payload.kind", "payload.grossPayCents", "payload.employeeId"]);
+  });
+
+  it("asks for a second look at a regular payroll well above the three before it", async () => {
+    const s = store();
+    await s.send("payroll.payroll_processed", payroll(1, "2026-08-21", { grossPayCents: 450_000 }));
+    await s.send("payroll.payroll_processed", payroll(2, "2026-09-04", { grossPayCents: 440_000 }));
+    await s.send("payroll.payroll_processed", payroll(3, "2026-09-18", { grossPayCents: 460_000 }));
+    await s.send("payroll.payroll_processed", payroll(4, "2026-10-02", { grossPayCents: 620_000 }));
+    // An off-cycle bonus run and another pay schedule's payroll don't count toward the average.
+    await s.send("payroll.payroll_processed", payroll(5, "2026-09-25", { kind: "off_cycle", grossPayCents: 2_000_000 }));
+    await s.send("payroll.payroll_processed", payroll(6, "2026-09-26", { payScheduleId: "gusto:pay_schedule:2", grossPayCents: 10_000 }));
+    const [rec, ...rest] = about(await s.ask(NOW), "gross");
+    expect(rest).toEqual([]);
+    expect(rec).toMatchObject({
+      id: "rec_finance_payroll_jump_gusto:payroll:4_2026-10-02",
+      summary: "The payroll for 2026-10-02 came to $6,200.00 gross, 38% more than the $4,500.00 average of the 3 before it. Check its hours, overtime, commissions and bonuses before the next payroll runs.",
+      expectedImpact: "Catches up to $1,700.00 of payroll errors",
+      confidence: 0.6,
+    });
+    expect(rec!.provenance.signalIds).toHaveLength(4);
+  });
+
+  it("uses the latest version of each payroll, and its own pay schedule", async () => {
+    const s = store();
+    for (const [n, day] of [[1, "2026-08-21"], [2, "2026-09-04"], [3, "2026-09-18"]] as const) await s.send("payroll.payroll_processed", payroll(n, day));
+    await s.send("payroll.payroll_processed", payroll(4, "2026-10-02", { grossPayCents: 620_000 }));
+    // Gusto corrected it before the check date.
+    await s.send("payroll.payroll_processed", payroll(4, "2026-10-02", { grossPayCents: 470_000 }));
+    expect(about(await s.ask(NOW), "gross")).toEqual([]);
+    // An earlier payroll entered far too high and then corrected counts at its corrected amount.
+    const corrected = store();
+    for (const [n, day] of [[1, "2026-08-21"], [2, "2026-09-04"]] as const) await corrected.send("payroll.payroll_processed", payroll(n, day));
+    await corrected.send("payroll.payroll_processed", payroll(3, "2026-09-18", { grossPayCents: 900_000 }));
+    await corrected.send("payroll.payroll_processed", payroll(3, "2026-09-18"));
+    await corrected.send("payroll.payroll_processed", payroll(4, "2026-10-02", { grossPayCents: 600_000 }));
+    expect(about(await corrected.ask(NOW), "gross").map((r) => r.summary)).toEqual([expect.stringContaining("$6,000.00 gross, 33% more than the $4,500.00 average")]);
+    const unscheduled = store();
+    for (const n of [1, 2, 3]) await unscheduled.send("payroll.payroll_processed", payroll(n, `2026-09-0${n}`, { payScheduleId: undefined }));
+    await unscheduled.send("payroll.payroll_processed", payroll(4, "2026-09-10", { payScheduleId: undefined, grossPayCents: 700_000 }));
+    expect(about(await unscheduled.ask(NOW), "gross").map((r) => r.summary)).toEqual([expect.stringContaining("The payroll for 2026-09-10 came to $7,000.00 gross, 56% more")]);
+  });
+
+  it("is quiet with fewer than three payrolls before, a rise of 25% or less, under $500 more, or a payroll over 30 days old", async () => {
+    const cases: [number[], string][] = [
+      [[450_000, 450_000, 900_000], "2026-10-02"],
+      [[450_000, 450_000, 450_000, 562_500], "2026-10-02"],
+      [[100_000, 100_000, 100_000, 149_999], "2026-10-02"],
+      [[450_000, 450_000, 450_000, 900_000], "2026-09-01"],
+    ];
+    for (const [gross, last] of cases) {
+      const s = store();
+      for (const [i, cents] of gross.entries()) await s.send("payroll.payroll_processed", payroll(i + 1, i === gross.length - 1 ? last : `2026-08-0${i + 1}`, { grossPayCents: cents }));
+      expect(about(await s.ask(NOW), "gross")).toEqual([]);
+    }
+    // Exactly 30 days old still counts.
+    const s = store();
+    for (const n of [1, 2, 3]) await s.send("payroll.payroll_processed", payroll(n, `2026-08-0${n}`));
+    await s.send("payroll.payroll_processed", payroll(4, "2026-09-02", { grossPayCents: 900_000 }));
+    expect(about(await s.ask(NOW), "gross")).toHaveLength(1);
+    const missing = store();
+    for (const n of [1, 2, 3]) await missing.send("payroll.payroll_processed", payroll(n, `2026-09-0${n}`));
+    await missing.send("payroll.payroll_processed", payroll(4, "2026-09-10", { grossPayCents: null }));
+    await missing.send("payroll.payroll_processed", payroll(5, undefined as never, { grossPayCents: 900_000 }));
+    expect(about(await missing.ask(NOW), "gross")).toEqual([]);
   });
 });
 

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { ASSUMPTIONS, estimate, pct } from "../src/index.js";
-import { about, store } from "./harness.js";
+import { measureValue } from "@karatos/core";
+import { ASSUMPTIONS, estimate, measured, pct } from "../src/index.js";
+import { about, ORG, store } from "./harness.js";
 
 const NOW = "2026-10-02T15:00:00.000Z";
 
@@ -105,6 +106,7 @@ describe("dollar estimates on recommendations", () => {
         kind: "makes",
         ...range(1_400, 6_750, 27_500),
         basis: "10% of customers reminded of an occasion buy, at an average order of $1,500.00 and a 45% margin.",
+        measure: { signalKind: "sale.customer_purchase", subject: { kind: "customer", id: "c1" }, centsField: "totalCents", share: 0.45, windowDays: 30, label: "purchases" },
       });
     });
 
@@ -131,6 +133,7 @@ describe("dollar estimates on recommendations", () => {
         kind: "makes",
         ...range(10_500, 27_000, 49_500),
         basis: "10% of lapsed customers invited back in person buy, at their average order of $6,000.00 and a 45% margin.",
+        measure: { signalKind: "sale.customer_purchase", subject: { kind: "customer", id: "vip" }, centsField: "totalCents", share: 0.45, windowDays: 90, label: "purchases" },
       });
     });
 
@@ -212,7 +215,12 @@ describe("dollar estimates on recommendations", () => {
     await s.send("custom_order.stage_changed", { orderId: "CO1", stage: "ready" }, "2026-10-01T00:00:00Z");
     await s.send("custom_order.stage_changed", { orderId: "CO2", stage: "casting" }, "2026-09-10T00:00:00Z");
     const recs = await s.ask(NOW);
-    expect(about(recs, "CO1")[0]!.impact).toEqual({ kind: "protects", ...range(225_000, 225_000, 225_000), basis: "The $2,250.00 balance, collected at pickup." });
+    expect(about(recs, "CO1")[0]!.impact).toEqual({
+      kind: "protects",
+      ...range(225_000, 225_000, 225_000),
+      basis: "The $2,250.00 balance, collected at pickup.",
+      measure: { signalKind: "custom.payment", subject: { kind: "custom_order", id: "CO1" }, centsField: "amountCents", share: 1, windowDays: 30, label: "payments" },
+    });
     expect(about(recs, "CO2").map((r) => r.impact)).toEqual([undefined, undefined]);
   });
 
@@ -408,3 +416,39 @@ describe("dollar estimates on recommendations", () => {
     });
   });
 });
+
+describe("measuring what came back", () => {
+  it("follows an approved win-back to the margin on what the customer bought, at 30 and 90 days", async () => {
+    const s = store();
+    await s.send("customer.profile_updated", { customerId: "vip", name: "Customer vip", marketingConsent: true });
+    await s.send("sale.completed", sale("S1", "A", { customerId: "vip", price: 600_000 }), "2025-06-01T00:00:00Z");
+    const [rec] = about(await s.ask(NOW), "hasn't bought");
+    await s.memory.recordFeedback({ recommendationId: rec!.id, organizationId: ORG, outcome: "accepted", actor: "owner", recordedAt: NOW });
+    await s.send("sale.completed", sale("S2", "B", { customerId: "vip", price: 200_000 }), "2026-10-20T00:00:00Z");
+    await s.send("sale.completed", sale("S3", "C", { customerId: "vip", price: 100_000 }), "2026-12-01T00:00:00Z");
+    expect(await measureValue(s.memory, ORG, "2026-11-01T15:00:00.000Z")).toEqual([
+      expect.objectContaining({ recommendationId: rec!.id, kind: "makes", cents: 90_000, measuredDays: 30, note: "purchases within 30 days: 1" }),
+    ]);
+    expect((await measureValue(s.memory, ORG, "2026-12-31T15:00:00.000Z")).map((r) => [r.measuredDays, r.cents])).toEqual([
+      [60, 135_000],
+      [90, 135_000],
+    ]);
+  });
+
+  it("follows a ready custom order to the payments that came in", async () => {
+    const s = store();
+    await s.send("custom_order.created", { orderId: "CO1", customerId: "c1", description: "Halo", quotedCents: 450_000, dueBy: "2026-10-06" }, "2026-09-01T00:00:00Z");
+    await s.send("custom_order.stage_changed", { orderId: "CO1", stage: "ready" }, "2026-10-01T00:00:00Z");
+    const [rec] = await s.ask(NOW);
+    await s.memory.recordFeedback({ recommendationId: rec!.id, organizationId: ORG, outcome: "accepted", actor: "owner", recordedAt: NOW });
+    await s.send("custom_order.payment_received", { orderId: "CO1", amountCents: 450_000 }, "2026-10-05T00:00:00Z");
+    expect(await measureValue(s.memory, ORG, "2026-11-01T15:00:00.000Z")).toEqual([expect.objectContaining({ kind: "protects", cents: 450_000, measuredDays: 30 })]);
+  });
+
+  it("adds a measure only to an estimate there is", () => {
+    const m = { signalKind: "k", subject: { kind: "customer", id: "c" }, centsField: "f", share: 1, windowDays: 30 as const, label: "l" };
+    expect(measured(undefined, m)).toBeUndefined();
+    expect(measured(estimate("makes", "b", () => 500), m)).toEqual({ kind: "makes", lowCents: 500, cents: 500, highCents: 500, basis: "b", measure: m });
+  });
+});
+

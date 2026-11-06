@@ -1,7 +1,7 @@
 import type { Signal } from "@karatos/core";
 import { z } from "zod";
 import type { DepartmentModule } from "../department.js";
-import { ASSUMPTIONS, daysBetween, dollars, entityFrom, estimate, extractor, latestBySubject, pct, recommend, signalFrom, value } from "../department.js";
+import { ASSUMPTIONS, daysBetween, dollars, entityFrom, estimate, extractor, latestBySubject, measured, pct, recommend, signalFrom, value } from "../department.js";
 
 const ProfileUpdated = z.object({
   customerId: z.string().min(1),
@@ -62,13 +62,20 @@ export function daysUntilNext(month: number, day: number, now: string): number {
   return Math.round((next - start) / 86_400_000);
 }
 
-/** The likely profit on a sale to one customer, at their own average order when they have bought before. */
-function saleProfit(kind: "occasionRate" | "winBackRate", averageCents: number | undefined, how: string) {
+/**
+ * The likely profit on a sale to one customer, at their own average order
+ * when they have bought before, measured by the margin on what they buy in
+ * the window after.
+ */
+function saleProfit(kind: "occasionRate" | "winBackRate", customerId: string, averageCents: number | undefined, how: string, windowDays: 30 | 90) {
   const order = averageCents === undefined ? `an average order of ${dollars(ASSUMPTIONS.averageOrderCents.likely)}` : `their average order of ${dollars(averageCents)}`;
-  return estimate(
-    "makes",
-    `${pct(ASSUMPTIONS[kind].likely)} of ${how} buy, at ${order} and a ${pct(ASSUMPTIONS.margin.likely)} margin.`,
-    (a) => a(kind) * (averageCents ?? a("averageOrderCents")) * a("margin"),
+  return measured(
+    estimate(
+      "makes",
+      `${pct(ASSUMPTIONS[kind].likely)} of ${how} buy, at ${order} and a ${pct(ASSUMPTIONS.margin.likely)} margin.`,
+      (a) => a(kind) * (averageCents ?? a("averageOrderCents")) * a("margin"),
+    ),
+    { signalKind: "sale.customer_purchase", subject: { kind: "customer", id: customerId }, centsField: "totalCents", share: ASSUMPTIONS.margin.likely, windowDays, label: "purchases" },
   );
 }
 
@@ -161,7 +168,7 @@ export const clienteling: DepartmentModule = {
                 summary: `${profile.name}'s ${o.occasion}${who} is in ${days} days. Reach out${skus.length ? `; their wish list has ${skus.join(", ")}` : ""}.`,
                 confidence: skus.length ? 0.8 : 0.6,
                 expectedImpact: "Occasion-driven sale",
-                impact: saleProfit("occasionRate", average, "customers reminded of an occasion"),
+                impact: saleProfit("occasionRate", o.customerId, average, "customers reminded of an occasion", 30),
                 basedOn: [s, profile.signal, ...wishes, ...bought],
                 now,
               }),
@@ -193,7 +200,7 @@ export const clienteling: DepartmentModule = {
               summary: `${profile.name} has spent ${dollars(lifetime)} with you but hasn't bought in ${idle} days. Invite them in personally.`,
               confidence: 0.65,
               expectedImpact: "Win back a high-value customer",
-              impact: saleProfit("winBackRate", lifetime / list.length, "lapsed customers invited back in person"),
+              impact: saleProfit("winBackRate", customerId, lifetime / list.length, "lapsed customers invited back in person", 90),
               basedOn: [...list, profile.signal],
               now,
             }),
