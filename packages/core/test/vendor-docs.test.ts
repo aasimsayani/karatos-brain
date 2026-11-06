@@ -1,7 +1,9 @@
 import { readFileSync } from "node:fs";
+import { deflateRawSync } from "node:zlib";
 import { describe, expect, it } from "vitest";
 import {
   INTEGRATIONS,
+  WATCH_BODY_LIMIT,
   WATCH_MARKER,
   diffLines,
   pageText,
@@ -445,11 +447,75 @@ describe("the watch issue's body", () => {
     expect(body).toContain("Updated 2026-10-02T00:00:00Z by the daily vendor docs watch.");
   });
 
+  it("still reads a state saved as plain JSON", () => {
+    expect(readWatchBody(`<!-- vendor-docs-state:${Buffer.from(JSON.stringify(state)).toString("base64")} -->`)).toEqual(state);
+  });
+
+  const many = (vendors: number, pages: number) =>
+    Object.fromEntries(
+      Array.from({ length: vendors }, (_, v) => [
+        `v${v}`,
+        {
+          name: `Vendor ${v}`,
+          pages: Object.fromEntries(
+            Array.from({ length: pages }, (_, p) => [
+              `v${v}:p${p}`,
+              {
+                url: `https://docs.v${v}.example/reference/a-long-page-name-for-endpoint-${p}`,
+                status: "changed" as const,
+                mock: "2026-10-15",
+                firstSeen: "2026-10-01T00:00:00Z",
+                lastSeen: `2026-10-${String(10 + (p % 20)).padStart(2, "0")}T00:00:00Z`,
+                times: 2,
+                evidence: [`https://tracker.example/issues/1#c${v}-${p}-1`, `https://tracker.example/issues/1#c${v}-${p}-2`],
+              },
+            ]),
+          ),
+        },
+      ]),
+    );
+
+  it("lists a vendor's three newest pages and counts the rest", () => {
+    const body = renderWatchBody(many(1, 5), new Set(), new Set(), "2026-10-30T00:00:00Z");
+    const pages = body.split("\n").filter((l) => l.startsWith("  - "));
+    expect(pages).toHaveLength(4);
+    expect(pages[0]).toContain("endpoint-4 ");
+    expect(pages[2]).toContain("endpoint-2 ");
+    expect(pages[3]).toBe("  - and 2 more, in the comments");
+    expect(readWatchBody(body)).toEqual(many(1, 5));
+  });
+
+  it("stays under GitHub's body limit: rows without pages, then the top rows with a count of the rest", () => {
+    const bare = renderWatchBody(many(150, 3), new Set(), new Set(), "2026-10-30T00:00:00Z");
+    expect(bare.length).toBeLessThanOrEqual(WATCH_BODY_LIMIT);
+    expect(bare).not.toContain("\n  - ");
+    expect(bare.match(/<!-- row:/g)).toHaveLength(150);
+    expect(bare).not.toContain("more vendor");
+    expect(WATCH_BODY_LIMIT).toBeLessThan(65_536);
+    expect(readWatchBody(bare)).toEqual(many(150, 3));
+
+    const cut = renderWatchBody(many(800, 1), new Set(), new Set(), "2026-10-30T00:00:00Z");
+    expect(cut.length).toBeLessThanOrEqual(WATCH_BODY_LIMIT);
+    const shown = cut.match(/<!-- row:/g)!.length;
+    expect(shown).toBeGreaterThan(100);
+    expect(shown).toBeLessThan(800);
+    expect(cut).toContain(`- and ${800 - shown} more vendors, listed here as the ones above are ticked`);
+    expect(Object.keys(readWatchBody(cut))).toHaveLength(800);
+    expect(renderWatchBody(many(2, 1), new Set(), new Set(), "x")).not.toContain("more vendor");
+  });
+
+  it("says 'vendor' for one more", () => {
+    // A single row bigger than the room left shows none of them.
+    const huge = { big: { name: "x".repeat(WATCH_BODY_LIMIT), pages: { big: state.demo.pages.demo } } };
+    expect(renderWatchBody(huge, new Set(), new Set(), "x")).toContain("- and 1 more vendor, listed here");
+  });
+
   it("reads a body with no state, a broken state or a state that isn't an object as empty", () => {
     expect(readWatchBody(`${WATCH_MARKER}\nhand-written`)).toEqual({});
     expect(readWatchBody("<!-- vendor-docs-state:not base64 json -->")).toEqual({});
     expect(readWatchBody(`<!-- vendor-docs-state:${Buffer.from("[1]").toString("base64")} -->`)).toEqual({});
     expect(readWatchBody(`<!-- vendor-docs-state:${Buffer.from("null").toString("base64")} -->`)).toEqual({});
+    for (const json of ["[1]", "null", "3"]) expect(readWatchBody(`<!-- vendor-docs-state:${deflateRawSync(Buffer.from(json)).toString("base64")} -->`)).toEqual({});
   });
 
   it("drops rows ticked with x or X, and only whole rows", () => {
