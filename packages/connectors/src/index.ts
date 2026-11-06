@@ -39,6 +39,7 @@ export * from "./slack/index.js";
 export * from "./square/index.js";
 export * from "./stripe/index.js";
 export * from "./stuller/index.js";
+export * from "./supplier_invoices/index.js";
 export * from "./tiktok/index.js";
 export * from "./twilio/index.js";
 export * from "./watchsearch/index.js";

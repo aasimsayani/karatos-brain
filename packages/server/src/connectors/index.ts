@@ -39,6 +39,7 @@ import slack from "./slack.js";
 import square from "./square.js";
 import stripe from "./stripe.js";
 import stuller from "./stuller.js";
+import supplier_invoices from "./supplier_invoices.js";
 import tiktok from "./tiktok.js";
 import twilio from "./twilio.js";
 import watchsearch from "./watchsearch.js";
@@ -48,4 +49,4 @@ import xero from "./xero.js";
 import yext from "./yext.js";
 
 /** How each built connector is made from an instance's settings, by catalog id. */
-export const FACTORIES: Readonly<Record<string, ConnectorFactory>> = { affirm, amazon, authorize_net, avalara, bank_statements, bigcommerce, calendly, chase, clover, custom_forms, ebay, edi_x12, fincen_8300, gia, gmail, google_ads, google_analytics, google_workspace, gusto, hubspot, idex, inventory_pos, klaviyo, mailchimp, meta_ads, metals_api, monday, nivoda, pinterest, piro, plaid, quickbooks, rapnet, refiner_statements, shopify, slack, square, stripe, stuller, tiktok, twilio, watchsearch, wix, woocommerce, xero, yext };
+export const FACTORIES: Readonly<Record<string, ConnectorFactory>> = { affirm, amazon, authorize_net, avalara, bank_statements, bigcommerce, calendly, chase, clover, custom_forms, ebay, edi_x12, fincen_8300, gia, gmail, google_ads, google_analytics, google_workspace, gusto, hubspot, idex, inventory_pos, klaviyo, mailchimp, meta_ads, metals_api, monday, nivoda, pinterest, piro, plaid, quickbooks, rapnet, refiner_statements, shopify, slack, square, stripe, stuller, supplier_invoices, tiktok, twilio, watchsearch, wix, woocommerce, xero, yext };
