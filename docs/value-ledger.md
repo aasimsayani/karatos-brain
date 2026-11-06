@@ -30,6 +30,18 @@ Comparing `returned.cents.total` with what the owner pays for KaratOS gives the 
 
 Postgres keeps results in `value_results`, one row per recording, under the same row-level security as every other table. Earlier results are kept when a later one replaces them in the report, so the history stays auditable.
 
-## Next
+## Measured results
 
-Measuring results automatically: each rule will say how to read its own outcome from the store's data (did the lapsed customer buy within 90 days, did the past-due invoice get paid) and record it as `measured` at 30, 60 and 90 days.
+An estimate can say how to read its own result from the store's data, with an `ImpactMeasure`: which kind of signal, on which subject, which field holds the cents, and what share of them is the business's gain. Once a recommendation is approved, KaratOS measures it at 30, 60 and 90 days, up to the measure's window, and records each as a `measured` result with its checkpoint (`measuredDays`). Each sums everything since the recommendation, so the 90-day result replaces the 30-day one in the report rather than adding to it. Postgres keeps one measured result per recommendation and checkpoint, so measuring twice can't double up.
+
+Measuring runs with every reasoning run (`POST /v1/reason` returns how many results it recorded) and looks back over the last 91 days of recommendations.
+
+Only approved recommendations are measured. A customer who would have come back anyway isn't counted for a reminder nobody acted on.
+
+| Rule | Measured as | Window |
+| --- | --- | --- |
+| `clienteling.upcoming-occasions` | The margin on what that customer buys | 30 days |
+| `clienteling.lapsed-vip` | The margin on what that customer buys | 90 days |
+| `custom-orders.progress` (balance) | Payments on that order | 30 days |
+
+Other rules are recorded by hand for now. Rules whose outcome lives in data KaratOS reads (an invoice paid, a memo returned, a piece sold) are next.

@@ -50,7 +50,7 @@ Used by: R is retail, W is wholesale, M is manufacturing. Test with says how we 
 | Adobe Commerce (Magento) | R, W | Public API | Free sandbox | No | Planned (Orders, products, stock and customers through the REST API. Tested against a local Magento Open Source install, which is free) |
 | Punchmark | R | Partner | Partner | No | Planned |
 | Etsy | R, M | Public API | Unknown | No | Planned |
-| eBay | R, W | Public API | Free sandbox | Yes | Planned (Estate and pre-owned pieces) |
+| eBay | R, W | Public API | Free sandbox | No | Built (Connects with the seller's refresh token from an app the store owns. Every access token is asked for with sell.fulfillment.readonly alone, so eBay itself turns down any change, and the only API request is getOrders. No buyer details are kept, so no eBay user data is stored) |
 | Amazon (Selling Partner API) | R, W, M | Public API | Free sandbox | Yes | Planned (Amazon orders, listings, stock, fees and settlements; notifications arrive through Amazon's queues) |
 | TikTok Shop | R | Partner | Unknown | Yes | Planned (Orders, products and returns from TikTok's in-app shop, through an app registered in TikTok Shop Partner Center) |
 | Faire | W, M | Public API | Unknown | No | Planned (Wholesale orders from independent boutiques through the Faire marketplace) |
@@ -175,10 +175,10 @@ Used by: R is retail, W is wholesale, M is manufacturing. Test with says how we 
 | The Knot Pro | R | Unknown | Paid account | No | Planned (Leads and reviews from engaged couples on The Knot and WeddingWire vendor listings. No public API found; start with the lead notification emails) |
 | Calendly | R | Public API | Free sandbox | No | Built (Read-only: a personal access token with only the users:read and scheduled_events:read scopes, and the client sends only its three listed reads. No webhooks, since subscribing needs a paid plan and the webhooks:write scope; the sync polls instead) |
 | Acuity Scheduling | R | Public API | Paid account | Yes | Planned |
-| Mailchimp | R | Public API | Free sandbox | Yes | Planned |
-| Google Analytics 4 | R, W | Public API | Free sandbox | No | Planned |
-| Google Ads | R | Public API | Free sandbox | No | Planned (Test accounts for development; production needs an approved developer token) |
-| Meta Ads | R | Public API | Free sandbox | No | Planned |
+| Mailchimp | R | Public API | Free sandbox | Yes | Built (A Mailchimp API key can't be limited to reading, so the client sends its five listed GET reads only and throws before anything else. Every read names the fields it wants, so names, phone numbers, addresses and merge fields never leave Mailchimp) |
+| Google Analytics 4 | R, W | Public API | Free sandbox | No | Built (Connects with analytics.readonly only and stops if the token holds anything more. Its only API request is runReport for the one property in the settings, built from two fixed reports) |
+| Google Ads | R | Public API | Free sandbox | No | Built (Google Ads has one scope, which can change campaigns, so the client keeps the connection read-only: its only API request is googleAds:search for the one account in the settings, built from one fixed report, and it never calls mutate. Connect it as a Google Ads user with Read only access. Production accounts need a developer token with Basic access) |
+| Meta Ads | R | Public API | Free sandbox | No | Built (Connects with a system user token holding ads_read only, and stops if the token holds anything more. Its only API requests are the permissions check and the insights read for the one ad account in the settings, built from one fixed report) |
 | Google Business Profile | R | Partner | Partner | No | Planned (Reviews and local listings; Google approves API access on request) |
 | Google Merchant Center | R | Public API | Free sandbox | No | Planned (Product listings, disapprovals and free listing clicks through the Merchant API, which replaced the Content API for Shopping in 2026) |
 | Microsoft 365 Outlook mail and calendar | R, W, M | Public API | Paid account | Yes | Planned (Customer and vendor email and appointments for stores on Microsoft 365, read-only. Microsoft's free developer tenant now goes only to Visual Studio subscribers) |
@@ -195,10 +195,10 @@ Used by: R is retail, W is wholesale, M is manufacturing. Test with says how we 
 | Judge.me | R | Public API | Unknown | Yes | Planned (Shopify product reviews and ratings) |
 | Smile.io | R | Public API | Paid account | No | Planned (Loyalty points, VIP tiers and referrals. The API needs the Plus or Enterprise plan) |
 | Trustpilot | R, W | Public API | Paid account | No | Planned (Company reviews and trust score. The API needs Trustpilot's API module add-on) |
-| Pinterest | R, M | Public API | Free sandbox | No | Planned (Organic pins, boards and pin analytics, where bridal shoppers save ideas) |
-| TikTok | R | Public API | Free sandbox | No | Planned (The store's own videos and how they perform) |
+| Pinterest | R, M | Public API | Free sandbox | No | Built (Connects a Pinterest business account through an app the store owns, holding boards:read, pins:read and user_accounts:read only; the connector stops if the token holds anything more. Its only API requests are the Pin list and two analytics reads. Pinterest's analytics reach back 90 days, so the first import reads 90 days of metrics and every Pin) |
+| TikTok | R | Public API | Free sandbox | No | Built (Connects the store's own TikTok account through an app the store owns, holding user.info.basic, user.info.stats and video.list only; the connector stops if the token holds anything more. Its only API requests are the profile read and the video list) |
 | TikTok Ads | R | Public API | Free sandbox | No | Planned (Ad spend and results from TikTok's API for Business. No public API changelog found; the nightly sandbox run catches API changes) |
-| Yext | R | Public API | Free sandbox | No | Planned (Local listings and reviews from many sites in one place, including Yelp, whose own API shows only a few reviews. No public API changelog found; the nightly sandbox run catches API changes) |
+| Yext | R | Public API | Free sandbox | No | Built (Connects with an API key of a Yext app the store owns, which should hold read access to Entities and Reviews only. Its only API requests are two GETs, the location list and the review list. Listing status and analytics are a follow-up. No public API changelog found; the docs watch follows the three doc pages the mock was built from) |
 | Docusign | R, W, M | Public API | Free sandbox | Yes | Planned (Signed appraisal, consignment, memo and custom order agreements, and who has yet to sign) |
 | Dropbox | R, W, M | Public API | Free sandbox | Yes | Planned (Files such as invoices, appraisals and design files. Dropbox publishes no API changelog; changes are announced on its developer blog) |
 | Microsoft OneDrive and SharePoint files | R, W, M | Public API | Free sandbox | Yes | Planned (Files kept in OneDrive or SharePoint, read through Microsoft Graph, whose one changelog is watched through the Outlook entry) |
@@ -241,7 +241,7 @@ Used by: R is retail, W is wholesale, M is manufacturing. Test with says how we 
 | TaxJar | R, W | Public API | Unknown | No | Planned |
 | FinCEN Form 8300 cash reporting | R, W, M | File export | Sample files | No | Built (The store's Form 8300 filings log, kept as CSV. BSA E-Filing has no API, so a person files and KaratOS tracks what was filed) |
 | Refiner and scrap settlement statements | R, W, M | File export | Sample files | No | Built (CSV exports from any refiner, and PDF statements from a refiner whose layout is in its profile) |
-| Gusto | R, W, M | Public API | Free sandbox | Yes | Planned (Payroll, commissions and staff costs) |
+| Gusto | R, W, M | Public API | Free sandbox | Yes | Built (Read-only: the app holds only the payrolls:read scope, and after every token refresh the connector asks Gusto what the token may do and stops on any other scope or another company. Webhook deliveries only prompt a sync) |
 | ADP Workforce Now | R, W, M | Partner | Partner | Yes | Planned (Payroll, commissions and staff costs. The API is open to apps listed on the ADP Marketplace) |
 | Paychex Flex | R, W, M | Partner | Partner | No | Planned (Payroll, commissions and staff costs. Paychex issues API access to approved integration partners) |
 | QuickBooks Desktop | R, W, M | File export | Sample files | No | Planned (Books many older stores still keep. The Web Connector needs software on the store's own computer, so start with exported reports) |
@@ -396,26 +396,35 @@ A request for a path or method the docs don't list throws `UndocumentedRequestEr
 - Calendly's current user, scheduled event and invitee endpoints (API v2)
 - Clover's REST API v3 read endpoints with its v2 OAuth token refresh, including its 90-day cap on orders, payments and refunds
 - Typeform's Create API (a form's definition) and Responses API
+- eBay's Fulfillment API getOrders and createShippingFulfillment (Sell APIs, v1) with its OAuth refresh, enforcing the client credentials, the scopes the seller agreed to, the order filter, limit and offset
 - GIA's Report Results API: getReport and getChangedReports
 - Gmail's message, label and history reads with Google's token refresh (API v1)
+- The Google Ads API's `googleAds:search` and `googleAds:mutate` (REST, v26) with Google's token refresh, enforcing the developer token, the adwords scope, the account and manager headers, GAQL fields and page tokens tied to their query
+- The Google Analytics Data API's `runReport` (v1beta) with Google's token refresh, enforcing analytics scopes, date ranges and the rule that item-scoped fields can't be mixed with session ones
 - Google Drive (files and changes, v3), Sheets (`values:batchGet`, v4) and Calendar (`events.list` with sync tokens, v3) with Google's token refresh, enforcing each API's documented scopes so `drive.metadata.readonly` can't read Sheets values
+- Gusto's payroll list and payroll endpoints with its token refresh and token_info
 - HubSpot's CRM search, archived list, batch association and token info endpoints (date version 2026-09)
 - IDEX's Onsite feeds: the natural full feed and the lab-grown full file
 - Klaviyo's mock covers its profile, list, segment, campaign, flow and metric reads and the campaign and flow values reports (revision 2026-10-15). Plaid's accounts, transactions sync, Item and webhook verification key endpoints (API version 2020-09-14), with webhooks signed the way Plaid signs them
+- Mailchimp's ping, audience, member, campaign and campaign report reads (Marketing API 3.0)
+- Meta's Marketing API ad account insights and `/me/permissions` (Graph API v26.0), enforcing the token, ads_read, the ad account, campaign level by day, the fields and cursors tied to their read
 - monday.com's GraphQL API: boards, items, activity logs and updates
 - Nivoda's GraphQL diamond search: sign-in, diamonds_by_query and get_diamond_by_id
+- Pinterest's API v5 Pin list, account analytics, top Pins and Pin creation with its OAuth refresh, enforcing the client credentials, each token's scopes, the 90-day analytics window, page sizes, metrics and bookmarks tied to their list
 - Plaid's accounts, transactions sync, Item and webhook verification key endpoints (API version 2020-09-14), with webhooks signed the way Plaid signs them
 - QuickBooks Online's query and change data capture endpoints with Intuit's token refresh (minor version 75)
 - Rapaport's token service and Price List API: the full list and its changes
 - Slack's auth.test, conversations.list, conversations.history and conversations.replies, with both rate-limit regimes (Web API)
 - Square's read endpoints with its OAuth refresh and token status check (API version 2026-09-16)
 - Stuller's invoice and metal market rate endpoints (API v2)
+- TikTok's Display API v2 profile read and video list with its OAuth refresh, enforcing the client credentials, each token's scopes and the scope each field needs, page sizes and time cursors
 - Trello's token, member board, list, custom field, card and action endpoints (REST API 1)
 - A Wix site's read endpoints (eCommerce orders, Catalog V3 and V1, Contacts V5) with the app token, its permissions and cursor paging
 - A WooCommerce store's REST API v3 read endpoints with its key permissions and page headers
 - Xero's Accounting API endpoints with its token refresh
+- Yext's Management API v2 location and review lists, enforcing the API key header, the version date, the account, the app's access, page sizes, update-date ranges and page tokens tied to their query
 
-Where a vendor has a free sandbox (Affirm, Authorize.net, Avalara AvaTax, BigCommerce, Calendly, Clover, Custom forms, GIA Report Results, Gmail, Google Workspace and Drive, HubSpot, Klaviyo, Monday.com, Plaid, QuickBooks Online, Slack, Square, Trello, Wix, WooCommerce and Xero so far), its mock is a stand-in until a developer account is set up for the nightly run.
+Where a vendor has a free sandbox (Affirm, Authorize.net, Avalara AvaTax, BigCommerce, Calendly, Clover, Custom forms, eBay, GIA Report Results, Gmail, Google Ads, Google Analytics 4, Google Workspace and Drive, Gusto, HubSpot, Klaviyo, Mailchimp, Meta Ads, Monday.com, Pinterest, Plaid, QuickBooks Online, Slack, Square, TikTok, Trello, Wix, WooCommerce, Xero and Yext so far), its mock is a stand-in until a developer account is set up for the nightly run.
 
 <!-- registry:mocks:end -->
 
@@ -786,6 +795,31 @@ await fetch(instanceFormsUrl, {
 
 **Testing.** Until a Typeform test account is set up, the tests run against a mock built from Typeform's docs (`packages/testkit/src/mocks/typeform.ts`), which answers a form's definition and its responses only, pages with `before` newest first, filters by `since` and `until`, refuses a page size over 1000, answers 401 without the token, and names the responses host in the form's links. Its assumptions are listed in the mock and checked on the first sandbox run. Fixtures are synthetic and carry the personal data a real submission would, so the tests can check none of it is kept. For the nightly run, create a free Typeform account, build a test form and fill it in with made-up answers, create a personal token with `forms:read` and `responses:read`, and add `SANDBOX_CUSTOM_FORMS_TYPEFORM_TOKEN` and `SANDBOX_CUSTOM_FORMS_TYPEFORM_FORM_ID` as GitHub Actions secrets.
 
+### eBay
+
+Reads one seller's eBay orders through the Fulfillment API (Sell APIs, v1). Read-only two ways over: every access token is asked for from the seller's refresh token with `sell.fulfillment.readonly` alone, so eBay itself turns down any change to an order or listing; and the only API request is getOrders, with a filter, page size and offset the client builds and checks itself.
+
+| Setting | What it is |
+| --- | --- |
+| `EBAY_CLIENT_ID` | The App ID of an eBay developer app the store owns |
+| `EBAY_CLIENT_SECRET` | The same keyset's Cert ID |
+| `EBAY_REFRESH_TOKEN` | The seller account's refresh token, agreed with `sell.fulfillment.readonly` only. It lasts 18 months |
+| `EBAY_ENVIRONMENT` | `production` (the default) or `sandbox` |
+
+**What it reads.** Orders, 200 a page, a 31-day window at a time. The historical import reads every order created in the two years getOrders reaches, up to now. Each incremental sync reads the orders changed since the previous pass ended, less 15 minutes, so a shipped or refunded order comes in again as a new version. getOrders pages by offset, so each next page starts 20 orders early in case an order changed mid-read and shifted the rest.
+
+**Events.** Every order gives `order.updated`, with its fulfillment and payment status, whether it was cancelled, its total and what eBay kept in fees, in cents. A paid order that isn't cancelled gives `sale.completed` with each line's SKU (or a stand-in from the listing), quantity, unit price and discount. A line refunded in full gives `sale.returned`; a partial refund moves no stock, so it shows in the order's `refundedCents` only. These are the same shapes as Shopify and BigCommerce.
+
+**Privacy.** No buyer username, name, email address, phone number, shipping address or checkout note is kept, so no eBay user data is stored. That makes the store eligible for eBay's exemption from Marketplace Account Deletion notifications, which every production keyset must either subscribe to or opt out of.
+
+**Rate limits.** eBay counts calls a day per app. The client sends one request at a time, waits out a 429 (honoring `Retry-After` up to a minute, doubling from a second otherwise), three tries, before the error goes to the sync runner, which resumes from its checkpoint next time. A 401 renews the access token once.
+
+**Writes.** Setting a listing's quantity, so a piece sold in the store can't sell again online, setting a listing's price and adding tracking to an order are declared, so they can be gated and audited, and all three are turned off. Each needs a named person's approval. Turning them on would also need a refresh token with the write scopes, which the client never asks for today.
+
+**Not read yet.** Listings and stock come from the Inventory API, which only covers listings made through that API, so a store that lists in Seller Hub needs them moved over first. That is a follow-up.
+
+**Testing.** The tests run against a mock built from eBay's docs (`packages/testkit/src/mocks/ebay.ts`), which checks the client credentials, that a refresh asks only for scopes the seller agreed to, the token's scope on each call, the order filter, limit and offset. For the nightly run, make a sandbox keyset and a sandbox test user, get that user's refresh token with `sell.fulfillment.readonly` only, and add `SANDBOX_EBAY_CLIENT_ID`, `SANDBOX_EBAY_CLIENT_SECRET` and `SANDBOX_EBAY_REFRESH_TOKEN` as GitHub Actions secrets.
+
 ### EDI with retail partners
 
 Reads the X12 files a wholesaler or manufacturer exchanges with its retail partners, from the folder where the business's VAN or SFTP mailbox keeps them. Partners send purchase orders, inventory and sell-through; the business sends acknowledgments, ship notices and invoices back, and the mailbox keeps a copy of each. KaratOS reads both sides of the folder and never sends a document, so there are no webhooks and nothing to write back.
@@ -920,6 +954,55 @@ Reads one mailbox's message metadata, threads and labels through the Gmail API, 
 
 **Testing.** Until a test account is set up, the tests run against a mock built from Google's docs (`packages/testkit/src/mocks/gmail.ts`), which holds the metadata scope to its documented limits (no `q`, no `full` or `raw`), answers 401 without a valid access token, pages lists and history, expires history below a floor, and answers 404 for deleted messages. Every docs fact it relies on is listed with its URL, and what the docs leave out is in its assumptions, checked on the first live run. Google has no Gmail sandbox: for the nightly run, make a Google account for testing that holds only synthetic mail, create an OAuth client in a test Cloud project with the consent screen in Testing and that account as a test user, connect it with `gmail.metadata` only, and add `SANDBOX_GMAIL_CLIENT_ID`, `SANDBOX_GMAIL_CLIENT_SECRET` and `SANDBOX_GMAIL_REFRESH_TOKEN` as GitHub Actions secrets. Tokens in Testing expire after seven days, so when the run fails with `invalid_grant`, reconnect the test account and update the secret.
 
+### Google Ads
+
+Reads one Google Ads account's campaign figures by day through the Google Ads API (REST, v26). Google Ads has one OAuth scope, `adwords`, and it can change campaigns, so the scope can't keep the connection read-only. The client does: its only API request is `googleAds:search` for the account in the settings, with a query built from one fixed report, and it never calls a mutate method. Connect it as a Google Ads user with Read only access, so Google would turn down a change even if one were sent.
+
+| Setting | What it is |
+| --- | --- |
+| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | The instance's Google OAuth client, shared with the other Google connectors. Turn on the Google Ads API in its Cloud project |
+| `GOOGLE_ADS_REFRESH_TOKEN` | A refresh token from a Google account with Read only access to the Google Ads account, granted `adwords` only |
+| `GOOGLE_ADS_DEVELOPER_TOKEN` | From a manager account's API Center. A new token reads test accounts only; a store's real account needs Basic access |
+| `GOOGLE_ADS_CUSTOMER_ID` | The account's 10-digit customer id, with or without dashes |
+| `GOOGLE_ADS_LOGIN_CUSTOMER_ID` | Optional. The manager account's customer id, when the user reaches the store's account through one |
+
+**What it reads.** One report, a 31-day window at a time, in Google's fixed pages of 10,000 rows: for each campaign and day, its status, channel and daily budget, and the impressions, clicks, cost, conversions and conversion value. The historical import reads two years up to today. Each incremental sync reads again from two weeks before the last day the previous pass read, since Google keeps attributing conversions to past clicks.
+
+**Privacy.** The report is totals by campaign and day, so nothing names a person. Campaign names are cut short, and one holding an @ is dropped.
+
+**Rate limits.** Google Ads meters each developer token in operations per day. The client sends one request at a time and waits out a 429 (`Retry-After` when sent, otherwise doubling from a second, three tries) before the error goes to the sync runner, which resumes from its checkpoint next time. A 403 means the connected user can't reach the account, or needs `GOOGLE_ADS_LOGIN_CUSTOMER_ID`; `DEVELOPER_TOKEN_NOT_APPROVED` means the token has test access only.
+
+**Writes.** Pausing a campaign and changing its daily budget are declared, so they can be gated and audited, and both are turned off. Each needs a named person's approval and is capped at five a day. Turning them on would also need a user with Standard access in Google Ads.
+
+**Events.** `ads.campaign_reported`, one per campaign and day, with the account's currency and time zone, and money in cents (Google gives cost and budget in micros). Each is keyed by its day, its campaign and a digest of its numbers, so a revised row is stored as a new version and an unchanged one is a duplicate.
+
+**Testing.** The tests run against a mock built from Google's docs (`packages/testkit/src/mocks/google_ads.ts`), which checks the access token, the developer token, the scope, the account and manager headers, the GAQL fields, and that a page token belongs to its query, and counts any mutate call. For the nightly run, create a Google Ads test manager account with a test client account under it, connect a test Google account to a test OAuth client with `adwords`, and add `SANDBOX_GOOGLE_ADS_CLIENT_ID`, `SANDBOX_GOOGLE_ADS_CLIENT_SECRET`, `SANDBOX_GOOGLE_ADS_REFRESH_TOKEN`, `SANDBOX_GOOGLE_ADS_DEVELOPER_TOKEN`, `SANDBOX_GOOGLE_ADS_CUSTOMER_ID` and `SANDBOX_GOOGLE_ADS_LOGIN_CUSTOMER_ID` as GitHub Actions secrets. Any developer token reads test accounts.
+
+### Google Analytics 4
+
+Reads one GA4 property's reports through the Google Analytics Data API (v1beta). Read-only three ways over: the connection holds `analytics.readonly` and nothing else, which the client checks on every new access token; the only API request it sends is `runReport` for the property in the settings, with a body built from two fixed reports; and the Admin API is never called. Analytics has nothing to write, so no write is declared.
+
+| Setting | What it is |
+| --- | --- |
+| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | The instance's Google OAuth client, shared with Gmail and Google Workspace. Turn on the Google Analytics Data API in its Cloud project |
+| `GOOGLE_ANALYTICS_REFRESH_TOKEN` | A refresh token from a Google account with Viewer access to the property, granted `analytics.readonly` only |
+| `GOOGLE_ANALYTICS_PROPERTY_ID` | The property's numeric id from Admin > Property details (not the `G-` measurement id) |
+
+**What it reads.** Two reports, a 31-day window at a time, 10,000 rows a page, sorted on every dimension so paging is stable:
+
+- Traffic: by day, default channel group and source / medium, the sessions, total users, new users, engaged sessions, key events (GA4's conversions), ecommerce purchases and total revenue.
+- Products: by day and item, the items viewed, added to cart and purchased, and item revenue.
+
+The historical import reads two years up to today. Each incremental sync reads again from three days before the last day the previous pass read, since GA4 keeps adding late hits to recent days.
+
+**Privacy.** Reports are totals by day, so nothing names a visitor. Source, medium and item names are cut short, and one holding an @ is dropped in case a campaign tag carried an email address. When GA4 withholds small rows (thresholding), the events say so.
+
+**Rate limits.** The Data API meters each property in tokens per hour and per day. The client sends one request at a time and waits out a 429 (`Retry-After` when sent, otherwise doubling from a second, three tries) before the error goes to the sync runner, which resumes from its checkpoint next time. A 403 means the connected account can't read the property.
+
+**Events.** `analytics.traffic_reported` and `analytics.product_views_reported`, one per row, with the day, the property's currency and time zone, and money in cents. Each is keyed by its day, its dimensions and a digest of its numbers, so a revised row is stored as a new version and an unchanged one is a duplicate.
+
+**Testing.** The tests run against a mock built from Google's docs (`packages/testkit/src/mocks/google_analytics.ts`), which checks the token's scopes, the property, the date range, that item-scoped and session-scoped fields aren't mixed, and pages and sorts. For the nightly run, give a test Google account Viewer access to Google's public GA4 demo account (the Google Merchandise Store), connect it to a test OAuth client with `analytics.readonly`, and add `SANDBOX_GOOGLE_ANALYTICS_CLIENT_ID`, `SANDBOX_GOOGLE_ANALYTICS_CLIENT_SECRET`, `SANDBOX_GOOGLE_ANALYTICS_REFRESH_TOKEN` and `SANDBOX_GOOGLE_ANALYTICS_PROPERTY_ID` as GitHub Actions secrets.
+
 ### Google Workspace and Drive
 
 Reads the Drive folder a business shares with Brain A, the Sheets ranges it lists and the appointments on the calendars it names, for finance and compliance (which invoices, statements and certificates exist and when they changed), buying and pricing (a price list or stock count kept in a sheet) and clienteling (who is booked, and when). It never downloads a file, and never keeps an appointment's title, description, location, meeting link or anybody's address.
@@ -951,6 +1034,33 @@ Reads the Drive folder a business shares with Brain A, the Sheets ranges it list
 **Push.** Drive (`changes.watch`) and Calendar (`events.watch`) can notify the instance of changes. Opening a channel is a POST that creates state in the business's Google account and points Google at the instance, so it is declared as two gated writes, `watch_drive_changes` and `watch_calendar_events`, rather than allowed as a read: until an owner adds them to `ENABLED_WRITES` no channel exists, and the scheduled sync reads the same changes anyway (Google says notifications aren't fully reliable, so the sync would still be needed). Google doesn't sign notifications: each is an empty POST whose headers name the channel and resource and echo the channel's token. `googlePushVerifier` checks `X-Goog-Channel-Token` against `GOOGLE_PUSH_CHANNEL_TOKEN` in constant time, that `X-Goog-Channel-ID` and `X-Goog-Resource-ID` name a channel the instance opened and that it hasn't expired, that `X-Goog-Resource-State` is one Google documents for that kind, and refuses a message number at or below the last one seen on the channel as a replay. A valid notification is only a prompt to run the incremental sync.
 
 **Testing.** Until a test account is set up, the tests run against a mock built from Google's docs (`packages/testkit/src/mocks/google_workspace.ts`), which enforces each API's documented scopes, answers 401 without a valid access token, pages files, changes and events, keeps per-stream change feeds, expires sync tokens with 410, and returns whole resources (owners, titles, descriptions, links) so the tests check the connector drops them. Its assumptions are listed in the mock and checked on the first live run. Google has no Workspace sandbox: for the nightly run, make a Google account for testing that holds only a synthetic folder, spreadsheet and calendar, create an OAuth client in a test Cloud project with the consent screen in Testing and that account as a test user, connect it with the three read-only scopes, and add `SANDBOX_GOOGLE_WORKSPACE_CLIENT_ID`, `SANDBOX_GOOGLE_WORKSPACE_CLIENT_SECRET`, `SANDBOX_GOOGLE_WORKSPACE_REFRESH_TOKEN`, `SANDBOX_GOOGLE_WORKSPACE_FOLDER_ID` and `SANDBOX_GOOGLE_WORKSPACE_SHEETS_RANGE` (one `spreadsheetId/Sheet!A1:C10` entry) as GitHub Actions secrets. When the run fails with `invalid_grant`, reconnect the test account and update the secret.
+
+### Gusto
+
+Reads one company's processed payrolls from Gusto's App Integrations API, asking for API version `2026-06-15` on every request. Read-only is enforced twice. The app holds only the `payrolls:read` scope, and after every token refresh the client calls `GET /v1/token_info` and stops if the token belongs to a company other than `GUSTO_COMPANY_UUID`, holds any scope that doesn't end in `:read`, or doesn't say which scopes it holds. The client also sends GET requests to two payroll endpoints only, and its only POST is the token refresh. It declares no writes: payroll stays with a person in Gusto.
+
+| Setting | What it is |
+| --- | --- |
+| `GUSTO_CLIENT_ID`, `GUSTO_CLIENT_SECRET` | The KaratOS app's keys from the Gusto developer portal |
+| `GUSTO_REDIRECT_URI` | The app's registered redirect URI, which Gusto asks for on every refresh |
+| `GUSTO_COMPANY_UUID` | The company's UUID, from `GET /v1/token_info` after connecting |
+| `GUSTO_REFRESH_TOKEN` | The refresh token from connecting the company. It only seeds the instance's own copy (below) |
+| `GUSTO_ENVIRONMENT` | Optional. `demo` for Gusto's demo environment (`api.gusto-demo.com`); production otherwise |
+| `GUSTO_WEBHOOK_VERIFICATION_TOKEN` | Optional. The webhook subscription's verification token, for when webhooks are turned on |
+
+**Tokens.** Access tokens last two hours and are refreshed five minutes early, one refresh at a time. Each refresh returns a new refresh token, and Gusto revokes the old one the first time the new access token is used, so the new one is saved before anything else happens. The instance keeps it in its database, sealed the same way as QuickBooks' and Xero's. An `invalid_grant` error means the company needs reconnecting.
+
+**What it reads.** `GET /v1/companies/{company}/payrolls` for processed payrolls with their totals, by check date, oldest first, 100 per page, then `GET /v1/companies/{company}/payrolls/{payroll}` for each one's employee compensations. The historical import reads three years back in windows of at most a year, which is as much as Gusto lists at once. Incremental syncs read again from 45 days before the previous pass, so a payroll processed late or changed after processing is picked up. Both reach 31 days ahead, since Gusto processes a payroll days before its check date. Unprocessed payrolls aren't read, since their numbers can still change. Reversed and cancelled payrolls aren't handled yet.
+
+**Rate limits.** Gusto allows 200 requests a minute per company and app. A 429 is waited out (`Retry-After` when sent, at most a minute, three tries) before the error goes to the sync runner.
+
+**Events.** `payroll.payroll_processed` for each payroll: check date, pay period, regular, off-cycle or external, and gross pay, net pay, employer and employee taxes, benefits, reimbursements, bonuses, commissions and the company debit in whole cents. `payroll.employee_paid` for each employee it paid: gross and net pay, hours, overtime, commissions, bonuses and tips, and the payment method. Employees are named by Gusto's employee UUID only; no names, pay rates, bank details, tax withholdings or deductions are kept. Gusto has no version number on a payroll, so each event is keyed by a hash of what was kept, and a replay is a duplicate. A payroll with no readable check date is dead-lettered rather than given a made-up day.
+
+**Finance.** The finance department turns these into payroll signals, and flags a regular payroll whose gross pay is more than 25% (and at least $500) above the average of the three before it on the same pay schedule, so it gets a second look.
+
+**Webhooks.** `verifyGustoWebhook` checks `X-Gusto-Signature`, the HMAC-SHA256 of the raw body keyed with the verification token. Gusto's docs don't say whether the digest is hex or base64, so both are accepted, compared in constant time; the nightly sandbox run is where that gets confirmed. Gusto retries a delivery for up to three days and signs no timestamp, so `gustoWebhookEvent` returns the event's uuid to drop replays by, and only events for this company. A payroll event is a prompt to sync, not data. The instance doesn't take webhooks yet; the scheduled sync picks every change up.
+
+**Testing.** The tests run against a mock built from Gusto's docs (`packages/testkit/src/mocks/gusto.ts`), which replaces refresh tokens and revokes the old one on first use of the new access token, answers `token_info`, needs the API version header and enforces the one-year window and paging. For the nightly run, create a Gusto developer account, make a demo company with a few synthetic employees and processed payrolls, connect it to a test app with only `payrolls:read`, and add `SANDBOX_GUSTO_CLIENT_ID`, `SANDBOX_GUSTO_CLIENT_SECRET`, `SANDBOX_GUSTO_REDIRECT_URI`, `SANDBOX_GUSTO_COMPANY_UUID` and `SANDBOX_GUSTO_REFRESH_TOKEN` as GitHub Actions secrets. The nightly run can't save the replacement refresh token, so expect `invalid_grant` after its first use until the run can store tokens.
 
 ### HubSpot
 
@@ -1074,6 +1184,49 @@ Reads Klaviyo's JSON:API (`https://a.klaviyo.com/api/...`) with a private API ke
 
 **Testing.** Until a Klaviyo account is set up for the nightly run, the tests run against a mock built from Klaviyo's API reference (`packages/testkit/src/mocks/klaviyo.ts`). It answers 401 without the key and 400 without a revision, applies sparse fieldsets, binds each cursor to its query, and checks report bodies the way the reference describes. Its assumptions are listed in the mock and checked on the first sandbox run. For the nightly run, create a free Klaviyo account for testing only, add a few synthetic profiles, a list, a campaign and a flow, make a private key with the read scopes above, and add it as the `SANDBOX_KLAVIYO_PRIVATE_API_KEY` GitHub Actions secret. The writes it may do later (add profiles to lists, trigger flows) are declared, and the write-gate test shows each one is stopped.
 
+### Mailchimp
+
+Reads one Mailchimp account through the Marketing API (3.0) on the data center its API key names. A Mailchimp API key can't be limited to reading, so read-only is enforced in the client: it sends GET requests for five listed reads only (ping, audiences, audience members, campaigns and campaign reports), with parameters it checked, and throws before sending anything else. The one write it may do later (add a contact to an audience) is declared and stays behind the write gate.
+
+| Setting | What it is |
+| --- | --- |
+| `MAILCHIMP_API_KEY` | An API key from Profile > Extras > API keys, ending in the account's data center (such as `-us21`) |
+| `CUSTOMER_REF_KEY` | The instance's customer reference key, shared with custom forms, Calendly and Klaviyo |
+| `MAILCHIMP_WEBHOOK_SECRET` | Optional. A random secret for the webhook URL, for when webhooks are turned on |
+
+**Privacy.** Every read names the fields it wants (`fields=`), so names, phone numbers, addresses, birthdays, merge fields, tags, locations and subject lines never leave Mailchimp. A member's email address comes back only to become the same keyed reference custom forms makes for it, so a subscriber lines up with the same person's form submissions, Calendly bookings and Klaviyo profile. Mailchimp's member id is the MD5 of the email address, which anyone can recompute from a guess, so it is never kept.
+
+**What it reads.** The historical import reads every audience, every member of each (1000 a page, oldest change first), and the campaigns sent in the last five years with each one's report. Incremental syncs read the audiences again, the members changed since the previous pass started (less five minutes), and the campaigns sent from 30 days before that, since a report keeps growing as opens and clicks come in.
+
+**Rate limits.** Mailchimp allows 10 requests at once. The client sends one at a time and waits out a 429 (`Retry-After` when sent, at most a minute, three tries) before the error goes to the sync runner.
+
+**Events.** The same types as Klaviyo: `marketing.list_updated` for audiences, `customer.profile_updated` with `marketingConsent` true only for subscribed members, `marketing.group_membership_seen`, `marketing.campaign_updated`, `marketing.campaign_metrics_reported` with sends, bounces, opens, clicks, orders, revenue in cents, unsubscribes and abuse reports, and marketing's `campaign.sent` once emails went out (cost 0, as Mailchimp has none per campaign). Members are keyed by audience, reference and last change, and reports by a digest of their numbers, so a replay is a duplicate.
+
+**Webhooks.** Mailchimp doesn't sign deliveries. `verifyMailchimpWebhook` checks the `key` query parameter the instance put in the webhook URL against `MAILCHIMP_WEBHOOK_SECRET`, in constant time. `mailchimpWebhookEvent` reads a delivery's type, audience and time from its form body and nothing about the member. A delivery is a prompt to sync. The instance doesn't take webhooks yet; the scheduled sync picks every change up.
+
+**Testing.** The tests run against a mock built from Mailchimp's docs (`packages/testkit/src/mocks/mailchimp.ts`), which needs Basic auth, applies `fields`, filters by `since_last_changed` and `since_send_time`, sorts and pages. For the nightly run, make a free Mailchimp account with one audience of `example.test` addresses and a test campaign, and add its key as the `SANDBOX_MAILCHIMP_API_KEY` GitHub Actions secret.
+
+### Meta Ads
+
+Reads one ad account's Facebook and Instagram campaign insights by day through Meta's Marketing API (Graph API v26.0). Read-only three ways over: the token holds `ads_read` and nothing else, which the client checks against `/me/permissions` before its first read; its only other request is the insights read for the ad account in the settings, with parameters built from one fixed report; and it never follows a link Meta returns, rebuilding each next page from the cursor instead.
+
+| Setting | What it is |
+| --- | --- |
+| `META_ADS_ACCESS_TOKEN` | A system user token from the store's Meta Business account, with `ads_read` only and the ad account assigned |
+| `META_ADS_ACCOUNT_ID` | The ad account's numeric id, with or without `act_` |
+
+**What it reads.** One report at campaign level, a 31-day window at a time, by day, 500 rows a page: for each campaign, its objective and the account's currency, and the spend, impressions, reach, clicks, purchases and purchase value. The historical import reads two years up to today. Each incremental sync reads again from two weeks before the last day the previous pass read, since Meta keeps attributing purchases to past views and clicks.
+
+**Privacy.** Insights are totals by campaign and day, so nothing names a person. Campaign names are cut short, and one holding an @ is dropped.
+
+**Rate limits.** Meta throttles by app, user and ad account, answering Graph error codes 4, 17, 32, 613, 80000 or 80004 (or HTTP 429). The client sends one request at a time and waits, doubling from a second, three tries, before the error goes to the sync runner, which resumes from its checkpoint next time. Error 190 means the token expired or was revoked; 200 or 10 means the ad account isn't assigned to the system user.
+
+**Writes.** Pausing a campaign and changing its daily budget are declared, so they can be gated and audited, and both are turned off. Each needs a named person's approval and is capped at five a day. Turning them on would also need a token with `ads_management`, which the connector stops on today.
+
+**Events.** `ads.campaign_reported`, the same event Google Ads gives, one per campaign and day, with money in cents and purchases counted from Meta's `purchase` action. Each is keyed by its day, its campaign and a digest of its numbers, so a revised row is stored as a new version and an unchanged one is a duplicate.
+
+**Testing.** The tests run against a mock built from Meta's docs (`packages/testkit/src/mocks/meta_ads.ts`), which checks the token, `ads_read`, the ad account, campaign level by day, the fields, the time range and that a cursor belongs to its read. For the nightly run, create a sandbox ad account from a Meta developer app (Marketing API > Tools), make a system user token for it with `ads_read` only, and add `SANDBOX_META_ADS_ACCESS_TOKEN` and `SANDBOX_META_ADS_ACCOUNT_ID` as GitHub Actions secrets.
+
 ### Metals-API
 
 Spot prices for gold, silver, platinum and palladium from [Metals-API](https://metals-api.com/documentation), in US dollars per troy ounce, as the metals department's `metal.price_updated` events. They feed melt values for inventory and for gold bought from the public, and the metals department's alert when a price moves 5% or more.
@@ -1157,6 +1310,30 @@ A listing's time is when KaratOS saw it, since Nivoda doesn't say when a diamond
 **Writes.** Declared and turned off: putting a diamond on hold and ordering one, which are Nivoda's Pro API mutations.
 
 **Testing.** The tests run against a mock built from Nivoda's API help pages (`packages/testkit/src/mocks/nivoda.ts`), which signs in, pages a search and expires tokens with synthetic diamonds. The fields past Nivoda's installation guide are listed as the mock's assumptions and checked on the first staging run.
+
+### Pinterest
+
+Reads one Pinterest business account's Pins and analytics through Pinterest's API (v5). Read-only two ways over: the connection holds `boards:read`, `pins:read` and `user_accounts:read` and nothing else, which the client checks on every token refresh before reading anything; and its only requests are the Pin list and two analytics reads for the connected account, with parameters it builds and checks itself.
+
+| Setting | What it is |
+| --- | --- |
+| `PINTEREST_CLIENT_ID` | The App id of a Pinterest developer app the store owns |
+| `PINTEREST_CLIENT_SECRET` | The same app's App secret key |
+| `PINTEREST_REFRESH_TOKEN` | The business account's refresh token, with the three read scopes only |
+
+**What it reads.** Every pass reads every Pin the account owns, 250 a page, with its title, the page it links to, its board and its 90-day and lifetime metrics. Then the account's daily impressions, saves, Pin clicks, outbound clicks and engagements: 90 days on the first import, which is as far back as Pinterest's analytics reach, and the last 30 days on each sync after, since Pinterest keeps refining recent days. Last, the 50 Pins saved most over the last 30 days, ranked.
+
+**Events.** `social.pin_updated` for each Pin, `social.account_reported` for each day and `social.top_pin_reported` for each ranked Pin. Each is keyed by a digest of its numbers, so a revised day or Pin is stored as a new version and an unchanged one is a duplicate.
+
+**Privacy.** Pins are the store's own posts and analytics are totals, so nothing names a customer. A Pin's description isn't kept, a title holding an @ is dropped, and a link keeps its address without the query string or fragment.
+
+**Tokens.** Pinterest replaces the refresh token on every refresh (continuous refresh tokens, 60 days each). The newest is kept in the instance's database, sealed with a key derived from the client secret, so a daily sync keeps the connection alive indefinitely.
+
+**Rate limits.** The client sends one request at a time and waits out a 429 (honoring `Retry-After` up to a minute, doubling from a second otherwise), three tries, before the error goes to the sync runner, which resumes from its checkpoint next time. A 401 renews the access token once. A 403 on analytics means the account isn't a business account.
+
+**Writes.** Creating a Pin for a product, with its photo and a link to its page, is declared so it can be gated and audited, and is turned off. It needs a named person's approval. Turning it on would also need a token with `pins:write` and `boards:write`, which the connector stops on today.
+
+**Testing.** The tests run against a mock built from Pinterest's OpenAPI description (`packages/testkit/src/mocks/pinterest.ts`), which checks the client credentials, the refresh token rotation, each token's scopes, the 90-day analytics window, page sizes, metrics and that a bookmark belongs to its list. Pinterest's sandbox doesn't serve analytics, so for the nightly run connect a test business account to a developer app with the three read scopes and add `SANDBOX_PINTEREST_CLIENT_ID`, `SANDBOX_PINTEREST_CLIENT_SECRET` and `SANDBOX_PINTEREST_REFRESH_TOKEN` as GitHub Actions secrets.
 
 ### PIRO
 
@@ -1398,7 +1575,7 @@ Only what the departments use is kept: no email addresses, phone numbers or stre
 
 **Webhooks.** `verifyShopifyWebhook` checks `X-Shopify-Hmac-SHA256` against the raw body before it's parsed. `handleWebhook({ topic, payload })` maps the REST-shaped delivery onto the same events the sync produces, so a webhook for a record already synced, or a redelivery, is a duplicate. Topics read: orders, refunds, products and customers.
 
-**Testing.** The tests use synthetic, doc-shaped responses until the nightly sandbox run has a development store. To set one up, create a free development store and an app with the read scopes above in the same Shopify Dev Dashboard organization, then add `SANDBOX_SHOPIFY_SHOP_DOMAIN`, `SANDBOX_SHOPIFY_CLIENT_ID` and `SANDBOX_SHOPIFY_CLIENT_SECRET` as GitHub Actions secrets. Until those exist, the nightly run lists Shopify as skipped. The writes it may do later (adjust inventory, tag customers and orders, create draft orders) are declared, and the write-gate test shows each one is rejected.
+**Testing.** The tests use synthetic, doc-shaped responses until the nightly sandbox run has a development store. To set one up, create a free development store and an app with the read scopes above in the same Shopify Dev Dashboard organization, then add `SANDBOX_SHOPIFY_SHOP_DOMAIN`, `SANDBOX_SHOPIFY_CLIENT_ID` and `SANDBOX_SHOPIFY_CLIENT_SECRET` as GitHub Actions secrets. Until those exist, the nightly run lists Shopify as skipped. The writes it may do later (adjust inventory, tag customers and orders, create draft orders, change a variant's price, and create a single-use discount code for one customer) are declared, and the write-gate test shows each one is rejected.
 
 ### Slack
 
@@ -1496,6 +1673,30 @@ An invoice is recorded again when its status, tracking or anything else read cha
 **Writes.** Declared and turned off: submitting an order to Stuller.
 
 **Testing.** The tests run against a mock built from Stuller's API help pages (`packages/testkit/src/mocks/stuller.ts`), which answers synthetic invoices and rates and turns down a wrong login. It is checked live once a developer login is connected.
+
+### TikTok
+
+Reads the store's own TikTok account through TikTok's Display API (v2). Read-only two ways over: the connection holds `user.info.basic`, `user.info.stats` and `video.list` and nothing else, which the client checks on every token refresh before reading anything; and its only requests are the profile read and the video list, with fields and a page cursor it builds and checks itself.
+
+| Setting | What it is |
+| --- | --- |
+| `TIKTOK_CLIENT_KEY` | The client key of a TikTok for Developers app the store owns |
+| `TIKTOK_CLIENT_SECRET` | The same app's client secret |
+| `TIKTOK_REFRESH_TOKEN` | The store account's refresh token, with the three read scopes only |
+
+**What it reads.** Each pass reads the account's followers, accounts followed, total likes and video count, then its public videos, newest first, 20 a page: on the first import every video posted in the last two years, and on each sync after, the videos of the last 90 days again, since their views and likes are still moving. Each video comes with its title, its share link, how long it runs and its views, likes, comments and shares.
+
+**Events.** `social.account_reported` for the account's counts on the day read and `social.video_updated` for each video. Each is keyed by a digest of its numbers, so a video whose counts moved is stored as a new version and an unchanged one is a duplicate.
+
+**Privacy.** Videos are the store's own posts and the counts are totals, so nothing names a customer. A video's description isn't asked for, a title holding an @ is dropped, and a link keeps only a tiktok.com address without its query string.
+
+**Tokens.** Access tokens last a day. TikTok may answer a new refresh token on a refresh, and the newest is kept in the instance's database, sealed with a key derived from the client secret. A refresh token lasts a year from when the account signed in, so the account signs in again once a year.
+
+**Rate limits.** The client sends one request at a time and waits out a 429 (honoring `Retry-After` up to a minute if TikTok sends one, doubling from a second otherwise), three tries, before the error goes to the sync runner, which resumes from its checkpoint next time. A 401 renews the access token once, except when TikTok says a scope was never allowed. An error code other than `ok` in an answer is treated as an error, whatever the HTTP status.
+
+**Writes.** Posting a product video is declared so it can be gated and audited, and is turned off. It needs a named person's approval. Turning it on would also need a token with `video.publish`, which the connector stops on today.
+
+**Testing.** The tests run against a mock built from TikTok for Developers' Display API docs (`packages/testkit/src/mocks/tiktok.ts`), which checks the client credentials in the form, the refresh token rotation, each token's scopes and the scope each field needs, page sizes and time cursors. For the nightly run, add a sandbox to the developer app with a test TikTok account, sign it in with the three read scopes, and add `SANDBOX_TIKTOK_CLIENT_KEY`, `SANDBOX_TIKTOK_CLIENT_SECRET` and `SANDBOX_TIKTOK_REFRESH_TOKEN` as GitHub Actions secrets.
 
 ### Trello
 
@@ -1732,6 +1933,28 @@ Reads the Xero Accounting API (`api.xro/2.0`) for one organisation. Read-only is
 **Webhooks.** `verifyXeroWebhook` checks `x-xero-signature`, the base64 HMAC-SHA256 of the raw body keyed with the webhooks key. Anything but a match must be answered 401, which is also what Xero's intent-to-receive check expects. `xeroWebhookChanges` lists the invoice, contact and credit note changes for this organisation. A delivery names what changed without the record, so it is a prompt to sync, not data. The instance doesn't take webhooks yet; the scheduled sync picks every change up.
 
 **Testing.** The tests run against a mock built from Xero's docs (`packages/testkit/src/mocks/xero.ts`), which rotates refresh tokens, rejects the old one, issues access tokens carrying their scopes, answers 401 without a valid token, needs the tenant header and enforces paging, date filters and `If-Modified-Since`. For the nightly run, create a free Xero developer account, connect the Demo Company to an app with the read scopes above, and add `SANDBOX_XERO_CLIENT_ID`, `SANDBOX_XERO_CLIENT_SECRET`, `SANDBOX_XERO_TENANT_ID` and `SANDBOX_XERO_REFRESH_TOKEN` as GitHub Actions secrets. The nightly run can't save the token Xero rotates to, so expect it to fail with `invalid_grant` after its first use until the run can store tokens; reconnect and update the secret to check again.
+
+### Yext
+
+Reads the store's Yext account through Yext's Management API (v2): its locations and the reviews Yext gathers from Google, Yelp, Facebook and the other publishers it watches. Read-only by request: its only requests are two GETs, the location list and the review list, with parameters it builds and checks itself. Yext API keys carry no scopes the connector could check, so give the app the key belongs to read access to Entities and Reviews and nothing else.
+
+| Setting | What it is |
+| --- | --- |
+| `YEXT_API_KEY` | An API key of a Yext app the store owns, with read access to Entities and Reviews |
+| `YEXT_ACCOUNT_ID` | The account to read; unset reads the key's own account |
+| `YEXT_ENVIRONMENT` | `production` (default) or `sandbox` |
+
+**What it reads.** Each pass reads every location, 50 a page, with its name, address, time zone and whether it is closed. Then the reviews Yext last updated in a range of days, 100 a page: the last two years on the first import, and on each sync after, the days since the last pass ended, starting two days early so a review updated late on a day already read is read again.
+
+**Events.** `location.updated` for each location and `review.updated` for each review, with its location, publisher, rating, an excerpt, its status, when it was published and last updated, a link to it, how many comments it has, how many are the store's replies, and whether it is still awaiting one. Each is keyed by a digest of what was kept, so an edited or newly answered review is stored as a new version and an unchanged one is a duplicate.
+
+**Privacy.** A review is written by a customer, so it keeps no author name or email, and its title and excerpt (the first 500 characters) have email addresses and phone numbers masked. Replies are counted, not copied. A link keeps its address without the query string.
+
+**Rate limits.** Yext allows 5,000 Management API requests an hour. The client sends one request at a time and waits out a 429, a 500 or a 504, doubling from a second, three tries, before the error goes to the sync runner, which resumes from its checkpoint next time. A 401 means the key is wrong, and a 403 that the app lacks read access.
+
+**Writes.** Replying to a review and changing a location's hours are declared so they can be gated and audited, and are turned off. Each needs a named person's approval, and the client has no request to send either.
+
+**Testing.** The tests run against a mock built from Yext's Management API docs (`packages/testkit/src/mocks/yext.ts`), which checks the API key header, the version date, the account, the app's access, page sizes, update-date ranges and that a page token belongs to its query. For the nightly run, add an app in a Yext sandbox account with read access to Entities and Reviews and add its key as the GitHub Actions secret `SANDBOX_YEXT_API_KEY`.
 
 <!-- registry:connector-docs:end -->
 

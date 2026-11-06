@@ -90,6 +90,15 @@ These are built, tested against recorded vendor responses or mocks built from ea
 | Avalara AvaTax | Imports five years of sales tax for every sale, return and purchase, then keeps it current as transactions are committed, voided or adjusted | Compliance, Finance |
 | FinCEN Form 8300 cash reporting | Imports five years of Form 8300 filings: date filed, sales covered, cash, and the BSA Tracking ID or BSA ID | Compliance |
 | Refiner and scrap settlement statements | Imports five years of refiner and scrap settlements: lots, metals, weights, assays, metal credited and fees | Metals, Finance |
+| Gusto | Imports three years of processed payrolls with their gross pay, taxes, benefits and company debit | Finance, Compliance |
+| Mailchimp | Imports every audience and subscriber, and five years of sent campaigns with their reports, then keeps them current | Marketing, Clienteling |
+| Google Analytics 4 | Imports two years of daily website sessions, users and new users by channel and by source and medium, then keeps them current | Marketing, Sales |
+| Google Ads | Imports two years of daily spend, impressions, clicks, conversions and conversion value for every campaign, then keeps them current | Marketing |
+| Meta Ads | Imports two years of daily Facebook and Instagram ad spend, reach, clicks and purchases for every campaign, then keeps them current | Marketing |
+| eBay | Imports the two years of eBay orders that eBay keeps, then reads every order changed since the last sync | Sales, Inventory |
+| Pinterest | Imports every Pin the store has made, with its title, the page it links to and its 90-day and lifetime metrics | Marketing, Sales |
+| TikTok | Imports every public video the store posted in the last two years, with its title, link, length and views, likes, comments and shares | Marketing |
+| Yext | Imports two years of reviews from Google, Yelp, Facebook and the other sites Yext watches, with the rating, an excerpt and where to answer it | Marketing, Clienteling |
 | Trello | Imports five years of cards from every board you can see, such as repairs, custom orders and buying, then keeps them current | Repairs, Custom orders, Buying |
 | TheWatchSearch (by TheWatchCloud) | Turns the dealer WhatsApp groups the store is in into a feed of offers: brand, reference, buy or sell, price, year, condition and set | Buying, Sales, Inventory |
 <!-- connected:end -->
@@ -123,7 +132,7 @@ Every accept, reject and override is stored, so these numbers come from the syst
 The weeks before Black Friday decide a jeweler's year, so that is when KaratOS has to prove itself. We are running an open testing weekend on **November 21–22, 2026**, the weekend before Black Friday, with sign-ups open from November 16.
 
 - **For jewelers:** connect your store, POS or bank in read-only mode and get your first list of recommendations before the holiday rush. Nothing in your systems is changed.
-- **For developers:** every connector runs against recorded vendor responses, so you can run the full suite offline with `npm test` and help us break things before stores rely on them.
+- **For developers:** every connector runs against recorded vendor responses or mocks built from the vendor's own docs, so you can run the full suite offline with `npm test` and help us break things before stores rely on them.
 
 Sign up with the pilot form on the KaratOS website, or open an issue here to join as a tester.
 
@@ -134,7 +143,7 @@ This section updates itself as work lands: it is generated from [docs/milestones
 <!-- progress:start -->
 <!-- Generated from docs/milestones.json and the integration catalog by npm run progress:write. Edit those, not this block. -->
 
-**Overall: 68% complete**, 26 of 38 roadmap items done. 37 of the 253 systems in the integration catalog are connected.
+**Overall: 68% complete**, 26 of 38 roadmap items done. 46 of the 253 systems in the integration catalog are connected.
 
 | Milestone | What it gives a jeweler | Progress | Target |
 | --- | --- | --- | --- |
@@ -243,6 +252,8 @@ Every piece of data passes through seven layers, in order. No layer is skipped.
 See [docs/architecture/overview.md](docs/architecture/overview.md) for details.
 
 [Integrations](docs/integrations.md) lists all the systems in the catalog, and [the website guide](docs/website.md) covers the public site.
+
+[Integration research](docs/research/README.md) records what each vendor's own docs say about API access, sign-up and test environments, checked before a connector is planned, with a source for every claim.
 
 ## Quick start
 

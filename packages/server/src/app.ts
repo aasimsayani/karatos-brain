@@ -1,7 +1,7 @@
 import { timingSafeEqual } from "node:crypto";
 import type { IncomingMessage, RequestListener, ServerResponse } from "node:http";
 import { z } from "zod";
-import { DeadLetteredError, monthOf, readValueReport, type BrainPipeline, type IntegrationStatus, type MemoryStore } from "@karatos/core";
+import { DeadLetteredError, measureValue, monthOf, readValueReport, type BrainPipeline, type IntegrationStatus, type MemoryStore } from "@karatos/core";
 
 export interface BrainAppOptions {
   pipeline: BrainPipeline;
@@ -159,7 +159,12 @@ export function createBrainApp(options: BrainAppOptions): RequestListener {
     [
       "POST",
       /^\/v1\/reason$/,
-      async () => [200, { recommendations: await options.pipeline.reason(options.organizationId) }],
+      async () => {
+        const recommendations = await options.pipeline.reason(options.organizationId);
+        // Each run also records the results now due on approved recommendations.
+        const measured = await measureValue(options.memory, options.organizationId, new Date().toISOString());
+        return [200, { recommendations, measured: measured.length }];
+      },
     ],
     [
       "GET",
