@@ -23,6 +23,7 @@ const printing: IssueTracker = {
     return 0;
   },
   comment: async () => {},
+  update: async () => {},
   close: async () => {},
 };
 const issues = dryRun ? printing : gitHubIssueTracker({ repo: repo!, token: token!, labels: ["sandbox-run", "integration"] });

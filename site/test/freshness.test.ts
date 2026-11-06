@@ -21,6 +21,9 @@ function tracker(open: { number: number; body: string } | null = null) {
     comment: async (n, body) => {
       calls.push(`comment ${n}\n${body}`);
     },
+    update: async (n, body) => {
+      calls.push(`update ${n}\n${body}`);
+    },
     close: async (n, body) => {
       calls.push(`close ${n} ${body}`);
     },

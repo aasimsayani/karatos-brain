@@ -432,13 +432,14 @@ Where a vendor has a free sandbox (Affirm, Amazon (Selling Partner API), Authori
 
 Every integration in the catalog lists its vendor's public API changelog (`changelog` in `packages/core/src/integrations.ts`), or null when the vendor publishes none. The **Vendor docs watch** workflow runs daily:
 
-- It fetches each changelog and compares its readable text with the last run's copy. Scripts, styles and markup are ignored, so a site rebuild isn't a change.
-- A change opens one issue, labeled `vendor-docs`, with the removed and added lines as evidence and a short to-do list. If that vendor's issue is still open, a later change is added as a comment instead of a new issue.
-- A changelog that answers 404 or 410 opens one "changelog moved" issue so the URL gets fixed. Other failures are listed in the run summary and retried the next day.
+- It fetches each changelog, and every page a doc-derived mock was built from (`docMockVendorDocsTargets(allDocMocks())`, keyed `integration:page`), and compares its readable text with the last run's copy. Scripts, styles and markup are ignored, so a site rebuild isn't a change.
+- Everything it finds goes on one long-running issue, **Vendor docs watch**, labeled `vendor-docs`. Each run that finds something adds one comment with the removed and added lines for every page that changed, and what a moved page (404 or 410) needs. Other failures are listed in the run summary and retried the next day.
+- The issue body is a checklist with one row per vendor, however many of its pages changed, and links to the newest evidence. Vendors a client syncs come first, then other built connectors, then the rest of the catalog, newest change first. The daily build works the top rows. Ticking a row marks it handled: the next run drops it, and a later change brings it back.
+- Which systems clients sync comes from the `DOCS_WATCH_IN_USE` repository variable (comma-separated catalog ids), never from the repo, and the issue only uses it to order rows.
+- A snapshot is saved only once its change is on the issue, so a run that can't reach GitHub reports the change again the next day.
 - The first run, or a changed URL, only records a baseline.
-- It also checks every page a doc-derived mock was built from (`docMockVendorDocsTargets(allDocMocks())`). Each page gets its own snapshot and issue, keyed `integration:page`. A change opens an issue saying which mock may be stale and the day it last matched. A page that answers 404 or 410 opens a "docs page moved" issue.
 
-Run it locally with `npm run build -w @karatos/core -w @karatos/connector-testkit && npm run docs:watch -- --dry-run`, which prints what it would file.
+Run it locally with `npm run build -w @karatos/core -w @karatos/connector-testkit && npm run docs:watch -- --dry-run`, which prints the issue body and comment it would write.
 
 ### Nightly sandbox run
 

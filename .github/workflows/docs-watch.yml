@@ -35,3 +35,4 @@ jobs:
       - run: npm run docs:watch
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DOCS_WATCH_IN_USE: ${{ vars.DOCS_WATCH_IN_USE }}
