@@ -303,7 +303,7 @@ Every connector must:
 - Ship tests built with `@karatos/connector-testkit`: synthetic fixtures, recorded responses with secrets scrubbed, a full import, replay, resume and retry run, and a check that the write gate refuses writes.
 - Pass the nightly sandbox run (`npm run sandbox:run`) against the vendor's free test account, once one is configured. A failure opens an issue naming the connector and the step.
 
-Systems we can't reach yet are tested against mocks built from the vendor's docs. The daily vendor docs watch (`npm run docs:watch`) checks each vendor's API changelog and every page a mock was built from, and opens an issue when one changes.
+Systems we can't reach yet are tested against mocks built from the vendor's docs. The daily vendor docs watch (`npm run docs:watch`) checks each vendor's API changelog and every page a mock was built from, and keeps one ranked checklist issue of the vendors whose docs changed, with the ones clients use first.
 
 The Shopify connector is the first one built. See [docs/integrations.md](docs/integrations.md#shopify) for what it reads and how to connect a store.
 

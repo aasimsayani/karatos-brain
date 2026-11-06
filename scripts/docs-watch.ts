@@ -11,9 +11,12 @@ import {
 import { allDocMocks, docMockVendorDocsTargets } from "@karatos/connector-testkit";
 
 // Daily vendor docs watch. Snapshots live in a directory the CI job caches
-// between runs; changes become issues in this repository.
+// between runs; changes go on the one "Vendor docs watch" issue.
 //   GITHUB_TOKEN, GITHUB_REPOSITORY  set by GitHub Actions
 //   DOCS_WATCH_DIR                    snapshot directory (default .docs-watch)
+//   DOCS_WATCH_IN_USE                 comma-separated catalog ids clients sync, ranked first.
+//                                     A repository variable, never committed: which systems
+//                                     a client uses is theirs.
 //   --dry-run                         print what would be filed instead of filing it
 
 const dryRun = process.argv.includes("--dry-run");
@@ -45,6 +48,7 @@ function dryRunTracker(): IssueTracker {
       return next++;
     },
     comment: async (issue, body) => console.log(`\n[dry run] would comment on #${issue}:\n${body}\n`),
+    update: async (issue, body) => console.log(`\n[dry run] would update #${issue}:\n${body}\n`),
     close: async (issue, body) => console.log(`\n[dry run] would close #${issue}:\n${body}\n`),
   };
 }
@@ -61,7 +65,13 @@ const { targets: changelogs, unwatched } = vendorDocsTargets();
 // The pages each doc-derived mock was built from: a change means the mock may be out of date.
 const mockPages = docMockVendorDocsTargets(allDocMocks());
 const targets = [...changelogs, ...mockPages];
-const outcomes = await runVendorDocsWatch({ targets, fetch, store, issues });
+const inUse = new Set(
+  (process.env.DOCS_WATCH_IN_USE ?? "")
+    .split(",")
+    .map((id) => id.trim())
+    .filter((id) => /^[a-z0-9_]+$/.test(id)),
+);
+const outcomes = await runVendorDocsWatch({ targets, fetch, store, issues, inUse });
 
 const rows = outcomes.map((o) => `| ${o.integration} | ${o.status} | ${o.issue ? `#${o.issue}` : ""} | ${o.detail ?? ""} |`);
 const summary = [

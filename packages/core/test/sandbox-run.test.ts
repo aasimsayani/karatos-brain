@@ -37,6 +37,9 @@ class Tracker implements IssueTracker {
   async comment(number: number, body: string) {
     this.issues[number - 1]!.comments.push(body);
   }
+  async update(number: number, body: string) {
+    this.issues[number - 1]!.body = body;
+  }
   async close(number: number, body: string) {
     await this.comment(number, body);
     this.issues[number - 1]!.open = false;

@@ -13,7 +13,10 @@ export interface IssueTracker {
   /** The open issue whose body carries this marker, if any. */
   findOpen(marker: string): Promise<TrackedIssue | null>;
   open(title: string, body: string): Promise<number>;
-  comment(issue: number, body: string): Promise<void>;
+  /** Adds a comment, and returns its link when the tracker has one. */
+  comment(issue: number, body: string): Promise<string | void>;
+  /** Replaces the issue's body. */
+  update(issue: number, body: string): Promise<void>;
   /** Comments, then closes the issue as completed. */
   close(issue: number, comment: string): Promise<void>;
 }
@@ -62,7 +65,11 @@ export function gitHubIssueTracker(options: GitHubIssueTrackerOptions): IssueTra
       return created.number;
     },
     async comment(issue, body) {
-      await api(`/issues/${issue}/comments`, { method: "POST", body: JSON.stringify({ body }) });
+      const created = (await api(`/issues/${issue}/comments`, { method: "POST", body: JSON.stringify({ body }) })) as { html_url?: unknown };
+      return typeof created.html_url === "string" ? created.html_url : undefined;
+    },
+    async update(issue, body) {
+      await api(`/issues/${issue}`, { method: "PATCH", body: JSON.stringify({ body }) });
     },
     async close(issue, comment) {
       await api(`/issues/${issue}/comments`, { method: "POST", body: JSON.stringify({ body: comment }) });

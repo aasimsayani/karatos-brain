@@ -1,12 +1,16 @@
 import { createHash } from "node:crypto";
+import { CONNECTOR_CATALOG } from "./catalog/index.js";
 import { INTEGRATIONS, type IntegrationSpec } from "./integrations.js";
 import type { IssueTracker } from "./issue-tracker.js";
 
 /**
  * Vendor docs watch: every day, fetch each integration's public API
- * changelog, compare it with the last saved copy, and open one issue per
- * change with the changed lines as evidence. A vendor that changes again
- * while its issue is still open gets a comment on that issue, not a new one.
+ * changelog and the pages its doc mock was built from, and compare each with
+ * the last saved copy. Everything found goes on one long-running issue: a
+ * comment per run with the changed lines as evidence, and a ranked checklist
+ * in the issue body with one row per vendor. Vendors a client uses come
+ * first, then other built connectors, then the rest of the catalog. Ticking a
+ * row marks it handled, and the next run drops it.
  */
 
 export interface VendorDocsTarget {
@@ -130,11 +134,20 @@ export interface VendorDocsWatchOptions {
   fetch: typeof globalThis.fetch;
   store: SnapshotStore;
   issues: IssueTracker;
+  /** Catalog ids a client syncs today. They rank first; the issue doesn't say which they are. */
+  inUse?: ReadonlySet<string>;
+  /** Catalog ids with a built connector. Defaults to the connector catalog. */
+  built?: ReadonlySet<string>;
   now?: () => Date;
 }
 
-export const changeMarker = (integration: string) => `<!-- vendor-docs:${integration} -->`;
-export const movedMarker = (integration: string) => `<!-- vendor-docs-moved:${integration} -->`;
+/** Marks the one issue the watch keeps. */
+export const WATCH_MARKER = "<!-- vendor-docs-watch -->";
+export const WATCH_TITLE = "Vendor docs watch";
+const STATE_PREFIX = "<!-- vendor-docs-state:";
+const ROW_MARKER = (vendor: string) => `<!-- row:${vendor} -->`;
+/** Evidence links kept per page; older ones stay in the issue's comments. */
+const EVIDENCE_KEPT = 3;
 
 /** Fences text in more backticks than it contains, so page text can't break out of the block. */
 function fence(text: string): string {
@@ -149,42 +162,6 @@ function evidence(diff: TextDiff): string {
   return `${fence(lines || "(only whitespace or ordering changed)")}${more}`;
 }
 
-function changeBody(target: VendorDocsTarget, diff: TextDiff, at: string): string {
-  if (target.mock) {
-    return [
-      changeMarker(target.integration),
-      `A page the ${target.name} doc mock was built from changed. Seen ${at} at ${target.url}`,
-      `The mock matches the version read on ${target.mock.retrievedOn}, so it may no longer match the real API.`,
-      "",
-      "Lines removed (-) and added (+):",
-      "",
-      evidence(diff),
-      "",
-      "**To do**",
-      `- [ ] Compare the change with the mock in \`packages/testkit/src/mocks/${target.mock.integration}.ts\``,
-      "- [ ] Update its routes, fixtures and assumptions, and its `retrievedOn` date",
-      "- [ ] If the connector is affected, open a fix PR with a test that reproduces the new behavior",
-      "",
-      "Opened by the daily vendor docs watch.",
-    ].join("\n");
-  }
-  return [
-    changeMarker(target.integration),
-    `The ${target.name} API changelog changed. Seen ${at} at ${target.url}`,
-    "",
-    "Lines removed (-) and added (+):",
-    "",
-    evidence(diff),
-    "",
-    "**To do**",
-    "- [ ] Read the change and decide whether the connector is affected",
-    "- [ ] If it is, open a fix PR with a test that reproduces the new behavior",
-    "- [ ] Note anything a client or onboarding needs in the runbook's connection guide",
-    "",
-    "Opened by the daily vendor docs watch.",
-  ].join("\n");
-}
-
 /** "fetch failed" alone says nothing; Node keeps the real reason (DNS, TLS, proxy) in the cause chain. */
 function errorChain(error: unknown): string {
   const parts: string[] = [];
@@ -192,7 +169,117 @@ function errorChain(error: unknown): string {
   return parts.join(": ") || String(error);
 }
 
-async function watchOne(target: VendorDocsTarget, options: VendorDocsWatchOptions, at: string): Promise<WatchOutcome> {
+/** A change or move found on one page this run, not yet on the issue. */
+interface Finding {
+  target: VendorDocsTarget;
+  status: "changed" | "moved";
+  detail: string;
+  /** The changed lines, or what the page answered. */
+  evidence: string;
+  /** Saved once the finding is on the issue, so a failed run reports it again. */
+  snapshot?: DocsSnapshot;
+}
+
+interface PageState {
+  url: string;
+  status: "changed" | "moved";
+  /** Set for a page a doc mock was built from. */
+  mock?: string;
+  firstSeen: string;
+  lastSeen: string;
+  times: number;
+  evidence: string[];
+}
+
+interface VendorState {
+  name: string;
+  pages: Record<string, PageState>;
+}
+
+export type WatchState = Record<string, VendorState>;
+
+/** The catalog id a target belongs to: its own, or the one its doc mock stands in for. */
+export const vendorOf = (target: VendorDocsTarget) => target.mock?.integration ?? target.integration;
+
+/** The saved state in a watch issue's body, minus the rows someone ticked. */
+export function readWatchBody(body: string): WatchState {
+  const start = body.indexOf(STATE_PREFIX);
+  if (start === -1) return {};
+  const end = body.indexOf(" -->", start);
+  let state: WatchState;
+  try {
+    state = JSON.parse(Buffer.from(body.slice(start + STATE_PREFIX.length, end), "base64").toString("utf8")) as WatchState;
+  } catch {
+    return {};
+  }
+  if (typeof state !== "object" || state === null || Array.isArray(state)) return {};
+  for (const line of body.split("\n")) {
+    const ticked = /^- \[[xX]\] .*<!-- row:([a-z0-9_]+) -->$/.exec(line);
+    if (ticked) delete state[ticked[1]!];
+  }
+  return state;
+}
+
+const day = (iso: string) => iso.slice(0, 10);
+
+/** Ranks vendors: in use, then built, then the rest; newest change first within each. */
+export function rankVendors(state: WatchState, inUse: ReadonlySet<string>, built: ReadonlySet<string>): string[] {
+  const tier = (vendor: string) => (inUse.has(vendor) ? 0 : built.has(vendor) ? 1 : 2);
+  const latest = (vendor: string) => Object.values(state[vendor]!.pages).reduce((a, p) => (p.lastSeen > a ? p.lastSeen : a), "");
+  return Object.keys(state).sort(
+    (a, b) => tier(a) - tier(b) || latest(b).localeCompare(latest(a)) || state[a]!.name.localeCompare(state[b]!.name) || a.localeCompare(b),
+  );
+}
+
+function row(vendor: string, v: VendorState, built: boolean): string[] {
+  const pages = Object.values(v.pages);
+  const changed = pages.filter((p) => p.status === "changed").length;
+  const moved = pages.length - changed;
+  const counts = [changed ? `${changed} ${changed === 1 ? "page" : "pages"} changed` : "", moved ? `${moved} moved` : ""].filter(Boolean).join(", ");
+  const first = pages.reduce((a, p) => (p.firstSeen < a ? p.firstSeen : a), pages[0]!.firstSeen);
+  const last = pages.reduce((a, p) => (p.lastSeen > a ? p.lastSeen : a), pages[0]!.lastSeen);
+  const seen = day(first) === day(last) ? `seen ${day(last)}` : `first seen ${day(first)}, last ${day(last)}`;
+  const lines = [`- [ ] **${v.name}** (${built ? "built" : "not built yet"}): ${counts}, ${seen} ${ROW_MARKER(vendor)}`];
+  for (const p of Object.values(v.pages).sort((a, b) => a.url.localeCompare(b.url))) {
+    const what = p.mock ? `doc mock page, read ${p.mock}` : "changelog";
+    const status = p.status === "moved" ? "moved" : p.times > 1 ? `changed ${p.times} times` : "changed";
+    const links = p.evidence.map((url, i) => `[${i === 0 ? "evidence" : i + 1}](${url})`).join(" ");
+    lines.push(`  - ${status}: ${p.url} (${what})${links ? ` ${links}` : ""}`);
+  }
+  return lines;
+}
+
+export function renderWatchBody(state: WatchState, inUse: ReadonlySet<string>, built: ReadonlySet<string>, at: string): string {
+  const vendors = rankVendors(state, inUse, built);
+  return [
+    WATCH_MARKER,
+    "Every vendor whose API changelog, or a page its doc mock was built from, changed or moved since its row was last ticked. Vendors our clients use come first, then built connectors, then the rest of the catalog, newest change first.",
+    "",
+    "**To work a row:** read its evidence and decide whether the connector or mock is affected. If it is, open a fix PR with a test that reproduces the new behavior, and update the mock's `retrievedOn`. A moved page needs its new URL in `packages/core/src/integrations.ts` or the mock. Then tick the row; the next run drops it, and a later change brings it back.",
+    "",
+    vendors.length === 0 ? "Nothing waiting." : `**${vendors.length} ${vendors.length === 1 ? "vendor" : "vendors"} waiting**`,
+    "",
+    ...vendors.flatMap((v) => row(v, state[v]!, built.has(v))),
+    "",
+    `Updated ${at} by the daily vendor docs watch.`,
+    `${STATE_PREFIX}${Buffer.from(JSON.stringify(state), "utf8").toString("base64")} -->`,
+  ].join("\n");
+}
+
+function findingNote(f: Finding): string {
+  const t = f.target;
+  if (f.status === "moved") {
+    return t.mock
+      ? `A page the ${t.name} doc mock was built from, ${t.url}, ${f.evidence}. Find where it moved and update \`packages/testkit/src/mocks/${t.mock.integration}.ts\`.`
+      : `The ${t.name} API changelog at ${t.url} ${f.evidence}. Find the new URL and update \`changelog\` for this integration in \`packages/core/src/integrations.ts\`.`;
+  }
+  const lead = t.mock
+    ? `A page the ${t.name} doc mock was built from changed: ${t.url}. The mock matches the version read on ${t.mock.retrievedOn}, so it may no longer match the real API.`
+    : `The ${t.name} API changelog changed: ${t.url}`;
+  return `${lead}\n\nLines removed (-) and added (+):\n\n${f.evidence}`;
+}
+
+async function watchOne(target: VendorDocsTarget, options: VendorDocsWatchOptions, at: string): Promise<WatchOutcome | Finding> {
   const { integration } = target;
   let response: Response;
   try {
@@ -202,24 +289,7 @@ async function watchOne(target: VendorDocsTarget, options: VendorDocsWatchOption
   }
 
   if (response.status === 404 || response.status === 410) {
-    const existing = await options.issues.findOpen(movedMarker(integration));
-    if (existing) return { integration, status: "moved", issue: existing.number, detail: `HTTP ${response.status}` };
-    const issue = await options.issues.open(
-      target.mock ? `Vendor docs page moved: ${target.name}` : `Vendor changelog moved: ${target.name}`,
-      [
-        movedMarker(integration),
-        target.mock
-          ? `A page the ${target.name} doc mock was built from, ${target.url}, answered HTTP ${response.status} on ${at}.`
-          : `The ${target.name} API changelog at ${target.url} answered HTTP ${response.status} on ${at}.`,
-        "",
-        target.mock
-          ? `Find where the page moved and update the mock in \`packages/testkit/src/mocks/${target.mock.integration}.ts\`, checking the endpoint is still documented the same way. Until then, changes to that page go unnoticed.`
-          : "Find the new changelog URL and update `changelog` for this integration in `packages/core/src/integrations.ts`. Until then, changes to this API go unnoticed.",
-        "",
-        "Opened by the daily vendor docs watch.",
-      ].join("\n"),
-    );
-    return { integration, status: "moved", issue, detail: `HTTP ${response.status}` };
+    return { target, status: "moved", detail: `HTTP ${response.status}`, evidence: `answered HTTP ${response.status} on ${at}` };
   }
   if (!response.ok) return { integration, status: "error", detail: `HTTP ${response.status}` };
 
@@ -235,29 +305,83 @@ async function watchOne(target: VendorDocsTarget, options: VendorDocsWatchOption
   if (previous.sha256 === snapshot.sha256) return { integration, status: "unchanged" };
 
   const diff = diffLines(previous.text, text);
-  const existing = await options.issues.findOpen(changeMarker(integration));
-  let issue: number;
-  if (existing) {
-    issue = existing.number;
-    await options.issues.comment(issue, [`Changed again, seen ${at}.`, "", evidence(diff)].join("\n"));
-  } else {
-    issue = await options.issues.open(`Vendor docs changed: ${target.name}`, changeBody(target, diff, at));
-  }
-  // Save only after the issue exists, so a failed run reports the change next time.
-  await options.store.put(snapshot);
-  return { integration, status: "changed", issue, detail: `${diff.added.length} added, ${diff.removed.length} removed` };
+  return { target, status: "changed", detail: `${diff.added.length} added, ${diff.removed.length} removed`, evidence: evidence(diff), snapshot };
 }
 
-/** Checks every target once. One target failing never stops the others. */
+const isFinding = (r: WatchOutcome | Finding): r is Finding => "target" in r;
+
+/**
+ * Checks every target once, then puts what it found on the watch issue in
+ * one comment and one body update. One target failing never stops the
+ * others; if the issue can't be updated, the changes are reported again
+ * next run.
+ */
 export async function runVendorDocsWatch(options: VendorDocsWatchOptions): Promise<WatchOutcome[]> {
   const at = (options.now ?? (() => new Date()))().toISOString();
-  const outcomes: WatchOutcome[] = [];
+  const inUse = options.inUse ?? new Set<string>();
+  const built = options.built ?? new Set(Object.keys(CONNECTOR_CATALOG));
+  const results: (WatchOutcome | Finding)[] = [];
   for (const target of options.targets) {
     try {
-      outcomes.push(await watchOne(target, options, at));
+      results.push(await watchOne(target, options, at));
     } catch (error) {
-      outcomes.push({ integration: target.integration, status: "error", detail: (error as Error).message });
+      results.push({ integration: target.integration, status: "error", detail: (error as Error).message });
     }
   }
-  return outcomes;
+  const findings = results.filter(isFinding);
+
+  let issue: number | undefined;
+  let failure: string | undefined;
+  try {
+    const existing = await options.issues.findOpen(WATCH_MARKER);
+    const state = existing ? readWatchBody(existing.body) : {};
+    let link: string | undefined;
+    if (findings.length > 0 && existing) {
+      link = (await options.issues.comment(existing.number, runComment(findings, at))) ?? undefined;
+    }
+    for (const f of findings) {
+      const vendor = vendorOf(f.target);
+      const v = (state[vendor] ??= { name: f.target.name, pages: {} });
+      v.name = f.target.name;
+      const before = v.pages[f.target.integration];
+      v.pages[f.target.integration] = {
+        url: f.target.url,
+        status: f.status,
+        ...(f.target.mock ? { mock: f.target.mock.retrievedOn } : {}),
+        firstSeen: before?.firstSeen ?? at,
+        lastSeen: at,
+        times: (before?.times ?? 0) + 1,
+        evidence: [...(link ? [link] : []), ...(before?.evidence ?? [])].slice(0, EVIDENCE_KEPT),
+      };
+    }
+    const body = renderWatchBody(state, inUse, built, at);
+    if (existing) {
+      // An unchanged body (nothing found, nothing ticked) isn't written back.
+      if (body.split("\n").slice(0, -2).join("\n") !== existing.body.split("\n").slice(0, -2).join("\n")) {
+        await options.issues.update(existing.number, body);
+      }
+      issue = existing.number;
+    } else if (findings.length > 0) {
+      issue = await options.issues.open(WATCH_TITLE, body);
+      await options.issues.comment(issue, runComment(findings, at));
+    }
+    // Save only after the issue has the change, so a failed run reports it next time.
+    for (const f of findings) if (f.snapshot) await options.store.put(f.snapshot);
+  } catch (error) {
+    failure = errorChain(error);
+  }
+
+  return results.map((r): WatchOutcome => {
+    if (!isFinding(r)) return r;
+    const integration = r.target.integration;
+    if (failure !== undefined) return { integration, status: "error", detail: `${r.status}, but the watch issue couldn't be updated: ${failure}` };
+    return { integration, status: r.status, ...(issue !== undefined ? { issue } : {}), detail: r.detail };
+  });
+}
+
+function runComment(findings: readonly Finding[], at: string): string {
+  return [
+    `Seen ${at}.`,
+    ...findings.flatMap((f) => ["", `### ${f.target.name}`, "", findingNote(f)]),
+  ].join("\n");
 }

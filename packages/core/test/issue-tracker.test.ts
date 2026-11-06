@@ -1,15 +1,17 @@
 import { describe, expect, it } from "vitest";
-import { changeMarker, gitHubIssueTracker } from "../src/index.js";
+import { WATCH_MARKER, gitHubIssueTracker } from "../src/index.js";
 
 describe("gitHubIssueTracker", () => {
-  function github(pages: unknown[][], created = 7) {
+  function github(pages: unknown[][], created = 7, comment: unknown = "https://github.com/o/r/issues/7#issuecomment-1") {
     const calls: { url: string; method: string; body: unknown; auth: string | null }[] = [];
     const fetch = async (url: string | URL | Request, init?: RequestInit) => {
       const method = init?.method ?? "GET";
       const headers = new Headers(init?.headers);
       calls.push({ url: String(url), method, body: init?.body ? JSON.parse(String(init.body)) : null, auth: headers.get("authorization") });
       if (String(url).includes("fail")) return new Response("{}", { status: 500 });
+      if (method === "POST" && String(url).endsWith("/comments")) return Response.json({ id: 1, html_url: comment }, { status: 201 });
       if (method === "POST") return Response.json({ number: created }, { status: 201 });
+      if (method === "PATCH") return Response.json({});
       const page = Number(new URL(String(url)).searchParams.get("page"));
       return Response.json(pages[page - 1] ?? []);
     };
@@ -17,10 +19,10 @@ describe("gitHubIssueTracker", () => {
   }
 
   it("finds an open issue by marker across pages, ignoring pull requests", async () => {
-    const full = Array.from({ length: 100 }, (_, i) => ({ number: i + 1, body: i === 3 ? changeMarker("demo") : null, pull_request: i === 3 ? {} : undefined }));
-    const { fetch, calls } = github([full, [{ number: 200, body: `x ${changeMarker("demo")}` }]]);
+    const full = Array.from({ length: 100 }, (_, i) => ({ number: i + 1, body: i === 3 ? WATCH_MARKER : null, pull_request: i === 3 ? {} : undefined }));
+    const { fetch, calls } = github([full, [{ number: 200, body: `x ${WATCH_MARKER}` }]]);
     const tracker = gitHubIssueTracker({ repo: "o/r", token: "t", labels: ["vendor-docs"], fetch });
-    expect(await tracker.findOpen(changeMarker("demo"))).toEqual({ number: 200, body: `x ${changeMarker("demo")}` });
+    expect(await tracker.findOpen(WATCH_MARKER)).toEqual({ number: 200, body: `x ${WATCH_MARKER}` });
     expect(calls.map((c) => c.url)).toEqual([
       "https://api.github.com/repos/o/r/issues?state=open&labels=vendor-docs&per_page=100&page=1",
       "https://api.github.com/repos/o/r/issues?state=open&labels=vendor-docs&per_page=100&page=2",
@@ -33,14 +35,21 @@ describe("gitHubIssueTracker", () => {
     const { fetch, calls } = github([]);
     const tracker = gitHubIssueTracker({ repo: "o/r", token: "t", labels: ["vendor-docs", "integration"], fetch });
     expect(await tracker.open("Title", "Body")).toBe(7);
-    await tracker.comment(7, "Again");
+    expect(await tracker.comment(7, "Again")).toBe("https://github.com/o/r/issues/7#issuecomment-1");
+    await tracker.update(7, "New body");
     await tracker.close(7, "Fixed");
     expect(calls.map((c) => [c.method, c.url, c.body])).toEqual([
       ["POST", "https://api.github.com/repos/o/r/issues", { title: "Title", body: "Body", labels: ["vendor-docs", "integration"] }],
       ["POST", "https://api.github.com/repos/o/r/issues/7/comments", { body: "Again" }],
+      ["PATCH", "https://api.github.com/repos/o/r/issues/7", { body: "New body" }],
       ["POST", "https://api.github.com/repos/o/r/issues/7/comments", { body: "Fixed" }],
       ["PATCH", "https://api.github.com/repos/o/r/issues/7", { state: "closed", state_reason: "completed" }],
     ]);
+  });
+
+  it("returns no link when GitHub's answer has none", async () => {
+    const tracker = gitHubIssueTracker({ repo: "o/r", token: "t", labels: ["vendor-docs"], fetch: github([], 7, 12).fetch });
+    expect(await tracker.comment(7, "Again")).toBeUndefined();
   });
 
   it("surfaces GitHub errors", async () => {
