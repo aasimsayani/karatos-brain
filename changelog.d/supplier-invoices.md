@@ -1,0 +1,3 @@
+- Supplier invoices and memos connector (`@karatos/connectors`): reads six years of invoice and memo lines from each supplier's CSV exports, with items, quantities, costs, memo terms and due dates, whether each line is a natural or lab-grown diamond, and whether its document carries the System of Warranties statement or names the Kimberley Process. Memo lines with an item, a cost and a due date also go to the memo reminder. Read-only, with no writes. Turn it on with `supplier_invoices` in `ENABLED_INTEGRATIONS` and `SUPPLIER_INVOICES_IMPORT_DIR`.
+- Buying department: takes `supplier_invoice.line_imported` lines.
+- Compliance department: flags an invoice or memo from the last 90 days that lists a natural diamond when no System of Warranties statement was found on it.

@@ -51,7 +51,7 @@ Used by: R is retail, W is wholesale, M is manufacturing. Test with says how we 
 | Punchmark | R | Partner | Partner | No | Planned |
 | Etsy | R, M | Public API | Unknown | No | Planned |
 | eBay | R, W | Public API | Free sandbox | No | Built (Connects with the seller's refresh token from an app the store owns. Every access token is asked for with sell.fulfillment.readonly alone, so eBay itself turns down any change, and the only API request is getOrders. No buyer details are kept, so no eBay user data is stored) |
-| Amazon (Selling Partner API) | R, W, M | Public API | Free sandbox | Yes | Planned (Amazon orders, listings, stock, fees and settlements; notifications arrive through Amazon's queues) |
+| Amazon (Selling Partner API) | R, W, M | Public API | Free sandbox | No | Built (Connects through a private SP-API app the seller authorizes with the Finance and Accounting, and Amazon Fulfillment, roles. Its only API requests are three GETs (orders, transactions and FBA stock) and the Login with Amazon token refresh, and it never asks for the buyer or the address. Listings, returns and settlement reports are a follow-up. Amazon sends notifications through AWS queues rather than signed webhooks, so there is no webhook to verify) |
 | TikTok Shop | R | Partner | Unknown | Yes | Planned (Orders, products and returns from TikTok's in-app shop, through an app registered in TikTok Shop Partner Center) |
 | Faire | W, M | Public API | Unknown | No | Planned (Wholesale orders from independent boutiques through the Faire marketplace) |
 | NuORDER | W, M | Public API | Unknown | No | Planned (B2B wholesale orders, line sheets and buyers, with API keys a brand approves in NuORDER Admin) |
@@ -111,7 +111,7 @@ Used by: R is retail, W is wholesale, M is manufacturing. Test with says how we 
 | HRD Antwerp report check | R, W | Unknown | Unknown | No | Planned (Web lookup through MyHRD only; no API found) |
 | GCAL report verification | R, W | Unknown | Unknown | No | Planned (Web lookup through GCAL by Sarine only; no API found) |
 | AGL report verification | R, W | Unknown | Unknown | No | Planned (Colored stone and pearl reports from American Gemological Laboratories. Web lookup only; no API found) |
-| Supplier invoices and memos | R, W, M | File export | Sample files | No | Planned (Invoice and memo PDFs or CSVs from any supplier, read for memo terms and Kimberley Process and System of Warranties statements) |
+| Supplier invoices and memos | R, W, M | File export | Sample files | No | Built (CSV exports of invoices and memos from any supplier, read for memo terms and System of Warranties and Kimberley Process statements) |
 | Overnight Mountings | R | File export | Sample files | No | Planned (Catalog downloads as Excel or CSV with images; no ordering API found) |
 | Laravo | R, W, M | Partner | Partner | No | Planned (Normalized brand product data, codes and images mapped to the store's POS. Partner only. Exhibited at JCK 2026) |
 | Lashbrook Builder | R, M | Unknown | Partner | No | Planned (Custom band configurations and special orders. Retailer API not confirmed; partner only. Exhibited at JCK 2026) |
@@ -302,7 +302,7 @@ Used by: R is retail, W is wholesale, M is manufacturing. Test with says how we 
 | RFID and barcode tray counts | R, W, M | File export | Sample files | No | Planned (Tray and case scan exports, so the nightly count is checked against what should be there) |
 | Homebase | R | Partner | Partner | No | Planned (Staff schedules and time clock, so labor can be set against sales. API keys need the Enterprise plan and a request to Homebase support) |
 | Deputy | R, W, M | Public API | Unknown | Yes | Planned (Staff rosters and timesheets, so labor can be set against sales or bench work) |
-| Asana | R, W, M | Public API | Free sandbox | Yes | Planned (Tasks and projects used to track repairs, custom orders and buying trips) |
+| Asana | R, W, M | Public API | Free sandbox | No | Built (Read-only: the client sends only its five listed GETs and names every field it reads. A personal access token can do whatever its user can, so make it as a user with access to only the projects to sync, or use an OAuth app limited to read scopes. No webhooks yet; the sync polls) |
 | Trello | R, W, M | Public API | Free sandbox | No | Built (Read-only: a token authorized with scope=read, which the connector checks before every sync, turning away one that can write. The client sends only its six listed GETs and never asks for card names or descriptions. No webhooks yet; the sync polls) |
 | Airtable | R, W, M | Public API | Free sandbox | Yes | Planned (Bases many stores use for memo logs, repair intake and custom order tracking) |
 | Notion | R, W, M | Public API | Free sandbox | Yes | Planned (Databases and pages used for job tracking, procedures and buying notes) |
@@ -390,6 +390,8 @@ A request for a path or method the docs don't list throws `UndocumentedRequestEr
 <!-- Generated from the mock modules in packages/testkit/src/mocks/ by npm run registry:write. Edit those, not this block. -->
 
 - Affirm's transaction, transaction event, daily settlement and dispute reads
+- Amazon's Selling Partner API orders search (v2026-01-01), finance transactions (v2024-06-19) and FBA inventory summaries, with the Login with Amazon token refresh, enforcing the access token header, the app's roles, date ranges, page sizes and page tokens tied to their query
+- Asana's current user, project, section, task and story endpoints (REST API 1.0)
 - Authorize.net's Transaction Reporting requests on its JSON API
 - AvaTax's connection check, company and transaction endpoints (REST API v2)
 - BigCommerce's v2 order and store paths and v3 catalog, inventory, customer, refund and price list paths
@@ -424,7 +426,7 @@ A request for a path or method the docs don't list throws `UndocumentedRequestEr
 - Xero's Accounting API endpoints with its token refresh
 - Yext's Management API v2 location and review lists, enforcing the API key header, the version date, the account, the app's access, page sizes, update-date ranges and page tokens tied to their query
 
-Where a vendor has a free sandbox (Affirm, Authorize.net, Avalara AvaTax, BigCommerce, Calendly, Clover, Custom forms, eBay, GIA Report Results, Gmail, Google Ads, Google Analytics 4, Google Workspace and Drive, Gusto, HubSpot, Klaviyo, Mailchimp, Meta Ads, Monday.com, Pinterest, Plaid, QuickBooks Online, Slack, Square, TikTok, Trello, Wix, WooCommerce, Xero and Yext so far), its mock is a stand-in until a developer account is set up for the nightly run.
+Where a vendor has a free sandbox (Affirm, Amazon (Selling Partner API), Asana, Authorize.net, Avalara AvaTax, BigCommerce, Calendly, Clover, Custom forms, eBay, GIA Report Results, Gmail, Google Ads, Google Analytics 4, Google Workspace and Drive, Gusto, HubSpot, Klaviyo, Mailchimp, Meta Ads, Monday.com, Pinterest, Plaid, QuickBooks Online, Slack, Square, TikTok, Trello, Wix, WooCommerce, Xero and Yext so far), its mock is a stand-in until a developer account is set up for the nightly run.
 
 <!-- registry:mocks:end -->
 
@@ -513,6 +515,66 @@ Canadian accounts are on Affirm's global hosts (`api.global.affirm.com`), which 
 **Webhooks.** Affirm sets webhooks up itself, on request through its support widget; the events its docs describe are about checkouts and prequalification, and a failed delivery isn't resent. `verifyAffirmWebhook` checks the `Affirm-Signature` header (the docs also call it `X-Affirm-Signature`): `t=<timestamp>` and one or more `v0=<hex>` signatures, each the HMAC-SHA512 of `<timestamp>.<raw body>` keyed with the signing secret, compared in constant time. Only `v0` counts, so a downgrade is refused, and a timestamp more than five minutes off is refused as stale, so an old delivery can't be replayed. A delivery is a prompt to sync, never data; the instance doesn't take webhooks yet, and the scheduled sync picks every change up. The docs don't say whether the timestamp is in seconds; the check assumes Unix seconds, as Stripe's scheme does, until a live delivery shows otherwise.
 
 **Testing.** The tests run against a mock built from Affirm's docs (`packages/testkit/src/mocks/affirm.ts`), which answers the sandbox or production host only, checks the key pair, refuses parameters the docs don't list, pages each list as its page describes, and throws for any POST. Its assumptions (the list order, `next_page`'s shape, date formats the docs leave out) are listed in the mock and checked on the first sandbox run. For the nightly run, take the sandbox key pair from sandbox.affirm.com/dashboard/apikeys (an Affirm merchant account comes with sandbox access) and the Merchant ID from Affirm support, and add them as the `SANDBOX_AFFIRM_PUBLIC_API_KEY`, `SANDBOX_AFFIRM_PRIVATE_API_KEY` and `SANDBOX_AFFIRM_MERCHANT_ID` GitHub Actions secrets.
+
+### Amazon (Selling Partner API)
+
+Reads the store's Amazon seller account in one marketplace through the Selling Partner API (SP-API): its orders (Orders API v2026-01-01), the transactions Amazon posts to the account, such as sales, fees, refunds and transfers (Finances API v2024-06-19), and the stock in Amazon's warehouses (FBA Inventory API v1). Read-only by request: its only SP-API requests are three GETs with parameters it builds and checks itself, and its only other request is the Login with Amazon (LWA) token refresh. It never asks for the buyer or the shipping address.
+
+| Setting | What it is |
+| --- | --- |
+| `AMAZON_SP_CLIENT_ID` | The LWA client id of a private SP-API app in the seller's own Seller Central account |
+| `AMAZON_SP_CLIENT_SECRET` | The same app's LWA client secret, which Amazon asks to be rotated every 180 days |
+| `AMAZON_SP_REFRESH_TOKEN` | The refresh token from authorizing the app (self-authorization) |
+| `AMAZON_SP_MARKETPLACE_ID` | The marketplace to read; `ATVPDKIKX0DER` (Amazon.com) when unset |
+| `AMAZON_SP_REGION` | `na` (default), `eu` or `fe`, the region the marketplace belongs to |
+| `AMAZON_SP_ENVIRONMENT` | `production` (default) or `sandbox` |
+
+**Setting it up.** In Seller Central, under Apps and Services, open Develop Apps and add a private SP-API app with only the Finance and Accounting role (orders and transactions) and the Amazon Fulfillment role (warehouse stock). Authorize it for the store's own account, generate a refresh token, and put the three credentials in the host's secret store. AWS request signing is no longer needed, so there is no AWS account to set up.
+
+**What it reads.** Each pass reads, in turn, the orders Amazon last updated in a range of time, 100 a page, with their totals and fulfillment status; the transactions Amazon posted in the same range, in steps of up to 179 days because Amazon answers nothing for a range wider than 180; and every SKU's stock in Amazon's warehouses as it stands now. The range is the last two years on the first import, and on each sync after, the time since the last pass ended, starting two days early because Amazon can post a transaction up to two days late. Each range ends five minutes before the pass starts, since Amazon turns away a range ending less than two minutes before the request.
+
+**Events.** `order.updated` for each order, with its status, who fulfils it (Amazon or the seller), its marketplace, its total and how many lines and units it holds, keyed by when Amazon last updated it. `sale.completed` for each order Amazon has taken payment for (unshipped, partly shipped or shipped) whose lines all have a SKU, a quantity and a price, keyed by order so a later update never counts the sale twice. `marketplace.transaction_posted` for each transaction, with its type, status, amount, top-level breakdown and the order it belongs to; a deferred transaction that is later released is a new version. `inventory.counted` for each SKU, counting the units ready to ship, with what is inbound, reserved and unsellable. Amounts are whole cents parsed from Amazon's decimals without floating point.
+
+**Privacy.** The client asks only for each order's totals and fulfillment status, never the buyer, the recipient, the address or the payment. If Amazon sent any of them anyway, none is kept.
+
+**Rate limits.** Amazon's order search allows one request every three minutes after a burst of 20, transactions one every two seconds after a burst of 10, and stock two a second. The client sends one request at a time and waits out a 429, a 500 or a 503, doubling from a second, three tries, before the error goes to the sync runner, which resumes from its checkpoint next time. An order page token lasts 24 hours; a stock page token lasts 30 seconds, so a stock step that was cut off starts again from its first page, and its unchanged counts are duplicates. An access token that has expired is renewed once; a second 403 means the app lacks a role.
+
+**Webhooks.** Amazon sends notifications through AWS queues (SQS and EventBridge), not signed HTTP webhooks, so there is no webhook to verify. Incremental syncs pick up changes instead.
+
+**Writes.** Changing a merchant-fulfilled listing's quantity and changing a listing's price are declared so they can be gated and audited, and are turned off. Each needs a named person's approval, and the client has no request to send either.
+
+**Not yet read.** Listings, customer returns and settlement reports come from Amazon's asynchronous Reports API and are a follow-up.
+
+**Testing.** The tests run against a mock built from Amazon's docs (`packages/testkit/src/mocks/amazon.ts`), which checks the LWA refresh, the access token header, the user-agent, the app's roles, date ranges and their two-minute rule, the 180-day transaction limit, page sizes, page tokens tied to their query, and the 30-second life of a stock token. For the nightly run, add a private app's sandbox credentials as the GitHub Actions secrets `SANDBOX_AMAZON_SP_CLIENT_ID`, `SANDBOX_AMAZON_SP_CLIENT_SECRET` and `SANDBOX_AMAZON_SP_REFRESH_TOKEN`.
+
+### Asana
+
+Reads Asana's REST API (`https://app.asana.com/api/1.0`) with an access token: the workspaces the token's user belongs to, each workspace's projects (archived ones too) with their sections, each project's tasks, and the comments on each task read.
+
+| Setting | What it is |
+| --- | --- |
+| `ASANA_ACCESS_TOKEN` | A personal access token made by a user who sees only the projects to sync, or an OAuth app's token limited to read scopes |
+| `ASANA_WORKSPACE_GID` | Optional. The one workspace to read; unset reads every workspace the user belongs to |
+
+**Read-only.** The client sends only five GETs: `/users/me`, `/projects`, `/projects/{gid}/sections`, `/tasks` and `/tasks/{gid}/stories`, with parameters it builds itself. Ids and page offsets are checked before they go into a request, and the next page is asked for by its `offset`, never by following the `next_page` URI, so a reply can't send the token to another host. A personal access token can do anything its user can and can't be limited, so make it as a user added only to the projects to sync. Creating a task and commenting on one are declared behind the write gate, and the test shows each one is stopped.
+
+**What it reads.** Every request names its fields with `opt_fields`, and none of them is a task's name or notes, a comment's text or a custom field's text. The first import reads tasks changed in the last five years, 100 a page. Each later sync asks only for tasks changed since the last pass started, less five minutes of overlap (`modified_since`). Each batch's checkpoint records the workspace, the project and the page offset it got to, so a resumed sync carries on. Asana's offsets expire; a resumed list whose offset Asana turns down is read again from its start, once, and what was already stored is a duplicate. A project deleted part way through a pass is skipped. A 429 is waited out for `Retry-After` seconds, up to a minute, three times, then left to `runSync`, which retries from the checkpoint. A 401 stops the sync saying the token was turned down; a 402 says the read needs a paid plan.
+
+Asana doesn't count a new comment as a change to its task, so a comment on a task that otherwise didn't change is read with the task's next change. Subtasks aren't listed in a project unless they were added to it, so they aren't read.
+
+**Events.** The same vendor-neutral work-tracking events monday.com sends, so a department reads both the same way.
+
+| Event | From | Key |
+| --- | --- | --- |
+| `work.board_updated` | A project: its name, whether it's archived, start and due days, owner and team as `asana:user:<gid>` and `asana:team:<gid>`, its custom fields as columns and its sections as groups | project and `modified_at` |
+| `work.item_updated` | A task: its project and section, kind (task, milestone or approval), whether it's done and when, created and modified times, start and due days and due time, assignee, parent task, and its custom field values | task and `modified_at` |
+| `work.comment_updated` | A comment on a task: who wrote it and when | story and `created_at` |
+
+Custom fields are kept only for types that hold no free text: number, single select and multi select (their option labels), date and people (as user ids). Text fields aren't asked for. Stories that aren't comments, such as a task being moved, are dropped. A record whose time doesn't read is dead-lettered.
+
+**Webhooks.** None yet. The scheduled sync polls.
+
+**Testing.** The tests run against a mock built from Asana's API reference (`packages/testkit/src/mocks/asana.ts`). Like Asana, it returns only the fields `opt_fields` names, so the tests show a task's name and notes never come back. It answers 401 for the wrong token, filters tasks by project and `modified_since`, pages with `offset`, and can answer 429 with `Retry-After` and 400 for an expired offset. Its assumptions are listed in the mock and checked on the first sandbox run. For the nightly run, make a free Asana workspace for testing only, add a project or two of synthetic tasks, make a personal access token as a user who belongs only to that workspace, and add it as the `SANDBOX_ASANA_ACCESS_TOKEN` GitHub Actions secret.
 
 ### Authorize.net
 
@@ -1673,6 +1735,66 @@ An invoice is recorded again when its status, tracking or anything else read cha
 **Writes.** Declared and turned off: submitting an order to Stuller.
 
 **Testing.** The tests run against a mock built from Stuller's API help pages (`packages/testkit/src/mocks/stuller.ts`), which answers synthetic invoices and rates and turns down a wrong login. It is checked live once a developer login is connected.
+
+### Supplier invoices and memos
+
+Reads the invoices and memos a store or workshop gets from its suppliers, as CSV exports, one folder per supplier. Each line becomes the document, the item, its quantity and cost, and whether it is a natural or lab-grown diamond, with what the document says about where its diamonds came from. Memo lines also go to the memo reminder, so goods on memo are paid for or sent back on time.
+
+| Setting | What it is |
+| --- | --- |
+| `SUPPLIER_INVOICES_IMPORT_DIR` | The folder of exports, outside any git repo. Inside it, one subfolder per supplier, named in lowercase letters, digits and underscores, such as `test_supplier`. Other folders are skipped |
+| `SUPPLIER_INVOICES_PROFILES` | Optional. `generic`, or the path to a JSON file in the client's private instance repo mapping supplier folders to parsing profiles or `"generic"`, with `"*"` for the rest |
+
+**Parsing profiles.** A profile names the document number and date columns, and a line amount or unit cost column. It can also name the document type, item (`sku`), description, stone, quantity, due date, terms and statement columns, the delimiter and the date order.
+
+The generic profile reads:
+
+- Invoice (or Invoice Number, Invoice No, Invoice #, Memo, Memo Number, Memo No, Memo #, Document, Document Number, Doc #)
+- Date (or Invoice Date, Memo Date, Document Date)
+- Type (or Document Type, Doc Type, Transaction Type)
+- SKU (or Style, Style #, Style Number, Item #, Item Number, Stock #, Stock Number), Description (or Item Description, Details) and Stone (or Stone Type, Center Stone, Gem)
+- Qty (or Quantity, Pcs, Pieces, Units)
+- Unit Price (or Unit Cost, Price, Cost, Price Each) and Amount (or Extended, Ext Price, Extended Price, Line Total, Total)
+- Due Back (or Return By, Memo Due, Memo Due Date, Due Date) and Terms (or Memo Terms, Payment Terms)
+- Statement (or Warranty, Warranty Statement, Notes, Remarks, Comments)
+
+**Values.**
+
+- **Type** reads Memo, Memorandum, Consignment, Consigned or On Memo as a memo, and Invoice, Inv, Sale, Sales Invoice, Bill or Purchase as an invoice. Anything else, such as a credit note, is dead-lettered. Without a type column, a file whose name says memo or consignment holds memos, and any other holds invoices.
+- **Money** is in cents. A line without an amount is its quantity (1 when there is no quantity column) times its unit cost.
+- **Due dates** come from the due column. Without one, terms such as "Net 30", "30 days" or "30 day memo" count that many days from the document's date. For a memo it is the date the goods go back by; for an invoice, the date it is due.
+- **Diamonds.** A line whose stone or description says diamond is a natural diamond, unless it also says lab-grown, lab-created, laboratory-grown, LGD, synthetic, man-made, CVD, HPHT or cultured. "Diamond-cut", "diamond-shaped" and similar metal finishes, and simulated or imitation diamonds, are not diamonds.
+
+**Statements.** Each document's text is searched for the World Diamond Council's System of Warranties statement. The current wording reads: "The diamonds herein invoiced have been purchased from legitimate sources not involved in funding conflict, in compliance with United Nations Resolutions and corresponding national laws. The seller hereby guarantees that these diamonds are conflict free and confirms adherence to the WDC SoW Guidelines." A document carries it when its text has "not involved in funding conflict", "guarantees that these diamonds are conflict free", "System of Warranties" or "WDC SoW". It is `current` when it names the WDC SoW Guidelines, and `earlier` otherwise. The text is every cell of the document's rows. When a file holds one document, it also includes the lines above the header and rows without a document number, where a printed statement usually sits. `kimberleyProcess` says whether the text names the Kimberley Process.
+
+**What it reads.** Each CSV in a supplier's folder, in name order, suppliers in name order. Title lines above the header are skipped: the header is the first line with the document number, the date and a money column. A row with a document number and an item, unit cost or amount is a line. A row with only words, such as a statement printed under the lines, counts toward its document's text. Documents older than six years are skipped. The checkpoint and resume work as for bank statements: a file is read again only when its content changes.
+
+**Events.** Each line becomes `supplier_invoice.line_imported`. The payload has:
+
+- `lineId`, which is `supplier:<supplier>:<type>:<number>:<n>`, where `n` counts the document's earlier lines in the same file
+- `supplier`, `documentType`, `documentNumber` and `documentDate`
+- `sku`, `description`, `stone`, `quantity`, `unitCostCents`, `amountCents`, `due` and `terms`, when the line has them
+- `diamond` (`natural`, `lab_grown` or `none`), `warrantyStatement` (`current`, `earlier` or `none`) and `kimberleyProcess`
+- `currency` and `sourceRow`
+
+A memo line with an item, an amount above zero and a due date also becomes `memo.received`, with the memo id `<supplier>/<number>/<n + 1>`, since memo numbers repeat between suppliers.
+
+The key adds a hash of what the line says, so the same line in two exports is stored once, and a corrected document is stored as its newer version. A line whose date, type or amount can't be read is keyed by where it is and dead-lettered with it kept.
+
+**Checks.**
+
+- The buying department's memo reminder follows each memo line from 14 days before it is due back. It says whether the item has sold, so the memo is paid for or the goods go back.
+- The compliance department checks each invoice and memo from the last 90 days that lists a natural diamond. When no System of Warranties statement was found anywhere on the document, it suggests asking the supplier for a copy that carries it. It is a reminder, not legal advice. A statement printed only on a paper or PDF copy isn't in the CSV, so the reminder says no statement was found, not that none exists.
+
+**Not yet read.** PDF invoices and memos, and memo returns and purchases (`memo.settled`), are a follow-up.
+
+**Testing.** Synthetic exports only:
+
+- an invoice export with a title block, a statement printed under the lines, natural, lab-grown and diamond-cut lines, and unreadable rows
+- a memo export with terms instead of due dates and two documents in one file
+- an overlapping corrected export
+
+Invoices and memos are the client's business records and never go in a repo.
 
 ### TikTok
 

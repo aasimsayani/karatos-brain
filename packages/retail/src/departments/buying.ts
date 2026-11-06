@@ -18,6 +18,26 @@ const PurchaseOrderCreated = z.object({
   totalCents: z.number().int().nonnegative(),
 });
 const PurchaseOrderReceived = z.object({ poId: z.string().min(1) });
+/** A line of a supplier's invoice or memo, with what its document says about where its diamonds came from. */
+const SupplierLineImported = z.object({
+  lineId: z.string().min(1),
+  supplier: z.string().min(1),
+  documentType: z.enum(["invoice", "memo"]),
+  documentNumber: z.string().min(1),
+  documentDate: z.iso.date(),
+  sku: z.string().min(1).optional(),
+  description: z.string().min(1).optional(),
+  stone: z.string().min(1).optional(),
+  quantity: z.number().int().positive().optional(),
+  unitCostCents: z.number().int().nonnegative().optional(),
+  amountCents: z.number().int(),
+  due: z.iso.date().optional(),
+  terms: z.string().min(1).optional(),
+  diamond: z.enum(["natural", "lab_grown", "none"]),
+  warrantyStatement: z.enum(["current", "earlier", "none"]),
+  kimberleyProcess: z.boolean(),
+  currency: z.string().regex(/^[A-Z]{3}$/),
+});
 /** A dealer's offer seen in the trade's WhatsApp groups, such as through TheWatchSearch. Dealers are keyed hashes; the group is the name the store gave its export. */
 const WatchOfferSeen = z
   .object({
@@ -66,6 +86,7 @@ export const buying: DepartmentModule = {
     "memo.settled": MemoSettled,
     "purchase_order.created": PurchaseOrderCreated,
     "purchase_order.received": PurchaseOrderReceived,
+    "supplier_invoice.line_imported": SupplierLineImported,
     "watch_market.offer_seen": WatchOfferSeen,
   },
   normalizers: [],
@@ -87,6 +108,10 @@ export const buying: DepartmentModule = {
         case "purchase_order.received": {
           const p = PurchaseOrderReceived.parse(event.payload);
           return [signalFrom(event, "po.received", { kind: "purchase_order", id: p.poId }, { ...p })];
+        }
+        case "supplier_invoice.line_imported": {
+          const p = SupplierLineImported.parse(event.payload);
+          return [signalFrom(event, "supplier.line", { kind: "supplier_line", id: p.lineId }, { ...p })];
         }
         case "watch_market.offer_seen": {
           const p = WatchOfferSeen.parse(event.payload);
