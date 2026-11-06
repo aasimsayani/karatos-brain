@@ -26,6 +26,9 @@ export const SHOPIFY_WRITES: WriteAction[] = [
   { integration: "shopify", name: "tag_customer", description: "Add tags to a customer" },
   { integration: "shopify", name: "tag_order", description: "Add tags to an order" },
   { integration: "shopify", name: "create_draft_order", description: "Create a draft order for a customer to pay" },
+  // Both change what a customer pays, so each needs a named person's approval and is capped low.
+  { integration: "shopify", name: "set_variant_price", description: "Change a variant's price, such as after a move in the metal price", kind: "update", approval: "each", dailyCap: 10 },
+  { integration: "shopify", name: "create_discount_code", description: "Create a single-use discount code for one customer", kind: "append", approval: "each", dailyCap: 10 },
 ];
 
 const money = "shopMoney { amount currencyCode }";
