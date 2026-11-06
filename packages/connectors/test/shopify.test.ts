@@ -1,6 +1,6 @@
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { BrainPipeline, InMemoryStore, runSync, type SourceBatch } from "@karatos/core";
+import { BrainPipeline, InMemoryStore, dailyWriteCap, requiredApproval, runSync, type SourceBatch } from "@karatos/core";
 import { RETAIL_DEPARTMENTS, combineDepartments } from "@karatos/retail";
 import {
   TEST_ORG,
@@ -16,6 +16,7 @@ import {
 } from "@karatos/connector-testkit";
 import {
   SHOPIFY_DEFAULT_API_VERSION,
+  SHOPIFY_WRITES,
   ShopifyApiError,
   ShopifyConfigError,
   customerEvents,
@@ -265,7 +266,18 @@ describe("Shopify connector against recorded responses", () => {
       ["tag_customer", "refused"],
       ["tag_order", "refused"],
       ["create_draft_order", "refused"],
+      ["set_variant_price", "refused"],
+      ["create_discount_code", "refused"],
     ]);
+  });
+
+  it("asks a named person to approve each price change and discount code, and caps them low", () => {
+    const pricing = SHOPIFY_WRITES.filter((w) => w.name === "set_variant_price" || w.name === "create_discount_code");
+    expect(pricing.map((w) => [w.name, w.kind, w.approval, w.dailyCap])).toEqual([
+      ["set_variant_price", "update", "each", 10],
+      ["create_discount_code", "append", "each", 10],
+    ]);
+    for (const w of pricing) expect([requiredApproval(w, "none"), dailyWriteCap(w)]).toEqual(["each", 10]);
   });
 });
 
