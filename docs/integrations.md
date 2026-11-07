@@ -305,7 +305,7 @@ Used by: R is retail, W is wholesale, M is manufacturing. Test with says how we 
 | Asana | R, W, M | Public API | Free sandbox | No | Built (Read-only: the client sends only its five listed GETs and names every field it reads. A personal access token can do whatever its user can, so make it as a user with access to only the projects to sync, or use an OAuth app limited to read scopes. No webhooks yet; the sync polls) |
 | Trello | R, W, M | Public API | Free sandbox | No | Built (Read-only: a token authorized with scope=read, which the connector checks before every sync, turning away one that can write. The client sends only its six listed GETs and never asks for card names or descriptions. No webhooks yet; the sync polls) |
 | Airtable | R, W, M | Public API | Free sandbox | No | Built (Read-only: the client sends only its four listed GETs and names every field it reads. It stops if an OAuth token has a write scope; a personal access token's scopes aren't reported, so make it with data.records:read and schema.bases:read only. No webhooks yet; the sync polls) |
-| Notion | R, W, M | Public API | Free sandbox | Yes | Planned (Databases and pages used for job tracking, procedures and buying notes) |
+| Notion | R, W, M | Public API | Free sandbox | No | Built (Read-only: the client sends only a search, a data source read and a query, and names every property it reads. Notion's API can't report a connection's capabilities, so make the connection with Read content only. No webhooks yet; the sync polls) |
 | Verkada store traffic | R | Public API | Paid account | Yes | Planned (People counts from store cameras, to compare footfall with sales) |
 | ShopperTrak | R | Partner | Partner | No | Planned (Door counts from mall and street store traffic counters, to compare footfall with sales. Data access goes through Sensormatic) |
 | Reshyne | R, W | Partner | Partner | No | Planned (Cloud jewelry and watch repair management: work orders, status and vendor price lists. Partner only. Exhibited at JCK 2026) |
@@ -413,6 +413,7 @@ A request for a path or method the docs don't list throws `UndocumentedRequestEr
 - Meta's Marketing API ad account insights and `/me/permissions` (Graph API v26.0), enforcing the token, ads_read, the ad account, campaign level by day, the fields and cursors tied to their read
 - monday.com's GraphQL API: boards, items, activity logs and updates
 - Nivoda's GraphQL diamond search: sign-in, diamonds_by_query and get_diamond_by_id
+- Notion's search, retrieve data source and query data source endpoints (API version 2026-03-11)
 - Pinterest's API v5 Pin list, account analytics, top Pins and Pin creation with its OAuth refresh, enforcing the client credentials, each token's scopes, the 90-day analytics window, page sizes, metrics and bookmarks tied to their list
 - Plaid's accounts, transactions sync, Item and webhook verification key endpoints (API version 2020-09-14), with webhooks signed the way Plaid signs them
 - QuickBooks Online's query and change data capture endpoints with Intuit's token refresh (minor version 75)
@@ -427,7 +428,7 @@ A request for a path or method the docs don't list throws `UndocumentedRequestEr
 - Xero's Accounting API endpoints with its token refresh
 - Yext's Management API v2 location and review lists, enforcing the API key header, the version date, the account, the app's access, page sizes, update-date ranges and page tokens tied to their query
 
-Where a vendor has a free sandbox (Affirm, Airtable, Amazon (Selling Partner API), Asana, Authorize.net, Avalara AvaTax, BigCommerce, Calendly, Clover, Custom forms, eBay, GIA Report Results, Gmail, Google Ads, Google Analytics 4, Google Workspace and Drive, Gusto, HubSpot, Klaviyo, Mailchimp, Meta Ads, Monday.com, Pinterest, Plaid, QuickBooks Online, Slack, Square, TikTok, Trello, Wix, WooCommerce, Xero and Yext so far), its mock is a stand-in until a developer account is set up for the nightly run.
+Where a vendor has a free sandbox (Affirm, Airtable, Amazon (Selling Partner API), Asana, Authorize.net, Avalara AvaTax, BigCommerce, Calendly, Clover, Custom forms, eBay, GIA Report Results, Gmail, Google Ads, Google Analytics 4, Google Workspace and Drive, Gusto, HubSpot, Klaviyo, Mailchimp, Meta Ads, Monday.com, Notion, Pinterest, Plaid, QuickBooks Online, Slack, Square, TikTok, Trello, Wix, WooCommerce, Xero and Yext so far), its mock is a stand-in until a developer account is set up for the nightly run.
 
 <!-- registry:mocks:end -->
 
@@ -1402,6 +1403,34 @@ A listing's time is when KaratOS saw it, since Nivoda doesn't say when a diamond
 **Writes.** Declared and turned off: putting a diamond on hold and ordering one, which are Nivoda's Pro API mutations.
 
 **Testing.** The tests run against a mock built from Nivoda's API help pages (`packages/testkit/src/mocks/nivoda.ts`), which signs in, pages a search and expires tokens with synthetic diamonds. The fields past Nivoda's installation guide are listed as the mock's assumptions and checked on the first staging run.
+
+### Notion
+
+Reads Notion's API (`https://api.notion.com/v1`, version `2026-03-11`) with an internal connection's secret: the data sources (database tables) shared with the connection, or the ones `NOTION_DATA_SOURCE_IDS` names, each one's properties, and its pages.
+
+| Setting | What it is |
+| --- | --- |
+| `NOTION_ACCESS_TOKEN` | The secret of an internal connection with only the Read content capability and no user information, shared with only the databases to sync |
+| `NOTION_DATA_SOURCE_IDS` | Optional. The data sources to read, by id, separated by commas; unset reads every data source shared with the connection |
+
+**Read-only.** The client sends only three requests: `POST /search` for data sources, `GET /data_sources/{id}` and `POST /data_sources/{id}/query`. Search and query are POSTs in Notion's API, but both only read. Ids, page cursors and the edited-since time are checked before they go into a request, and the request bodies are built by the client. Notion's API can't report what a connection may do, so make it with the Read content capability only. Creating and changing a page are declared behind the write gate, and the test shows each one is stopped.
+
+**What it reads.** Notion returns every property of a page when a query names none, so every query names its properties by id with `filter_properties`, and a data source with no readable property is kept for its structure only. Any property that comes back unasked is dropped. The properties read are those whose values hold no free text: number, checkbox, date, select, multi-select and status (their option labels), created and last edited time, relation (as page ids), people (as user ids) and unique id. Title, text, email, phone, URL, files, formula, rollup, created and edited by, verification, button and place properties are never asked for, and a page's own address, which holds its title, isn't kept. A data source with more than 100 readable properties has its first 100 read.
+
+The first import reads pages edited in the last five years, 100 a page, oldest edit first. Each later sync asks only for pages edited since the last pass started, less five minutes of overlap. Each batch's checkpoint records the data source and the latest edit time read, so a resumed sync asks again from there, and pages already stored are duplicates; Notion's page cursors aren't kept. Notion stops one query at 10,000 pages, so the connector then asks again from the latest edit time read. A data source deleted or unshared part way through a pass is skipped, but one named in `NOTION_DATA_SOURCE_IDS` that isn't shared stops the sync saying so. A 429 is waited out for `Retry-After` seconds, up to a minute, three times, then left to `runSync`, which retries from the checkpoint. A 401 stops the sync saying the token was turned down; a 403 names the capability it needs. Notion doesn't report deleted pages to a query, so a deleted page is simply no longer read.
+
+**Events.** The same vendor-neutral work-tracking events monday.com, Asana, Trello and Airtable send, so a department reads them all the same way.
+
+| Event | From | Key |
+| --- | --- | --- |
+| `work.board_updated` | A data source: its name, its database as `notion:database:<id>`, whether it is in the trash, when it was made, and every property's id, type and name as columns, each marked with whether it is read | data source and a hash of what was read |
+| `work.item_updated` | A page: its data source, when it was made and last edited, and its read property values | page and a hash of what was read |
+
+Notion keeps edit times to the minute, so each version is keyed by a hash of what was read: a change is stored once and a replay is a duplicate. A record whose edit time doesn't read is dead-lettered.
+
+**Webhooks.** None yet. The scheduled sync polls.
+
+**Testing.** The tests run against a mock built from Notion's API reference (`packages/testkit/src/mocks/notion.ts`). Like Notion, it returns every property when none are named and only the named ones otherwise, so the tests show a title or text property never comes back. It answers 401 for the wrong token, 400 without the API version, 404 for a data source that isn't shared, applies the edited-since filter and sort, pages with `start_cursor`, stops a query at its result limit, and can answer 429. Its assumptions are listed in the mock and checked on the first sandbox run. For the nightly run, make a free Notion workspace for testing only, add a database or two of synthetic pages, make an internal connection with only Read content, share the databases with it, and add its secret as the `SANDBOX_NOTION_ACCESS_TOKEN` GitHub Actions secret.
 
 ### Pinterest
 

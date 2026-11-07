@@ -1,0 +1,1 @@
+- Notion connector (read-only): the data sources shared with a connection, each with its properties, and each page's number, checkbox, date, select, status, relation, people and unique id properties. It never asks Notion for titles, text, email, phone, URL, file, formula or rollup properties. Creating and changing a page are declared behind the write gate and turned down.
