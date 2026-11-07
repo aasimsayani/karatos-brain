@@ -32,7 +32,7 @@ export function notionId(value: unknown): string | undefined {
 
 /** A property id as Notion writes it (URL-encoded), decoded, or undefined when it doesn't read as one. */
 export function notionPropertyId(value: unknown): string | undefined {
-  if (typeof value !== "string" || value.length === 0 || value.length > 200) return undefined;
+  if (typeof value !== "string" || value.length > 200) return undefined;
   let decoded: string;
   try {
     decoded = decodeURIComponent(value);

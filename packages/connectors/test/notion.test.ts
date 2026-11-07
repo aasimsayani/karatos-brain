@@ -192,7 +192,7 @@ describe("notionTime, notionDay and the id readers", () => {
   it("decodes property ids, and turns down ones that don't read", () => {
     expect(notionPropertyId("title")).toBe("title");
     expect(notionPropertyId("f%5C%5C%3Ap")).toBe("f\\\\:p");
-    for (const bad of ["", "%E0%A4%A", "a b", "%0A", "x".repeat(101), "x".repeat(201), 5, null]) expect(notionPropertyId(bad), JSON.stringify(bad)).toBeUndefined();
+    for (const bad of ["", "%E0%A4%A", "a b", "%0A", "x".repeat(101), "x".repeat(201), "%41".repeat(67), 5, null]) expect(notionPropertyId(bad), JSON.stringify(bad)).toBeUndefined();
     expect(notionPropertyId("x".repeat(100))).toBe("x".repeat(100));
   });
 });
@@ -211,7 +211,7 @@ describe("notionSource and notionSafeProperties", () => {
     });
     expect(source).toEqual({ id: REPAIRS, name: "Repairs", databaseId: DB, inTrash: true, createdAt: "2025-01-01T00:00:00.000Z", updatedAt: "2026-10-30T10:00:00.000Z", properties: [{ id: "st%3Aa", name: "Status", type: "status" }, { id: "nn", name: "nn", type: "unknown" }] });
     expect(notionSource({ id: REPAIRS })).toEqual({ id: REPAIRS, name: `Data source ${REPAIRS}`, databaseId: undefined, inTrash: false, createdAt: undefined, updatedAt: undefined, properties: [] });
-    expect(notionSource({ id: REPAIRS, parent: { type: "page_id", page_id: DB } })!.databaseId).toBeUndefined();
+    expect(notionSource({ id: REPAIRS, parent: { type: "page_id", page_id: DB, database_id: DB } })!.databaseId).toBeUndefined();
     expect(notionSource({ id: REPAIRS, in_trash: "yes" })!.inTrash).toBe(false);
     expect(notionSource({ id: REPAIRS, title: [{ plain_text: "x".repeat(250) }], properties: { P: { id: "p", name: "y".repeat(150), type: "number" } } })).toMatchObject({ name: "x".repeat(200), properties: [{ name: "y".repeat(100) }] });
     expect(notionSource({ id: "not-an-id" })).toBeUndefined();
@@ -256,6 +256,7 @@ describe("notionPropertyValues", () => {
         { id: "c", name: "c", type: "checkbox" },
         { id: "d", name: "d", type: "date" },
         { id: "d2", name: "d2", type: "date" },
+        { id: "d3", name: "d3", type: "date" },
         { id: "s", name: "s", type: "select" },
         { id: "s2", name: "s2", type: "select" },
         { id: "m", name: "m", type: "multi_select" },
@@ -271,6 +272,7 @@ describe("notionPropertyValues", () => {
       c: { id: "c", type: "checkbox", checkbox: "true" },
       d: { id: "d", type: "date", date: { start: "2026-11-10T15:00:00.000+01:00", end: "2026-02-30" } },
       d2: { id: "d2", type: "date", date: null },
+      d3: { id: "d3", type: "date", date: { start: "2026-11-10", end: "2026-11-12" } },
       s: { id: "s", type: "select", select: null },
       s2: { id: "s2", type: "select", select: { id: "x".repeat(150), name: " y ".repeat(60) } },
       m: { id: "m", type: "multi_select", multi_select: [{ id: "m1", name: "" }, "Gold", null, { name: "Silver" }] },
@@ -286,6 +288,7 @@ describe("notionPropertyValues", () => {
       c: { type: "checkbox", checked: false },
       d: { type: "date", start: "2026-11-10T14:00:00.000Z", end: null },
       d2: { type: "date", start: null, end: null },
+      d3: { type: "date", start: "2026-11-10", end: "2026-11-12" },
       s: { type: "select", label: null, id: null },
       s2: { type: "select", label: " y ".repeat(60).trim().slice(0, 100), id: "x".repeat(100) },
       m: { type: "multi_select", labels: ["Silver"], ids: ["m1"] },
@@ -304,6 +307,8 @@ describe("notionPropertyValues", () => {
     expect(notionPropertyValues(repairsSource(), "nope")).toEqual({});
     expect(notionPropertyValues(repairsSource(), [{ id: "qt", type: "number", number: 1 }])).toEqual({});
     expect(notionPropertyValues(repairsSource(), { a: null, b: { type: "number" } })).toEqual({});
+    // Only a property whose id is the schema's own string matches it.
+    expect(notionPropertyValues(repairsSource(), { Quote: { id: ["qt"], type: "number", number: 1 } })).toEqual({});
   });
 });
 
@@ -803,6 +808,20 @@ describe("the Notion connector", () => {
     const out = await batches(c.historicalImport({ organizationId: TEST_ORG, cursor: null }));
     expect(sent.map((u) => u.pathname.replace("/v1", ""))).toEqual(["/search", `/data_sources/${NOTES}`, `/data_sources/${MEMOS}`, `/data_sources/${MEMOS}/query`]);
     expect(out.flatMap((b) => b.events).map((e) => String(e.payload.itemId ?? e.payload.boardId))).toEqual([notionRef("data_source", MEMOS), notionRef("page", PAGE.memo1)]);
+  });
+
+  it("checkpoints the latest edit read even when a page of results comes back out of order", async () => {
+    const source = { object: "data_source", id: MEMOS, properties: { C: { id: "ca", type: "number" } } };
+    const late = { object: "page", id: PAGE.memo2, last_edited_time: "2026-10-02T00:00:00.000Z", properties: {} };
+    const early = { object: "page", id: PAGE.memo1, last_edited_time: "2026-10-01T00:00:00.000Z", properties: {} };
+    const client = {
+      dataSources: async () => ({ data: [], next: null }),
+      dataSource: async () => source,
+      pages: async (_id: string, _p: readonly string[], _from: string, cursor?: string | null) => (cursor ? { data: [], next: null, complete: true } : { data: [late, early], next: "cursor-2", complete: true }),
+    };
+    const c = notionConnector({ token: TOKEN, now: () => NOW, client, dataSources: [MEMOS] });
+    const out = await batches(c.historicalImport({ organizationId: TEST_ORG, cursor: null }));
+    expect(parseNotionCursor(out[1]!.cursor!)!.from).toBe("2026-10-02T00:00:00.000Z");
   });
 
   it("keeps at most 1,000 data sources, so the checkpoint stays bounded", async () => {
