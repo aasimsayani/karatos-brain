@@ -355,5 +355,6 @@ export const CONNECTED_ON: Readonly<Record<string, string>> = {
   airtable: "2026-11-06",
   asana: "2026-11-03",
   notion: "2026-11-07",
+  docusign: "2026-11-08",
   gusto: "2026-10-30",
 };
