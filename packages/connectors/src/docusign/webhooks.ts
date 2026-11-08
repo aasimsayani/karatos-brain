@@ -29,7 +29,7 @@ export function docusignSignatures(header: (name: string) => string | null | und
   const out: string[] = [];
   for (let i = 1; i <= DOCUSIGN_MAX_HMAC_KEYS; i++) {
     const value = header(`x-docusign-signature-${i}`);
-    if (typeof value === "string") out.push(value);
+    if (value) out.push(value);
   }
   return out;
 }
@@ -69,6 +69,7 @@ export function docusignConnectEvents(body: unknown, accountId: string, ctx: Doc
   const generated = docusignTime(body.generatedDateTime);
   if (!generated || now.getTime() - Date.parse(generated) > DOCUSIGN_STALE_DELIVERY_MS) return [];
   const summary = data.envelopeSummary;
-  if (!isObject(summary) || docusignGuid(summary.envelopeId) === undefined || docusignGuid(summary.envelopeId) !== docusignGuid(data.envelopeId)) return [];
+  // An envelope whose id doesn't read is dropped by the normalizer.
+  if (!isObject(summary) || docusignGuid(summary.envelopeId) !== docusignGuid(data.envelopeId)) return [];
   return docusignEnvelopeEvents(summary, ctx);
 }

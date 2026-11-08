@@ -57,10 +57,10 @@ export class DocusignApiError extends Error {
  */
 export function docusignPrivateKey(value: string | undefined): KeyObject {
   const raw = value?.trim() ?? "";
-  const pem = raw.startsWith("-----BEGIN") ? raw.replace(/\\n/g, "\n") : /^[A-Za-z0-9+/=\s]{100,20000}$/.test(raw) ? Buffer.from(raw, "base64").toString("utf8") : "";
+  const pem = raw.startsWith("-----BEGIN") ? raw.replace(/\\n/g, "\n") : /^[A-Za-z0-9+/=\s]{1,20000}$/.test(raw) ? Buffer.from(raw, "base64").toString("utf8") : "";
   let key: KeyObject | undefined;
   try {
-    key = pem.startsWith("-----BEGIN") ? createPrivateKey(pem) : undefined;
+    key = createPrivateKey(pem);
   } catch {
     key = undefined;
   }
@@ -178,7 +178,7 @@ export function docusignClient(options: DocusignClientOptions): DocusignClient {
     const value = isObject(reply) ? reply.access_token : undefined;
     const life = isObject(reply) ? count(reply.expires_in) : undefined;
     if (typeof value !== "string" || !/^[A-Za-z0-9._~+/=-]{20,8192}$/.test(value)) throw new DocusignApiError("Docusign's sign-in answer has no access token", 200);
-    token = { value, until: now().getTime() + Math.max((life ?? 3600) * 1000 - TOKEN_MARGIN_MS, 0) };
+    token = { value, until: now().getTime() + (life ?? 3600) * 1000 - TOKEN_MARGIN_MS };
     return value;
   }
 

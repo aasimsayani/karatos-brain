@@ -210,6 +210,7 @@ describe("agreementKind", () => {
       ["Please sign: Consignment agreement", "consignment"],
       ["Consigned goods", "consignment"],
       ["Memo for 2 rings", "memo"],
+      ["Memorial Day bill of sale", "sale"],
       ["Memorandum agreement", "memo"],
       ["Appraisal for insurance", "appraisal"],
       ["Valuation", "appraisal"],
@@ -248,8 +249,8 @@ describe("docusignRecipients", () => {
   it("keeps each recipient's role, order, status and times, and only a keyed reference for their address", () => {
     const people = docusignRecipients(
       {
-        signers: [signer(1, "completed", { signedDateTime: ds("2026-11-01T10:00:00.000Z"), deliveredDateTime: ds("2026-10-31T10:00:00.000Z"), sentDateTime: ds("2026-10-30T10:00:00.000Z"), declinedReason: "Test Customer changed their mind", phoneNumber: "+1 212 555 0101" })],
-        inPersonSigners: [{ recipientId: 2, hostEmail: "staff@example.test", hostName: "Test Staff", signerName: synthetic.name(2), signerEmail: synthetic.email(2), status: "SIGNED", routingOrder: 1 }],
+        signers: [signer(1, "completed", { signerEmail: synthetic.email(8), signedDateTime: ds("2026-11-01T10:00:00.000Z"), deliveredDateTime: ds("2026-10-31T10:00:00.000Z"), sentDateTime: ds("2026-10-30T10:00:00.000Z"), declinedReason: "Test Customer changed their mind", phoneNumber: "+1 212 555 0101" })],
+        inPersonSigners: [{ recipientId: 2, email: "staff@example.test", hostEmail: "staff@example.test", hostName: "Test Staff", signerName: synthetic.name(2), signerEmail: synthetic.email(2), status: "SIGNED", routingOrder: 1 }],
         carbonCopies: [{ recipientId: "9", email: " Staff@Example.Test ", status: "completed", routingOrder: "2" }],
         witnesses: [{ recipientId: "../x", email: "not an address", status: "declined", declinedDateTime: ds("2026-11-02T10:00:00.000Z"), routingOrder: "-1" }],
         editors: "nope",
@@ -273,6 +274,7 @@ describe("docusignRecipients", () => {
     expect(docusignRecipients(null, KEY)).toEqual([]);
     expect(docusignRecipients([signer(1, "sent")], KEY)).toEqual([]);
     const [odd] = docusignRecipients({ notaries: [{ recipientId: 1.5, status: "teleported", routingOrder: "12345" }, null, "x"] }, KEY);
+    for (const order of ["1e3", " 1", "0x1", "1.0"]) expect(docusignRecipients({ signers: [{ routingOrder: order }] }, KEY)[0]!.routingOrder, order).toBeUndefined();
     expect(odd).toEqual({ role: "notary", recipientId: undefined, routingOrder: undefined, status: "unknown", sentAt: undefined, deliveredAt: undefined, signedAt: undefined, declinedAt: undefined, customerRefs: [] });
     expect(docusignRecipients({ signers: [{ recipientId: "x".repeat(101), routingOrder: 10_000 }, { recipientId: "x".repeat(100), routingOrder: 9999 }] }, KEY).map((r) => [r.recipientId, r.routingOrder])).toEqual([
       [undefined, undefined],
@@ -333,6 +335,8 @@ describe("the Docusign normalizer", () => {
     });
     const text = JSON.stringify(event);
     for (const word of ["Test Customer", "Test Staff", "@", "please sign", "Memo for"]) expect(text).not.toContain(word);
+    // A time a recipient doesn't have is left out, not written as empty.
+    expect(Object.keys((event!.payload.recipients as object[])[0]!)).toEqual(["role", "recipientId", "routingOrder", "status", "customerRefs"]);
   });
 
   it("keys each version by what was read, so a replay is a duplicate and a change is new", () => {
@@ -354,6 +358,7 @@ describe("the Docusign normalizer", () => {
     const base = envelope(E.memo, "Memo", "sent", "2026-10-20T10:00:00.000Z");
     expect(docusignEnvelopeEvents({ ...base, statusChangedDateTime: undefined }, ctx)[0]!.occurredAt).toBe("2026-10-20T10:00:00.000Z");
     expect(docusignEnvelopeEvents({ ...base, statusChangedDateTime: "x", lastModifiedDateTime: ds("2026-10-21T10:00:00.000Z") }, ctx)[0]!.occurredAt).toBe("2026-10-21T10:00:00.000Z");
+    expect(docusignEnvelopeEvents({ ...base, lastModifiedDateTime: ds("2026-10-22T10:00:00.000Z") }, ctx)[0]!.occurredAt).toBe("2026-10-20T10:00:00.000Z");
     const [dead] = docusignEnvelopeEvents({ ...base, statusChangedDateTime: "x", lastModifiedDateTime: undefined }, ctx);
     expect(dead!.occurredAt).toBeUndefined();
   });
@@ -384,7 +389,7 @@ describe("the Docusign client", () => {
 
   it("signs in with an RS256 JWT for signature impersonation only, and reads production by default", async () => {
     const { fetch, sent } = scripted([TOKEN_OK(), USERINFO("https://na3.docusign.net"), LIST([])]);
-    const { environment: _, ...prod } = clientOptions(fetch);
+    const { environment: _, ...prod } = clientOptions(fetch, { userId: ` ${USER.toUpperCase()} `, integrationKey: APP.toUpperCase() });
     await docusignClient(prod).envelopes({ from: SINCE, orderBy: "status_changed", start: 0 });
     expect(sent.map((s) => `${s.init.method} ${s.url.origin}${s.url.pathname}`)).toEqual(["POST https://account.docusign.com/oauth/token", "GET https://account.docusign.com/oauth/userinfo", `GET https://na3.docusign.net/restapi/v2.1/accounts/${ACCOUNT}/envelopes`]);
     const form = new URLSearchParams(String(sent[0]!.init.body));
@@ -605,6 +610,7 @@ describe("Docusign Connect", () => {
     const headers = new Headers({ "X-Docusign-Signature-1": "a", "x-docusign-signature-2": "b", "X-DocuSign-Signature-100": "c", "X-Docusign-Signature-101": "d", "X-Docusign-Signature-0": "e", "X-Docusign-Signature": "f" });
     expect(docusignSignatures((name) => headers.get(name))).toEqual(["a", "b", "c"]);
     expect(docusignSignatures(() => undefined)).toEqual([]);
+    expect(docusignSignatures(() => "")).toEqual([]);
     expect(DOCUSIGN_MAX_HMAC_KEYS).toBe(100);
   });
 
@@ -641,6 +647,7 @@ describe("Docusign Connect", () => {
     ];
     for (const body of none) expect(docusignConnectEvents(body, ACCOUNT, ctx, NOW), JSON.stringify(body)?.slice(0, 80)).toEqual([]);
     expect(docusignConnectEvents(delivery(), "not-an-id", ctx, NOW)).toEqual([]);
+    expect(docusignConnectEvents(delivery({}, { accountId: "x" }), "not-an-id", ctx, NOW)).toEqual([]);
     expect(DOCUSIGN_STALE_DELIVERY_MS).toBe(24 * 3_600_000);
   });
 
@@ -764,6 +771,7 @@ describe("the Docusign connector", () => {
     expect(new Set(ids(out)).size).toBe(400);
     expect(cursorOf(out, 0).seen).toEqual([env("b99")]);
     expect(cursorOf(out, 1).seen).toEqual(Array.from({ length: 49 }, (_, i) => env(`c${i}`)));
+    expect(cursorOf(out).seen).toEqual([]);
     expect(out.map((b) => cursorOf(out, out.indexOf(b))).map((x) => [x.phase, x.from, x.skip])).toEqual([
       ["changed", at(99), 0],
       ["changed", "2026-10-02T10:00:00.000Z", 0],
@@ -771,6 +779,25 @@ describe("the Docusign connector", () => {
       ["changed", "2026-10-02T10:00:00.000Z", 200],
       ["done", "2026-10-02T10:00:00.000Z", 0],
     ]);
+  });
+
+  it("sends an envelope read at the time it asks from again when it has changed since", async () => {
+    const first = Array.from({ length: 100 }, (_, i) => envelope(env(`a${i}`), "Memo", "completed", i === 99 ? "2026-10-02T10:00:00.000Z" : "2026-10-01T10:00:00.000Z"));
+    const changedAgain = { ...first[99]!, status: "voided", statusChangedDateTime: ds("2026-10-02T11:00:00.000Z") };
+    const pages = [first, [changedAgain, envelope(env("a100"), "Memo", "completed", "2026-10-03T10:00:00.000Z")]];
+    const client: DocusignClient = { envelopes: async () => ({ data: pages.shift() ?? [], total: 101 }) };
+    const c = docusignConnector({ integrationKey: APP, userId: USER, accountId: ACCOUNT, privateKey: PEM, customerKey: KEY, now: () => NOW, client });
+    const out = await batches(c.historicalImport({ organizationId: TEST_ORG, cursor: null }));
+    // Read already, but at another time now, so it is sent again.
+    expect(out[1]!.events.map((e) => e.payload.status)).toEqual(["voided", "completed"]);
+    const moved = Array.from({ length: 100 }, (_, i) => envelope(env(`d${i}`), "Memo", "completed", i === 99 ? "2026-10-02T10:00:00.000Z" : "2026-10-01T10:00:00.000Z"));
+    const later = { ...moved[0]!, statusChangedDateTime: ds("2026-10-02T10:00:00.000Z"), status: "voided" };
+    const pages2 = [moved, [later]];
+    const client2: DocusignClient = { envelopes: async () => ({ data: pages2.shift() ?? [], total: 101 }) };
+    const c2 = docusignConnector({ integrationKey: APP, userId: USER, accountId: ACCOUNT, privateKey: PEM, customerKey: KEY, now: () => NOW, client: client2 });
+    const out2 = await batches(c2.historicalImport({ organizationId: TEST_ORG, cursor: null }));
+    // An envelope read earlier at another time that changes to the time asked from is new.
+    expect(out2[1]!.events.map((e) => [e.payload.agreementId, e.payload.status])).toEqual([[`docusign:envelope:${env("d0")}`, "voided"]]);
   });
 
   it("ends the pass when Docusign's total is reached, even on a full page", async () => {
