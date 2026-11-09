@@ -106,6 +106,7 @@ These are built, tested against recorded vendor responses or mocks built from ea
 | Airtable | Imports five years of records from every base you share, such as memo logs, repair intake and custom orders, then keeps them current | Repairs, Custom orders, Buying, Inventory |
 | Notion | Imports five years of pages from every database you share, such as repairs, custom orders and buying, then keeps them current | Repairs, Custom orders, Buying |
 | Docusign | Imports five years of agreements sent for signature, such as consignment and memo agreements, then keeps them current | Appraisals, Wholesale, Compliance, Custom orders |
+| Dropbox | Imports the names, kinds, folders, sizes and edit times of the files in the folder you share, then keeps up with every change | Finance, Compliance, Custom orders |
 | TheWatchSearch (by TheWatchCloud) | Turns the dealer WhatsApp groups the store is in into a feed of offers: brand, reference, buy or sell, price, year, condition and set | Buying, Sales, Inventory |
 <!-- connected:end -->
 
@@ -149,7 +150,7 @@ This section updates itself as work lands: it is generated from [docs/milestones
 <!-- progress:start -->
 <!-- Generated from docs/milestones.json and the integration catalog by npm run progress:write. Edit those, not this block. -->
 
-**Overall: 68% complete**, 26 of 38 roadmap items done. 52 of the 253 systems in the integration catalog are connected.
+**Overall: 68% complete**, 26 of 38 roadmap items done. 53 of the 253 systems in the integration catalog are connected.
 
 | Milestone | What it gives a jeweler | Progress | Target |
 | --- | --- | --- | --- |

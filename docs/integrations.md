@@ -200,7 +200,7 @@ Used by: R is retail, W is wholesale, M is manufacturing. Test with says how we 
 | TikTok Ads | R | Public API | Free sandbox | No | Planned (Ad spend and results from TikTok's API for Business. No public API changelog found; the nightly sandbox run catches API changes) |
 | Yext | R | Public API | Free sandbox | No | Built (Connects with an API key of a Yext app the store owns, which should hold read access to Entities and Reviews only. Its only API requests are two GETs, the location list and the review list. Listing status and analytics are a follow-up. No public API changelog found; the docs watch follows the three doc pages the mock was built from) |
 | Docusign | R, W, M | Public API | Free sandbox | Yes | Built (Read-only by its client: Docusign has no read-only scope, so it signs in with JWT Grant as a user that can't send envelopes, and sends only the sign-in, the user's accounts and envelope reads. It never downloads a document. Connect deliveries are verified with the configuration's HMAC keys) |
-| Dropbox | R, W, M | Public API | Free sandbox | Yes | Planned (Files such as invoices, appraisals and design files. Dropbox publishes no API changelog; changes are announced on its developer blog) |
+| Dropbox | R, W, M | Public API | Free sandbox | Yes | Built (Read-only: every token is asked for account_info.read and files.metadata.read only (and files.content.read for file imports), and the client stops if Dropbox reports more. Webhooks only say an account changed, so a verified one prompts the incremental sync. Dropbox publishes no API changelog; changes are announced on its developer blog) |
 | Microsoft OneDrive and SharePoint files | R, W, M | Public API | Free sandbox | Yes | Planned (Files kept in OneDrive or SharePoint, read through Microsoft Graph, whose one changelog is watched through the Outlook entry) |
 | BLNG AI | R, M | Unknown | Unknown | No | Planned (Sketch-to-render jewelry design projects. No API found. Exhibited at JCK 2026) |
 | Amptive | R, W, M | Unknown | Unknown | No | Planned (Jewelry digital marketing agency: campaign results, website leads and ad reports. No API; start with the reports it sends. Exhibited at JCK 2026) |
@@ -400,6 +400,7 @@ A request for a path or method the docs don't list throws `UndocumentedRequestEr
 - Clover's REST API v3 read endpoints with its v2 OAuth token refresh, including its 90-day cap on orders, payments and refunds
 - Typeform's Create API (a form's definition) and Responses API
 - Docusign's JWT Grant sign-in, user info and envelope status changes (eSignature REST API v2.1)
+- Dropbox's token refresh, current account, folder listing and change feed, and download endpoints (API v2)
 - eBay's Fulfillment API getOrders and createShippingFulfillment (Sell APIs, v1) with its OAuth refresh, enforcing the client credentials, the scopes the seller agreed to, the order filter, limit and offset
 - GIA's Report Results API: getReport and getChangedReports
 - Gmail's message, label and history reads with Google's token refresh (API v1)
@@ -429,7 +430,7 @@ A request for a path or method the docs don't list throws `UndocumentedRequestEr
 - Xero's Accounting API endpoints with its token refresh
 - Yext's Management API v2 location and review lists, enforcing the API key header, the version date, the account, the app's access, page sizes, update-date ranges and page tokens tied to their query
 
-Where a vendor has a free sandbox (Affirm, Airtable, Amazon (Selling Partner API), Asana, Authorize.net, Avalara AvaTax, BigCommerce, Calendly, Clover, Custom forms, Docusign, eBay, GIA Report Results, Gmail, Google Ads, Google Analytics 4, Google Workspace and Drive, Gusto, HubSpot, Klaviyo, Mailchimp, Meta Ads, Monday.com, Notion, Pinterest, Plaid, QuickBooks Online, Slack, Square, TikTok, Trello, Wix, WooCommerce, Xero and Yext so far), its mock is a stand-in until a developer account is set up for the nightly run.
+Where a vendor has a free sandbox (Affirm, Airtable, Amazon (Selling Partner API), Asana, Authorize.net, Avalara AvaTax, BigCommerce, Calendly, Clover, Custom forms, Docusign, Dropbox, eBay, GIA Report Results, Gmail, Google Ads, Google Analytics 4, Google Workspace and Drive, Gusto, HubSpot, Klaviyo, Mailchimp, Meta Ads, Monday.com, Notion, Pinterest, Plaid, QuickBooks Online, Slack, Square, TikTok, Trello, Wix, WooCommerce, Xero and Yext so far), its mock is a stand-in until a developer account is set up for the nightly run.
 
 <!-- registry:mocks:end -->
 
@@ -922,6 +923,41 @@ Each version is keyed by a hash of what was read, so a change is stored once and
 **Webhooks.** Docusign Connect, in the JSON SIM format with the envelope summary and recipients included. `verifyDocusignConnect` checks the `X-Docusign-Signature-N` headers against the raw body with each of `DOCUSIGN_CONNECT_HMAC_KEYS`, in constant time, before the body is parsed. Docusign signs no timestamp, so a delivery generated more than a day ago, one for another account, or one whose summary doesn't match its envelope gives no events, and the event keys are the sync's own, so a replay stores nothing twice.
 
 **Testing.** The tests run against a mock built from Docusign's developer docs (`packages/testkit/src/mocks/docusign.ts`). Its sign-in checks the JWT's RS256 signature against the app's public key and its claims, including the scope, and answers `consent_required` until the user consents. Its envelope list filters by status change and status, sorts, pages with `start_position`, writes counts as strings and leaves the list out when nothing matches, as Docusign does, and can answer 429. Its assumptions are listed in the mock and checked on the first sandbox run. For the nightly run, make a free Docusign developer account, send a few envelopes of synthetic agreements to test addresses, set up the app and a Viewer user as above, consent once, and add the `SANDBOX_DOCUSIGN_INTEGRATION_KEY`, `SANDBOX_DOCUSIGN_USER_ID`, `SANDBOX_DOCUSIGN_ACCOUNT_ID` and `SANDBOX_DOCUSIGN_PRIVATE_KEY` GitHub Actions secrets.
+
+### Dropbox
+
+Reads Dropbox's API (v2) for one folder the store chooses, and everything below it: its files and folders, then every change, so a department can see a new statement, invoice, appraisal or design file land without anyone moving it. The store approves a KaratOS app once and the connector keeps a refresh token, so nobody signs in again.
+
+| Setting | What it is |
+| --- | --- |
+| `DROPBOX_APP_KEY` | The app key of the store's KaratOS app in the Dropbox App Console |
+| `DROPBOX_APP_SECRET` | The app's secret. It goes with each token refresh and checks webhook signatures |
+| `DROPBOX_REFRESH_TOKEN` | The refresh token from the account owner approving the app once with offline access |
+| `DROPBOX_FOLDER` | The folder to read, as the Dropbox website shows its path, such as `/Accounting`. Not the whole Dropbox |
+| `DROPBOX_FILE_NAMES` | Optional. `keep` (the default) keeps file and folder names; `drop` keeps only ids, kinds and times |
+
+**Connecting.** In the App Console, create a Scoped access app with Full Dropbox access named KaratOS, and in its Permissions tab tick only `files.metadata.read` and `files.content.read` (`account_info.read` is always on). Signed in as the account owner, open `https://www.dropbox.com/oauth2/authorize?client_id=<app key>&response_type=code&token_access_type=offline&scope=files.metadata.read%20files.content.read`, choose Allow, and exchange the code it shows once at `POST https://api.dropboxapi.com/oauth2/token` with `grant_type=authorization_code` and the app key and secret, on the host. Save the answer's `refresh_token` straight into the host's secret store.
+
+**Read-only.** Each token refresh asks Dropbox for `account_info.read` and `files.metadata.read` only (and `files.content.read` for file imports), so the token can't write whatever the app was given, and the client stops if Dropbox reports any other scope. It sends only the token refresh, `POST /2/users/get_current_account`, `POST /2/files/list_folder` and `POST /2/files/list_folder/continue`; Dropbox's RPC calls are POSTs, but these only read. File imports also send `POST /2/files/download`. Saving a report is declared behind the write gate, and the test shows it is stopped.
+
+**What it reads.** For each file: its id, name, kind (pdf, spreadsheet, document, presentation, image, design or file) and extension, its modified times, size, revision and content hash, and whether Dropbox can download it. For each folder: its id and name. Paths aren't kept, since folder names often name customers: each file and its folder get a reference made from a hash of the lowercased path, so a deletion, which Dropbox reports by path only, links to the file that was there. Sharing, links and who made a change are never kept, and `DROPBOX_FILE_NAMES=drop` leaves names out too.
+
+The historical import lists the folder and everything below it, 500 entries a page, keeping every folder and each file changed in the last five years. When the listing ends, its cursor becomes the change feed: each later sync asks only for what changed since, including edits, moves and deletions. The incremental sync keeps its own checkpoint, so its first run lists the folder once (what the import stored comes back as duplicates) and reads changes from then on. Each batch's checkpoint keeps Dropbox's cursor, so a resumed sync asks again from the page it was on. If Dropbox resets a cursor, the folder is listed again (at most three times a sync); a deletion in between can't be seen then. Every call names the account's root namespace in `Dropbox-API-Path-Root`, so in a team space the folder path is the one the website shows. A token lasts four hours and a new one is asked for five minutes before it ends; a 401 refreshes once. A 429 is waited out for `Retry-After` seconds, up to a minute, three times, then left to `runSync`.
+
+**Events.**
+
+| Event | From | Key |
+| --- | --- | --- |
+| `document.file_updated` | A file or folder: `dropbox:file:<id>`, its name, kind, path references and the details above | id and a hash of what was read |
+| `document.file_removed` | A deleted or moved-away path: its path reference, name and `reason: removed` | path and the page it was read on |
+
+These are the same events Google Drive gives. A file with no modified time that reads is dead-lettered. Folders and deletions carry no time of their own, so they take the time they were read.
+
+**File imports.** `dropboxFileSource` gives the file imports (bank and refiner statements, supplier invoices and the rest) the files directly in one Dropbox folder, read through a client that also asks for `files.content.read`. It skips subfolders and files Dropbox can't download, won't read a file over 25 MB, and checks each download against Dropbox's content hash. Pointing each import's settings at a Dropbox folder is the next step.
+
+**Webhooks.** Dropbox checks the webhook address with a GET carrying `?challenge=`, which `dropboxWebhookChallenge` echoes as plain text. Each notification's `X-Dropbox-Signature` is the hex HMAC-SHA256 of the raw body keyed with the app secret, checked by `verifyDropboxWebhook` in constant time before the body is parsed. A notification only lists the accounts with changes, so it carries no events: `webhookPromptsSync` says whether it names this account, and the incremental sync reads the change. A replay only prompts a sync that finds nothing new.
+
+**Testing.** The tests run against a mock built from Dropbox's HTTP documentation and OAuth guide (`packages/testkit/src/mocks/dropbox.ts`). Its token refresh checks the app's key, secret and refresh token and gives a token with only the scopes asked for, which must be among the app's own. Every change goes into a log, so a listing cursor carries on with exactly what changed after it, deletions included; it can reset cursors, revoke tokens and answer 429. Its assumptions are listed in the mock and checked on the first sandbox run. For the nightly run, make a free Dropbox Basic account with a `/KaratOS Test` folder of synthetic statements and invoices, a scoped test app as above, approve it once, and add the `SANDBOX_DROPBOX_APP_KEY`, `SANDBOX_DROPBOX_APP_SECRET` and `SANDBOX_DROPBOX_REFRESH_TOKEN` GitHub Actions secrets.
 
 ### eBay
 

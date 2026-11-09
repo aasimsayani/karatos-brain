@@ -11,6 +11,7 @@ import calendly from "./calendly.js";
 import clover from "./clover.js";
 import custom_forms from "./custom_forms.js";
 import docusign from "./docusign.js";
+import dropbox from "./dropbox.js";
 import ebay from "./ebay.js";
 import gia from "./gia.js";
 import gmail from "./gmail.js";
@@ -41,4 +42,4 @@ import xero from "./xero.js";
 import yext from "./yext.js";
 
 /** Every connector's nightly sandbox check. */
-export const SANDBOX_CHECKS: SandboxCheck[] = [affirm, airtable, amazon, asana, authorize_net, avalara, bigcommerce, calendly, clover, custom_forms, docusign, ebay, gia, gmail, google_ads, google_analytics, google_workspace, gusto, hubspot, klaviyo, mailchimp, meta_ads, metals_api, monday, notion, pinterest, plaid, quickbooks, shopify, slack, square, stripe, tiktok, trello, twilio, wix, woocommerce, xero, yext];
+export const SANDBOX_CHECKS: SandboxCheck[] = [affirm, airtable, amazon, asana, authorize_net, avalara, bigcommerce, calendly, clover, custom_forms, docusign, dropbox, ebay, gia, gmail, google_ads, google_analytics, google_workspace, gusto, hubspot, klaviyo, mailchimp, meta_ads, metals_api, monday, notion, pinterest, plaid, quickbooks, shopify, slack, square, stripe, tiktok, trello, twilio, wix, woocommerce, xero, yext];
