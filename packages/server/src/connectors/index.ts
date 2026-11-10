@@ -16,6 +16,7 @@ import docusign from "./docusign.js";
 import dropbox from "./dropbox.js";
 import ebay from "./ebay.js";
 import edi_x12 from "./edi_x12.js";
+import fedex from "./fedex.js";
 import fincen_8300 from "./fincen_8300.js";
 import gia from "./gia.js";
 import gmail from "./gmail.js";
@@ -57,4 +58,4 @@ import xero from "./xero.js";
 import yext from "./yext.js";
 
 /** How each built connector is made from an instance's settings, by catalog id. */
-export const FACTORIES: Readonly<Record<string, ConnectorFactory>> = { affirm, airtable, amazon, asana, authorize_net, avalara, bank_statements, bigcommerce, calendly, chase, clover, custom_forms, docusign, dropbox, ebay, edi_x12, fincen_8300, gia, gmail, google_ads, google_analytics, google_workspace, gusto, hubspot, idex, inventory_pos, klaviyo, mailchimp, meta_ads, metals_api, microsoft_onedrive, monday, nivoda, notion, pinterest, piro, plaid, quickbooks, rapnet, refiner_statements, shopify, slack, square, stripe, stuller, supplier_invoices, tiktok, trello, twilio, ups, watchsearch, wix, woocommerce, xero, yext };
+export const FACTORIES: Readonly<Record<string, ConnectorFactory>> = { affirm, airtable, amazon, asana, authorize_net, avalara, bank_statements, bigcommerce, calendly, chase, clover, custom_forms, docusign, dropbox, ebay, edi_x12, fedex, fincen_8300, gia, gmail, google_ads, google_analytics, google_workspace, gusto, hubspot, idex, inventory_pos, klaviyo, mailchimp, meta_ads, metals_api, microsoft_onedrive, monday, nivoda, notion, pinterest, piro, plaid, quickbooks, rapnet, refiner_statements, shopify, slack, square, stripe, stuller, supplier_invoices, tiktok, trello, twilio, ups, watchsearch, wix, woocommerce, xero, yext };

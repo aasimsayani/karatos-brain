@@ -274,7 +274,7 @@ Used by: R is retail, W is wholesale, M is manufacturing. Test with says how we 
 | BriteCo jewelry insurance | R | Partner | Partner | No | Planned (Appraisals and insurance offered at the point of sale; reached through POS partners today) |
 | Extend product protection | R | Partner | Partner | Yes | Planned (Protection plans sold online and the claims made on them; needs an Extend merchant account) |
 | ShipStation | R, W | Public API | Paid account | Yes | Planned (Shipments, labels, insured values and tracking across carriers. API access needs a Gold plan or above) |
-| FedEx | R, W, M | Public API | Free sandbox | Yes | Planned (Tracking, declared values and delivery exceptions; tracking webhooks need an enterprise shipping account) |
+| FedEx | R, W, M | Public API | Free sandbox | No | Built (Reads FedEx tracking for each number on the business's list until the package is delivered or returned, with FedEx's free Track API. FedEx's sandbox checks the sign-in and calls; the docs watch follows FedEx's announcements, and the nightly sandbox run catches API changes) |
 | UPS | R, W, M | Public API | Free sandbox | No | Built (Reads UPS tracking for each number on the business's list until the package is delivered or returned, with UPS's free Tracking API. UPS's test environment checks the sign-in and calls; the docs watch follows UPS's published API files, and the nightly sandbox run catches API changes) |
 | USPS | R, W, M | Public API | Free sandbox | Yes | Planned (Tracking for Registered Mail and other USPS parcels, with tracking event subscriptions. USPS publishes no changelog for its new APIs) |
 | NetSuite | W, M | Public API | Paid account | No | Planned (ERP for wholesalers and manufacturers: items, orders, purchase orders and the books. Release notes are published per release, so the nightly sandbox run catches API changes) |
@@ -402,6 +402,7 @@ A request for a path or method the docs don't list throws `UndocumentedRequestEr
 - Docusign's JWT Grant sign-in, user info and envelope status changes (eSignature REST API v2.1)
 - Dropbox's token refresh, current account, folder listing and change feed, and download endpoints (API v2)
 - eBay's Fulfillment API getOrders and createShippingFulfillment (Sell APIs, v1) with its OAuth refresh, enforcing the client credentials, the scopes the seller agreed to, the order filter, limit and offset
+- FedEx's OAuth client credentials token and Track API tracking-number call
 - GIA's Report Results API: getReport and getChangedReports
 - Gmail's message, label and history reads with Google's token refresh (API v1)
 - The Google Ads API's `googleAds:search` and `googleAds:mutate` (REST, v26) with Google's token refresh, enforcing the developer token, the adwords scope, the account and manager headers, GAQL fields and page tokens tied to their query
@@ -432,7 +433,7 @@ A request for a path or method the docs don't list throws `UndocumentedRequestEr
 - Xero's Accounting API endpoints with its token refresh
 - Yext's Management API v2 location and review lists, enforcing the API key header, the version date, the account, the app's access, page sizes, update-date ranges and page tokens tied to their query
 
-Where a vendor has a free sandbox (Affirm, Airtable, Amazon (Selling Partner API), Asana, Authorize.net, Avalara AvaTax, BigCommerce, Calendly, Clover, Custom forms, Docusign, Dropbox, eBay, GIA Report Results, Gmail, Google Ads, Google Analytics 4, Google Workspace and Drive, Gusto, HubSpot, Klaviyo, Mailchimp, Meta Ads, Microsoft OneDrive and SharePoint files, Monday.com, Notion, Pinterest, Plaid, QuickBooks Online, Slack, Square, TikTok, Trello, UPS, Wix, WooCommerce, Xero and Yext so far), its mock is a stand-in until a developer account is set up for the nightly run.
+Where a vendor has a free sandbox (Affirm, Airtable, Amazon (Selling Partner API), Asana, Authorize.net, Avalara AvaTax, BigCommerce, Calendly, Clover, Custom forms, Docusign, Dropbox, eBay, FedEx, GIA Report Results, Gmail, Google Ads, Google Analytics 4, Google Workspace and Drive, Gusto, HubSpot, Klaviyo, Mailchimp, Meta Ads, Microsoft OneDrive and SharePoint files, Monday.com, Notion, Pinterest, Plaid, QuickBooks Online, Slack, Square, TikTok, Trello, UPS, Wix, WooCommerce, Xero and Yext so far), its mock is a stand-in until a developer account is set up for the nightly run.
 
 <!-- registry:mocks:end -->
 
@@ -1018,6 +1019,28 @@ The key is the partner, the set, the document number and a hash of the document'
 **What it leaves out.** Names and addresses in N1 to N4 are never stored: a ship-to store or reporting location is kept as its code only. No department reasons over these events yet; they are stored for the wholesale views to come.
 
 **Testing.** The tests build synthetic interchanges in code, including other delimiters, several interchanges per file, every envelope error, and a broken document of each set.
+
+### FedEx tracking
+
+Follows the FedEx packages on the business's list, such as repairs going out to a setter, memo goods and customer orders, through FedEx's free Track API. It shows where each is, flags a delivery exception as soon as FedEx records one, and says which parcels needed a signature.
+
+| Setting | What it is |
+| --- | --- |
+| `FEDEX_CLIENT_ID` | The API key of a FedEx Developer Portal project with only the Track API chosen |
+| `FEDEX_CLIENT_SECRET` | That project's secret key |
+| `FEDEX_TRACKING_NUMBERS_FILE` | A text or CSV file of tracking numbers, one or more a line, split by spaces, commas or semicolons. Lines starting with `#` are skipped, and anything that isn't 12 to 34 digits or a door tag (DT and 12 digits) is left out |
+| `FEDEX_ENVIRONMENT` | Optional. `production` (the default) or `test`, FedEx's sandbox |
+| `FEDEX_MAX_TRACKING_PER_SYNC` | Optional. The most numbers one sync reads, 500 when unset |
+
+**What it reads.** It works the way UPS tracking does, with the same shared tracking logic: each sync reads every number on the list that isn't delivered or returned yet, oldest first, 25 to a checkpoint, and a number that never gets there is dropped 120 days after it was first read.
+
+The client signs in with the API key and secret (OAuth client credentials, sent as a form) and keeps the token until five minutes before it runs out. It calls `POST /track/v1/trackingnumbers` only, one number a call, with a fresh `x-customer-transaction-id` and no detailed scans. A 401 signs in again once; a 429 or 503 waits as Retry-After says, up to a minute, three times. A number FedEx has nothing for comes back as an error on its track result and is read again next sync.
+
+**Events.** `shipment.tracked`, as for UPS: status from FedEx's derived code (or its code), FedEx's code and text, latest scan time in UTC, the estimated delivery day, the delivered day, the service, whether a direct, adult or indirect signature was asked for, and the destination's state and country. Days are the local day FedEx wrote. Names, street addresses, postal codes, who received or signed, declared values and proof-of-delivery images are never kept.
+
+**Writes.** None. KaratOS never creates labels, pickups or returns, and doesn't make tracking subscriptions.
+
+**Testing.** FedEx's request and response schemas sit behind a page this project can't read, so the mock (`packages/testkit/src/mocks/fedex.ts`) is built from FedEx's public catalog page and public sample responses, and its assumptions list what the first live run must confirm: the token form, the status codes and the not-found error. The nightly sandbox run signs in at FedEx's sandbox and reads two of its test numbers once `SANDBOX_FEDEX_CLIENT_ID` and `SANDBOX_FEDEX_CLIENT_SECRET` are set.
 
 ### FinCEN Form 8300 cash reporting
 
