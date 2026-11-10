@@ -13,6 +13,7 @@ import custom_forms from "./custom_forms.js";
 import docusign from "./docusign.js";
 import dropbox from "./dropbox.js";
 import ebay from "./ebay.js";
+import fedex from "./fedex.js";
 import gia from "./gia.js";
 import gmail from "./gmail.js";
 import google_ads from "./google_ads.js";
@@ -44,4 +45,4 @@ import xero from "./xero.js";
 import yext from "./yext.js";
 
 /** Every connector's nightly sandbox check. */
-export const SANDBOX_CHECKS: SandboxCheck[] = [affirm, airtable, amazon, asana, authorize_net, avalara, bigcommerce, calendly, clover, custom_forms, docusign, dropbox, ebay, gia, gmail, google_ads, google_analytics, google_workspace, gusto, hubspot, klaviyo, mailchimp, meta_ads, metals_api, microsoft_onedrive, monday, notion, pinterest, plaid, quickbooks, shopify, slack, square, stripe, tiktok, trello, twilio, ups, wix, woocommerce, xero, yext];
+export const SANDBOX_CHECKS: SandboxCheck[] = [affirm, airtable, amazon, asana, authorize_net, avalara, bigcommerce, calendly, clover, custom_forms, docusign, dropbox, ebay, fedex, gia, gmail, google_ads, google_analytics, google_workspace, gusto, hubspot, klaviyo, mailchimp, meta_ads, metals_api, microsoft_onedrive, monday, notion, pinterest, plaid, quickbooks, shopify, slack, square, stripe, tiktok, trello, twilio, ups, wix, woocommerce, xero, yext];
