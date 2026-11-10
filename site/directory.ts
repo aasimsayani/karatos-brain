@@ -357,5 +357,6 @@ export const CONNECTED_ON: Readonly<Record<string, string>> = {
   notion: "2026-11-07",
   docusign: "2026-11-08",
   dropbox: "2026-11-09",
+  microsoft_onedrive: "2026-11-10",
   gusto: "2026-10-30",
 };

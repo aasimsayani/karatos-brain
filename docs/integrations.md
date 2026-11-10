@@ -201,7 +201,7 @@ Used by: R is retail, W is wholesale, M is manufacturing. Test with says how we 
 | Yext | R | Public API | Free sandbox | No | Built (Connects with an API key of a Yext app the store owns, which should hold read access to Entities and Reviews only. Its only API requests are two GETs, the location list and the review list. Listing status and analytics are a follow-up. No public API changelog found; the docs watch follows the three doc pages the mock was built from) |
 | Docusign | R, W, M | Public API | Free sandbox | Yes | Built (Read-only by its client: Docusign has no read-only scope, so it signs in with JWT Grant as a user that can't send envelopes, and sends only the sign-in, the user's accounts and envelope reads. It never downloads a document. Connect deliveries are verified with the configuration's HMAC keys) |
 | Dropbox | R, W, M | Public API | Free sandbox | Yes | Built (Read-only: every token is asked for account_info.read and files.metadata.read only (and files.content.read for file imports), and the client stops if Dropbox reports more. Webhooks only say an account changed, so a verified one prompts the incremental sync. Dropbox publishes no API changelog; changes are announced on its developer blog) |
-| Microsoft OneDrive and SharePoint files | R, W, M | Public API | Free sandbox | Yes | Planned (Files kept in OneDrive or SharePoint, read through Microsoft Graph, whose one changelog is watched through the Outlook entry) |
+| Microsoft OneDrive and SharePoint files | R, W, M | Public API | Free sandbox | Yes | Built (Read-only: the app is meant to have Sites.Selected with the read role on one site, and the client stops if its token carries any permission that isn't a read one. Graph's notifications only say the drive changed, so one carrying the subscription's clientState prompts the incremental sync. Graph's one changelog is watched through the Outlook entry) |
 | BLNG AI | R, M | Unknown | Unknown | No | Planned (Sketch-to-render jewelry design projects. No API found. Exhibited at JCK 2026) |
 | Amptive | R, W, M | Unknown | Unknown | No | Planned (Jewelry digital marketing agency: campaign results, website leads and ad reports. No API; start with the reports it sends. Exhibited at JCK 2026) |
 | Smart Age Solutions (SEO Genie, Smart Care app) | R | Unknown | Unknown | No | Planned (Jewelry web agency and Shopify apps, including care plan sales through its Smart Care app. No API found. Exhibited at JCK 2025) |
@@ -413,6 +413,7 @@ A request for a path or method the docs don't list throws `UndocumentedRequestEr
 - Klaviyo's mock covers its profile, list, segment, campaign, flow and metric reads and the campaign and flow values reports (revision 2026-10-15). Plaid's accounts, transactions sync, Item and webhook verification key endpoints (API version 2020-09-14), with webhooks signed the way Plaid signs them
 - Mailchimp's ping, audience, member, campaign and campaign report reads (Marketing API 3.0)
 - Meta's Marketing API ad account insights and `/me/permissions` (Graph API v26.0), enforcing the token, ads_read, the ad account, campaign level by day, the fields and cursors tied to their read
+- Microsoft's client credentials sign-in and Microsoft Graph's driveItem delta (v1.0)
 - monday.com's GraphQL API: boards, items, activity logs and updates
 - Nivoda's GraphQL diamond search: sign-in, diamonds_by_query and get_diamond_by_id
 - Notion's search, retrieve data source and query data source endpoints (API version 2026-03-11)
@@ -430,7 +431,7 @@ A request for a path or method the docs don't list throws `UndocumentedRequestEr
 - Xero's Accounting API endpoints with its token refresh
 - Yext's Management API v2 location and review lists, enforcing the API key header, the version date, the account, the app's access, page sizes, update-date ranges and page tokens tied to their query
 
-Where a vendor has a free sandbox (Affirm, Airtable, Amazon (Selling Partner API), Asana, Authorize.net, Avalara AvaTax, BigCommerce, Calendly, Clover, Custom forms, Docusign, Dropbox, eBay, GIA Report Results, Gmail, Google Ads, Google Analytics 4, Google Workspace and Drive, Gusto, HubSpot, Klaviyo, Mailchimp, Meta Ads, Monday.com, Notion, Pinterest, Plaid, QuickBooks Online, Slack, Square, TikTok, Trello, Wix, WooCommerce, Xero and Yext so far), its mock is a stand-in until a developer account is set up for the nightly run.
+Where a vendor has a free sandbox (Affirm, Airtable, Amazon (Selling Partner API), Asana, Authorize.net, Avalara AvaTax, BigCommerce, Calendly, Clover, Custom forms, Docusign, Dropbox, eBay, GIA Report Results, Gmail, Google Ads, Google Analytics 4, Google Workspace and Drive, Gusto, HubSpot, Klaviyo, Mailchimp, Meta Ads, Microsoft OneDrive and SharePoint files, Monday.com, Notion, Pinterest, Plaid, QuickBooks Online, Slack, Square, TikTok, Trello, Wix, WooCommerce, Xero and Yext so far), its mock is a stand-in until a developer account is set up for the nightly run.
 
 <!-- registry:mocks:end -->
 
@@ -1409,6 +1410,42 @@ Spot prices for gold, silver, platinum and palladium from [Metals-API](https://m
 **Read-only.** The client sends only GET requests with no body, to the latest and timeseries endpoints, for the four metal codes. Metals-API takes the key as the `access_key` query parameter, so request URLs are never put in errors, and an error message that repeats the key has it replaced with `[key]`. There is nothing to write back, and Metals-API has no webhooks.
 
 **Testing.** The tests use a stand-in for the API built from its documentation, with synthetic prices. For the nightly sandbox run, sign up for a free Metals-API account and add its key as the `SANDBOX_METALS_API_KEY` GitHub Actions secret. The run reads a week of history to stay within the free plan's allowance.
+
+### Microsoft OneDrive and SharePoint files
+
+Reads Microsoft Graph (v1.0) for one document library the store chooses, such as a SharePoint site's Documents: its files and folders, then every change, so a department can see a new statement, invoice, appraisal or design file land without anyone moving it. The connector signs in as its own app with a client secret, so nobody signs in again.
+
+| Setting | What it is |
+| --- | --- |
+| `MICROSOFT_TENANT_ID` | The directory (tenant) id of the store's Microsoft 365 organization |
+| `MICROSOFT_CLIENT_ID` | The application (client) id of the store's KaratOS app registration |
+| `MICROSOFT_CLIENT_SECRET` | A client secret of that app, sent only to Microsoft's sign-in |
+| `MICROSOFT_ONEDRIVE_DRIVE_ID` | The drive id of the library to read. It starts with `b!` |
+| `MICROSOFT_ONEDRIVE_FILE_NAMES` | Optional. `keep` (the default) keeps file and folder names; `drop` keeps only ids, kinds and times |
+| `MICROSOFT_GRAPH_CLIENT_STATE` | Optional. The clientState a change notification subscription was made with |
+
+**Connecting.** In the Microsoft Entra admin center, register an app named KaratOS (single tenant), remove `User.Read` from its API permissions, add the Microsoft Graph application permission `Sites.Selected` and grant admin consent. That permission alone reaches nothing: an admin then grants the app the `read` role on the one site that holds the library, in Graph Explorer, with `POST https://graph.microsoft.com/v1.0/sites/{site id}/permissions` and the body `{"roles":["read"],"grantedToIdentities":[{"application":{"id":"<client id>","displayName":"KaratOS"}}]}`. Find the site id with `GET /sites/{host}:/sites/{site}?$select=id` and the library's drive id with `GET /sites/{site id}/drives?$select=id,name`. Add a client secret in Certificates & secrets and save its value straight into the host's secret store.
+
+**Read-only.** The app is meant to hold `Sites.Selected` with the `read` role on one site, so it can't see the rest of the organization or change anything. Each sign-in is a client credentials grant for `https://graph.microsoft.com/.default`, and the client reads the token's `roles` claim: if it lists any permission other than `Sites.Selected`, `Lists.SelectedOperations.Selected`, `Files.SelectedOperations.Selected`, `Files.Read.All` or `Sites.Read.All`, the connector stops and says which. It sends only the sign-in and `GET /drives/{drive}/root/delta`. Graph's paging links are never fetched as given: the client reads the delta token out of each one, checks the link is this drive's delta on `graph.microsoft.com` and nothing else, and builds the next request itself. Saving a report and making a notification subscription are declared behind the write gate, and the test shows they are stopped.
+
+**What it reads.** Each request asks Graph for `id`, `name`, `size`, `file`, `folder`, `package`, `root`, `deleted`, `parentReference` and the created and modified times only, so who made or changed an item, its sharing and its links are never fetched. For each file: its id, name, kind (pdf, spreadsheet, document, presentation, image, design or file) and extension, MIME type, its folder's id, created and modified times, size and QuickXorHash. For each folder: its id, name and folder's id. Delta doesn't return paths, so items are tracked by id, and `MICROSOFT_ONEDRIVE_FILE_NAMES=drop` leaves names out too. The library's root isn't an event.
+
+The historical import reads the drive's delta from the start, which lists every folder and file, keeping every folder and each file changed in the last five years. Its last page's delta token becomes the change feed: each later sync asks only for what changed since, including edits, renames, moves and deletions. The incremental sync keeps its own checkpoint, so its first run lists the library once (what the import stored comes back as duplicates) and reads changes from then on. Each batch's checkpoint keeps Graph's token, so a resumed sync asks again from the page it was on. If Graph answers 410 Gone, the library is listed again (at most three times a sync); a deletion in between can't be seen then. A token lasts an hour and a new one is asked for five minutes before it ends; a 401 signs in again once. A 429 or 503 is waited out for `Retry-After` seconds, up to a minute, three times, then left to `runSync`. A 403 says to grant the app the read role, and a 404 to check the drive id.
+
+**Events.**
+
+| Event | From | Key |
+| --- | --- | --- |
+| `document.file_updated` | A file or folder: `onedrive:item:<id>`, its name, kind, folder and the details above | id and a hash of what was read |
+| `document.file_removed` | An item with Graph's `deleted` facet: its reference, name and `reason: removed` | id and the page it was read on |
+
+These are the same events Google Drive and Dropbox give. A file with no modified time that reads is dead-lettered. A folder with no modified time and deletions take the time they were read.
+
+**Notifications.** Graph checks a notification address with a POST carrying `?validationToken=`, which `microsoftWebhookValidation` echoes as plain text. Graph doesn't sign notifications: each one carries the `clientState` its subscription was made with, which `webhookPromptsSync` compares in constant time with `MICROSOFT_GRAPH_CLIENT_STATE`. A notification carries no file data, so a matching one prompts the incremental sync, and a replay only prompts a sync that finds nothing new. Graph lets an app subscribe to a drive only with `Files.Read.All`, which reads every site and OneDrive in the organization, so most stores should leave notifications off and sync on a schedule.
+
+**Not yet.** Reading file contents for the statement and invoice imports, as `dropboxFileSource` does for Dropbox, is the next step. A personal OneDrive (consumer account) isn't covered: its app-only sign-in isn't supported.
+
+**Testing.** The tests run against a mock built from Microsoft's client credentials and Graph `driveItem` reference pages (`packages/testkit/src/mocks/microsoft_onedrive.ts`). Its sign-in checks the tenant, client id, secret and scope and gives a JWT whose `roles` claim lists the app's permissions. Every change goes into a log, so a delta token carries on with exactly what changed after it, each item once in its latest state, deletions included; it can expire tokens with 410, revoke access tokens, answer 403 before the read role is granted and answer 429. Its assumptions are listed in the mock and checked on the first sandbox run. For the nightly run, use a Microsoft 365 test tenant with a KaratOS Test site of synthetic statements and invoices, an app given `Sites.Selected` with the read role on that site, and add the `SANDBOX_MICROSOFT_ONEDRIVE_TENANT_ID`, `SANDBOX_MICROSOFT_ONEDRIVE_CLIENT_ID`, `SANDBOX_MICROSOFT_ONEDRIVE_CLIENT_SECRET` and `SANDBOX_MICROSOFT_ONEDRIVE_DRIVE_ID` GitHub Actions secrets.
 
 ### Monday.com
 
