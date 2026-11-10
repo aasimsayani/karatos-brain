@@ -360,5 +360,6 @@ export const CONNECTED_ON: Readonly<Record<string, string>> = {
   microsoft_onedrive: "2026-11-10",
   ups: "2026-11-10",
   fedex: "2026-11-10",
+  rfid_counts: "2026-11-10",
   gusto: "2026-10-30",
 };
