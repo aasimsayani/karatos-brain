@@ -1,7 +1,7 @@
 import { meltValueCents, type Metal, type Signal } from "@karatos/core";
 import { z } from "zod";
 import type { DepartmentModule } from "../department.js";
-import { ASSUMPTIONS, daysBetween, dollars, entityFrom, estimate, extractor, pct, recommend, signalFrom, value } from "../department.js";
+import { ASSUMPTIONS, daysBetween, dollars, entityFrom, estimate, extractor, latestBySubject, pct, recommend, signalFrom, value } from "../department.js";
 
 export const CATEGORIES = ["ring", "engagement_ring", "wedding_band", "necklace", "pendant", "earrings", "bracelet", "watch", "loose_stone", "other"] as const;
 export const METALS = ["gold", "silver", "platinum", "palladium"] as const;
@@ -32,7 +32,44 @@ const InventoryCounted = z.object({
   onHand: z.number().int().nonnegative(),
 });
 
+const TrayItem = z.object({ tag: z.string().min(1), sku: z.string().min(1).optional() });
+
+/** One tray or case count from an RFID reader or barcode scanner: what was read, what should have been and wasn't, and what was out of place. */
+const InventoryTrayCounted = z.object({
+  tray: z.string().min(1),
+  sessionId: z.string().optional(),
+  startedAt: z.string().datetime(),
+  countedAt: z.string().datetime(),
+  staff: z.array(z.string().min(1)),
+  found: z.array(TrayItem),
+  missing: z.array(TrayItem),
+  unexpected: z.array(TrayItem),
+});
+
 type Received = z.infer<typeof InventoryReceived>;
+type TrayCount = z.infer<typeof InventoryTrayCounted>;
+type TrayItem = z.infer<typeof TrayItem>;
+
+/** How many tags a recommendation names before it says how many more. */
+const TAGS_NAMED = 5;
+
+const tagList = (items: TrayItem[]) => {
+  const named = items.slice(0, TAGS_NAMED).map((i) => (i.sku ? `${i.tag} (${i.sku})` : i.tag));
+  const more = items.length - named.length;
+  return more > 0 ? `${named.join(", ")} and ${more} more` : named.join(", ");
+};
+
+/** What the store paid for each SKU, from the latest receipt of it. */
+function costBySku(signals: Signal[]): Map<string, { costCents: number; signal: Signal }> {
+  const costs = new Map<string, { costCents: number; signal: Signal }>();
+  for (const s of signals) {
+    if (s.kind !== "inventory.received") continue;
+    const v = value<Received>(s);
+    const seen = costs.get(v.sku);
+    if (!seen || s.observedAt >= seen.signal.observedAt) costs.set(v.sku, { costCents: v.costCents, signal: s });
+  }
+  return costs;
+}
 
 const AGED_AFTER_DAYS = 270;
 
@@ -97,7 +134,12 @@ export const inventory: DepartmentModule = {
   id: "inventory",
   name: "Inventory and Merchandising",
   purpose: "What's in the cases and the safe, what sells, what sits, and when to reorder, mark down or remake.",
-  events: { "inventory.received": InventoryReceived, "inventory.adjusted": InventoryAdjusted, "inventory.counted": InventoryCounted },
+  events: {
+    "inventory.received": InventoryReceived,
+    "inventory.adjusted": InventoryAdjusted,
+    "inventory.counted": InventoryCounted,
+    "inventory.tray_counted": InventoryTrayCounted,
+  },
   normalizers: [
     entityFrom<Received>("inventory-products", "inventory.received", (p) => ({
       ref: { kind: "product", id: p.sku },
@@ -114,10 +156,54 @@ export const inventory: DepartmentModule = {
         const p = InventoryAdjusted.parse(event.payload);
         return [signalFrom(event, "inventory.adjusted", { kind: "product", id: p.sku }, { ...p })];
       }
+      if (event.type === "inventory.tray_counted") {
+        const p = InventoryTrayCounted.parse(event.payload);
+        return [signalFrom(event, "inventory.tray_counted", { kind: "tray", id: p.tray }, { ...p })];
+      }
       return [];
     }),
   ],
   reasoners: [
+    {
+      // Only a tray's latest count matters: a piece found missing and then found again is back.
+      name: "inventory.tray-count",
+      reason: ({ organizationId, signals, now }) => {
+        const costs = costBySku(signals);
+        return [...latestBySubject(signals, ["inventory.tray_counted"]).values()].flatMap((count) => {
+          const p = value<TrayCount>(count);
+          if (p.missing.length === 0 && p.unexpected.length === 0) return [];
+          const day = p.countedAt.slice(0, 10);
+          const by = p.staff.length ? ` by ${p.staff.join(" and ")}` : "";
+          const known = p.missing.flatMap((i) => (i.sku && costs.has(i.sku) ? [costs.get(i.sku)!] : []));
+          const atRisk = known.reduce((sum, c) => sum + c.costCents, 0);
+          const parts: string[] = [];
+          if (p.missing.length) {
+            parts.push(
+              `The count of ${p.tray} on ${day}${by} came up ${p.missing.length} short: ${tagList(p.missing)}. Check the safe, repair envelopes and pieces out on memo or approval before calling it a loss.`,
+            );
+          } else {
+            parts.push(`The count of ${p.tray} on ${day}${by} found everything that belongs there.`);
+          }
+          if (p.unexpected.length) {
+            const n = p.unexpected.length;
+            parts.push(`${n} ${n === 1 ? "piece" : "pieces"} read there ${n === 1 ? "belongs" : "belong"} in another tray: ${tagList(p.unexpected)}.`);
+          }
+          return [
+            recommend({
+              department: "inventory",
+              key: `tray_${p.tray}`,
+              organizationId,
+              summary: parts.join(" "),
+              confidence: p.missing.length ? 0.8 : 0.6,
+              expectedImpact: atRisk > 0 ? `Accounts for ${dollars(atRisk)} of stock at cost` : "Keeps the case count true",
+              impact: estimate("protects", `The cost of the missing pieces whose SKU KaratOS knows (${known.length} of ${p.missing.length}).`, () => atRisk),
+              basedOn: [count, ...known.map((c) => c.signal)],
+              now,
+            }),
+          ];
+        });
+      },
+    },
     {
       name: "inventory.aged-stock",
       reason: ({ organizationId, signals, now }) =>

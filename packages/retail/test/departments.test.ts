@@ -86,6 +86,85 @@ describe("inventory", () => {
   });
 });
 
+const trayCount = (tray: string, extra: Record<string, unknown> = {}) => ({
+  tray,
+  startedAt: "2026-10-01T21:00:00.000Z",
+  countedAt: "2026-10-01T21:05:00.000Z",
+  staff: [],
+  found: [{ tag: "TEST-BC-1", sku: "RING-1" }],
+  missing: [],
+  unexpected: [],
+  ...extra,
+});
+
+describe("inventory: tray counts", () => {
+  it("flags a short count, naming the missing tags and what they cost", async () => {
+    const s = store();
+    await s.send("inventory.received", received("RING-2", { costCents: 30_000 }), "2026-01-01T00:00:00Z");
+    await s.send("inventory.received", received("RING-2", { costCents: 45_000 }), "2026-06-01T00:00:00Z");
+    await s.send("inventory.received", received("RING-9", { costCents: 99_000 }), "2026-06-01T00:00:00Z");
+    await s.send(
+      "inventory.tray_counted",
+      trayCount("Tray A1", { staff: ["TEST-STAFF-1", "TEST-STAFF-2"], missing: [{ tag: "TEST-BC-2", sku: "RING-2" }, { tag: "TEST-BC-3", sku: "RING-3" }, { tag: "TEST-BC-4" }] }),
+      "2026-10-01T21:05:00Z",
+    );
+    const [rec, ...rest] = about(await s.ask(NOW), "Tray A1");
+    expect(rest).toEqual([]);
+    expect(rec!.summary).toBe(
+      "The count of Tray A1 on 2026-10-01 by TEST-STAFF-1 and TEST-STAFF-2 came up 3 short: TEST-BC-2 (RING-2), TEST-BC-3 (RING-3), TEST-BC-4. Check the safe, repair envelopes and pieces out on memo or approval before calling it a loss.",
+    );
+    expect(rec!.id).toBe("rec_inventory_tray_Tray A1_2026-10-02");
+    expect(rec!.confidence).toBe(0.8);
+    // The latest receipt of RING-2 says what it cost; RING-3 was never received and the last tag has no SKU.
+    expect(rec!.expectedImpact).toBe("Accounts for $450.00 of stock at cost");
+    expect(rec!.impact).toEqual({ kind: "protects", cents: 45_000, lowCents: 45_000, highCents: 45_000, basis: "The cost of the missing pieces whose SKU KaratOS knows (1 of 3)." });
+    expect(rec!.provenance.signalIds.filter((id) => id.startsWith("sig_inventory.received"))).toHaveLength(1);
+    expect(rec!.provenance.signalIds.some((id) => id.startsWith("sig_inventory.tray_counted_tray_Tray A1"))).toBe(true);
+  });
+
+  it("names five tags and says how many more", async () => {
+    const s = store();
+    const tags = (n: number) => Array.from({ length: n }, (_, i) => ({ tag: `TEST-BC-${i + 1}` }));
+    await s.send("inventory.tray_counted", trayCount("Tray A1", { missing: tags(7) }));
+    await s.send("inventory.tray_counted", trayCount("Tray A2", { missing: tags(5) }));
+    const recs = await s.ask(NOW);
+    expect(about(recs, "Tray A1")[0]!.summary).toContain("came up 7 short: TEST-BC-1, TEST-BC-2, TEST-BC-3, TEST-BC-4, TEST-BC-5 and 2 more. Check");
+    expect(about(recs, "Tray A2")[0]!.summary).toContain("came up 5 short: TEST-BC-1, TEST-BC-2, TEST-BC-3, TEST-BC-4, TEST-BC-5. Check");
+  });
+
+  it("points out pieces read in the wrong tray", async () => {
+    const s = store();
+    await s.send("inventory.tray_counted", trayCount("Case 3", { unexpected: [{ tag: "TEST-BC-7", sku: "NECK-1" }] }));
+    await s.send("inventory.tray_counted", trayCount("Case 4", { missing: [{ tag: "TEST-BC-8" }], unexpected: [{ tag: "TEST-BC-5" }, { tag: "TEST-BC-6" }] }));
+    const recs = await s.ask(NOW);
+    const [one] = about(recs, "Case 3");
+    expect(one!.summary).toBe("The count of Case 3 on 2026-10-01 found everything that belongs there. 1 piece read there belongs in another tray: TEST-BC-7 (NECK-1).");
+    expect(one!.confidence).toBe(0.6);
+    expect(one!.expectedImpact).toBe("Keeps the case count true");
+    expect(one!.impact).toBeUndefined();
+    expect(about(recs, "Case 4")[0]!.summary).toBe(
+      "The count of Case 4 on 2026-10-01 came up 1 short: TEST-BC-8. Check the safe, repair envelopes and pieces out on memo or approval before calling it a loss. 2 pieces read there belong in another tray: TEST-BC-5, TEST-BC-6.",
+    );
+  });
+
+  it("goes by each tray's latest count, so a clean recount clears it", async () => {
+    const s = store();
+    await s.send("inventory.tray_counted", trayCount("Tray A1", { missing: [{ tag: "TEST-BC-2" }] }), "2026-09-30T21:00:00Z");
+    await s.send("inventory.tray_counted", trayCount("Tray A1"), "2026-10-01T21:00:00Z");
+    await s.send("inventory.tray_counted", trayCount("Tray B1"), "2026-09-30T21:00:00Z");
+    await s.send("inventory.tray_counted", trayCount("Tray B1", { missing: [{ tag: "TEST-BC-9" }] }), "2026-10-01T21:00:00Z");
+    const recs = await s.ask(NOW);
+    expect(about(recs, "Tray A1")).toEqual([]);
+    expect(about(recs, "Tray B1")).toHaveLength(1);
+  });
+
+  it("dead-letters a count that doesn't say which tray", async () => {
+    const s = store();
+    await expect(s.send("inventory.tray_counted", trayCount(""))).rejects.toThrow();
+    await expect(s.send("inventory.tray_counted", trayCount("Tray A1", { countedAt: "last night" }))).rejects.toThrow();
+  });
+});
+
 describe("clienteling", () => {
   const profile = (customerId: string, marketingConsent = true) => ({ customerId, name: `Customer ${customerId}`, marketingConsent });
 
