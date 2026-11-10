@@ -104,6 +104,7 @@ These are built, tested against recorded vendor responses or mocks built from ea
 | RFID and barcode tray counts | Imports two years of tray and case counts: what was read, when, and by whom | Inventory, Compliance |
 | FedEx | Follows every FedEx package on the business's list, from label created to delivered or returned | Inventory, Repairs, Compliance |
 | UPS | Follows every UPS package on the business's list, from label created to delivered or returned | Inventory, Repairs, Compliance |
+| BILL | Imports six years of supplier bills with their due dates, balances, payment status and approval status | Finance, Buying |
 | Asana | Imports five years of tasks from every project you can see, such as repairs, custom orders and production jobs, then keeps them current | Repairs, Custom orders, Buying |
 | Trello | Imports five years of cards from every board you can see, such as repairs, custom orders and buying, then keeps them current | Repairs, Custom orders, Buying |
 | Airtable | Imports five years of records from every base you share, such as memo logs, repair intake and custom orders, then keeps them current | Repairs, Custom orders, Buying, Inventory |
@@ -154,7 +155,7 @@ This section updates itself as work lands: it is generated from [docs/milestones
 <!-- progress:start -->
 <!-- Generated from docs/milestones.json and the integration catalog by npm run progress:write. Edit those, not this block. -->
 
-**Overall: 78% complete**, 63 of 81 roadmap items done. 57 of the 253 systems in the integration catalog are connected.
+**Overall: 79% complete**, 64 of 81 roadmap items done. 58 of the 253 systems in the integration catalog are connected.
 
 | Milestone | What it gives a jeweler | Progress | Target |
 | --- | --- | --- | --- |
@@ -168,7 +169,7 @@ This section updates itself as work lands: it is generated from [docs/milestones
 | Self-hosted and managed plans | Run it yourself for free, or let us host it on the premium plan. | ███░░░░░░░ 33% | Mar 2027 |
 | Integrations, next wave | Jewelry POS, CRM, messaging, marketing and diamond feeds join the catalog. | ██████████ 95% | Dec 2026 |
 | Marketplaces, ads and office tools | Sales channels, ad spend and the files and tasks a team already keeps, in one place. | ██████████ 100% | Done |
-| Shipping, payables and insurance | Packages, bills and care plans tracked next to the sale they belong to. | ███░░░░░░░ 33% | Jan 2027 |
+| Shipping, payables and insurance | Packages, bills and care plans tracked next to the sale they belong to. | █████░░░░░ 50% | Jan 2027 |
 | Manufacturing departments | Bench, casting and setting work tracked with metal loss and labor cost per piece. | ░░░░░░░░░░ 0% | Jun 2027 |
 
 ### Up next
