@@ -43,6 +43,7 @@ import {
   lightspeedWriteScopes,
   memoryTokenStore,
   parseLightspeedCursor,
+  squareCustomerRef,
   type LightspeedClient,
   type LightspeedContext,
   type LightspeedCursor,
@@ -382,7 +383,7 @@ describe("the Lightspeed client", () => {
     expect(await c.product(pid(2))).toBeNull();
     expect(await c.product(pid(3))).toBeNull();
     expect(await c.product(pid(3))).toBeNull();
-    for (const id of ["../sales", pid(1).toUpperCase(), `${pid(1)}x`, ""]) await expect(c.product(id), id).rejects.toThrow("not a Lightspeed product ID");
+    for (const id of ["../sales", pid(1).toUpperCase(), "ABCDEF00-0000-4000-8000-000000000001", `${pid(1)}x`, "0000000-00000-4000-8000-000000000001", ""]) await expect(c.product(id), id).rejects.toThrow("not a Lightspeed product ID");
     await expect(client(scripted([token(), json(500, {})]).fetch).client.product(pid(1))).rejects.toMatchObject({ status: 500 });
   });
 });
@@ -390,13 +391,16 @@ describe("the Lightspeed client", () => {
 describe("Lightspeed records", () => {
   it("reads Lightspeed's ids, times, amounts and counts", () => {
     expect(lightspeedId(` ${pid(1).toUpperCase()} `)).toBe(pid(1));
-    for (const bad of ["x", 5, null, `${pid(1)}0`, pid(1).replace(/-/g, "")]) expect(lightspeedId(bad), String(bad)).toBeUndefined();
+    for (const bad of ["x", 5, null, `${pid(1)}0`, pid(1).replace(/-/g, ""), "0000000-00000-4000-8000-000000000001", "00000000-0000-4000-8000-00000000000-1"]) expect(lightspeedId(bad), String(bad)).toBeUndefined();
     expect(lightspeedTime("2026-01-05T15:00:00Z")).toBe("2026-01-05T15:00:00.000Z");
     expect(lightspeedTime("2026-01-05T15:00:00+00:00")).toBe("2026-01-05T15:00:00.000Z");
     expect(lightspeedTime("2026-01-05 15:00:00")).toBe("2026-01-05T15:00:00.000Z");
     expect(lightspeedTime(" 2026-01-05T15:00:00.123456Z ")).toBe("2026-01-05T15:00:00.123Z");
     expect(lightspeedTime("2026-01-05T15:00:00-0500")).toBe("2026-01-05T20:00:00.000Z");
     expect(lightspeedTime("2026-01-05T15:00:00+05:30")).toBe("2026-01-05T09:30:00.000Z");
+    // Spaces are trimmed, but a value longer than any time Lightspeed writes is turned down first.
+    expect(lightspeedTime(`${" ".repeat(20)}2026-01-05T15:00:00Z`)).toBe("2026-01-05T15:00:00.000Z");
+    expect(lightspeedTime(`${" ".repeat(21)}2026-01-05T15:00:00Z`)).toBeUndefined();
     for (const bad of ["2026-02-30T00:00:00Z", "2026-01-05T25:00:00", "2026-01-05", "yesterday", 5, null, `2026-01-05T15:00:00${"0".repeat(30)}Z`, "2026-01-05T15:00:00+5:00"]) {
       expect(lightspeedTime(bad), String(bad)).toBeUndefined();
     }
@@ -562,6 +566,11 @@ describe("Lightspeed records", () => {
     }
     expect(lightspeedSaleEvents({ ...SALE, line_items: [] }, ctx()).map((e) => e.type)).toEqual(["order.updated"]);
     expect(lightspeedSaleEvents({ ...SALE, line_items: "x" }, ctx())[0]!.payload.lineCount).toBe(0);
+    expect(lightspeedSaleEvents({ ...SALE, line_items: ["x", null, [1], ...(SALE.line_items as unknown[])] }, ctx())[0]!.payload.lineCount).toBe(1);
+    // A line with no quantity is neither sold nor taken back.
+    const zero = lightspeedSaleEvents({ ...SALE, line_items: [...(SALE.line_items as unknown[]), { product: { sku: "Z" }, quantity: 0, pricing: { price: 1, total: 0 } }] }, ctx());
+    expect(zero.map((e) => e.type)).toEqual(["order.updated", "sale.completed"]);
+    expect((zero[1]!.payload.lines as { sku: string }[]).map((l) => l.sku)).toEqual(["SKU-TEST-0001"]);
     expect(lightspeedSaleEvents({ ...SALE, totals: { price_incl_tax: 0.01 } }, ctx()).map((e) => e.type)).toEqual(["order.updated", "sale.completed"]);
   });
 
@@ -640,6 +649,7 @@ describe("Lightspeed records", () => {
     expect(status({ active: null })).toBe("ACTIVE");
     expect(status({ deleted_at: "2026-02-01T00:00:00Z" })).toBe("DELETED");
     expect(status({ deleted_at: "x" })).toBe("ACTIVE");
+    expect(lightspeedProductEvent({ ...product, variant_name: "  Test 14k\n  ring\t 1 " }, ctx())!.payload.title).toBe("Test 14k ring 1");
     const bare = lightspeedProductEvent({ id: product.id }, ctx())!;
     expect(bare).toMatchObject({ idempotencyKey: `lightspeed:product:${product.id}:unknown:ACTIVE`, occurredAt: undefined });
     expect(bare.payload).toMatchObject({ title: `Lightspeed product ${String(product.id).slice(0, 8)}`, variants: [{ sku: `lightspeed-product-${product.id}`, priceCents: null }] });
@@ -696,6 +706,7 @@ describe("Lightspeed records", () => {
     expect(lightspeedCustomerRef(KEY, id)).not.toBe(lightspeedCustomerRef(KEY, lightspeedTestId("c", 2)));
     // Not the same reference Square would give the same id.
     expect(lightspeedCustomerRef(KEY, id)).toMatch(/^lightspeed:customer:[0-9a-f]{32}$/);
+    expect(lightspeedCustomerRef(KEY, id)!.split(":")[2]).not.toBe(squareCustomerRef(KEY, id)!.split(":")[2]);
     for (const bad of [undefined, 5, "", "walk-in"]) expect(lightspeedCustomerRef(KEY, bad), String(bad)).toBeUndefined();
     expect(() => lightspeedCustomerRef("short", id)).toThrow("CUSTOMER_REF_KEY");
   });
@@ -745,13 +756,18 @@ describe("the Lightspeed connector", () => {
 
   it("asks Lightspeed for the SKUs of products it hasn't read this run, once each, and keeps a stand-in for ones it no longer has", async () => {
     const gone = pid(77);
-    const inventory = [...INVENTORY, { ...INVENTORY[0]!, id: lightspeedTestId("b", 9), outlet_id: lightspeedTestId("0", 2), version: 2009 }, { ...INVENTORY[0]!, id: lightspeedTestId("b", 10), product_id: gone, version: 2010 }];
+    const inventory = [
+      ...INVENTORY,
+      { ...INVENTORY[0]!, id: lightspeedTestId("b", 9), outlet_id: lightspeedTestId("0", 2), version: 2009 },
+      { ...INVENTORY[0]!, id: lightspeedTestId("b", 10), product_id: gone, version: 2010 },
+      { ...INVENTORY[0]!, id: lightspeedTestId("b", 11), product_id: gone, outlet_id: lightspeedTestId("0", 2), version: 2011 },
+    ];
     const mock = store({ inventory });
     const resumed: LightspeedCursor = { pass: "historical", step: 1, after: { products: 1003, inventory: 0, customers: 0, sales: 0 } };
     const out = await collect(connector(mock).historicalImport({ organizationId: TEST_ORG, cursor: JSON.stringify(resumed) }));
     expect(mock.reads.filter((r) => r.list.startsWith("product:")).map((r) => r.list)).toEqual([`product:${pid(1)}`, `product:${pid(2)}`, `product:${pid(3)}`, `product:${gone}`]);
     const counted = eventsOf(out).filter((e) => e.type === "inventory.counted");
-    expect(counted.map((e) => e.payload.sku)).toEqual(["SKU-TEST-0001", "SKU-TEST-0002", "SKU-TEST-0003", "SKU-TEST-0001", `lightspeed-product-${gone}`]);
+    expect(counted.map((e) => e.payload.sku)).toEqual(["SKU-TEST-0001", "SKU-TEST-0002", "SKU-TEST-0003", "SKU-TEST-0001", `lightspeed-product-${gone}`, `lightspeed-product-${gone}`]);
     // A product with no SKU of its own keeps the stand-in too, and sales find the SKUs the lookups learned.
     const blank = store({ products: [{ ...PRODUCTS[0]!, sku: " " }], inventory: [INVENTORY[0]!], sales: [{ ...SALE, line_items: [{ product: { id: pid(1) }, quantity: 1, pricing: { price: 1 } }] }] });
     const blankOut = await collect(connector(blank).historicalImport({ organizationId: TEST_ORG, cursor: JSON.stringify(resumed) }));
@@ -760,6 +776,24 @@ describe("the Lightspeed connector", () => {
     const lookedOut = await collect(connector(looked).historicalImport({ organizationId: TEST_ORG, cursor: JSON.stringify(resumed) }));
     expect(eventsOf(lookedOut).filter((e) => e.type === "sale.completed").map((e) => (e.payload.lines as { sku: string }[])[0]!.sku)).toEqual(["LOOKED-UP"]);
     expect(eventsOf(lookedOut).filter((e) => e.type === "inventory.counted").map((e) => e.payload.sku)).toEqual(["LOOKED-UP"]);
+  });
+
+  it("remembers a product Lightspeed no longer has, so later pages don't ask again", async () => {
+    const gone = pid(78);
+    const record = (v: number) => ({ ...INVENTORY[0]!, id: lightspeedTestId("b", v), product_id: gone, version: v });
+    const pages = [Array.from({ length: LIGHTSPEED_INVENTORY_PAGE }, (_, i) => record(i + 1)), [record(LIGHTSPEED_INVENTORY_PAGE + 1)]];
+    const asked: string[] = [];
+    const fake: LightspeedClient = {
+      list: async () => ({ data: [], max: null }),
+      inventory: async () => pages.shift() ?? [],
+      product: async (id) => {
+        asked.push(id);
+        return null;
+      },
+    };
+    const out = await collect(connector(store(), { client: fake }).historicalImport({ organizationId: TEST_ORG, cursor: null }));
+    expect(asked).toEqual([gone]);
+    expect(eventsOf(out).filter((e) => e.type === "inventory.counted")).toHaveLength(LIGHTSPEED_INVENTORY_PAGE + 1);
   });
 
   it("skips sales older than the history window, keeping an undated one so it dead-letters", async () => {

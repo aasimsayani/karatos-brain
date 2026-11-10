@@ -48,9 +48,8 @@ export function lightspeedTime(value: unknown): string | undefined {
   if (typeof value !== "string" || value.length > 40) return undefined;
   const m = /^(\d{4}-\d{2}-\d{2})[T ](\d{2}:\d{2}:\d{2})(\.\d{1,9})?(Z|[+-]\d{2}:?\d{2})?$/.exec(value.trim());
   if (!m) return undefined;
-  const fraction = m[3] ? m[3].slice(0, 4) : "";
-  const zone = !m[4] || m[4] === "Z" ? "Z" : m[4].includes(":") ? m[4] : `${m[4].slice(0, 3)}:${m[4].slice(3)}`;
-  const at = Date.parse(`${m[1]}T${m[2]}${fraction}${zone}`);
+  const zone = m[4] ?? "Z";
+  const at = Date.parse(`${m[1]}T${m[2]}${m[3] ?? ""}${zone}`);
   if (Number.isNaN(at)) return undefined;
   const iso = new Date(at).toISOString();
   // A day or time that doesn't exist (February 30th, 25:00) is turned down rather than rolled over.
@@ -86,7 +85,8 @@ export function lightspeedVersion(r: LightspeedRecord): number | undefined {
 
 function event(key: string, type: string, occurredAt: string | undefined, receivedAt: string, payload: Record<string, unknown>): LightspeedBrainEvent {
   // A record missing its time gets no occurredAt, so the pipeline dead-letters it with the raw record kept.
-  return { id: `lightspeed_${key.replace(/[^A-Za-z0-9_.:-]/g, "_")}`, type, occurredAt, receivedAt, idempotencyKey: `lightspeed:${key}`, payload };
+  // Keys are built from checked ids, versions and ISO times only, so they need no escaping.
+  return { id: `lightspeed_${key}`, type, occurredAt, receivedAt, idempotencyKey: `lightspeed:${key}`, payload };
 }
 
 /**
