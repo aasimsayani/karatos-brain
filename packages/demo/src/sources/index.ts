@@ -58,6 +58,7 @@ export const DEMO_NOT_YET: Readonly<Record<string, string>> = {
   affirm: NOT_READ_YET,
   airtable: NOT_READ_YET,
   asana: NOT_READ_YET,
+  microsoft_onedrive: NOT_READ_YET,
   notion: NOT_READ_YET,
   dropbox: NOT_READ_YET,
   authorize_net: NOT_READ_YET,

@@ -23,6 +23,7 @@ import klaviyo from "./klaviyo.js";
 import mailchimp from "./mailchimp.js";
 import meta_ads from "./meta_ads.js";
 import metals_api from "./metals_api.js";
+import microsoft_onedrive from "./microsoft_onedrive.js";
 import monday from "./monday.js";
 import notion from "./notion.js";
 import pinterest from "./pinterest.js";
@@ -41,4 +42,4 @@ import xero from "./xero.js";
 import yext from "./yext.js";
 
 /** Every connector's nightly sandbox check. */
-export const SANDBOX_CHECKS: SandboxCheck[] = [affirm, airtable, amazon, asana, authorize_net, avalara, bigcommerce, calendly, clover, custom_forms, dropbox, ebay, gia, gmail, google_ads, google_analytics, google_workspace, gusto, hubspot, klaviyo, mailchimp, meta_ads, metals_api, monday, notion, pinterest, plaid, quickbooks, shopify, slack, square, stripe, tiktok, trello, twilio, wix, woocommerce, xero, yext];
+export const SANDBOX_CHECKS: SandboxCheck[] = [affirm, airtable, amazon, asana, authorize_net, avalara, bigcommerce, calendly, clover, custom_forms, dropbox, ebay, gia, gmail, google_ads, google_analytics, google_workspace, gusto, hubspot, klaviyo, mailchimp, meta_ads, metals_api, microsoft_onedrive, monday, notion, pinterest, plaid, quickbooks, shopify, slack, square, stripe, tiktok, trello, twilio, wix, woocommerce, xero, yext];

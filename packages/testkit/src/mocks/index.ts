@@ -23,6 +23,7 @@ import idex from "./idex.js";
 import klaviyo from "./klaviyo.js";
 import mailchimp from "./mailchimp.js";
 import meta_ads from "./meta_ads.js";
+import microsoft_onedrive from "./microsoft_onedrive.js";
 import monday from "./monday.js";
 import nivoda from "./nivoda.js";
 import notion from "./notion.js";
@@ -63,6 +64,7 @@ export * from "./idex.js";
 export * from "./klaviyo.js";
 export * from "./mailchimp.js";
 export * from "./meta_ads.js";
+export * from "./microsoft_onedrive.js";
 export * from "./monday.js";
 export * from "./nivoda.js";
 export * from "./notion.js";
@@ -81,7 +83,7 @@ export * from "./xero.js";
 export * from "./yext.js";
 
 /** Every mock module, one per catalog integration. */
-export const DOC_MOCK_MODULES: readonly DocMockModule[] = [affirm, airtable, amazon, asana, authorize_net, avalara, bigcommerce, calendly, clover, custom_forms, dropbox, ebay, gia, gmail, google_ads, google_analytics, google_workspace, gusto, hubspot, idex, klaviyo, mailchimp, meta_ads, monday, nivoda, notion, pinterest, plaid, quickbooks, rapnet, slack, square, stuller, tiktok, trello, wix, woocommerce, xero, yext];
+export const DOC_MOCK_MODULES: readonly DocMockModule[] = [affirm, airtable, amazon, asana, authorize_net, avalara, bigcommerce, calendly, clover, custom_forms, dropbox, ebay, gia, gmail, google_ads, google_analytics, google_workspace, gusto, hubspot, idex, klaviyo, mailchimp, meta_ads, microsoft_onedrive, monday, nivoda, notion, pinterest, plaid, quickbooks, rapnet, slack, square, stuller, tiktok, trello, wix, woocommerce, xero, yext];
 
 /** Every doc-derived mock, with empty data, for checks and the vendor docs watch. */
 export function allDocMocks(): DocMock[] {
