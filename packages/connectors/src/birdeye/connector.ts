@@ -46,8 +46,11 @@ export interface BirdeyeOptions extends Partial<Pick<BirdeyeClientOptions, "fetc
   client?: BirdeyeClient;
 }
 
-const ISO = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/;
-const isTime = (t: unknown) => typeof t === "string" && ISO.test(t) && !Number.isNaN(Date.parse(t)) && new Date(t).toISOString() === t;
+/** A time exactly as toISOString writes it. Anything that isn't a string never equals what toISOString gives back. */
+const isTime = (t: unknown) => {
+  const at = Date.parse(t as string);
+  return !Number.isNaN(at) && new Date(at).toISOString() === t;
+};
 
 export function parseBirdeyeCursor(raw: string | null): BirdeyeCursor | null {
   if (raw === null) return null;

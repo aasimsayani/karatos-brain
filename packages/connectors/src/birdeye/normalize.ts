@@ -41,8 +41,8 @@ export function birdeyeTime(value: unknown): string | undefined {
   else if (iso) [y, m, d] = [Number(iso[1]), Number(iso[2]), Number(iso[3])];
   else return undefined;
   const day = new Date(Date.UTC(y, m - 1, d));
-  // A day that doesn't exist (February 30th, a 13th month) is turned down rather than rolled over, as is one before 1970.
-  if (y < 1970 || day.getUTCMonth() !== m - 1 || day.getUTCDate() !== d) return undefined;
+  // A day that doesn't exist (February 30th, a 13th month) rolls into another month, so it is turned down; so is one before 1970.
+  if (y < 1970 || day.getUTCMonth() !== m - 1) return undefined;
   return iso ? new Date(Date.parse(v)).toISOString() : day.toISOString();
 }
 
@@ -55,7 +55,7 @@ const word = (value: unknown, max = 40) => (typeof value === "string" && value.t
 
 /** A rating from 0 to 5; Birdeye gives 0 for direct feedback and Facebook recommendations. */
 export function birdeyeRating(value: unknown): number | undefined {
-  return typeof value === "number" && Number.isFinite(value) && value >= 0 && value <= 5 ? value : undefined;
+  return typeof value === "number" && value >= 0 && value <= 5 ? value : undefined;
 }
 
 /** A review as review.updated, or null without a usable id. */
@@ -64,7 +64,7 @@ export function birdeyeReviewEvent(review: Record<string, unknown>, ctx: { recei
   const reviewId = typeof raw === "number" && Number.isSafeInteger(raw) && raw > 0 ? String(raw) : typeof raw === "string" && /^[1-9]\d{0,17}$/.test(raw) ? raw : undefined;
   if (!reviewId) return null;
   const replied = typeof review.response === "string" && review.response.trim() !== "";
-  const operational = word(review.reviewOperationalStatus, 20)?.toUpperCase();
+  const operational = typeof review.reviewOperationalStatus === "string" ? review.reviewOperationalStatus.trim().toUpperCase() : undefined;
   const payload = defined({
     reviewId: `birdeye:review:${reviewId}`,
     locationId: `birdeye:business:${ctx.businessId}`,

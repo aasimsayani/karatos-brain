@@ -148,6 +148,7 @@ describe("Birdeye client", () => {
       [401, { code: 1161, message: "Invalid API key" }, { status: 401, code: 1161, message: "Birdeye turned down the API key: check BIRDEYE_API_KEY" }],
       [404, { code: 1011, message: "Business id is invalid" }, { status: 404, code: 1011, message: "Birdeye doesn't know that business: check BIRDEYE_BUSINESS_ID" }],
       [400, { code: 1186, message: "Invalid fromDate" }, { status: 400, code: 1186, message: "Birdeye reviews answered HTTP 400 (code 1186)" }],
+      [400, { code: 0 }, { status: 400, code: 0, message: "Birdeye reviews answered HTTP 400 (code 0)" }],
       [500, "oops", { status: 500, code: undefined, message: "Birdeye reviews answered HTTP 500" }],
       [201, [], { status: 201, message: "Birdeye reviews answered HTTP 201" }],
       [200, { reviews: [] }, { status: 200, message: "Birdeye reviews answered without a list" }],
@@ -191,7 +192,7 @@ describe("Birdeye normalizer", () => {
       "Feb 30, 2026", "Foo 1, 2026", "Ja 1, 2026", "Jan 32, 2026", "Jan 0, 2026", "Jan 1 2026", "Jan 1, 26", "Dec 31, 1969", "Jan 1, 0014",
       "02/30/2026", "13/01/2026", "00/01/2026", "1/1/2026", "01/01/26",
       "2026-02-30T00:00:00Z", "2026-13-01T00:00:00Z", "2026-11-10T24:00:00Z", "2026-11-10T12:60:00Z", "2026-11-10T12:00:60Z", "2026-11-10T12:00:00+15:00", "2026-11-10T12:00:00+05:60",
-      "2026-11-10T12:00:00", "2026-11-10", "2026-11-10T12:00:00.1234Z", "1969-12-31T23:00:00Z",
+      "2026-11-10T12:00:00", "2026-11-10", "Jan20, 2026", "Jan  1, 2026", "Jan 1, 20261", "1 Jan 1, 2026", "Apr 31, 2026", "2026-11-10T12:00:00.1234Z", "1969-12-31T23:00:00Z",
       `Jan 1, 2026${" ".repeat(30)}`, "", 5, null, undefined,
     ];
     expect(bad.map(birdeyeTime)).toEqual(Array(bad.length).fill(undefined));
@@ -222,6 +223,7 @@ describe("Birdeye normalizer", () => {
       ownerReplies: 1,
       awaitingReply: false,
     });
+    expect(Object.keys(e.payload)).not.toContain("title");
     expect(e.idempotencyKey).toMatch(/^birdeye:review:500001:[0-9a-f]{16}$/);
     expect(e.id).toBe(`birdeye_review_500001_${e.idempotencyKey.slice(-16)}`);
     const kept = JSON.stringify(e);
@@ -248,6 +250,7 @@ describe("Birdeye normalizer", () => {
     for (const status of ["DELETED", "created!", "x".repeat(21), 5]) expect(birdeyeReviewEvent({ reviewId: 1, reviewOperationalStatus: status }, CTX)!.payload.edited, String(status)).toBeUndefined();
     expect(birdeyeReviewEvent({ reviewId: 1, reviewOperationalStatus: "Created" }, CTX)!.payload.edited).toBe(false);
     expect(birdeyeReviewEvent({ reviewId: 1, reviewOperationalStatus: "x".repeat(20) }, CTX)!.payload.edited).toBeUndefined();
+    for (const rating of [6, -1, "5", Number.NaN]) expect(birdeyeReviewEvent({ reviewId: 1, rating }, CTX)!.payload.rating, String(rating)).toBeUndefined();
   });
 
   it("keeps a site name only when it reads like one", () => {
@@ -283,7 +286,7 @@ describe("Birdeye cursor", () => {
     const bad = [
       "{", "null", "5", "[]", JSON.stringify({ ...good, pass: "full" }), JSON.stringify({ ...good, sindex: -2 }), JSON.stringify({ ...good, sindex: BIRDEYE_MAX_WINDOW }),
       JSON.stringify({ ...good, sindex: 1.5 }), JSON.stringify({ ...good, sindex: "0" }), JSON.stringify({ ...good, since: "2026-11-08T15:00:00Z" }), JSON.stringify({ ...good, since: "2026-02-30T15:00:00.000Z" }),
-      JSON.stringify({ ...good, nextFrom: undefined }), JSON.stringify({ ...good, nextFrom: "x2026-11-09T15:00:00.000Z" }), JSON.stringify({ ...good, since: "2026-11-08T15:00:00.000Zx" }),
+      JSON.stringify({ ...good, nextFrom: undefined }), JSON.stringify({ ...good, since: Date.parse(good.since) }), JSON.stringify({ ...good, nextFrom: null }), JSON.stringify({ ...good, since: [good.since] }), JSON.stringify({ ...good, nextFrom: "x2026-11-09T15:00:00.000Z" }), JSON.stringify({ ...good, since: "2026-11-08T15:00:00.000Zx" }),
     ];
     for (const raw of bad) expect(() => parseBirdeyeCursor(raw), raw).toThrow("Birdeye checkpoint is not in the expected shape");
   });
@@ -390,6 +393,7 @@ describe("Birdeye connector", () => {
     const [batch] = await drain(birdeyeConnector({ apiKey: "", businessId: " 77 ", client: fake, now: NOW }).historicalImport({ cursor: null } as never));
     expect(asked).toEqual([{ fromDate: "11/10/2021", sindex: 0 }]);
     expect(batch!.events).toHaveLength(1);
+    expect(batch!.events[0]).toMatchObject({ receivedAt: RECEIVED });
     expect((batch!.events[0] as { payload: unknown }).payload).toMatchObject({ locationId: "birdeye:business:77", reviewId: "birdeye:review:3" });
   });
 
