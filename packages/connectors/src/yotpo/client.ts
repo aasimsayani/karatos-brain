@@ -120,7 +120,7 @@ export function yotpoClient(options: YotpoClientOptions): YotpoClient {
       body: JSON.stringify({ secret: apiSecret }),
     });
     if (status === 401 || status === 403 || status === 404) throw new YotpoConfigError(`Yotpo turned down the store's credentials (HTTP ${status}): check YOTPO_STORE_ID and YOTPO_API_SECRET`);
-    const value = isObject(body) ? body.access_token : undefined;
+    const value = (body as Record<string, unknown> | undefined)?.access_token;
     if (status !== 200 || typeof value !== "string" || !/^[A-Za-z0-9._-]{16,4096}$/.test(value)) throw new YotpoApiError(`Yotpo answered the token request with HTTP ${status} and no token`, status, yotpoErrorCode(body));
     token = value;
     return token;
@@ -158,11 +158,11 @@ export function yotpoClient(options: YotpoClientOptions): YotpoClient {
       if (pageInfo !== null && !YOTPO_PAGE_INFO.test(pageInfo)) throw new YotpoApiError("a Loyalty page cursor is not in the expected shape", 0);
       const url = new URL(`${YOTPO_LOYALTY_URL}/customers/recent`);
       url.searchParams.set("per_page", String(YOTPO_LOYALTY_PAGE));
-      if (pageInfo !== null) url.searchParams.set("page_info", pageInfo);
+      if (pageInfo) url.searchParams.set("page_info", pageInfo);
       const { status, body } = await send(url.toString(), { method: "GET", headers: { "X-GUID": guid, "X-API-KEY": loyaltyKey, accept: "application/json" } });
       const page = check(status, body, "the Loyalty customers", "the Loyalty GUID and API key");
       if (!Array.isArray(page.customers)) throw new YotpoApiError("Yotpo answered the Loyalty customers without the customers list", 200);
-      const next = isObject(page.metadata) ? page.metadata.next_page_info : undefined;
+      const next = (page.metadata as Record<string, unknown> | undefined)?.next_page_info;
       if (next === undefined || next === null || next === "") return { rows: page.customers, next: null };
       if (typeof next !== "string" || !YOTPO_PAGE_INFO.test(next)) throw new YotpoApiError("Yotpo answered the Loyalty customers with a page cursor that doesn't read", 200);
       return { rows: page.customers, next };

@@ -47,7 +47,7 @@ const isObject = (v: unknown): v is Record<string, unknown> => typeof v === "obj
 const count = (v: unknown) => (Number.isSafeInteger(v) && (v as number) >= 0 ? (v as number) : undefined);
 const time = (v: unknown) => quoTime(v) ?? undefined;
 /** A short label, such as a sku or a tier name, when it is one. */
-const label = (v: unknown, max = 60) => (typeof v === "string" && v.trim().length > 0 && v.trim().length <= max && /^[\p{L}\p{N} ._/+#&-]+$/u.test(v.trim()) ? v.trim() : undefined);
+const label = (v: unknown, max = 60) => (typeof v === "string" && v.trim().length <= max && /^[\p{L}\p{N} ._/+#&-]+$/u.test(v.trim()) ? v.trim() : undefined);
 /** A Yotpo id: a positive whole number, sent as a number or as digits. */
 export function yotpoId(v: unknown): string | undefined {
   if (typeof v === "number") return Number.isSafeInteger(v) && v > 0 ? String(v) : undefined;

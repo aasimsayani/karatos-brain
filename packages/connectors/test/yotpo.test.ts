@@ -105,7 +105,7 @@ describe("Yotpo client", () => {
     for (const apiSecret of ["", "a".repeat(19), "a".repeat(129), `${SECRET}-`, undefined]) expect(make({ apiSecret: apiSecret as string }), String(apiSecret)).toThrow("YOTPO_API_SECRET is missing or not in the expected shape");
     expect(make({ loyaltyGuid: GUID })).toThrow("YOTPO_LOYALTY_GUID and YOTPO_LOYALTY_API_KEY go together: give both or neither");
     expect(make({ loyaltyApiKey: LOYALTY_KEY, loyaltyGuid: "  " })).toThrow("go together");
-    for (const loyaltyGuid of ["a".repeat(9), "a".repeat(65), "bad guid!!"]) expect(make({ loyaltyGuid, loyaltyApiKey: LOYALTY_KEY }), loyaltyGuid).toThrow("YOTPO_LOYALTY_GUID is not in the expected shape");
+    for (const loyaltyGuid of ["a".repeat(9), "a".repeat(65), "bad guid!!", "has a space 00"]) expect(make({ loyaltyGuid, loyaltyApiKey: LOYALTY_KEY }), loyaltyGuid).toThrow("YOTPO_LOYALTY_GUID is not in the expected shape");
     for (const loyaltyApiKey of ["a".repeat(15), "a".repeat(129), "bad key!!!!!!!!!!"]) expect(make({ loyaltyGuid: GUID, loyaltyApiKey }), loyaltyApiKey).toThrow("YOTPO_LOYALTY_API_KEY is not in the expected shape");
     expect(make({ storeId: "" })).toThrow(YotpoConfigError);
     for (const ok of [{ storeId: "a".repeat(10) }, { storeId: "a".repeat(64) }, { apiSecret: "a".repeat(20) }, { apiSecret: "a".repeat(128) }, { loyaltyGuid: "a".repeat(10), loyaltyApiKey: "a".repeat(16) }, { loyaltyGuid: "a".repeat(64), loyaltyApiKey: "a".repeat(128) }]) expect(make(ok)).not.toThrow();
@@ -174,7 +174,7 @@ describe("Yotpo client", () => {
       await expect(client(scripted(json(status, {})).fetch).c.reviews("2026-11-01", 1)).rejects.toThrow(`Yotpo turned down the store's credentials (HTTP ${status}): check YOTPO_STORE_ID and YOTPO_API_SECRET`);
     }
     await expect(client(scripted(json(401, {})).fetch).c.reviews("2026-11-01", 1)).rejects.toThrow(YotpoConfigError);
-    for (const answer of [json(400, { status: { code: 400 } }), json(200, {}), json(200, ["x"]), text(200, "<html>"), json(200, { access_token: "short" }), json(200, { access_token: "has a space in it ok" }), json(200, { access_token: 12345678901234567 }), json(200, { access_token: "a".repeat(4097) })]) {
+    for (const answer of [json(400, { status: { code: 400 } }), json(200, {}), json(200, ["x"]), text(200, "<html>"), json(200, { access_token: "short" }), json(200, { access_token: "a".repeat(15) }), json(200, { access_token: `${"a".repeat(16)}!` }), json(400, { access_token: "a".repeat(20) }), json(200, { access_token: "has a space in it ok" }), json(200, { access_token: 12345678901234567 }), json(200, { access_token: "a".repeat(4097) })]) {
       await expect(client(scripted(answer).fetch).c.reviews("2026-11-01", 1)).rejects.toThrow(/^Yotpo answered the token request with HTTP (400|200) and no token$/);
     }
     await expect(client(scripted(json(400, { status: { code: 4 } })).fetch).c.reviews("2026-11-01", 1)).rejects.toMatchObject({ status: 400, code: 4 });
@@ -262,7 +262,8 @@ describe("Yotpo reading helpers", () => {
 
   it("reads HTML entities back", () => {
     expect(yotpoText("Couldn&#x27;t &amp; won&#39;t &lt;3 &quot;so&quot; &apos;good&apos;&nbsp;!")).toBe("Couldn't & won't <3 \"so\" 'good' !");
-    expect(yotpoText("&#X41;&AMP;")).toBe("A&");
+    expect(yotpoText("&#X41;&AMP;&gt;")).toBe("A&>");
+    expect(yotpoText("&bogus; &unknown;")).toBe("&bogus; &unknown;");
     expect(yotpoText("&unknown; &#0; &#x110000; &#1114111;")).toBe(`&unknown; &#0; &#x110000; ${String.fromCodePoint(0x10ffff)}`);
     expect(yotpoText("&#x1F48E; ring")).toBe("💎 ring");
     expect(yotpoText(5)).toBeUndefined();
@@ -320,6 +321,7 @@ describe("Yotpo events", () => {
       ctx,
     ).event.payload;
     expect(payload).toMatchObject({ kind: "site", productSku: undefined, verifiedBuyer: false, incentivized: true, incentiveType: "coupon", published: false, escalated: true, sentiment: 1 });
+    expect(yotpoReviewEvent({ ...r, escalated: "yes" }, ctx).event.payload.escalated).toBe(false);
     expect(payload.title).toBe("Call me [phone]");
     expect(payload.excerpt).toBe("Email me at [email] please");
     expect(yotpoReviewEvent({ ...r, deleted: true }, ctx).event.payload.published).toBe(false);
@@ -415,6 +417,8 @@ describe("Yotpo events", () => {
     expect(noMember.event).toMatchObject({ type: YOTPO_LOYALTY_EVENT, occurredAt: undefined, payload: { system: "Yotpo", loyaltyCustomerId: null, problems: ["customer is not an object", "customer has no id that reads"] } });
     expect(noMember.event.idempotencyKey).toMatch(/^yotpo:unreadable_loyalty_customer:[0-9a-f]{12}$/);
     expect(yotpoLoyaltyEvent({ ...member(), yotpo_customer_id: "x" }, ctx).event.payload.problems).toEqual(["customer has no id that reads"]);
+    // Two unreadable reviews apart only in what isn't kept still get their own keys.
+    expect(yotpoReviewEvent({ ...r, id: null, name: "A" }, ctx).event.idempotencyKey).not.toBe(yotpoReviewEvent({ ...r, id: null, name: "B" }, ctx).event.idempotencyKey);
   });
 });
 
@@ -534,6 +538,9 @@ describe("Yotpo connector", () => {
     const followOn = mock.reads.length;
     await drain(connector(mock).incrementalSync({ cursor: JSON.stringify({ pass: null, done: true, nextFrom: "2026-10-01" }) } as never));
     expect(mock.reads[followOn]!.query.since_updated_at).toBe("2026-10-01");
+    // The next pass starts two days before this one, not where this one started.
+    const batches = await drain(connector(mock).incrementalSync({ cursor: JSON.stringify({ pass: null, done: true, nextFrom: "2026-10-01" }) } as never));
+    expect(parseYotpoCursor(batches.at(-1)!.cursor ?? null)).toEqual({ pass: null, done: true, nextFrom: "2026-11-08" });
   });
 
   it("resumes a later sync part way, keeping what it says of the import", async () => {
