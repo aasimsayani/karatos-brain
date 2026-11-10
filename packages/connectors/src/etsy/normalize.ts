@@ -55,11 +55,11 @@ export function etsyTime(value: unknown): string | undefined {
   return Number.isSafeInteger(value) && (value as number) >= ETSY_EPOCH_MIN && (value as number) < 1e10 ? new Date((value as number) * 1000).toISOString() : undefined;
 }
 
-/** An Etsy money object, { amount, divisor, currency_code }, in cents; null for anything else. */
+/** An Etsy money object, { amount, divisor, currency_code }, in cents; null for anything else (a divisor of 0 gives no whole number of cents). */
 export function etsyCents(money: unknown): number | null {
   const m = obj(money);
   const { amount, divisor } = m;
-  if (!Number.isSafeInteger(amount) || !Number.isSafeInteger(divisor) || (divisor as number) < 1) return null;
+  if (!Number.isSafeInteger(amount) || !Number.isSafeInteger(divisor) || (divisor as number) < 0) return null;
   const cents = Math.round(((amount as number) * 100) / (divisor as number));
   return Number.isSafeInteger(cents) ? cents : null;
 }
@@ -180,7 +180,7 @@ function variantsOf(listing: EtsyRecord, listingId: string): Variant[] {
     return [{
       variantId: etsyRef("product", productId),
       sku: etsySku(p.sku, listingId, productId)!,
-      priceCents: offerings.length ? etsyCents(offerings[0]!.price) : null,
+      priceCents: etsyCents(offerings[0]?.price),
       // A quantity Etsy gave that isn't a whole number from 0 stays unreadable, so the inventory schema dead-letters it.
       inventoryQuantity: quantities.every((q) => Number.isSafeInteger(q) && (q as number) >= 0) ? quantities.reduce((sum: number, q) => sum + (q as number), 0) : null,
     }];

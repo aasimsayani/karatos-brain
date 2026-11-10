@@ -66,8 +66,8 @@ describe("Etsy client", () => {
   it("checks its settings before sending anything", () => {
     const mock = etsyDocMock(shop());
     const bad: Partial<EtsyClientOptions>[] = [
-      { keystring: "" }, { keystring: "short" }, { keystring: "a-b".repeat(4) }, { keystring: "a".repeat(65) }, { keystring: undefined as never },
-      { sharedSecret: "" }, { sharedSecret: "abcde" }, { sharedSecret: "abc def" }, { sharedSecret: "a".repeat(129) }, { sharedSecret: undefined as never },
+      { keystring: "" }, { keystring: "a".repeat(7) }, { keystring: "a-b".repeat(4) }, { keystring: "a".repeat(65) }, { keystring: undefined as never },
+      { sharedSecret: "" }, { sharedSecret: "b".repeat(5) }, { sharedSecret: "abc def" }, { sharedSecret: "a".repeat(129) }, { sharedSecret: undefined as never },
     ];
     for (const b of bad) expect(() => etsyClient(options(mock, b)), JSON.stringify(b)).toThrow(new EtsyConfigError("set ETSY_KEYSTRING and ETSY_SHARED_SECRET to the app's keystring and shared secret"));
     for (const shopId of ["", "0", "01", "shop", "1".repeat(19), undefined as never]) expect(() => etsyClient(options(mock, { shopId })), String(shopId)).toThrow(new EtsyConfigError("ETSY_SHOP_ID must be the shop's numeric id"));
@@ -125,6 +125,7 @@ describe("Etsy client", () => {
       [["transactions_r", "listings_r", "listings_d", "shops_w", "email_r", "a_w", "b_w", "c_w"], "the Etsy connection can change data (listings_d, shops_w, a_w, b_w, c_w); reconnect it with only transactions_r listings_r"],
       [["transactions_r", "listings_r", "Listings_R"], "the Etsy connection can change data (Listings_R)"],
       [["transactions_r", "listings_r", " listings_r"], "the Etsy connection can change data ( listings_r)"],
+      [["transactions_r", "listings_r", "listings_rw"], "the Etsy connection can change data (listings_rw)"],
       [["transactions_r"], "the Etsy connection is missing listings_r; reconnect it with transactions_r listings_r"],
       [[], "the Etsy connection is missing transactions_r listings_r"],
       [{ raw: { scopes: "transactions_r listings_r" } }, "Etsy did not say which scopes the connection has (HTTP 200)"],
@@ -161,7 +162,8 @@ describe("Etsy client", () => {
       [() => new Response(JSON.stringify({ error: "invalid_grant" }), { status: 400 }), "Etsy turned down the token refresh (HTTP 400, invalid_grant); reconnect the shop to get a new refresh token", 400],
       [() => new Response(JSON.stringify({ error: "Bad thing <script>" }), { status: 401 }), "Etsy turned down the token refresh (HTTP 401); reconnect the shop to get a new refresh token", 401],
       [() => new Response(JSON.stringify({ error: "a".repeat(41) }), { status: 400 }), "Etsy turned down the token refresh (HTTP 400); reconnect", 400],
-      [() => new Response(JSON.stringify({ access_token: "short" }), { status: 200 }), "Etsy turned down the token refresh (HTTP 200)", 200],
+      [() => new Response(JSON.stringify({ access_token: "a".repeat(15) }), { status: 200 }), "Etsy turned down the token refresh (HTTP 200)", 200],
+      [() => new Response(JSON.stringify({ error: "bad <x>" }), { status: 400 }), "Etsy turned down the token refresh (HTTP 400); reconnect", 400],
       [() => new Response(JSON.stringify({ access_token: "a b".repeat(8) }), { status: 200 }), "Etsy turned down the token refresh (HTTP 200)", 200],
       [() => new Response(JSON.stringify({ access_token: 5 }), { status: 200 }), "Etsy turned down the token refresh (HTTP 200)", 200],
       [() => new Response(JSON.stringify(["x"]), { status: 200 }), "Etsy turned down the token refresh (HTTP 200)", 200],
@@ -345,7 +347,7 @@ describe("Etsy normalizer", () => {
     expect(etsyCents(money(45, 1))).toBe(4500);
     expect(etsyCents(money(-500))).toBe(-500);
     expect(etsyCents({ amount: 0, divisor: 100 })).toBe(0);
-    expect([money(1.5), money(100, 0), money(100, -100), money(100, 1.5), { amount: "100", divisor: 100 }, { amount: 100 }, money(2 ** 53), null, 5].map(etsyCents)).toEqual(Array(9).fill(null));
+    expect([money(1.5), money(100, 0), money(100, -1), money(100, -100), money(100, 1.5), { amount: "100", divisor: 100 }, { amount: 100 }, money(2 ** 53), null, 5].map(etsyCents)).toEqual(Array(10).fill(null));
     expect(etsyCents({ amount: Number.MAX_SAFE_INTEGER, divisor: 1 })).toBeNull();
   });
 
@@ -443,6 +445,7 @@ describe("Etsy normalizer", () => {
     expect(partial[0]!.payload.refundedCents).toBe(5_000);
     expect(etsyReceiptEvents({ ...r, status: "fully refunded", transactions: [{ ...line, quantity: 0 }] }, CTX).map((e) => e.type)).toEqual(["order.updated"]);
     expect(etsyReceiptEvents({ ...r, status: "fully refunded", is_paid: false }, CTX).map((e) => e.type)).toEqual(["order.updated", "sale.returned"]);
+    expect(etsyReceiptEvents({ ...r, status: "fully refunded", transactions: [] }, CTX).map((e) => e.type)).toEqual(["order.updated"]);
   });
 
   it("turns a listing into product.updated with its products, and their stock into inventory.counted", () => {
@@ -576,6 +579,11 @@ describe("Etsy connector", () => {
     const batches = await drain(connector(mock).historicalImport({ cursor } as never));
     expect(mock.reads.map((r) => [r.query.min_created, r.query.offset])).toEqual([[String(BASE), "0"], [String(BASE), "100"], [String(BASE), "200"]]);
     expect(batches.map((b) => b.events.length)).toEqual([200, 200, 60]);
+    expect(parseEtsyCursor(batches.at(-1)!.cursor)).toMatchObject({ step: 6, offset: 0 });
+    // A page one short of full is the last.
+    const short = etsyDocMock(shop({ receipts: receipts.slice(0, ETSY_PAGE_SIZE - 1), listings: [] }));
+    await drain(connector(short).historicalImport({ cursor } as never));
+    expect(short.reads).toHaveLength(1);
   });
 
   it("stops at a full page of receipts it can't move past", async () => {
