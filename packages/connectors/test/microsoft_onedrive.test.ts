@@ -153,7 +153,7 @@ describe("OneDrive times, tokens and links", () => {
     expect(microsoftDeltaToken(link("abc"), DRIVE)).toBe("abc");
     expect(microsoftDeltaToken(`${link("a.b~c_d-e=f")}&$select=id,name`, DRIVE)).toBe("a.b~c_d-e=f");
     expect(microsoftDeltaToken(link("a%2Bb"), DRIVE)).toBe("a+b");
-    expect(microsoftDeltaToken(`https://graph.microsoft.com/v1.0/drives/${DRIVE.replace("!", "%21")}/root/delta?token=t`, DRIVE)).toBe("t");
+    expect(microsoftDeltaToken(`https://graph.microsoft.com/v1.0/drives/${DRIVE.replaceAll("!", "%21")}/root/delta?token=t`, DRIVE)).toBe("t");
     expect(microsoftDeltaToken(`https://GRAPH.microsoft.com/V1.0/Drives/${DRIVE}/Root/Delta?token=t`, DRIVE)).toBe("t");
     expect(microsoftDeltaToken(`https://graph.microsoft.com:443/v1.0/drives/${DRIVE}/root/delta?token=t`, DRIVE)).toBe("t");
     const bad: unknown[] = [
