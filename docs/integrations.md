@@ -275,7 +275,7 @@ Used by: R is retail, W is wholesale, M is manufacturing. Test with says how we 
 | Extend product protection | R | Partner | Partner | Yes | Planned (Protection plans sold online and the claims made on them; needs an Extend merchant account) |
 | ShipStation | R, W | Public API | Paid account | Yes | Planned (Shipments, labels, insured values and tracking across carriers. API access needs a Gold plan or above) |
 | FedEx | R, W, M | Public API | Free sandbox | Yes | Planned (Tracking, declared values and delivery exceptions; tracking webhooks need an enterprise shipping account) |
-| UPS | R, W, M | Public API | Free sandbox | No | Planned (Tracking, declared values and delivery exceptions for parcels sent to customers and vendors) |
+| UPS | R, W, M | Public API | Free sandbox | No | Built (Reads UPS tracking for each number on the business's list until the package is delivered or returned, with UPS's free Tracking API. UPS's test environment checks the sign-in and calls; the docs watch follows UPS's published API files, and the nightly sandbox run catches API changes) |
 | USPS | R, W, M | Public API | Free sandbox | Yes | Planned (Tracking for Registered Mail and other USPS parcels, with tracking event subscriptions. USPS publishes no changelog for its new APIs) |
 | NetSuite | W, M | Public API | Paid account | No | Planned (ERP for wholesalers and manufacturers: items, orders, purchase orders and the books. Release notes are published per release, so the nightly sandbox run catches API changes) |
 | Katana | M | Public API | Unknown | Yes | Planned (Manufacturing orders, materials, stock and costs for small makers) |
@@ -426,12 +426,13 @@ A request for a path or method the docs don't list throws `UndocumentedRequestEr
 - Stuller's invoice and metal market rate endpoints (API v2)
 - TikTok's Display API v2 profile read and video list with its OAuth refresh, enforcing the client credentials, each token's scopes and the scope each field needs, page sizes and time cursors
 - Trello's token, member board, list, custom field, card and action endpoints (REST API 1)
+- UPS's OAuth client credentials token and Tracking API details call
 - A Wix site's read endpoints (eCommerce orders, Catalog V3 and V1, Contacts V5) with the app token, its permissions and cursor paging
 - A WooCommerce store's REST API v3 read endpoints with its key permissions and page headers
 - Xero's Accounting API endpoints with its token refresh
 - Yext's Management API v2 location and review lists, enforcing the API key header, the version date, the account, the app's access, page sizes, update-date ranges and page tokens tied to their query
 
-Where a vendor has a free sandbox (Affirm, Airtable, Amazon (Selling Partner API), Asana, Authorize.net, Avalara AvaTax, BigCommerce, Calendly, Clover, Custom forms, Docusign, Dropbox, eBay, GIA Report Results, Gmail, Google Ads, Google Analytics 4, Google Workspace and Drive, Gusto, HubSpot, Klaviyo, Mailchimp, Meta Ads, Microsoft OneDrive and SharePoint files, Monday.com, Notion, Pinterest, Plaid, QuickBooks Online, Slack, Square, TikTok, Trello, Wix, WooCommerce, Xero and Yext so far), its mock is a stand-in until a developer account is set up for the nightly run.
+Where a vendor has a free sandbox (Affirm, Airtable, Amazon (Selling Partner API), Asana, Authorize.net, Avalara AvaTax, BigCommerce, Calendly, Clover, Custom forms, Docusign, Dropbox, eBay, GIA Report Results, Gmail, Google Ads, Google Analytics 4, Google Workspace and Drive, Gusto, HubSpot, Klaviyo, Mailchimp, Meta Ads, Microsoft OneDrive and SharePoint files, Monday.com, Notion, Pinterest, Plaid, QuickBooks Online, Slack, Square, TikTok, Trello, UPS, Wix, WooCommerce, Xero and Yext so far), its mock is a stand-in until a developer account is set up for the nightly run.
 
 <!-- registry:mocks:end -->
 
@@ -2052,6 +2053,34 @@ Costs are kept as positive whole micro-units of the account's currency (`-0.0079
 **Writes.** Sending a text and placing a call are declared, and the write-gate test shows both are turned down. The restricted key has no permission to do either.
 
 **Testing.** The tests use a stand-in for Twilio's list endpoints shaped from its API reference, with fictional 555-01xx numbers. For the nightly sandbox run, create a restricted key with the two read permissions on a Twilio trial account and add `SANDBOX_TWILIO_ACCOUNT_SID`, `SANDBOX_TWILIO_API_KEY_SID` and `SANDBOX_TWILIO_API_KEY_SECRET` as GitHub Actions secrets.
+
+### UPS tracking
+
+Follows the UPS packages on the business's list, such as repairs going out to a setter, memo goods and customer orders, through UPS's free Tracking API. It shows where each is, flags a delivery exception as soon as UPS records one, and says which parcels needed a signature or went UPS Premier.
+
+| Setting | What it is |
+| --- | --- |
+| `UPS_CLIENT_ID` | The Client ID of a UPS developer app with only the Tracking product added |
+| `UPS_CLIENT_SECRET` | That app's Client Secret |
+| `UPS_TRACKING_NUMBERS_FILE` | A text or CSV file of tracking numbers, one or more a line, split by spaces, commas or semicolons. Lines starting with `#` are skipped, and anything that isn't 7 to 34 letters and digits is left out |
+| `UPS_ENVIRONMENT` | Optional. `production` (the default) or `test`, UPS's Customer Integration Environment |
+| `UPS_MAX_TRACKING_PER_SYNC` | Optional. The most numbers one sync reads, 500 when unset |
+
+**What it reads.** UPS keeps no feed of changes, so each sync reads every number on the list that isn't delivered or returned yet, oldest first, 25 to a checkpoint. A delivered or returned package is never read again, and a number that never reaches either is dropped 120 days after it was first read. A number taken off the list is forgotten. The historical import and the incremental sync do the same; a status that hasn't changed comes back as a duplicate.
+
+The client signs in with the client id and secret (OAuth client credentials) and keeps the token until five minutes before it runs out. It calls `GET /api/track/v1/details/{number}` only, with a fresh `transId` each time, and asks for no signature image, proof of delivery or milestones. A 401 signs in again once; a 429 or 503 waits as Retry-After says, up to a minute, three times. A number UPS doesn't know (404, or a 200 with only a warning) is skipped and read again next sync.
+
+**Events.**
+
+| Event | From | Key |
+| --- | --- | --- |
+| `shipment.tracked` | One package's tracking: status (`label_created`, `picked_up`, `in_transit`, `out_for_delivery`, `delivered`, `exception`, `returned` or `unknown`), UPS's status code and text, latest scan time, scheduled or rescheduled delivery day, delivered day, service, whether a signature was asked for, UPS Premier level, and the destination's state and country | tracking number and a hash of what was kept, so a new scan is a new event and the same status read again is a duplicate |
+
+A package's time is its latest scan, or when it was read when UPS has no scan yet. Names, street addresses, postal codes, who signed, signatures, photos, proof of delivery and payment details are never kept, even when UPS sends them. No department reasons over these events yet.
+
+**Writes.** None. KaratOS never creates labels, pickups or returns.
+
+**Testing.** The tests run against a mock built from the OpenAPI files UPS publishes (`packages/testkit/src/mocks/ups.ts`), with synthetic packages. UPS's status type letters aren't listed in those files, so the mock's assumptions name them for the first live run to check. The nightly sandbox run signs in at UPS's test environment and reads two of UPS's test tracking numbers once `SANDBOX_UPS_CLIENT_ID` and `SANDBOX_UPS_CLIENT_SECRET` are set.
 
 ### TheWatchSearch (by TheWatchCloud)
 

@@ -21,6 +21,8 @@
       "items": [
         { "name": "Sales, inventory, clienteling, repairs, custom orders, appraisals, buying, metals, marketing, finance and compliance", "done": true },
         { "name": "Turn departments on per business", "done": true },
+        { "name": "A dollar estimate on each recommendation: money made, saved or protected", "done": true },
+        { "name": "Value ledger: what acting on a recommendation brought back, measured at 30, 60 and 90 days", "done": true },
         { "name": "Tune thresholds against a live store's data", "done": false }
       ]
     },
@@ -48,7 +50,23 @@
         { "name": "Instance API locked to one organization", "done": true },
         { "name": "Published container image with a real-database smoke test", "done": true },
         { "name": "Guided secrets setup that never prints a value", "done": true },
+        { "name": "Connectors sync on a schedule, each on its own checkpoint", "done": true },
+        { "name": "Raw vendor data cleared after a set number of days", "done": true },
+        { "name": "Writes to a client's systems behind approvals, off by default", "done": true },
         { "name": "First live client instance", "done": false }
+      ]
+    },
+    {
+      "id": "showcase",
+      "name": "Website and demo",
+      "value": "Jewelers can see what KaratOS does for their business before they talk to us.",
+      "target": "2026-11",
+      "items": [
+        { "name": "Website at karatos.app with pricing, payback estimate and a directory of every system", "done": true },
+        { "name": "Live demo store at karatos.app/demo", "done": true },
+        { "name": "Private form for reporting a broken system", "done": true },
+        { "name": "Demo walkthroughs of the biggest jeweler problems", "done": false },
+        { "name": "Homepage video of the live dashboard solving real problems", "done": false }
       ]
     },
     {
@@ -88,17 +106,66 @@
       "id": "catalog_wave_2",
       "name": "Integrations, next wave",
       "value": "Jewelry POS, CRM, messaging, marketing and diamond feeds join the catalog.",
-      "target": "2027-06",
+      "target": "2026-12",
       "items": [
         { "integration": "square" },
         { "integration": "lightspeed" },
         { "integration": "clover" },
         { "integration": "woocommerce" },
+        { "integration": "bigcommerce" },
+        { "integration": "wix" },
         { "integration": "hubspot" },
         { "integration": "klaviyo" },
+        { "integration": "mailchimp" },
         { "integration": "gmail" },
+        { "integration": "slack" },
         { "integration": "xero" },
-        { "integration": "rapnet" }
+        { "integration": "gusto" },
+        { "integration": "rapnet" },
+        { "integration": "idex" },
+        { "integration": "nivoda" },
+        { "integration": "stuller" },
+        { "integration": "gia" },
+        { "integration": "metals_api" }
+      ]
+    },
+    {
+      "id": "catalog_wave_3",
+      "name": "Marketplaces, ads and office tools",
+      "value": "Sales channels, ad spend and the files and tasks a team already keeps, in one place.",
+      "target": "2026-12",
+      "items": [
+        { "integration": "amazon" },
+        { "integration": "ebay" },
+        { "integration": "meta_ads" },
+        { "integration": "google_ads" },
+        { "integration": "google_analytics" },
+        { "integration": "pinterest" },
+        { "integration": "tiktok" },
+        { "integration": "yext" },
+        { "integration": "google_workspace" },
+        { "integration": "dropbox" },
+        { "integration": "microsoft_onedrive" },
+        { "integration": "notion" },
+        { "integration": "airtable" },
+        { "integration": "asana" },
+        { "integration": "trello" },
+        { "integration": "monday" },
+        { "integration": "docusign" }
+      ]
+    },
+    {
+      "id": "catalog_wave_4",
+      "name": "Shipping, payables and insurance",
+      "value": "Packages, bills and care plans tracked next to the sale they belong to.",
+      "target": "2027-01",
+      "items": [
+        { "integration": "fedex" },
+        { "integration": "ups" },
+        { "integration": "usps" },
+        { "integration": "bill_com" },
+        { "integration": "jewelers_mutual" },
+        { "integration": "imap_email" }
       ]
     },
     {

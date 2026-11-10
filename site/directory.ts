@@ -270,7 +270,7 @@ export const SYSTEM_DETAILS: Readonly<Record<string, SystemDetail>> = {
   malca_amit: { about: "Secure shipments of valuables, with tracking and invoices." },
   shipstation: { about: "Shipments, labels, insured values and tracking across carriers." },
   fedex: { about: "Tracking, declared values and delivery exceptions." },
-  ups: { about: "Tracking, declared values and delivery exceptions." },
+  ups: { about: "Tracking, delivery exceptions and signature-required parcels." },
   usps: { about: "Tracking for Registered Mail and other USPS parcels." },
   cabrella: { about: "Insured shipments, declared values and claims." },
   brinks_connect: { about: "Secure shipping bookings, tracking, customs papers and invoices." },
@@ -358,5 +358,6 @@ export const CONNECTED_ON: Readonly<Record<string, string>> = {
   docusign: "2026-11-08",
   dropbox: "2026-11-09",
   microsoft_onedrive: "2026-11-10",
+  ups: "2026-11-10",
   gusto: "2026-10-30",
 };
