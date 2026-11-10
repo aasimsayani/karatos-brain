@@ -76,8 +76,9 @@ export function parseQuoCursor(raw: string | null): QuoCursor | null {
   const r = typeof c === "object" && c !== null && !Array.isArray(c) ? (c as Record<string, unknown>) : null;
   if (r && typeof r.done === "boolean" && isTime(r.nextFrom)) {
     if (r.pass === null) return { pass: null, done: r.done, nextFrom: r.nextFrom };
-    const p = typeof r.pass === "object" && !Array.isArray(r.pass) ? (r.pass as Record<string, unknown>) : null;
-    if (p && isTime(p.from) && isTime(p.until) && (p.step === 0 || p.step === 1) && (p.after === null || typeof p.after === "string")) {
+    // Anything but an object fails the checks below: a string or number has no such fields.
+    const p = r.pass as Record<string, unknown> | undefined;
+    if (isTime(p?.from) && isTime(p.until) && (p.step === 0 || p.step === 1) && (p.after === null || typeof p.after === "string")) {
       return { pass: { from: p.from, until: p.until, step: p.step, after: p.after }, done: r.done, nextFrom: r.nextFrom };
     }
   }

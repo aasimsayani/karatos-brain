@@ -49,17 +49,18 @@ const ACTOR_ID = /^(US|SYU)[A-Za-z0-9]{1,40}$/;
 
 /** An ISO time as Quo writes it, as UTC with milliseconds, or null when it isn't one. */
 export function quoTime(value: unknown): string | null {
-  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,9})?(Z|[+-]\d{2}:\d{2})$/.test(value)) return null;
+  const m = typeof value === "string" ? /^(\d{4}-\d{2}-\d{2})T\d{2}:\d{2}:\d{2}(\.\d{1,9})?(Z|[+-]\d{2}:\d{2})$/.exec(value) : null;
+  if (!m) return null;
   // Date.parse rolls an impossible day (Feb 30) into the next month, so the day must read back as itself.
-  const day = value.slice(0, 10);
-  const t = Date.parse(value.replace(/(\.\d{3})\d+/, "$1"));
-  return !Number.isNaN(t) && t >= 0 && new Date(`${day}T00:00:00Z`).toISOString().slice(0, 10) === day ? new Date(t).toISOString() : null;
+  const day = m[1]!;
+  const t = Date.parse(m[0]);
+  return t >= 0 && new Date(`${day}T00:00:00Z`).toISOString().slice(0, 10) === day ? new Date(t).toISOString() : null;
 }
 
 /** The customer references for a number, when it is one: E.164, not a withheld caller or short code. */
 export function quoCustomerRefs(key: string, numbers: unknown[]): string[] {
   const refs = numbers
-    .filter((n): n is string => typeof n === "string" && /^\+[1-9]\d{6,14}$/.test(n))
+    .filter((n): n is string => typeof n === "string" && /^\+[1-9]\d*$/.test(n))
     .slice(0, MAX_CUSTOMERS)
     .flatMap((phone) => formCustomerRefs(key, { phone }));
   return [...new Set(refs)].sort();

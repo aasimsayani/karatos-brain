@@ -131,8 +131,9 @@ describe("Quo client", () => {
   });
 
   it("says when a page has no data list or a next cursor that doesn't read", async () => {
-    const { fetch } = scripted(json(200, { nextCursor: null }), json(200, { data: [] }), json(200, { data: [], nextCursor: "a b" }), json(200, { data: [], nextCursor: 5 }));
+    const { fetch } = scripted(json(200, { nextCursor: null }), json(200, { data: {}, nextCursor: null }), json(200, { data: [] }), json(200, { data: [], nextCursor: "a b" }), json(200, { data: [], nextCursor: 5 }));
     const { c } = client(fetch);
+    await expect(c.page("calls", Q)).rejects.toThrow("Quo answered calls without the data list");
     await expect(c.page("calls", Q)).rejects.toThrow("Quo answered calls without the data list");
     await expect(c.page("calls", Q)).rejects.toThrow("Quo answered calls with a next cursor that doesn't read");
     await expect(c.page("messages", Q)).rejects.toThrow("Quo answered messages with a next cursor that doesn't read");
@@ -213,7 +214,7 @@ describe("Quo reading helpers", () => {
     expect(quoTime("2022-01-01T00:00:00.5Z")).toBe("2022-01-01T00:00:00.500Z");
     expect(quoTime("2022-01-01T08:00:00+08:00")).toBe("2022-01-01T00:00:00.000Z");
     expect(quoTime("1970-01-01T00:00:00Z")).toBe("1970-01-01T00:00:00.000Z");
-    for (const bad of ["2022-02-30T00:00:00Z", "2022-13-01T00:00:00Z", "2022-01-01T25:00:00Z", "2022-01-01", "2022-01-01T00:00:00", "x2022-01-01T00:00:00Z", "2022-01-01T00:00:00Zx", "1969-12-31T23:59:59Z", "2022-01-01T00:00:00.1234567890Z", 1, null]) {
+    for (const bad of ["2022-02-30T00:00:00Z", "2022-13-01T00:00:00Z", "2022-01-01T25:00:00Z", "2022-01-01", "2022-01-01T00:00:00", "x2022-01-01T00:00:00Z", "+002022-01-01T00:00:00Z", "2022-01-01T00:00:00Zx", "1969-12-31T23:59:59Z", "2022-01-01T00:00:00.1234567890Z", 1, null]) {
       expect(quoTime(bad), String(bad)).toBeNull();
     }
   });
@@ -222,7 +223,7 @@ describe("Quo reading helpers", () => {
     const n = quoCustomerNumber(3);
     expect(quoCustomerRefs(CUSTOMER_KEY, [n])).toEqual(formCustomerRefs(CUSTOMER_KEY, { phone: n }));
     expect(quoCustomerRefs(CUSTOMER_KEY, [n, n])).toHaveLength(1);
-    expect(quoCustomerRefs(CUSTOMER_KEY, ["anonymous", "Blocked", "12345", "+0123456789", "+123456", "1234567890", "+1234567890123456", 7, null])).toEqual([]);
+    expect(quoCustomerRefs(CUSTOMER_KEY, ["anonymous", "Blocked", "12345", "x+12125550100", "+12125550100x", "+0123456789", "+123456", "1234567890", "+1234567890123456", 7, null])).toEqual([]);
     expect(quoCustomerRefs(CUSTOMER_KEY, ["+1234567"])).toHaveLength(1);
     expect(quoCustomerRefs(CUSTOMER_KEY, ["+123456789012345"])).toHaveLength(1);
     const many = Array.from({ length: 12 }, (_, i) => quoCustomerNumber(i));
@@ -284,7 +285,7 @@ describe("Quo events", () => {
   it("notes withheld callers, forwarding and the AI agent, and drops what doesn't read", () => {
     const { event } = quoCallEvent(
       call({
-        participants: [{ phoneNumber: QUO_TEST_NUMBER, actorId: QUO_TEST_USER }, { phoneNumber: "Anonymous", actorId: null }, "x", { phoneNumber: quoCustomerNumber(9) }],
+        participants: [{ phoneNumber: QUO_TEST_NUMBER, actorId: QUO_TEST_USER }, { phoneNumber: "Anonymous", actorId: null }, "x", null, { phoneNumber: quoCustomerNumber(9) }],
         forwardedTo: "PNother",
         aiHandled: "ai-agent",
         phoneNumberId: "line-1",
@@ -298,6 +299,7 @@ describe("Quo events", () => {
     expect(event.payload).toMatchObject({ customerRefs: [], withheldCaller: true, forwarded: true, aiHandled: true, storeLineId: undefined, answeredBy: undefined, durationSeconds: undefined, answeredAt: undefined, endedAt: undefined });
     expect(quoCallEvent(call({ participants: "none", answeredBy: "SYUagent1", duration: 1.5, aiHandled: "human" }), ctx).event.payload).toMatchObject({ customerRefs: [], withheldCaller: false, answeredBy: "SYUagent1", durationSeconds: undefined, aiHandled: false });
     expect(quoCallEvent(call({ duration: 0, forwardedTo: undefined }), ctx).event.payload).toMatchObject({ durationSeconds: 0, forwarded: false });
+    expect(quoCallEvent(call({ participants: [{ phoneNumber: "Restricted", actorId: null }] }), ctx).event.payload).toMatchObject({ customerRefs: [], withheldCaller: true });
   });
 
   it("logs a text as Twilio's do, with its length but never its words", () => {
@@ -468,6 +470,15 @@ describe("Quo connector", () => {
     expect(eventsOf(batches)).toHaveLength(4);
     expect(parseQuoCursor(batches.at(-1)!.cursor ?? null)).toEqual({ pass: null, done: false, nextFrom: before(24) });
     expect(QUO_FIRST_LOOKBACK_MS).toBe(48 * HOUR_MS);
+  });
+
+  it("keeps saying the import is done through a later sync's pages", async () => {
+    quoCall.reset();
+    const mock = quoDocMock({ apiKey: KEY, calls: Array.from({ length: QUO_PAGE_SIZE + 1 }, (_, i) => quoCall.one({ createdAt: before(1 + i / 100) })) });
+    const cursor = JSON.stringify({ pass: null, done: true, nextFrom: before(26) } satisfies QuoCursor);
+    const batches = await drain(connector(mock).incrementalSync({ cursor } as never));
+    expect(batches.map((b) => parseQuoCursor(b.cursor ?? null)!.done)).toEqual([true, true, true]);
+    expect(eventsOf(batches)).toHaveLength(QUO_PAGE_SIZE + 1);
   });
 
   it("resumes a later sync part way, keeping what it says of the import", async () => {
