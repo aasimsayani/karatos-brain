@@ -48,6 +48,7 @@ export const DEMO_NOT_YET: Readonly<Record<string, string>> = {
   supplier_invoices: NEXT,
   amazon: NEXT,
   yext: NEXT,
+  birdeye: NEXT,
   tiktok: NEXT,
   pinterest: NEXT,
   ebay: NEXT,

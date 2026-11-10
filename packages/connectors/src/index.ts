@@ -8,6 +8,7 @@ export * from "./avalara/index.js";
 export * from "./bank_statements/index.js";
 export * from "./bigcommerce/index.js";
 export * from "./bill_com/index.js";
+export * from "./birdeye/index.js";
 export * from "./calendly/index.js";
 export * from "./chase/index.js";
 export * from "./clover/index.js";
