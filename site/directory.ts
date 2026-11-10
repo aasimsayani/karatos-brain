@@ -347,6 +347,7 @@ export const CONNECTED_ON: Readonly<Record<string, string>> = {
   etsy: "2026-11-10",
   taxjar: "2026-11-10",
   openphone: "2026-11-10",
+  zoom: "2026-11-10",
   tiktok: "2026-11-01",
   pinterest: "2026-10-31",
   ebay: "2026-10-30",
