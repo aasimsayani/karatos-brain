@@ -185,7 +185,7 @@ Used by: R is retail, W is wholesale, M is manufacturing. Test with says how we 
 | Any other mailbox (IMAP) | R, W, M | Public API | Sample files | No | Planned (Read-only mail from any provider that offers IMAP, for stores not on Google or Microsoft) |
 | Microsoft Teams | R, W, M | Public API | Paid account | Yes | Planned (Channel messages where staff hand off repairs, custom orders and sales, like Slack. Microsoft Graph has one changelog, watched through the Outlook entry) |
 | RingCentral | R, W, M | Public API | Paid account | Yes | Planned (Business phone call logs, texts and voicemail. RingCentral replaced its free developer account with a low-cost package) |
-| Quo (formerly OpenPhone) | R | Public API | Unknown | Yes | Planned (Small-business calls and texts, with call recordings and transcripts) |
+| Quo (formerly OpenPhone) | R | Public API | Paid account | Yes | Built (Reads calls and texts with the workspace's Quo API key. Quo keys have full access, so the client only ever sends List calls and List messages. No sandbox: the first client's key confirms the mock built from Quo's docs) |
 | Zoom | R, W, M | Public API | Unknown | Yes | Planned (Virtual consultations: who met, when and for how long, and whether it was recorded) |
 | Gorgias | R | Public API | Paid account | Yes | Planned (E-commerce helpdesk tickets from email, chat and social, common with Shopify jewelry brands) |
 | Zendesk | R, W, M | Public API | Paid account | Yes | Planned (Helpdesk tickets and customer conversations. Zendesk offers a 14-day trial, and sponsored test accounts only to Marketplace partners) |
@@ -422,6 +422,7 @@ A request for a path or method the docs don't list throws `UndocumentedRequestEr
 - monday.com's GraphQL API: boards, items, activity logs and updates
 - Nivoda's GraphQL diamond search: sign-in, diamonds_by_query and get_diamond_by_id
 - Notion's search, retrieve data source and query data source endpoints (API version 2026-03-11)
+- Quo's List calls and List messages
 - Pinterest's API v5 Pin list, account analytics, top Pins and Pin creation with its OAuth refresh, enforcing the client credentials, each token's scopes, the 90-day analytics window, page sizes, metrics and bookmarks tied to their list
 - Plaid's accounts, transactions sync, Item and webhook verification key endpoints (API version 2020-09-14), with webhooks signed the way Plaid signs them
 - QuickBooks Online's query and change data capture endpoints with Intuit's token refresh (minor version 75)
@@ -1680,6 +1681,31 @@ Notion keeps edit times to the minute, so each version is keyed by a hash of wha
 **Webhooks.** None yet. The scheduled sync polls.
 
 **Testing.** The tests run against a mock built from Notion's API reference (`packages/testkit/src/mocks/notion.ts`). Like Notion, it returns every property when none are named and only the named ones otherwise, so the tests show a title or text property never comes back. It answers 401 for the wrong token, 400 without the API version, 404 for a data source that isn't shared, applies the edited-since filter and sort, pages with `start_cursor`, stops a query at its result limit, and can answer 429. Its assumptions are listed in the mock and checked on the first sandbox run. For the nightly run, make a free Notion workspace for testing only, add a database or two of synthetic pages, make an internal connection with only Read content, share the databases with it, and add its secret as the `SANDBOX_NOTION_ACCESS_TOKEN` GitHub Actions secret.
+
+### Quo (formerly OpenPhone)
+
+Reads every call and text on a store's Quo lines. They arrive as the same `communication.call_logged` and `communication.message_logged` events the Twilio connector gives, so clienteling, repairs and sales see who called or wrote, and how fast the store answered, whichever phone system it uses.
+
+| Setting | What it is |
+| --- | --- |
+| `QUO_API_KEY` | An API key from the Quo workspace's Workspace Settings > API |
+| `CUSTOMER_REF_KEY` | The instance's key for customer references |
+
+**Read-only by design.** Quo issues one kind of API key and "each key has full access to your workspace's API", so the same key could send texts, change contacts or add webhooks. The client is what keeps KaratOS to reading. It sends only two requests, List calls (`GET /calls`) and List messages (`GET /messages`), to `https://api.quo.com`, with `Quo-Api-Version: 2026-03-30` and filters it builds itself from checked values. Sending a text and adding a contact note are declared behind the write gate, turned off, and the client has no request to send them.
+
+**What it reads.** Quo lists calls and messages newest first by when they were created, 50 a page, with a cursor and no change-time filter. So a pass reads the calls and then the messages created in a span. The first import covers two years. Each later sync starts where the last pass started, less a day, because a call or text changes after it is created: it is answered, ends or is delivered. An unchanged one is a duplicate. The first later sync looks back two days. Each page is one batch, and the checkpoint keeps the span and Quo's cursor, so a resumed pass goes on from the page it reached. Quo can send webhooks, but the connector polls so it needs no public route.
+
+**Events.**
+- `communication.call_logged` for each call: the store's line (Quo's phone number id), inbound or outbound, status, whether an inbound call was missed (busy, not answered, cancelled, missed or abandoned), who answered (Quo's user id), duration, whether it was forwarded or handled by Quo's AI agent, and when it started, was answered and ended.
+- `communication.message_logged` for each text: SMS or MMS, the conversation, line, direction, status, who sent it, how many attachments, how long the text was, and when it was sent and last changed.
+
+Each event is keyed by a digest of what was kept. A call or text without an id, a time, a direction or a status Quo documents is dead-lettered.
+
+**Privacy.** Calls and texts are the customer's own words, so no message text, media link, call summary, voicemail, recording or transcript is read into an event. Customers' numbers become the same customer references custom forms, Klaviyo and AvaTax make (an HMAC under `CUSTOMER_REF_KEY`), so one person lines up across systems without the number being kept. Withheld callers and short codes get no reference. Contacts aren't read: Quo's contact list carries names but no numbers, so it adds nothing a reference could link.
+
+**Rate limits.** Quo allows 10 requests a second per key and answers 429 past it, without a `Retry-After` header. The client backs off (1, 2 and 4 seconds) on a 429, 500, 502, 503 or 504, honoring a `Retry-After` up to a minute if one comes, before the error goes to the sync runner, which resumes from its checkpoint next time. A 401 means the key is wrong or deleted. A 403 means the workspace can't use the API.
+
+**Testing.** Quo has no sandbox. The tests run against a mock built from Quo's API reference (`packages/testkit/src/mocks/openphone.ts`). It checks the version header, the raw key, the filters each list takes and the page size. It lists what the first client's key must confirm: that a cursor stays good while the data it pages through changes, that a call or text's changes land within a day, and whether a 429 carries `Retry-After`.
 
 ### Pinterest
 

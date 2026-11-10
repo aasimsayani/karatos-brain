@@ -39,6 +39,7 @@ export * from "./microsoft_onedrive/index.js";
 export * from "./monday/index.js";
 export * from "./nivoda/index.js";
 export * from "./notion/index.js";
+export * from "./openphone/index.js";
 export * from "./pinterest/index.js";
 export * from "./piro/index.js";
 export * from "./plaid/index.js";
