@@ -63,6 +63,7 @@ export interface FedexClient {
 
 const isObject = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null && !Array.isArray(value);
 const list = (value: unknown): unknown[] => (Array.isArray(value) ? value : []);
+const field = (value: unknown, key: string): unknown => (value as Record<string, unknown> | null | undefined)?.[key];
 const CODE = /^[A-Z0-9_.]{1,80}$/;
 
 /** The first error code FedEx gave, when it reads as one. */
@@ -141,11 +142,11 @@ export function fedexClient(options: FedexClientOptions): FedexClient {
       if (response.status === 404) return { kind: "not_found" };
       if (response.status !== 200) throw new FedexApiError(`FedEx tracking answered HTTP ${response.status}`, response.status, fedexErrorCode(body));
       if (!isObject(body)) throw new FedexApiError("FedEx tracking answered with a body that isn't a JSON object", 200);
-      const results = list(isObject(body.output) ? body.output.completeTrackResults : undefined)
-        .flatMap((c) => list(isObject(c) ? c.trackResults : undefined))
+      const results = list(field(body.output, "completeTrackResults"))
+        .flatMap((c) => list(field(c, "trackResults")))
         .filter(isObject);
       // A result carrying an error, such as TRACKING.TRACKINGNUMBER.NOTFOUND, has nothing to read; the number is tried again next sync.
-      const found = results.filter((r) => r.error === undefined);
+      const found = results.filter((r) => !isObject(r.error));
       return found.length === 0 ? { kind: "not_found" } : { kind: "found", results: found };
     }
   }

@@ -13,7 +13,7 @@ import { FEDEX_TRACKING_NUMBER } from "./client.js";
 const isObject = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null && !Array.isArray(value);
 const list = (value: unknown): unknown[] => (Array.isArray(value) ? value : []);
 const text = (value: unknown, max: number): string | undefined => (typeof value === "string" && value.trim() ? value.trim().replace(/\s+/g, " ").slice(0, max) : undefined);
-const field = (value: unknown, key: string): unknown => (isObject(value) ? value[key] : undefined);
+const field = (value: unknown, key: string): unknown => (value as Record<string, unknown> | null | undefined)?.[key];
 
 /**
  * FedEx status codes. The Track API's public pages don't list them, so this
@@ -61,8 +61,8 @@ export function fedexTime(value: unknown): string | undefined {
   const ms = Date.parse(value);
   if (Number.isNaN(ms)) return undefined;
   const offset = m[3] === "Z" ? 0 : (m[3]!.startsWith("-") ? -1 : 1) * (Number(m[3]!.slice(1, 3)) * 60 + Number(m[3]!.slice(4, 6)));
-  // The day and time as written must be real, not rolled over from 30 February or 25:00.
-  if (new Date(ms + offset * 60_000).toISOString().slice(0, 19) !== `${m[1]}T${m[2]}`) return undefined;
+  // The day as written must be real, not rolled over from 30 February or 24:00.
+  if (new Date(ms + offset * 60_000).toISOString().slice(0, 10) !== m[1]) return undefined;
   return new Date(ms).toISOString();
 }
 
@@ -71,8 +71,8 @@ export function fedexDay(value: unknown): string | undefined {
   return fedexTime(value) === undefined ? undefined : (value as string).slice(0, 10);
 }
 
-function times(result: Record<string, unknown>): { delivered?: string; estimated?: string } {
-  const out: { delivered?: string; estimated?: string } = {};
+function times(result: Record<string, unknown>): { delivered?: string | undefined; estimated?: string | undefined } {
+  const out: { delivered?: string | undefined; estimated?: string | undefined } = {};
   for (const t of list(result.dateAndTimes)) {
     const day = fedexDay(field(t, "dateTime"));
     if (day === undefined) continue;

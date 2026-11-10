@@ -127,7 +127,7 @@ describe("FedEx client", () => {
     await expect(client(twice).track(N[0]!)).rejects.toMatchObject({ name: "FedexApiError", status: 401, code: "NOT.AUTHORIZED.ERROR", message: expect.stringMatching(/Track API/) });
     expect(twice.calls).toHaveLength(4);
     const forbidden = scripted([() => respond(200, TOKEN), () => respond(403, { errors: [{ code: "FORBIDDEN.ERROR" }] })]);
-    await expect(client(forbidden).track(N[0]!)).rejects.toMatchObject({ status: 403, code: "FORBIDDEN.ERROR" });
+    await expect(client(forbidden).track(N[0]!)).rejects.toMatchObject({ status: 403, code: "FORBIDDEN.ERROR", message: expect.stringMatching(/^FedEx turned down the token for tracking/) });
     expect(forbidden.calls).toHaveLength(2);
   });
 
@@ -140,6 +140,9 @@ describe("FedEx client", () => {
     expect(await client(scripted([() => respond(200, TOKEN), () => respond(404, "")])).track(N[0]!)).toEqual({ kind: "not_found" });
     const mixed = await client(scripted([() => respond(200, TOKEN), () => respond(200, tracked([{ error: { code: "X" } }, { trackingNumberInfo: { trackingNumber: N[0] } }]))])).track(N[0]!);
     expect(mixed).toEqual({ kind: "found", results: [{ trackingNumberInfo: { trackingNumber: N[0] } }] });
+    // Only an error object marks a result as empty; a null or a stray value doesn't.
+    const nulls = await client(scripted([() => respond(200, TOKEN), () => respond(200, tracked([{ error: null }, { error: "" }, { error: "x" }]))])).track(N[0]!);
+    expect(nulls).toEqual({ kind: "found", results: [{ error: null }, { error: "" }, { error: "x" }] });
   });
 
   it("waits out a 429 or 503 as Retry-After says, capped at a minute, then backs off, then gives up", async () => {
@@ -222,7 +225,7 @@ describe("FedEx client", () => {
     expect(make({ clientSecret: "a".repeat(256) })).not.toThrow();
     expect(make({ environment: "staging" })).toThrow(/FEDEX_ENVIRONMENT/);
     expect(make({ environment: "toString" })).toThrow(/FEDEX_ENVIRONMENT/);
-    for (const bad of ["12345678901", "1".repeat(35), "DT1234567890", "dt123456789012", "12345678901a", `${N[0]}\n`]) {
+    for (const bad of ["12345678901", "1".repeat(35), "DT1234567890", "DT12345678901", "dt123456789012", "12345678901a", `${N[0]}\n`]) {
       await expect(make({})().track(bad)).rejects.toThrow(/not a FedEx tracking number/);
     }
     expect(s.calls).toHaveLength(0);
@@ -260,7 +263,7 @@ describe("FedEx normalizer", () => {
     expect(fedexTime("2026-11-02T23:30:00+05:30")).toBe("2026-11-02T18:00:00.000Z");
     expect(fedexTime("2026-11-02T12:47:00Z")).toBe("2026-11-02T12:47:00.000Z");
     expect(fedexTime("2026-11-02T12:47:00.250Z")).toBe("2026-11-02T12:47:00.250Z");
-    for (const bad of ["2026-02-30T00:00:00-06:00", "2026-11-02T25:00:00-06:00", "2026-11-02T12:60:00Z", "2026-11-02 12:47:00Z", "2026-11-02T12:47:00", "2026-11-02T12:47:00-0600", "x2026-11-02T12:47:00Z", "2026-11-02T12:47:00Zx", "2026-11-02T12:47:00+24:00", "2026-11-02T12:47:00-06:60"]) {
+    for (const bad of [" 2026-11-02T12:47:00Z", "2026-11-02T24:00:00Z", "2026-11-02T24:00:00+06:00", "2026-02-30T00:00:00-06:00", "2026-11-02T25:00:00-06:00", "2026-11-02T12:60:00Z", "2026-11-02 12:47:00Z", "2026-11-02T12:47:00", "2026-11-02T12:47:00-0600", "x2026-11-02T12:47:00Z", "2026-11-02T12:47:00Zx", "2026-11-02T12:47:00+24:00", "2026-11-02T12:47:00-06:60"]) {
       expect([bad, fedexTime(bad)]).toEqual([bad, undefined]);
     }
     expect(fedexTime(5)).toBeUndefined();

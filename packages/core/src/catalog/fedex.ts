@@ -8,7 +8,7 @@ export default {
   note: "Reads FedEx tracking for each number on the business's list until the package is delivered or returned, with FedEx's free Track API. FedEx's sandbox checks the sign-in and calls; the docs watch follows FedEx's announcements, and the nightly sandbox run catches API changes",
   capabilities: [
     "Follows every FedEx package on the business's list, from label created to delivered or returned",
-    "Flags a delivery exception, such as a damaged parcel or a refused delivery, as soon as FedEx records it",
+    "Flags a delivery exception, such as a damaged parcel or a missed delivery, as soon as FedEx records it",
     "Shows which parcels needed a direct or adult signature, for insured jewelry shipments",
     "Gives the expected delivery day and the delivered day, for repairs, memo goods and customer orders",
     "Read-only: KaratOS only reads tracking, never creates labels, and keeps no names, addresses or signatures",

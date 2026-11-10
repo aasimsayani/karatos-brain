@@ -178,6 +178,6 @@ export function fedexDocMock(data: FedexMockData): FedexMock {
 export default {
   integration: "fedex",
   covers: "FedEx's OAuth client credentials token and Track API tracking-number call",
-  watchPages: [CATALOG, "https://developer.fedex.com/api/en-us/announcements.html"],
+  watchPages: [CATALOG],
   docMocks: () => [fedexDocMock({ clientId: "", clientSecret: "", results: {} }).api],
 } satisfies DocMockModule;
