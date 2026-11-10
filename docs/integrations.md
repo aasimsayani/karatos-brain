@@ -192,7 +192,7 @@ Used by: R is retail, W is wholesale, M is manufacturing. Test with says how we 
 | Apple Messages for Business | R | Partner | Partner | No | Planned (iMessage conversations with customers, reached through a messaging service provider Apple has approved) |
 | Postscript | R | Partner | Partner | Yes | Planned (Shopify SMS marketing. Custom API access is limited to enterprise plans and integration partners) |
 | Yotpo reviews and loyalty | R | Public API | Paid account | Yes | Built (Reads the store's reviews with its store ID and API secret, and its Loyalty members' points with the Loyalty GUID and API key when given. Neither can be limited to reading, so the client only ever sends a token request and two GETs. Yotpo has no sandbox: the first client's store confirms the mock built from Yotpo's docs) |
-| Judge.me | R | Public API | Unknown | Yes | Planned (Shopify product reviews and ratings) |
+| Judge.me | R | Public API | Paid account | Yes | Built (Reads the shop's reviews with its domain and an API token: an OAuth token with read_reviews only, or the private token, which also writes. The client only ever sends GETs of the review list. Judge.me has no sandbox: the first client's shop confirms the mock built from Judge.me's docs) |
 | Smile.io | R | Public API | Paid account | No | Planned (Loyalty points, VIP tiers and referrals. The API needs the Plus or Enterprise plan) |
 | Trustpilot | R, W | Public API | Paid account | No | Planned (Company reviews and trust score. The API needs Trustpilot's API module add-on) |
 | Pinterest | R, M | Public API | Free sandbox | No | Built (Connects a Pinterest business account through an app the store owns, holding boards:read, pins:read and user_accounts:read only; the connector stops if the token holds anything more. Its only API requests are the Pin list and two analytics reads. Pinterest's analytics reach back 90 days, so the first import reads 90 days of metrics and every Pin) |
@@ -414,6 +414,7 @@ A request for a path or method the docs don't list throws `UndocumentedRequestEr
 - Gusto's payroll list and payroll endpoints with its token refresh and token_info
 - HubSpot's CRM search, archived list, batch association and token info endpoints (date version 2026-09)
 - IDEX's Onsite feeds: the natural full feed and the lab-grown full file
+- Judge.me's review list (REST v1)
 - Klaviyo's mock covers its profile, list, segment, campaign, flow and metric reads and the campaign and flow values reports (revision 2026-10-15). Plaid's accounts, transactions sync, Item and webhook verification key endpoints (API version 2020-09-14), with webhooks signed the way Plaid signs them
 - Lightspeed Retail (X-Series) token refresh and product, inventory, customer and sale reads
 - Mailchimp's ping, audience, member, campaign and campaign report reads (Marketing API 3.0)
@@ -1426,6 +1427,28 @@ Money reads `$1,250.00`, `1250.5` and `(25.00)` without floating point. Metal an
 A value that can't be read is left null, so the department schema dead-letters the row with the raw event kept, and every event carries `sourceRow` (`file.csv:12`) to find it. Only mapped columns are read: email addresses, phone numbers and street addresses in an export are never stored.
 
 **Testing.** The tests use synthetic exports only. The CSV reader in `packages/connectors/src/files` (RFC 4180 quoting, CRLF, byte-order marks) and its money, date and flag parsers are shared with the bank statement connector.
+
+### Judge.me
+
+Reads a shop's Judge.me reviews, each on the product and customer it is about, with reviews of two stars or fewer marked for follow-up. Reviews arrive as the same `review.updated` events the Yext, Birdeye and Yotpo connectors give.
+
+| Setting | What it is |
+| --- | --- |
+| `JUDGEME_SHOP_DOMAIN` | The shop's domain, such as `example.myshopify.com` |
+| `JUDGEME_API_TOKEN` | An OAuth token with only `read_reviews`, or the private API token |
+| `CUSTOMER_REF_KEY` | The instance's key for customer references |
+
+**Read-only by design.** Judge.me's private API token reads and writes alike: it could post reviews and change what is published. An OAuth token can be limited to `read_reviews`, and that is the one to use when the shop can grant it. Either way the client is what keeps KaratOS to reading: its only request is a GET of the review list (`api.judge.me/api/v1/reviews`), to Judge.me's fixed address, with a query built from checked values. Replying to a review and publishing or hiding one are declared behind the write gate, turned off, and the client has no request to send them. Judge.me takes the token in the query string, so no error the client raises carries a URL.
+
+**What it reads.** Every page of the shop's reviews, 100 to a page by page number, since Judge.me has no filter by date. The first import keeps the reviews posted or changed in the last five years. Each later sync keeps the ones changed since two days before the last pass started. Each page is one batch and one checkpoint.
+
+**Events.** `review.updated` for each review, with its id, whether it is about a product (and the product's id on the store platform) or the store, the rating, whether it needs follow-up, the title and an excerpt with email addresses and phone numbers masked, where it came from, its curation and verification status, whether it is published or hidden, how many photos show, the reviewer's Judge.me reference and customer references, and when it was posted and last changed. Each is keyed by a digest of what was kept, so an unchanged review is a duplicate. A review without an id, a rating or a time that reads is dead-lettered.
+
+**Privacy.** Reviewers' email addresses and phone numbers only make keyed customer references. Names, IP addresses, marketing tags and photo links aren't kept.
+
+**Rate limits.** Judge.me doesn't document one. The client waits out a 429, 500, 502, 503 or 504 three times, honoring `Retry-After` in seconds up to a minute, before the error goes to the sync runner, which resumes from its checkpoint next time.
+
+**Testing.** Judge.me has no sandbox, so the tests run against a mock built from Judge.me's docs (`packages/testkit/src/mocks/judgeme.ts`). It checks the shop domain, the token and paging, and lists what the first client's shop must confirm: the order reviews come back in, whether hidden and unpublished reviews are listed, and the time zone of Judge.me's times.
 
 ### Klaviyo
 

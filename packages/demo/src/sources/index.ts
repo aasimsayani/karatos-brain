@@ -76,6 +76,7 @@ export const DEMO_NOT_YET: Readonly<Record<string, string>> = {
   taxjar: NOT_READ_YET,
   zoom: NOT_READ_YET,
   yotpo: NOT_READ_YET,
+  judgeme: NOT_READ_YET,
   calendly: NOT_READ_YET,
   custom_forms: NOT_READ_YET,
   edi_x12: NOT_READ_YET,

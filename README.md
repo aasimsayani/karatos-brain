@@ -103,6 +103,7 @@ These are built, tested against recorded vendor responses or mocks built from ea
 | Quo (formerly OpenPhone) | Imports two years of calls and texts on every Quo line, then rereads the last day on each sync | Clienteling, Repairs, Sales |
 | Zoom | Imports six months of the account's past meetings, then the last two days again on each sync | Clienteling, Custom orders, Sales |
 | Yotpo reviews and loyalty | Imports five years of product and store reviews, then the reviews changed in the last two days on each sync | Marketing, Clienteling |
+| Judge.me | Imports five years of product and store reviews, then the reviews posted or changed in the last two days on each sync | Marketing, Clienteling |
 | Pinterest | Imports every Pin the store has made, with its title, the page it links to and its 90-day and lifetime metrics | Marketing, Sales |
 | TikTok | Imports every public video the store posted in the last two years, with its title, link, length and views, likes, comments and shares | Marketing |
 | Yext | Imports two years of reviews from Google, Yelp, Facebook and the other sites Yext watches, with the rating, an excerpt and where to answer it | Marketing, Clienteling |
@@ -162,7 +163,7 @@ This section updates itself as work lands: it is generated from [docs/milestones
 <!-- progress:start -->
 <!-- Generated from docs/milestones.json and the integration catalog by npm run progress:write. Edit those, not this block. -->
 
-**Overall: 80% complete**, 65 of 81 roadmap items done. 65 of the 253 systems in the integration catalog are connected.
+**Overall: 80% complete**, 65 of 81 roadmap items done. 66 of the 253 systems in the integration catalog are connected.
 
 | Milestone | What it gives a jeweler | Progress | Target |
 | --- | --- | --- | --- |
