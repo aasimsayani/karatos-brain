@@ -246,7 +246,7 @@ Used by: R is retail, W is wholesale, M is manufacturing. Test with says how we 
 | Paychex Flex | R, W, M | Partner | Partner | No | Planned (Payroll, commissions and staff costs. Paychex issues API access to approved integration partners) |
 | QuickBooks Desktop | R, W, M | File export | Sample files | No | Planned (Books many older stores still keep. The Web Connector needs software on the store's own computer, so start with exported reports) |
 | LeadsOnline secondhand reporting | R | Partner | Partner | No | Planned (Gold and secondhand buys many US police departments require; LeadsOnline issues API credentials to point-of-sale partners) |
-| BILL | R, W, M | Public API | Free sandbox | Yes | Planned (Supplier bills, approvals and vendor payments) |
+| BILL | R, W, M | Public API | Free sandbox | No | Built (Reads supplier bills, approvals, vendors and payments from BILL's v3 API with a developer app made for accounting data only. BILL has no read-only option, so the connector only ever reads. BILL's sandbox checks the sign-in and calls, and the docs watch follows the pages the mock is built from) |
 | Ramp | R, W, M | Public API | Unknown | Yes | Planned (Company card spending, receipts, reimbursements and bills) |
 | Klarna | R | Public API | Unknown | No | Planned (Pay-over-time orders, captures, refunds and settlement reports) |
 | Afterpay | R | Public API | Partner | No | Planned (Pay-over-time orders, refunds and settlements; sandbox credentials come from an Afterpay account manager) |
@@ -396,6 +396,7 @@ A request for a path or method the docs don't list throws `UndocumentedRequestEr
 - Authorize.net's Transaction Reporting requests on its JSON API
 - AvaTax's connection check, company and transaction endpoints (REST API v2)
 - BigCommerce's v2 order and store paths and v3 catalog, inventory, customer, refund and price list paths
+- BILL's OAuth client credentials token and v3 vendor, bill and payment lists
 - Calendly's current user, scheduled event and invitee endpoints (API v2)
 - Clover's REST API v3 read endpoints with its v2 OAuth token refresh, including its 90-day cap on orders, payments and refunds
 - Typeform's Create API (a form's definition) and Responses API
@@ -433,7 +434,7 @@ A request for a path or method the docs don't list throws `UndocumentedRequestEr
 - Xero's Accounting API endpoints with its token refresh
 - Yext's Management API v2 location and review lists, enforcing the API key header, the version date, the account, the app's access, page sizes, update-date ranges and page tokens tied to their query
 
-Where a vendor has a free sandbox (Affirm, Airtable, Amazon (Selling Partner API), Asana, Authorize.net, Avalara AvaTax, BigCommerce, Calendly, Clover, Custom forms, Docusign, Dropbox, eBay, FedEx, GIA Report Results, Gmail, Google Ads, Google Analytics 4, Google Workspace and Drive, Gusto, HubSpot, Klaviyo, Mailchimp, Meta Ads, Microsoft OneDrive and SharePoint files, Monday.com, Notion, Pinterest, Plaid, QuickBooks Online, Slack, Square, TikTok, Trello, UPS, Wix, WooCommerce, Xero and Yext so far), its mock is a stand-in until a developer account is set up for the nightly run.
+Where a vendor has a free sandbox (Affirm, Airtable, Amazon (Selling Partner API), Asana, Authorize.net, Avalara AvaTax, BigCommerce, BILL, Calendly, Clover, Custom forms, Docusign, Dropbox, eBay, FedEx, GIA Report Results, Gmail, Google Ads, Google Analytics 4, Google Workspace and Drive, Gusto, HubSpot, Klaviyo, Mailchimp, Meta Ads, Microsoft OneDrive and SharePoint files, Monday.com, Notion, Pinterest, Plaid, QuickBooks Online, Slack, Square, TikTok, Trello, UPS, Wix, WooCommerce, Xero and Yext so far), its mock is a stand-in until a developer account is set up for the nightly run.
 
 <!-- registry:mocks:end -->
 
@@ -724,6 +725,32 @@ Reads the BigCommerce REST Management API at `https://api.bigcommerce.com/stores
 **Webhooks.** Webhooks created with a store-level API account carry no signature, so each one is created with a custom header, `x-karatos-webhook-secret`, holding `BIGCOMMERCE_WEBHOOK_SECRET`, and `verifyBigCommerceWebhook` compares it in constant time (both sides hashed first, so neither content nor length leaks). A notification names the scope and record ID, not the record, so it only prompts a sync: `bigCommerceWebhookChange` reads the change for this store (by `producer`) and drops one sent more than 49 hours ago, just past BigCommerce's 48 hours of retries, and `BigCommerceWebhookDeduper` takes each `hash` (the same on every delivery of an event) once. The instance doesn't take webhooks yet; the scheduled sync picks every change up.
 
 **Testing.** Until a BigCommerce sandbox store is set up, the tests run against a mock built from BigCommerce's docs (`packages/testkit/src/mocks/bigcommerce.ts`), which answers 401 without the store's token, serves v2 times in RFC 2822 and empty v2 pages as 204, returns variants and record SKUs only when asked, sends the rate-limit headers and queued 429s, and enforces the documented filters, sorts and page limits. Its assumptions are listed in the mock and checked on the first sandbox run. For the nightly run, create a free BigCommerce sandbox store (a trial store, or a sandbox from the partner program), create a store-level API account in it with the read-only scopes above, and add `SANDBOX_BIGCOMMERCE_STORE_HASH` and `SANDBOX_BIGCOMMERCE_ACCESS_TOKEN` as GitHub Actions secrets. The token doesn't expire, so the run keeps working.
+
+### BILL
+
+Reads a business's supplier bills, their approvals, the vendors it pays and the payments it sends from BILL's v3 API, for the finance and buying departments.
+
+| Setting | What it is |
+| --- | --- |
+| `BILL_CLIENT_ID` | The client id of a BILL developer app made with accounting data access |
+| `BILL_CLIENT_SECRET` | That app's client secret |
+| `BILL_ENVIRONMENT` | Optional. `production` (the default) or `sandbox` |
+
+**Sign-in.** BILL's developer apps offer two choices: full access, which can create payments and change funding accounts, and accounting data access, which can't. There is no read-only option, so the app is made with accounting data access and the connector itself only ever reads. The client signs in with OAuth client credentials at `POST /authx/token` (`auth.bill.com`, or `auth.stage.bill.com` for the sandbox), keeps the token until five minutes before its hour runs out, and sends it as a bearer token, with no developer key or session id. A 401 signs in again once.
+
+**What it reads.** `GET /v3/vendors`, `/v3/bills` and `/v3/payments`, in that order, 100 to a page, filtered to records changed at or after the pass's start and sorted by `updatedTime`, oldest first. The checkpoint keeps the list and BILL's page token, so a resumed sync goes on from the page it reached. The historical import reads six years; each later sync asks from the start of the last one, less five minutes, and the overlap comes back as duplicates. BILL allows 3 requests at once for an organization (`BDC_1322`, retried with backoff, as are 429 and 503) and 20,000 an hour (`BDC_1144`, which stops the sync until the next one).
+
+**Events.** The same types the QuickBooks and Xero connectors give:
+
+- `accounting.vendor_updated`: the vendor id, name, whether it's archived, its bill currency and how BILL pays it (ACH, check and so on).
+- `accounting.bill_updated`: the bill id, vendor, invoice number and date, due date, total, balance due, amount paid and scheduled in cents, currency, payment status and approval status, and whether it's archived.
+- `accounting.payment_updated`: the payment id, vendor, process date, amount in cents and in US dollars, status, method, whether it was made in BILL, and the bills it paid with how much each.
+
+Each is keyed by record, id and `updatedTime`, so each change is stored once. A record with no readable id or time is dead-lettered. Vendor email addresses, phone numbers, street addresses, account numbers, tax ids and bank details, payment card digits, check numbers and confirmation numbers, and bill and payment descriptions are never kept.
+
+**Writes.** None. KaratOS never pays, approves, voids or changes anything in BILL. BILL doesn't send webhooks to apps that sign in this way, so the connector reads on each sync.
+
+**Testing.** The mock (`packages/testkit/src/mocks/bill_com.ts`) is built from BILL's developer docs, and its assumptions list what the first live run must confirm: rate-limit errors as HTTP 400, the filter's time format, and page tokens sent with the first page's filters. The nightly sandbox run signs in at BILL's sandbox and reads a year of records once `SANDBOX_BILL_COM_CLIENT_ID` and `SANDBOX_BILL_COM_CLIENT_SECRET` are set.
 
 ### Calendly
 
