@@ -270,6 +270,7 @@ export const SYSTEM_DETAILS: Readonly<Record<string, SystemDetail>> = {
   malca_amit: { about: "Secure shipments of valuables, with tracking and invoices." },
   shipstation: { about: "Shipments, labels, insured values and tracking across carriers." },
   fedex: { about: "Tracking, delivery exceptions and signature-required parcels." },
+  fedex: { about: "Tracking, declared values and delivery exceptions." },
   ups: { about: "Tracking, delivery exceptions and signature-required parcels." },
   usps: { about: "Tracking for Registered Mail and other USPS parcels." },
   cabrella: { about: "Insured shipments, declared values and claims." },
