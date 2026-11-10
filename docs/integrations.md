@@ -253,7 +253,7 @@ Used by: R is retail, W is wholesale, M is manufacturing. Test with says how we 
 | cardONE Fintech | R | Unknown | Unknown | No | Planned (Payments and financing for jewelers; product still being confirmed. No API found. Exhibited at JCK 2026) |
 | American First Finance | R | Partner | Partner | No | Planned (Consumer financing and lease-to-own: applications, funded contracts and settlements. Merchant partner only. Exhibited at JCK 2026) |
 | Aurora Payments | R | Unknown | Unknown | No | Planned (Merchant card processing: transactions, batches, deposits and fees. No API confirmed; start with statements. Exhibited at JCK 2026) |
-| Sola Payments (formerly Cardknox) | R, W | Public API | Free sandbox | No | Planned (Payment gateway: transactions, customers and recurring schedules for layaways. Public API with a free sandbox. No public API changelog found; the nightly sandbox run catches API changes. Exhibited at JCK 2026) |
+| Sola Payments (formerly Cardknox) | R, W | Public API | Free sandbox | No | Built (Reads the gateway's transaction report with one API key. Sola's keys can't be limited to reports, so the client only ever posts Report:All to the reporting address, never the gateway. Sola publishes no API changelog, so the vendor docs watch follows its reporting page and the nightly sandbox run catches changes; until a sandbox is set up, the mock built from Sola's docs stands in) |
 | Wells Fargo Jewelry Advantage | R | File export | Paid account | No | Planned (Consumer financing program for jewelers. No API; start with merchant summary report exports. Exhibited at Centurion) |
 | OWL Financial Group | R, W, M | Unknown | Unknown | No | Planned (Collateral loans for jewelers and the pledged pieces behind them. No API found. Exhibited at Centurion) |
 
@@ -429,6 +429,7 @@ A request for a path or method the docs don't list throws `UndocumentedRequestEr
 - QuickBooks Online's query and change data capture endpoints with Intuit's token refresh (minor version 75)
 - Rapaport's token service and Price List API: the full list and its changes
 - Slack's auth.test, conversations.list, conversations.history and conversations.replies, with both rate-limit regimes (Web API)
+- Sola Payments' transaction report (Report:All)
 - Square's read endpoints with its OAuth refresh and token status check (API version 2026-09-16)
 - Stuller's invoice and metal market rate endpoints (API v2)
 - TaxJar's transaction and nexus reads
@@ -442,7 +443,7 @@ A request for a path or method the docs don't list throws `UndocumentedRequestEr
 - Yotpo's access token, Retrieve all reviews (Reviews v1) and recently updated Loyalty customers (Loyalty v2)
 - Zoom's Server-to-Server OAuth token, meeting history and meeting participant reports (API v2)
 
-Where a vendor has a free sandbox (Affirm, Airtable, Amazon (Selling Partner API), Asana, Authorize.net, Avalara AvaTax, BigCommerce, BILL, Calendly, Clover, Custom forms, Docusign, Dropbox, eBay, FedEx, GIA Report Results, Gmail, Google Ads, Google Analytics 4, Google Workspace and Drive, Gusto, HubSpot, Klaviyo, Lightspeed Retail, Mailchimp, Meta Ads, Microsoft OneDrive and SharePoint files, Monday.com, Notion, Pinterest, Plaid, QuickBooks Online, Slack, Square, TikTok, Trello, UPS, Wix, WooCommerce, Xero and Yext so far), its mock is a stand-in until a developer account is set up for the nightly run.
+Where a vendor has a free sandbox (Affirm, Airtable, Amazon (Selling Partner API), Asana, Authorize.net, Avalara AvaTax, BigCommerce, BILL, Calendly, Clover, Custom forms, Docusign, Dropbox, eBay, FedEx, GIA Report Results, Gmail, Google Ads, Google Analytics 4, Google Workspace and Drive, Gusto, HubSpot, Klaviyo, Lightspeed Retail, Mailchimp, Meta Ads, Microsoft OneDrive and SharePoint files, Monday.com, Notion, Pinterest, Plaid, QuickBooks Online, Slack, Sola Payments (formerly Cardknox), Square, TikTok, Trello, UPS, Wix, WooCommerce, Xero and Yext so far), its mock is a stand-in until a developer account is set up for the nightly run.
 
 <!-- registry:mocks:end -->
 
@@ -2051,6 +2052,28 @@ Reads the messages and threads in the channels the KaratOS app's bot has been in
 **Webhooks.** `verifySlackWebhook` checks `X-Slack-Signature`: `v0=` and the hex HMAC-SHA256 of `v0:<X-Slack-Request-Timestamp>:<raw body>` under `SLACK_SIGNING_SECRET`, compared in constant time, and refuses a timestamp more than 300 seconds from now, before the body is parsed. `slackUrlVerification` gives the challenge to answer Slack's `url_verification`. `handleWebhook` turns a verified `event_callback` for a message posted, edited (`message_changed`) or deleted (`message_deleted`) in a channel or private channel into the same events the sync makes, so a webhook for a synced message, or a delivery Slack retries, is a duplicate. Subscribing needs the `message.channels` and `message.groups` bot events. The instance doesn't take webhooks yet; the scheduled sync picks up the same messages.
 
 **Testing.** Until a sandbox is set up, the tests run against a mock built from Slack's docs (`packages/testkit/src/mocks/slack.ts`), which pages by cursor, filters channels by membership and scope, answers `not_in_channel`, `missing_scope`, `invalid_auth` and `ratelimited` the way the docs describe, and holds a non-Marketplace app to 15-message pages. What the docs leave out is in its assumptions, checked on the first live run. For the nightly run, join the Slack Developer Program, create a free developer sandbox workspace holding only synthetic messages, create an internal app there with the four read scopes above, install it, invite the bot to a test channel and a test private channel, and add the bot token as the `SANDBOX_SLACK_BOT_TOKEN` GitHub Actions secret.
+
+### Sola Payments
+
+Reads the card and check payments and refunds that go through a store's Sola Payments gateway (formerly Cardknox), so finance can reconcile them, layaway installments included, against sales and deposits. Payments arrive as the same `payment.charge_updated` and `payment.refund_updated` events the Stripe and Authorize.net connectors give.
+
+| Setting | What it is |
+| --- | --- |
+| `SOLA_API_KEY` | An API key from the Sola Portal's key management |
+| `SOLA_TIME_ZONE` | Optional: the time zone Sola's report times are in, defaulting to `America/New_York` |
+| `CUSTOMER_REF_KEY` | The instance's key for customer references |
+
+**Read-only by design.** Sola's API keys can run sales and refunds as well as reports, and Sola documents no way to limit one to reports. The client is what keeps KaratOS to reading. It posts only to Sola's reporting address (`x1.cardknox.com/reportjson`), never the gateway that moves money, and only the one command `Report:All`, with dates built from checked values. Creating payment links and recurring schedules for layaways are declared behind the write gate, turned off, and the client has no request to send them. Sola's own error text is never repeated in an error, only its code.
+
+**What it reads.** The transaction report a month at a time, oldest first, 1,000 rows to a page. Past a full page, the next request starts at the last row's time. The first import covers five years. Each later sync covers from two days before the last pass, by day. Each page is one batch and one checkpoint.
+
+**Events.** `payment.charge_updated` for sales, captures, post-auths, authorizations and check sales, and `payment.refund_updated` for refunds and credits. Each has the reference number, amount in cents, currency, status (succeeded, pending for an authorization, or failed for a decline, error or void), Sola's command and result, whether it was voided, card or ACH, the card brand, the batch, and the customer references. Saves, balance checks and gift card commands aren't payments, so they are skipped. Each is keyed by a digest of what was kept, so an unchanged row is a duplicate and a void is a new event. A row without a reference number, a command, a time or an amount that reads is dead-lettered.
+
+**Privacy.** A card is kept as its brand only: no masked number, token, name, address, invoice or description. The customer's email address and phone number only make keyed customer references.
+
+**Rate limits.** Sola doesn't document one. The client waits out a 429, 500, 502, 503 or 504 three times, honoring `Retry-After` in seconds up to a minute, before the error goes to the sync runner, which resumes from its checkpoint next time.
+
+**Testing.** The tests run against a mock built from Sola's docs (`packages/testkit/src/mocks/sola_payments.ts`). It checks the key, the command, the dates and paging, and lists what the first sandbox run must confirm: the report rows' field names, the time zone of report times, and whether the dates are inclusive. For the nightly run, sign up for a free Sola sandbox account (solapayments.com/devsdk), run a few test-card sales with synthetic customers (`@example.test` addresses), create an API key, and add it as the `SANDBOX_SOLA_PAYMENTS_API_KEY` GitHub Actions secret.
 
 ### Square
 

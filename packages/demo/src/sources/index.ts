@@ -73,6 +73,7 @@ export const DEMO_NOT_YET: Readonly<Record<string, string>> = {
   authorize_net: NOT_READ_YET,
   avalara: NOT_READ_YET,
   taxjar: NOT_READ_YET,
+  sola_payments: NOT_READ_YET,
   zoom: NOT_READ_YET,
   yotpo: NOT_READ_YET,
   judgeme: NOT_READ_YET,
