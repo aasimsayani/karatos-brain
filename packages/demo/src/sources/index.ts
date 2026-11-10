@@ -36,6 +36,7 @@ export const DEMO_NOT_YET: Readonly<Record<string, string>> = {
   bigcommerce: sameJobAs("the POS exports"),
   wix: sameJobAs("the POS exports"),
   xero: sameJobAs("QuickBooks"),
+  bill_com: sameJobAs("QuickBooks"),
   chase: sameJobAs("Plaid"),
   bank_statements: sameJobAs("Plaid"),
   klaviyo: NEXT,
