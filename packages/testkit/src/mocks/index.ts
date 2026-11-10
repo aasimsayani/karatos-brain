@@ -15,6 +15,7 @@ import custom_forms from "./custom_forms.js";
 import docusign from "./docusign.js";
 import dropbox from "./dropbox.js";
 import ebay from "./ebay.js";
+import etsy from "./etsy.js";
 import fedex from "./fedex.js";
 import gia from "./gia.js";
 import gmail from "./gmail.js";
@@ -62,6 +63,7 @@ export * from "./custom_forms.js";
 export * from "./docusign.js";
 export * from "./dropbox.js";
 export * from "./ebay.js";
+export * from "./etsy.js";
 export * from "./fedex.js";
 export * from "./gia.js";
 export * from "./gmail.js";
@@ -95,7 +97,7 @@ export * from "./xero.js";
 export * from "./yext.js";
 
 /** Every mock module, one per catalog integration. */
-export const DOC_MOCK_MODULES: readonly DocMockModule[] = [affirm, airtable, amazon, asana, authorize_net, avalara, bigcommerce, bill_com, birdeye, calendly, clover, custom_forms, docusign, dropbox, ebay, fedex, gia, gmail, google_ads, google_analytics, google_workspace, gusto, hubspot, idex, klaviyo, lightspeed, mailchimp, meta_ads, microsoft_onedrive, monday, nivoda, notion, pinterest, plaid, quickbooks, rapnet, slack, square, stuller, tiktok, trello, ups, wix, woocommerce, xero, yext];
+export const DOC_MOCK_MODULES: readonly DocMockModule[] = [affirm, airtable, amazon, asana, authorize_net, avalara, bigcommerce, bill_com, birdeye, calendly, clover, custom_forms, docusign, dropbox, ebay, etsy, fedex, gia, gmail, google_ads, google_analytics, google_workspace, gusto, hubspot, idex, klaviyo, lightspeed, mailchimp, meta_ads, microsoft_onedrive, monday, nivoda, notion, pinterest, plaid, quickbooks, rapnet, slack, square, stuller, tiktok, trello, ups, wix, woocommerce, xero, yext];
 
 /** Every doc-derived mock, with empty data, for checks and the vendor docs watch. */
 export function allDocMocks(): DocMock[] {

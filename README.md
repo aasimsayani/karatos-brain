@@ -97,6 +97,7 @@ These are built, tested against recorded vendor responses or mocks built from ea
 | Google Analytics 4 | Imports two years of daily website sessions, users and new users by channel and by source and medium, then keeps them current | Marketing, Sales |
 | Google Ads | Imports two years of daily spend, impressions, clicks, conversions and conversion value for every campaign, then keeps them current | Marketing |
 | Meta Ads | Imports two years of daily Facebook and Instagram ad spend, reach, clicks and purchases for every campaign, then keeps them current | Marketing |
+| Etsy | Imports five years of Etsy orders, then reads every order changed since the last sync | Sales, Inventory, Marketing |
 | eBay | Imports the two years of eBay orders that eBay keeps, then reads every order changed since the last sync | Sales, Inventory |
 | Pinterest | Imports every Pin the store has made, with its title, the page it links to and its 90-day and lifetime metrics | Marketing, Sales |
 | TikTok | Imports every public video the store posted in the last two years, with its title, link, length and views, likes, comments and shares | Marketing |
@@ -157,7 +158,7 @@ This section updates itself as work lands: it is generated from [docs/milestones
 <!-- progress:start -->
 <!-- Generated from docs/milestones.json and the integration catalog by npm run progress:write. Edit those, not this block. -->
 
-**Overall: 80% complete**, 65 of 81 roadmap items done. 60 of the 253 systems in the integration catalog are connected.
+**Overall: 80% complete**, 65 of 81 roadmap items done. 61 of the 253 systems in the integration catalog are connected.
 
 | Milestone | What it gives a jeweler | Progress | Target |
 | --- | --- | --- | --- |
