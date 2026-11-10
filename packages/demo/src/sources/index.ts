@@ -55,6 +55,7 @@ export const DEMO_NOT_YET: Readonly<Record<string, string>> = {
   google_analytics: NEXT,
   mailchimp: NEXT,
   fincen_8300: NEXT,
+  rfid_counts: NEXT,
   gusto: NEXT,
   affirm: NOT_READ_YET,
   airtable: NOT_READ_YET,

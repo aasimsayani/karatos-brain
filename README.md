@@ -101,6 +101,7 @@ These are built, tested against recorded vendor responses or mocks built from ea
 | Yext | Imports two years of reviews from Google, Yelp, Facebook and the other sites Yext watches, with the rating, an excerpt and where to answer it | Marketing, Clienteling |
 | Amazon (Selling Partner API) | Imports two years of Amazon orders with their status, totals and lines, counted as sales next to the store and website | Sales, Inventory, Finance |
 | Supplier invoices and memos | Imports six years of supplier invoice and memo lines: items, quantities, costs, memo terms and due dates | Buying, Inventory, Compliance, Finance |
+| RFID and barcode tray counts | Imports two years of tray and case counts: what was read, when, and by whom | Inventory, Compliance |
 | FedEx | Follows every FedEx package on the business's list, from label created to delivered or returned | Inventory, Repairs, Compliance |
 | UPS | Follows every UPS package on the business's list, from label created to delivered or returned | Inventory, Repairs, Compliance |
 | BILL | Imports six years of supplier bills with their due dates, balances, payment status and approval status | Finance, Buying |
@@ -154,7 +155,7 @@ This section updates itself as work lands: it is generated from [docs/milestones
 <!-- progress:start -->
 <!-- Generated from docs/milestones.json and the integration catalog by npm run progress:write. Edit those, not this block. -->
 
-**Overall: 79% complete**, 64 of 81 roadmap items done. 57 of the 253 systems in the integration catalog are connected.
+**Overall: 79% complete**, 64 of 81 roadmap items done. 58 of the 253 systems in the integration catalog are connected.
 
 | Milestone | What it gives a jeweler | Progress | Target |
 | --- | --- | --- | --- |
