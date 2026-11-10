@@ -225,8 +225,6 @@ export const SYSTEM_DETAILS: Readonly<Record<string, SystemDetail>> = {
   the_knot_pro: { about: "Engaged couple leads and reviews from The Knot and WeddingWire." },
   postscript: { about: "Shopify SMS campaigns, subscribers and the sales they brought in." },
   yotpo: { about: "Product and store reviews, and loyalty points and tiers." },
-  judgeme: { about: "Product reviews and ratings on a Shopify store." },
-  yotpo: { about: "Product reviews, questions, photos and loyalty points." },
   judgeme: { about: "Product and store reviews and ratings, with low ratings marked for follow-up." },
   smile_io: { about: "Loyalty points, VIP tiers and referrals." },
   trustpilot: { about: "Company reviews and the store's trust score." },
