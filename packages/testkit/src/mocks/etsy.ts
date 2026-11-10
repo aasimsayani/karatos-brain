@@ -262,7 +262,9 @@ export function etsyDocMock(data: EtsyMockData): EtsyMock {
           if (q.min_last_modified) rows = rows.filter((r) => updated(r) >= Number(q.min_last_modified));
           const key = sortOn === "updated" ? updated : sortOn === "created" ? created : (r: EtsyMockRecord) => Number(r.receipt_id);
           rows.sort((a, b) => key(a) - key(b) || Number(a.receipt_id) - Number(b.receipt_id));
-          if (/^desc|down/.test(q.sort_order ?? "desc")) rows.reverse();
+          const order = q.sort_order ?? "desc";
+          if (!["asc", "ascending", "up", "desc", "descending", "down"].includes(order)) return error(400, "invalid sort_order");
+          if (order === "desc" || order === "descending" || order === "down") rows.reverse();
           return page(rows, q);
         },
       },

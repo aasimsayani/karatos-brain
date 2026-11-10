@@ -112,7 +112,7 @@ describe("Etsy client", () => {
     expect(tokens.current).toBe(REFRESH);
     const key = `${KEYSTRING}:${SECRET}`;
     expect(sent.map((s) => [s.url, s.init.method, s.init.headers, s.init.body])).toEqual([
-      [ETSY_TOKEN_URL, "POST", { "content-type": "application/x-www-form-urlencoded", accept: "application/json" }, `grant_type=refresh_token&client_id=${KEYSTRING}&refresh_token=${REFRESH.replace(".", ".")}`],
+      [ETSY_TOKEN_URL, "POST", { "content-type": "application/x-www-form-urlencoded", accept: "application/json" }, `grant_type=refresh_token&client_id=${KEYSTRING}&refresh_token=${REFRESH}`],
       [`${ETSY_API_URL}/scopes`, "POST", { "x-api-key": key, "content-type": "application/x-www-form-urlencoded", accept: "application/json" }, "token=70000001.accesstoken000000"],
       [`${ETSY_API_URL}/users/me`, "GET", { "x-api-key": key, authorization: "Bearer 70000001.accesstoken000000", accept: "application/json" }, undefined],
       [`${SHOP}/listings?state=draft&includes=Inventory&limit=100&offset=0`, "GET", { "x-api-key": key, authorization: "Bearer 70000001.accesstoken000000", accept: "application/json" }, undefined],
