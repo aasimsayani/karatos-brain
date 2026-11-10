@@ -48,9 +48,19 @@ This is a rebuild of the original Brain A work (v0.1.0 to v0.1.9, April 2026). T
 - [x] Shopify orders, refunds, fulfillments, products and customers (`@karatos/connectors`)
 - [x] Stripe charges, refunds, disputes, payouts and customers
 - [x] Bank and card statements from CSV exports
-- [ ] Bank and card statements from PDFs
-- [ ] Chase business accounts and cards
-- [ ] QuickBooks Online
+- [x] Bank and card statements from PDFs
+- [x] Chase business accounts and cards
+- [x] QuickBooks Online
+
+## Phase 3.5: Value, writes and the showcase
+- [x] A dollar estimate on each recommendation, from the store's own data
+- [x] Value ledger, with results measured at 30, 60 and 90 days ([value-ledger.md](value-ledger.md))
+- [x] Careful write-back: every write declared, gated, approved and off by default ([write-back.md](architecture/write-back.md))
+- [x] Scheduled connector syncs and raw-data retention in each instance
+- [x] Website at karatos.app and the live demo store at karatos.app/demo
+- [x] More than 50 connectors, each read-only and tested against a mock built from the vendor's docs ([integrations.md](integrations.md))
+- [ ] Demo walkthroughs of the biggest jeweler problems
+- [ ] Homepage video of the live dashboard
 
 ## Phase 4: First reasoners
 - [ ] Claude-powered reasoner with provenance and confidence
@@ -59,5 +69,4 @@ This is a rebuild of the original Brain A work (v0.1.0 to v0.1.9, April 2026). T
 ## Later
 - Self-serve AI dashboards in the Brain Console
 - One-command self-hosted install, and a managed hosting plan
-- HubSpot, Slack, Monday.com
 - Meta, WhatsApp and Instagram, once the Facebook account is recovered
