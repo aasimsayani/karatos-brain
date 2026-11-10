@@ -66,6 +66,7 @@ These are built, tested against recorded vendor responses or mocks built from ea
 | Gmail | Imports five years of mail metadata from one mailbox: who wrote to whom, when, which thread and which labels | Clienteling, Buying, Custom orders |
 | Google Workspace and Drive | Imports the names, types, folders, sizes and edit times of the files in the folder the business shares, then keeps up with every change | Finance, Compliance |
 | Slack | Imports five years of messages and threads from the channels the KaratOS app is invited to, and nothing else | Sales, Repairs, Custom orders |
+| Lightspeed Retail | Imports five years of sales and returns from every outlet, with every product, stock level and customer, then keeps them current | Sales, Inventory, Clienteling, Repairs |
 | Square | Imports five years of orders, payments and refunds from every location, then keeps them current | Sales, Inventory, Clienteling, Repairs |
 | Clover | Imports five years of Clover orders, payments and refunds, then keeps them current as they change | Sales, Inventory, Clienteling, Repairs |
 | WooCommerce | Imports five years of orders and refunds and the whole catalog, then keeps them current | Sales, Inventory, Clienteling, Marketing |
@@ -155,7 +156,7 @@ This section updates itself as work lands: it is generated from [docs/milestones
 <!-- progress:start -->
 <!-- Generated from docs/milestones.json and the integration catalog by npm run progress:write. Edit those, not this block. -->
 
-**Overall: 79% complete**, 64 of 81 roadmap items done. 58 of the 253 systems in the integration catalog are connected.
+**Overall: 80% complete**, 65 of 81 roadmap items done. 59 of the 253 systems in the integration catalog are connected.
 
 | Milestone | What it gives a jeweler | Progress | Target |
 | --- | --- | --- | --- |
@@ -167,7 +168,7 @@ This section updates itself as work lands: it is generated from [docs/milestones
 | AI reasoning | Claude explains each recommendation in plain language and learns from the owner's decisions. | ░░░░░░░░░░ 0% | Jan 2027 |
 | Self-serve AI dashboards | Owners ask a question and get a dashboard, without a developer. | ███░░░░░░░ 33% | Mar 2027 |
 | Self-hosted and managed plans | Run it yourself for free, or let us host it on the premium plan. | ███░░░░░░░ 33% | Mar 2027 |
-| Integrations, next wave | Jewelry POS, CRM, messaging, marketing and diamond feeds join the catalog. | ██████████ 95% | Dec 2026 |
+| Integrations, next wave | Jewelry POS, CRM, messaging, marketing and diamond feeds join the catalog. | ██████████ 100% | Done |
 | Marketplaces, ads and office tools | Sales channels, ad spend and the files and tasks a team already keeps, in one place. | ██████████ 100% | Done |
 | Shipping, payables and insurance | Packages, bills and care plans tracked next to the sale they belong to. | █████░░░░░ 50% | Jan 2027 |
 | Manufacturing departments | Bench, casting and setting work tracked with metal loss and labor cost per piece. | ░░░░░░░░░░ 0% | Jun 2027 |
