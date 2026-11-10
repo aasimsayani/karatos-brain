@@ -64,3 +64,4 @@ export * from "./wix/index.js";
 export * from "./woocommerce/index.js";
 export * from "./xero/index.js";
 export * from "./yext/index.js";
+export * from "./zoom/index.js";
