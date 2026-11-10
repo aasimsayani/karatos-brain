@@ -343,6 +343,7 @@ export const CONNECTED_ON: Readonly<Record<string, string>> = {
   supplier_invoices: "2026-11-03",
   amazon: "2026-11-03",
   yext: "2026-11-02",
+  birdeye: "2026-11-10",
   tiktok: "2026-11-01",
   pinterest: "2026-10-31",
   ebay: "2026-10-30",
