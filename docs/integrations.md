@@ -40,7 +40,7 @@ Used by: R is retail, W is wholesale, M is manufacturing. Test with says how we 
 | The Edge (Abbott Jewelry Systems) | R | Partner | Partner | No | Planned (No public API; partners use an on-premises connector. Start with scheduled exports) |
 | Jewel360 | R | Partner | Partner | No | Planned (Partner integrations only. Start with exports) |
 | ARMS | R | Unknown | Unknown | No | Planned |
-| Lightspeed Retail | R | Public API | Unknown | Yes | Planned |
+| Lightspeed Retail | R | Public API | Free sandbox | No | Built (Lightspeed Retail X-Series (formerly Vend), not R-Series. Read scopes only; the connector checks the scopes Lightspeed reports on every token and stops on any other. Sales, products, stock and customers use the same events as Square and Shopify) |
 | Square | R | Public API | Free sandbox | Yes | Built (Read scopes only; the connector checks the token's scopes and stops on any other, so a full-access personal token won't do. Sales, refunds, items and stock use the same events as Shopify and the POS exports) |
 | Clover | R | Public API | Free sandbox | Yes | Built (Connector in @karatos/connectors: orders, payments, refunds, items, stock and customers, read-only. Clover can't report an app's permissions, so the connector sends only its listed GET requests) |
 | Valigara | R, W, M | Unknown | Unknown | No | Planned |
@@ -413,6 +413,7 @@ A request for a path or method the docs don't list throws `UndocumentedRequestEr
 - HubSpot's CRM search, archived list, batch association and token info endpoints (date version 2026-09)
 - IDEX's Onsite feeds: the natural full feed and the lab-grown full file
 - Klaviyo's mock covers its profile, list, segment, campaign, flow and metric reads and the campaign and flow values reports (revision 2026-10-15). Plaid's accounts, transactions sync, Item and webhook verification key endpoints (API version 2020-09-14), with webhooks signed the way Plaid signs them
+- Lightspeed Retail (X-Series) token refresh and product, inventory, customer and sale reads
 - Mailchimp's ping, audience, member, campaign and campaign report reads (Marketing API 3.0)
 - Meta's Marketing API ad account insights and `/me/permissions` (Graph API v26.0), enforcing the token, ads_read, the ad account, campaign level by day, the fields and cursors tied to their read
 - Microsoft's client credentials sign-in and Microsoft Graph's driveItem delta (v1.0)
@@ -434,7 +435,7 @@ A request for a path or method the docs don't list throws `UndocumentedRequestEr
 - Xero's Accounting API endpoints with its token refresh
 - Yext's Management API v2 location and review lists, enforcing the API key header, the version date, the account, the app's access, page sizes, update-date ranges and page tokens tied to their query
 
-Where a vendor has a free sandbox (Affirm, Airtable, Amazon (Selling Partner API), Asana, Authorize.net, Avalara AvaTax, BigCommerce, BILL, Calendly, Clover, Custom forms, Docusign, Dropbox, eBay, FedEx, GIA Report Results, Gmail, Google Ads, Google Analytics 4, Google Workspace and Drive, Gusto, HubSpot, Klaviyo, Mailchimp, Meta Ads, Microsoft OneDrive and SharePoint files, Monday.com, Notion, Pinterest, Plaid, QuickBooks Online, Slack, Square, TikTok, Trello, UPS, Wix, WooCommerce, Xero and Yext so far), its mock is a stand-in until a developer account is set up for the nightly run.
+Where a vendor has a free sandbox (Affirm, Airtable, Amazon (Selling Partner API), Asana, Authorize.net, Avalara AvaTax, BigCommerce, BILL, Calendly, Clover, Custom forms, Docusign, Dropbox, eBay, FedEx, GIA Report Results, Gmail, Google Ads, Google Analytics 4, Google Workspace and Drive, Gusto, HubSpot, Klaviyo, Lightspeed Retail, Mailchimp, Meta Ads, Microsoft OneDrive and SharePoint files, Monday.com, Notion, Pinterest, Plaid, QuickBooks Online, Slack, Square, TikTok, Trello, UPS, Wix, WooCommerce, Xero and Yext so far), its mock is a stand-in until a developer account is set up for the nightly run.
 
 <!-- registry:mocks:end -->
 
@@ -1399,6 +1400,39 @@ Reads Klaviyo's JSON:API (`https://a.klaviyo.com/api/...`) with a private API ke
 **Webhooks.** Only Advanced KDP customers and Klaviyo app partners can create system webhooks, so most accounts rely on the scheduled sync. `verifyKlaviyoWebhook` checks `Klaviyo-Signature`, the hex HMAC-SHA256 keyed with the webhook's secret over the raw body followed directly by the `Klaviyo-Timestamp` header, in constant time. It rejects a timestamp more than five minutes off, so a captured delivery can't be replayed later, and a body whose `meta.klaviyo_webhook_id` doesn't match `Klaviyo-Webhook-Id`, as Klaviyo advises. `KlaviyoReplayGuard` handles each event's `external_id` once, and the event keys make a redelivery a duplicate. Email and SMS consent topics become `marketing.consent_changed`; other topics are per-person activity and are dropped. The instance doesn't take webhooks yet.
 
 **Testing.** Until a Klaviyo account is set up for the nightly run, the tests run against a mock built from Klaviyo's API reference (`packages/testkit/src/mocks/klaviyo.ts`). It answers 401 without the key and 400 without a revision, applies sparse fieldsets, binds each cursor to its query, and checks report bodies the way the reference describes. Its assumptions are listed in the mock and checked on the first sandbox run. For the nightly run, create a free Klaviyo account for testing only, add a few synthetic profiles, a list, a campaign and a flow, make a private key with the read scopes above, and add it as the `SANDBOX_KLAVIYO_PRIVATE_API_KEY` GitHub Actions secret. The writes it may do later (add profiles to lists, trigger flows) are declared, and the write-gate test shows each one is stopped.
+
+### Lightspeed Retail
+
+Reads a store's products, stock at each outlet, customers, and sales and returns from Lightspeed Retail X-Series (formerly Vend), for the sales, inventory and clienteling departments. R-Series, Lightspeed's other retail product, has a separate API and isn't covered.
+
+| Setting | What it is |
+| --- | --- |
+| `LIGHTSPEED_DOMAIN_PREFIX` | The store's prefix, the part before `.retail.lightspeed.app` |
+| `LIGHTSPEED_CLIENT_ID` | The client ID of the KaratOS app on Lightspeed's X-Series developer portal |
+| `LIGHTSPEED_CLIENT_SECRET` | That app's client secret, which also encrypts the stored refresh token |
+| `LIGHTSPEED_REFRESH_TOKEN` | The refresh token from connecting the store; it only seeds the stored one |
+| `CUSTOMER_REF_KEY` | The instance's customer reference key, shared with Square and the custom forms |
+
+**Sign-in.** The store is connected over OAuth at `https://secure.retail.lightspeed.app/connect` with exactly `products:read inventory:read customers:read sales:read`. The client refreshes at `POST https://<prefix>.retail.lightspeed.app/api/1.0/token`. Every refresh gives a new refresh token, which is saved (encrypted, in the instance's database) before anything else, and only one refresh runs at a time. Lightspeed reports the scopes granted on every token response; the connector stops if any scope isn't a read scope, if none is reported, or if the token belongs to a different store. A 401 refreshes once.
+
+**What it reads.** Each pass reads `GET /api/2026-10/products`, `POST /api/2026-10/inventory` (Lightspeed's inventory list is a search sent as a POST; it needs only `inventory:read`), `GET /customers` and `GET /sales`, in that order. Lightspeed pages by version: every change gives a record a higher version, and each list is asked for what's after the version the last page reached, until an empty page comes back (for inventory, a page short of 1,000). The checkpoint keeps each list's version, so every pass reads only what changed since the last. The first import reads every product, stock level and customer and five years of sales. Lightspeed can't filter by date, so older sales are skipped as they are read, and an incremental sync with no checkpoint of its own reads everything once, with what the import stored coming back as duplicates. Lightspeed allows 300 calls per register plus 50 every five minutes; a 429 (or a 502, 503 or 504) is waited out three times, honoring `Retry-After` in seconds or as a date up to a minute, before the sync stops and resumes from its checkpoint.
+
+Inventory records name a product, not its SKU. The connector keeps the SKUs of products it has read in the run and asks `GET /api/2026-10/products/{id}` for any it hasn't, so stock and sales carry the same SKUs.
+
+**Events.** The same types the Square connector gives:
+
+- `order.updated` for each version of a sale: its state, outlet, register, total, line count, customer reference, and when it was voided or deleted.
+- `sale.completed` once a sale is closed, keyed by sale so an edit never counts it twice: each line's SKU, quantity, unit price before discount and discount, the total with tax, and how it was paid (the store's payment type names read as card, cash, check, gift card, financing, wire or other).
+- `sale.returned` for lines taken back (a negative quantity), with the refund per line, against the original sale when Lightspeed links one. An exchange gives both.
+- `product.updated` with the product's one variant, its SKU and price before tax, and whether it's active, archived or deleted.
+- `inventory.counted` for each outlet's stock of a product, dated when it was read, as Lightspeed's records carry no time. A negative or fractional level is dead-lettered by the inventory schema.
+- `customer.profile_updated` under a keyed reference, with a label in place of a name and marketing consent off, since Lightspeed's `do_not_email` only records opting out.
+
+A sale with no readable date is dead-lettered. Customer names, emails, phone numbers, birthdays, addresses, notes and balances are never kept, nor sale notes, staff names, gift card numbers or costs.
+
+**Writes.** `adjust_inventory` is declared behind the write gate and turned down while writes are off; no write scope is asked for. Lightspeed's webhooks aren't used: the scheduled sync reads changes by version.
+
+**Testing.** The mock (`packages/testkit/src/mocks/lightspeed.ts`) is built from Lightspeed's developer docs, and its assumptions list what the first live run must confirm, among them the default page size, error bodies, and that a sale line's `price` is after its discount. The nightly sandbox run reads a trial store once the `SANDBOX_LIGHTSPEED_*` secrets are set. As with Xero, the run can't save the new refresh token, so the secret needs updating after each run.
 
 ### Mailchimp
 
