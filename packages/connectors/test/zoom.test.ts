@@ -106,7 +106,7 @@ describe("Zoom client", () => {
   it("checks the app's credentials before sending anything", () => {
     const { fetch, sent } = scripted(tokenAnswer());
     const make = (o: Partial<Parameters<typeof zoomClient>[0]>) => () => zoomClient({ accountId: ACCOUNT, clientId: CLIENT_ID, clientSecret: SECRET, fetch, ...o });
-    for (const accountId of ["", "short", "a".repeat(65), "has space1", undefined]) expect(make({ accountId: accountId as string }), String(accountId)).toThrow("ZOOM_ACCOUNT_ID is missing or not in the expected shape");
+    for (const accountId of ["", "short", "a".repeat(7), "a".repeat(65), "has space1", undefined]) expect(make({ accountId: accountId as string }), String(accountId)).toThrow("ZOOM_ACCOUNT_ID is missing or not in the expected shape");
     for (const clientId of ["", "a".repeat(7), "a".repeat(65), "bad!char1", undefined]) expect(make({ clientId: clientId as string }), String(clientId)).toThrow("ZOOM_CLIENT_ID is missing or not in the expected shape");
     for (const clientSecret of ["", "a".repeat(15), "a".repeat(129), `${SECRET}!`, undefined]) expect(make({ clientSecret: clientSecret as string }), String(clientSecret)).toThrow("ZOOM_CLIENT_SECRET is missing or not in the expected shape");
     expect(make({ accountId: "" })).toThrow(ZoomConfigError);
@@ -169,7 +169,7 @@ describe("Zoom client", () => {
       await expect(client(fetch).c.meetings(Q)).rejects.toThrow(`Zoom turned down the app's credentials (HTTP ${status}): check ZOOM_ACCOUNT_ID, ZOOM_CLIENT_ID and ZOOM_CLIENT_SECRET, and that the app is activated`);
     }
     await expect(client(scripted(json(401, {})).fetch).c.meetings(Q)).rejects.toThrow(ZoomConfigError);
-    const answers = [json(403, { code: 4700, message: "x" }), json(200, { token_type: "bearer" }), json(200, ["a"]), text(200, "<html>"), json(200, { access_token: "short" }), json(200, { access_token: "has a space in it ok" }), json(200, { access_token: 12345678901234567 }), json(200, { access_token: "a".repeat(4097) })];
+    const answers = [json(403, { code: 4700, message: "x" }), json(200, { token_type: "bearer" }), json(200, ["a"]), text(200, "<html>"), json(200, { access_token: "short" }), json(200, { access_token: "a".repeat(15) }), json(403, { access_token: "a".repeat(20), scope: "report:read:admin" }), json(200, { access_token: "has a space in it ok" }), json(200, { access_token: 12345678901234567 }), json(200, { access_token: "a".repeat(4097) })];
     for (const answer of answers) {
       await expect(client(scripted(answer).fetch, { retries: 0 }).c.meetings(Q)).rejects.toThrow(/^Zoom answered the token request with HTTP (403|200) and no token$/);
     }
@@ -350,15 +350,24 @@ describe("Zoom reading helpers", () => {
   });
 
   it("keeps a topic only when it names nobody", () => {
-    expect(zoomSafeTopic("Bridal consultation", ["Test Customer 1", "customer1@example.test"])).toBe("Bridal consultation");
-    expect(zoomSafeTopic("Ring sizing for Customer", ["Test Customer 1"])).toBeUndefined();
-    expect(zoomSafeTopic("Call with customer1", [undefined, 5, "customer1@example.test"])).toBeUndefined();
-    expect(zoomSafeTopic("Design review: Al", ["Al Smith"])).toBeUndefined();
-    expect(zoomSafeTopic("Halo design review", ["Al Smith"])).toBe("Halo design review");
-    expect(zoomSafeTopic("Halo design review", ["A"])).toBe("Halo design review");
-    expect(zoomSafeTopic("x".repeat(200), [])).toBe("x".repeat(80));
-    expect(zoomSafeTopic(undefined, ["Al"])).toBeUndefined();
-    expect(zoomSafeTopic("", [])).toBeUndefined();
+    expect(zoomSafeTopic("Bridal consultation", ["Test Customer 1"], ["customer1@example.test"])).toBe("Bridal consultation");
+    expect(zoomSafeTopic("Ring sizing for Customer", ["Test Customer 1"], [])).toBeUndefined();
+    expect(zoomSafeTopic("Call with customer1", [undefined, 5], [5, "not an address", "Customer1@Example.test"])).toBeUndefined();
+    expect(zoomSafeTopic("Call: customer1@example.test", [], ["customer1@example.test"])).toBeUndefined();
+    expect(zoomSafeTopic("customer1 repair", [], [" Customer1@example.test "])).toBeUndefined();
+    // An address's domain isn't a name.
+    expect(zoomSafeTopic("Store visit follow-up", [], ["stylist@store.test"])).toBe("Store visit follow-up");
+    expect(zoomSafeTopic("Design review: Al", ["Al Smith"], [])).toBeUndefined();
+    expect(zoomSafeTopic("Review (Al)", ["Al Smith"], [])).toBeUndefined();
+    expect(zoomSafeTopic("Halo design review", ["Al Smith"], [])).toBe("Halo design review");
+    expect(zoomSafeTopic("Design a ring", ["A Smith"], [])).toBe("Design a ring");
+    expect(zoomSafeTopic("Ring for Jo", ["Smith,Jo"], [])).toBeUndefined();
+    expect(zoomSafeTopic("Ring for Jo", ["J.Jo"], [])).toBeUndefined();
+    // Names of three letters or more are matched inside words too.
+    expect(zoomSafeTopic("Bobby's ring", ["Bob"], [])).toBeUndefined();
+    expect(zoomSafeTopic("x".repeat(200), [], [])).toBe("x".repeat(80));
+    expect(zoomSafeTopic(undefined, ["Al"], [])).toBeUndefined();
+    expect(zoomSafeTopic("", [], [])).toBeUndefined();
   });
 });
 
@@ -405,6 +414,11 @@ describe("Zoom events", () => {
       expect(zoomMeetingEvent({ ...meeting, topic }, rows, ctx).event.payload, topic).toMatchObject({ title: undefined, kind: "repair" });
     }
     expect(zoomMeetingEvent({ ...meeting, topic: "Engagement ring call" }, null, ctx).event.payload).toMatchObject({ title: "Engagement ring call", kind: "bridal" });
+    // Each name and address is checked: the host's from the meeting, each guest's from the report.
+    expect(zoomMeetingEvent({ ...meeting, topic: "Repair with Morgan", host_display_name: "Morgan Lee" }, null, ctx).event.payload.title).toBeUndefined();
+    expect(zoomMeetingEvent({ ...meeting, topic: "Repair for stylist" , host_display_name: "Host" }, null, ctx).event.payload.title).toBeUndefined();
+    expect(zoomMeetingEvent({ ...meeting, topic: "Repair for Walker" }, [{ name: "Ann Walker" }], ctx).event.payload.title).toBeUndefined();
+    expect(zoomMeetingEvent({ ...meeting, topic: "Repair for annw" }, [{ user_email: "annw@example.test" }], ctx).event.payload.title).toBeUndefined();
     expect(zoomMeetingEvent({ ...meeting, topic: "  " }, rows, ctx).event.payload).toMatchObject({ title: undefined, kind: "other" });
     expect(zoomMeetingEvent({ ...meeting, topic: `${"x".repeat(158)} repair` }, rows, ctx).event.payload).toMatchObject({ title: "x".repeat(80), kind: "other" });
     expect(zoomMeetingEvent({ ...meeting, topic: `${"x".repeat(150)} repair` }, rows, ctx).event.payload).toMatchObject({ title: "x".repeat(80), kind: "repair" });
@@ -421,6 +435,17 @@ describe("Zoom events", () => {
     const read = zoomMeetingEvent(meeting, [rejoin, host, guest, later, unnamed, unnamed, shouting, emailOnly, "x", null], ctx).event.payload;
     expect(read).toMatchObject({ attendeeCount: 4, firstGuestJoinedAt: "2026-11-09T15:00:00.000Z" });
     expect(read.customerRefs).toEqual([...formCustomerRefs(CUSTOMER_KEY, { email: synthetic.email(1) }), ...formCustomerRefs(CUSTOMER_KEY, { email: "customer9@example.test" })].sort());
+    // Two people by one name are two when Zoom gives them ids; one address in two cases is one person; the same name without either is one.
+    const ids = [{ name: "Guest", participant_user_id: "g1" }, { name: "Guest", participant_user_id: "g2" }];
+    expect(zoomMeetingEvent(meeting, ids, ctx).event.payload.attendeeCount).toBe(2);
+    expect(zoomMeetingEvent(meeting, [{ user_email: "A@example.test", join_time: "a" }, { user_email: "a@example.test", join_time: "b" }], ctx).event.payload.attendeeCount).toBe(1);
+    expect(zoomMeetingEvent(meeting, [{ name: "Guest", join_time: "a" }, { name: "Guest", join_time: "b" }], ctx).event.payload.attendeeCount).toBe(1);
+    expect(zoomMeetingEvent(meeting, [{ id: "x" }, { id: "y" }], ctx).event.payload.attendeeCount).toBe(2);
+    // Without a host address, a guest without one still counts.
+    expect(zoomMeetingEvent({ ...meeting, host_email: undefined }, [{ name: "Guest" }], ctx).event.payload.attendeeCount).toBe(1);
+    // A guest who rejoins takes one of the twenty references, not two.
+    const rejoined = [{ user_email: synthetic.email(50), participant_user_id: "r" }, ...Array.from({ length: 20 }, (_, i) => ({ user_email: synthetic.email(i + 10), participant_user_id: `g${i}` }))];
+    expect(zoomMeetingEvent(meeting, [rejoined[0]!, ...rejoined], ctx).event.payload.customerRefs).toHaveLength(20);
     const crowd = Array.from({ length: 25 }, (_, i) => ({ user_email: synthetic.email(i + 10), participant_user_id: `g${i}` }));
     const many = zoomMeetingEvent(meeting, crowd, ctx).event.payload;
     expect(many).toMatchObject({ attendeeCount: 25 });
@@ -437,13 +462,13 @@ describe("Zoom events", () => {
     expect(zoomMeetingEvent(meeting, [], ctx).event.payload).toMatchObject({ participantsRead: true, attendeeCount: 0 });
     expect(zoomMeetingEvent({ ...meeting, feature_used: { record_to_computer: true, meeting_summary: true, screen_sharing: false } }, null, ctx).event.payload).toMatchObject({ recorded: true, summarized: true, screenShared: false });
     expect(zoomMeetingEvent({ ...meeting, feature_used: { record_to_cloud: true, screen_sharing: "yes" } }, null, ctx).event.payload).toMatchObject({ recorded: true, screenShared: false });
-    expect(zoomMeetingEvent({ ...meeting, feature_used: ["record_to_cloud"] }, null, ctx).event.payload).toMatchObject({ recorded: false, screenShared: false, summarized: false });
+    for (const feature_used of [["record_to_cloud"], null, "record_to_cloud", 5]) expect(zoomMeetingEvent({ ...meeting, feature_used }, null, ctx).event.payload, String(feature_used)).toMatchObject({ recorded: false, screenShared: false, summarized: false });
   });
 
   it("drops counts and ids that don't read", () => {
     const { meeting } = base();
     expect(zoomMeetingEvent({ ...meeting, meeting_id: "81000000001", duration: 0, participants: 0 }, null, ctx).event.payload).toMatchObject({ meetingId: "81000000001", durationMinutes: 0, participantCount: 0 });
-    for (const meeting_id of [12345678, 1_000_000_000_000, "8100000000x", null, 8.1e10 + 0.5]) expect(zoomMeetingEvent({ ...meeting, meeting_id }, null, ctx).event.payload.meetingId, String(meeting_id)).toBeUndefined();
+    for (const meeting_id of [12345678, 1_000_000_000_000, "8100000000x", null, 8.1e10 + 0.5, [81_000_000_001], { id: 81_000_000_001 }]) expect(zoomMeetingEvent({ ...meeting, meeting_id }, null, ctx).event.payload.meetingId, String(meeting_id)).toBeUndefined();
     expect(zoomMeetingEvent({ ...meeting, meeting_id: 123456789 }, null, ctx).event.payload.meetingId).toBe("123456789");
     expect(zoomMeetingEvent({ ...meeting, meeting_id: 999_999_999_999 }, null, ctx).event.payload.meetingId).toBe("999999999999");
     for (const n of [-1, 1.5, "30", null]) expect(zoomMeetingEvent({ ...meeting, duration: n, participants: n }, null, ctx).event.payload, String(n)).toMatchObject({ durationMinutes: undefined, participantCount: undefined });
@@ -472,7 +497,9 @@ describe("Zoom events", () => {
     expect(notObject.event.payload.problems).toEqual(["meeting is not an object", "meeting has no UUID that reads", "meeting has no start time that reads", "meeting has no end time that reads"]);
     expect(notObject.event.idempotencyKey).toMatch(/^zoom:unreadable_meeting:[0-9a-f]{12}$/);
     expect(notObject.event.id).toBe(`zoom_unreadable_meeting_${notObject.event.idempotencyKey.slice(-12)}`);
-    for (const meeting_uuid of ["short", "a".repeat(65), "has space==", 5]) expect(bad({ ...meeting, meeting_uuid }).event.payload.problems, String(meeting_uuid)).toEqual(["meeting has no UUID that reads"]);
+    // Two meetings that can't be read are two dead letters, however alike what was read of them.
+    expect(bad("other").event.idempotencyKey).not.toBe(notObject.event.idempotencyKey);
+    for (const meeting_uuid of ["short", "a".repeat(7), "a".repeat(65), "has space==", 5, 12_345_678]) expect(bad({ ...meeting, meeting_uuid }).event.payload.problems, String(meeting_uuid)).toEqual(["meeting has no UUID that reads"]);
     expect(bad({ ...meeting, meeting_uuid: "a".repeat(8) }).ok).toBe(true);
     expect(bad({ ...meeting, meeting_uuid: "a".repeat(64) }).ok).toBe(true);
     const ends = bad({ ...meeting, end_time: daysAgo(2) });
@@ -642,6 +669,24 @@ describe("Zoom connector", () => {
     expect(events.map((e) => e.payload.attendeeCount)).toEqual([undefined, 1]);
     expect(events.map((e) => e.payload.participantsRead)).toEqual([false, true]);
     expect(mock.reads.filter((r) => r.path.includes("participants") && r.query.meetingId === data.meetings[0]!.meeting_uuid)).toHaveLength(2);
+  });
+
+  it("keeps every row of each participant page", async () => {
+    const data = account({ pageCap: 2 });
+    const uuid = String(data.meetings[0]!.meeting_uuid);
+    data.participants![uuid]!.push({ name: "Second Guest", participant_user_id: "TstGuest9999", user_email: synthetic.email(99) });
+    const events = eventsOf(await drain(connector(zoomDocMock(data), { historyMonths: 1 }).historicalImport({ cursor: null } as never)));
+    expect(events.find((e) => e.payload.meetingUuid === uuid)!.payload.attendeeCount).toBe(2);
+  });
+
+  it("reads a span of one day, and keeps a pass going into its last day", async () => {
+    zoomMeeting.reset();
+    const today = held(0.1);
+    const mock = zoomDocMock({ ...account(), meetings: [today.meeting], participants: {} });
+    const single = JSON.stringify({ pass: { from: "2026-11-10", until: "2026-11-10", spanFrom: "2026-11-10" }, done: true, nextFrom: "2026-11-08" } satisfies ZoomCursor);
+    expect(eventsOf(await drain(connector(mock).incrementalSync({ cursor: single } as never)))).toHaveLength(1);
+    const twoSpans = await drain(connector(zoomDocMock(account())).incrementalSync({ cursor: JSON.stringify({ pass: null, done: true, nextFrom: "2026-10-11" }) } as never));
+    expect(twoSpans.map((b) => parseZoomCursor(b.cursor ?? null)!.pass?.spanFrom ?? null)).toEqual(["2026-11-10", null]);
   });
 
   it("skips the participant report for a meeting without a UUID, and dead-letters it", async () => {

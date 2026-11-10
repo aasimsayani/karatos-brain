@@ -79,8 +79,9 @@ export function parseZoomCursor(raw: string | null): ZoomCursor | null {
   const r = typeof c === "object" && c !== null && !Array.isArray(c) ? (c as Record<string, unknown>) : null;
   if (r && typeof r.done === "boolean" && isDay(r.nextFrom)) {
     if (r.pass === null) return { pass: null, done: r.done, nextFrom: r.nextFrom };
-    const p = typeof r.pass === "object" && !Array.isArray(r.pass) ? (r.pass as Record<string, unknown>) : null;
-    if (p && isDay(p.from) && isDay(p.until) && isDay(p.spanFrom)) return { pass: { from: p.from, until: p.until, spanFrom: p.spanFrom }, done: r.done, nextFrom: r.nextFrom };
+    // Anything but an object fails the checks below: a string or number has no such fields.
+    const p = r.pass as Record<string, unknown> | undefined;
+    if (isDay(p?.from) && isDay(p.until) && isDay(p.spanFrom)) return { pass: { from: p.from, until: p.until, spanFrom: p.spanFrom }, done: r.done, nextFrom: r.nextFrom };
   }
   throw new Error("Zoom checkpoint is not in the expected shape");
 }

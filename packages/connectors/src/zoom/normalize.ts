@@ -57,13 +57,22 @@ export function zoomHostRef(key: string, email: unknown): string | undefined {
   return address ? `zoom:host:${createHmac("sha256", key).update(`zoom-host:${address}`, "utf8").digest("hex").slice(0, 24)}` : undefined;
 }
 
-/** The topic, unless one of the names or addresses given appears in it. */
-export function zoomSafeTopic(topic: string | undefined, people: unknown[]): string | undefined {
+/**
+ * The topic, unless one of the names or addresses given appears in it: a
+ * name's words, or an address or the part before its @. An address's
+ * domain isn't matched, so "store" in a host's address doesn't hide every
+ * "store visit".
+ */
+export function zoomSafeTopic(topic: string | undefined, names: unknown[], emails: unknown[]): string | undefined {
   if (!topic) return undefined;
   const lower = topic.toLowerCase();
-  const words = people
-    .flatMap((v) => (typeof v === "string" ? [v.toLowerCase(), ...v.toLowerCase().split(/[\s,.@]+/)] : []))
-    .filter((w) => w.length >= 2);
+  const words = [
+    ...names.flatMap((v) => (typeof v === "string" ? v.toLowerCase().split(/[\s,.]+/) : [])),
+    ...emails.flatMap((v) => {
+      const address = normalizeEmail(v);
+      return address ? [address, address.split("@")[0]!] : [];
+    }),
+  ].filter((w) => w.length >= 2);
   // Longer words are matched anywhere; short names such as Al or Li only as whole words.
   const titleWords = new Set(lower.split(/[^\p{L}\p{N}]+/u));
   return words.some((w) => (w.length >= 3 ? lower.includes(w) : titleWords.has(w))) ? undefined : topic.slice(0, TITLE_MAX);
@@ -95,7 +104,7 @@ export function zoomMeetingEvent(raw: unknown, participants: unknown[] | null, c
 
   const hostEmail = normalizeEmail(m.host_email);
   const rows = (participants ?? []).filter(isObject);
-  const guests = rows.filter((p) => normalizeEmail(p.user_email) === undefined || normalizeEmail(p.user_email) !== hostEmail);
+  const guests = rows.filter((p) => hostEmail === undefined || normalizeEmail(p.user_email) !== hostEmail);
   const emails = [...new Set(guests.map((p) => normalizeEmail(p.user_email)).filter((e): e is string => e !== undefined))];
   const customerRefs = [...new Set(emails.slice(0, MAX_CUSTOMERS).flatMap((email) => formCustomerRefs(ctx.customerKey, { email })))].sort();
   // A person who drops and rejoins is listed once per join; they count once, by Zoom's participant id or else their name.
@@ -103,7 +112,8 @@ export function zoomMeetingEvent(raw: unknown, participants: unknown[] | null, c
   const joins = guests.map((p) => calendlyTime(p.join_time)).filter((t): t is string => t !== null).sort();
 
   const topic = text(m.topic, TITLE_MAX * 2);
-  const features = isObject(m.feature_used) ? m.feature_used : {};
+  // Anything but an object has no such flags.
+  const features = (m.feature_used ?? {}) as Record<string, unknown>;
   const uses = (...names: string[]) => names.some((n) => features[n] === true);
   const meetingId = typeof m.meeting_id === "number" || typeof m.meeting_id === "string" ? String(m.meeting_id) : "";
 
@@ -111,7 +121,7 @@ export function zoomMeetingEvent(raw: unknown, participants: unknown[] | null, c
     system: "Zoom",
     meetingUuid: uuid,
     meetingId: MEETING_ID.test(meetingId) ? meetingId : undefined,
-    title: zoomSafeTopic(topic, [m.host_display_name, m.host_email, ...rows.flatMap((p) => [p.name, p.user_email])]),
+    title: zoomSafeTopic(topic, [m.host_display_name, ...rows.map((p) => p.name)], [m.host_email, ...rows.map((p) => p.user_email)]),
     kind: appointmentKind(topic),
     startAt,
     endAt,

@@ -134,18 +134,20 @@ export function zoomClient(options: ZoomClientOptions): ZoomClient {
     );
     const body: unknown = await response.json().catch(() => undefined);
     if (response.status === 400 || response.status === 401) throw new ZoomConfigError(`Zoom turned down the app's credentials (HTTP ${response.status}): check ZOOM_ACCOUNT_ID, ZOOM_CLIENT_ID and ZOOM_CLIENT_SECRET, and that the app is activated`);
-    if (response.status !== 200 || !isObject(body) || typeof body.access_token !== "string" || !/^\S{16,4096}$/.test(body.access_token)) {
+    const value = (body as Record<string, unknown> | undefined)?.access_token;
+    if (response.status !== 200 || typeof value !== "string" || !/^\S{16,4096}$/.test(value)) {
       throw new ZoomApiError(`Zoom answered the token request with HTTP ${response.status} and no token`, response.status, zoomErrorCode(body));
     }
     // A token that could change anything is not used.
-    const writes = zoomWriteScopes(body.scope);
+    const writes = zoomWriteScopes((body as Record<string, unknown>).scope);
     if (writes === null) throw new ZoomConfigError("Zoom's token answer did not list its scopes; the connector won't read without knowing it can only read");
     if (writes.length) throw new ZoomConfigError(`the Zoom app can change data (${writes.slice(0, 5).join(", ")}); give it only ${ZOOM_READ_SCOPES.join(" ")}`);
-    const scopes = (body.scope as string).trim().split(/\s+/);
+    const scopes = ((body as Record<string, unknown>).scope as string).trim().split(/\s+/);
     const missing = scopes.includes(CLASSIC_REPORT_SCOPE) ? [] : ZOOM_READ_SCOPES.filter((s) => !scopes.includes(s));
     if (missing.length) throw new ZoomConfigError(`the Zoom app is missing ${missing.join(" ")}`);
-    const seconds = Number.isSafeInteger(body.expires_in) && (body.expires_in as number) > 0 ? (body.expires_in as number) : 600;
-    access = { token: body.access_token, until: clock() + seconds * 1000 - TOKEN_MARGIN_MS };
+    const expires = (body as Record<string, unknown>).expires_in;
+    const seconds = Number.isSafeInteger(expires) && (expires as number) > 0 ? (expires as number) : 600;
+    access = { token: value, until: clock() + seconds * 1000 - TOKEN_MARGIN_MS };
     return access.token;
   }
 
@@ -181,7 +183,7 @@ export function zoomClient(options: ZoomClientOptions): ZoomClient {
 
   const pageQuery = (next: string | null): Record<string, string> => {
     if (next !== null && !ZOOM_PAGE_TOKEN.test(next)) throw new ZoomApiError("a Zoom page token is not in the expected shape", 0);
-    return { page_size: String(ZOOM_PAGE_SIZE), ...(next !== null ? { next_page_token: next } : {}) };
+    return { page_size: String(ZOOM_PAGE_SIZE), ...(next ? { next_page_token: next } : {}) };
   };
 
   return {
