@@ -186,7 +186,7 @@ Used by: R is retail, W is wholesale, M is manufacturing. Test with says how we 
 | Microsoft Teams | R, W, M | Public API | Paid account | Yes | Planned (Channel messages where staff hand off repairs, custom orders and sales, like Slack. Microsoft Graph has one changelog, watched through the Outlook entry) |
 | RingCentral | R, W, M | Public API | Paid account | Yes | Planned (Business phone call logs, texts and voicemail. RingCentral replaced its free developer account with a low-cost package) |
 | Quo (formerly OpenPhone) | R | Public API | Paid account | Yes | Built (Reads calls and texts with the workspace's Quo API key. Quo keys have full access, so the client only ever sends List calls and List messages. No sandbox: the first client's key confirms the mock built from Quo's docs) |
-| Zoom | R, W, M | Public API | Unknown | Yes | Planned (Virtual consultations: who met, when and for how long, and whether it was recorded) |
+| Zoom | R, W, M | Public API | Paid account | Yes | Built (Reads the account's meeting history and who joined each meeting through a Server-to-Server OAuth app the account's admin makes, given only two report read scopes. The client checks each token's scopes and won't read with one that can change anything. Zoom keeps reports for paid plans only, so the first client's app confirms the mock built from Zoom's docs) |
 | Gorgias | R | Public API | Paid account | Yes | Planned (E-commerce helpdesk tickets from email, chat and social, common with Shopify jewelry brands) |
 | Zendesk | R, W, M | Public API | Paid account | Yes | Planned (Helpdesk tickets and customer conversations. Zendesk offers a 14-day trial, and sponsored test accounts only to Marketplace partners) |
 | Apple Messages for Business | R | Partner | Partner | No | Planned (iMessage conversations with customers, reached through a messaging service provider Apple has approved) |
@@ -438,6 +438,7 @@ A request for a path or method the docs don't list throws `UndocumentedRequestEr
 - A WooCommerce store's REST API v3 read endpoints with its key permissions and page headers
 - Xero's Accounting API endpoints with its token refresh
 - Yext's Management API v2 location and review lists, enforcing the API key header, the version date, the account, the app's access, page sizes, update-date ranges and page tokens tied to their query
+- Zoom's Server-to-Server OAuth token, meeting history and meeting participant reports (API v2)
 
 Where a vendor has a free sandbox (Affirm, Airtable, Amazon (Selling Partner API), Asana, Authorize.net, Avalara AvaTax, BigCommerce, BILL, Calendly, Clover, Custom forms, Docusign, Dropbox, eBay, FedEx, GIA Report Results, Gmail, Google Ads, Google Analytics 4, Google Workspace and Drive, Gusto, HubSpot, Klaviyo, Lightspeed Retail, Mailchimp, Meta Ads, Microsoft OneDrive and SharePoint files, Monday.com, Notion, Pinterest, Plaid, QuickBooks Online, Slack, Square, TikTok, Trello, UPS, Wix, WooCommerce, Xero and Yext so far), its mock is a stand-in until a developer account is set up for the nightly run.
 
@@ -2493,6 +2494,29 @@ Reads the store's Yext account through Yext's Management API (v2): its locations
 **Writes.** Replying to a review and changing a location's hours are declared so they can be gated and audited, and are turned off. Each needs a named person's approval, and the client has no request to send either.
 
 **Testing.** The tests run against a mock built from Yext's Management API docs (`packages/testkit/src/mocks/yext.ts`), which checks the API key header, the version date, the account, the app's access, page sizes, update-date ranges and that a page token belongs to its query. For the nightly run, add an app in a Yext sandbox account with read access to Entities and Reviews and add its key as the GitHub Actions secret `SANDBOX_YEXT_API_KEY`.
+
+### Zoom
+
+Reads the store's past Zoom meetings and who joined them, so virtual consultations sit beside the appointments booked in Calendly and the visits in the store. Each meeting arrives as an `appointment.held` event.
+
+| Setting | What it is |
+| --- | --- |
+| `ZOOM_ACCOUNT_ID` | The Account ID of the store's KaratOS Server-to-Server OAuth app |
+| `ZOOM_CLIENT_ID` | That app's Client ID |
+| `ZOOM_CLIENT_SECRET` | That app's Client Secret |
+| `CUSTOMER_REF_KEY` | The instance's key for customer references |
+
+**Read-only by design.** A Zoom admin makes the KaratOS app in the Zoom App Marketplace and gives it only two scopes, `report:read:list_history_meetings:admin` and `report:read:list_meeting_participants:admin` (or the older `report:read:admin`). Every token Zoom issues lists its scopes, and the client checks each one: a token with any scope that isn't a read, or that lists none, is not used, and the sync stops saying which scope to take away. The client's only requests are the token request and two GETs to `api.zoom.us`; it ignores the `api_url` a token answer names. Scheduling a meeting is declared behind the write gate, turned off, and the client has no request to send it.
+
+**What it reads.** Zoom's meeting history (`GET /report/history_meetings`) lists the account's past meetings by the day they started, at most a month at a time, and the participant report (`GET /report/meetings/{uuid}/participants`) lists who joined one. A pass reads the history in 30-day spans, 300 to a page, and each meeting's participants; a meeting Zoom has no report for (a 404) is kept with no guests. The first import covers six months, the longest Zoom keeps reports. Each later sync reads from two days before the last one, since a meeting is listed once it ends and by the account's own time zone. Each history page is one batch. Zoom's page tokens last 15 minutes, so the checkpoint keeps the span rather than the token, and a resumed pass reads its span again; what it already read is a duplicate.
+
+**Events.** `appointment.held` for each meeting, with its UUID and meeting id, start and end, length in minutes, kind (bridal, custom design, repair, appraisal, pickup, consultation or other, read from the topic the same way as Calendly titles), Zoom's participant count and how many guests joined (once each, however often they rejoined), when the first guest joined, a keyed host reference, the guests' customer references, and whether the meeting was recorded, shared a screen or had a meeting summary. Each is keyed by the UUID and a digest of what was kept. A meeting without a UUID or times that read is dead-lettered.
+
+**Privacy.** Guests' email addresses only make the same keyed customer references Calendly, custom forms and Klaviyo make, and the host's becomes a keyed host reference, so neither can be read back. Names, devices, IP addresses and locations aren't kept, and the topic only when it carries no participant's or host's name or address. Recordings, chat, transcripts and summaries are never read.
+
+**Rate limits.** Reports are in Zoom's Heavy rate limit group. The client waits out a 429, 500, 502, 503 or 504 three times, honoring `Retry-After` in seconds up to a minute, before the error goes to the sync runner, which resumes from its checkpoint next time. A 401 drops the token so the next read asks for a new one, and a 403 means the plan has no reports (they need Pro or higher).
+
+**Testing.** Reports need a paid Zoom plan, so the tests run against a mock built from Zoom's docs (`packages/testkit/src/mocks/zoom.ts`). It checks the app's credentials, the token and its scopes, the day range, paging and how a UUID with a slash is encoded, and lists what the first client's app must confirm: which day a meeting is listed under, and that a rejoining guest is listed once per join.
 
 <!-- registry:connector-docs:end -->
 

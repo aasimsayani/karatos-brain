@@ -49,6 +49,7 @@ import wix from "./wix.js";
 import woocommerce from "./woocommerce.js";
 import xero from "./xero.js";
 import yext from "./yext.js";
+import zoom from "./zoom.js";
 
 export * from "./affirm.js";
 export * from "./airtable.js";
@@ -99,9 +100,10 @@ export * from "./wix.js";
 export * from "./woocommerce.js";
 export * from "./xero.js";
 export * from "./yext.js";
+export * from "./zoom.js";
 
 /** Every mock module, one per catalog integration. */
-export const DOC_MOCK_MODULES: readonly DocMockModule[] = [affirm, airtable, amazon, asana, authorize_net, avalara, bigcommerce, bill_com, birdeye, calendly, clover, custom_forms, docusign, dropbox, ebay, etsy, fedex, gia, gmail, google_ads, google_analytics, google_workspace, gusto, hubspot, idex, klaviyo, lightspeed, mailchimp, meta_ads, microsoft_onedrive, monday, nivoda, notion, openphone, pinterest, plaid, quickbooks, rapnet, slack, square, stuller, taxjar, tiktok, trello, ups, wix, woocommerce, xero, yext];
+export const DOC_MOCK_MODULES: readonly DocMockModule[] = [affirm, airtable, amazon, asana, authorize_net, avalara, bigcommerce, bill_com, birdeye, calendly, clover, custom_forms, docusign, dropbox, ebay, etsy, fedex, gia, gmail, google_ads, google_analytics, google_workspace, gusto, hubspot, idex, klaviyo, lightspeed, mailchimp, meta_ads, microsoft_onedrive, monday, nivoda, notion, openphone, pinterest, plaid, quickbooks, rapnet, slack, square, stuller, taxjar, tiktok, trello, ups, wix, woocommerce, xero, yext, zoom];
 
 /** Every doc-derived mock, with empty data, for checks and the vendor docs watch. */
 export function allDocMocks(): DocMock[] {
