@@ -109,7 +109,7 @@ export function taxjarClient(options: TaxjarClientOptions): TaxjarClient {
       const response = await doFetch(url.toString(), { method: "GET", headers });
       if (RETRIED.has(response.status) && attempt < retries) {
         const after = Number(response.headers.get("retry-after"));
-        await sleep(1000 * (Number.isFinite(after) && after > 0 ? Math.min(after, MAX_RETRY_AFTER_S) : 2 ** attempt));
+        await sleep(1000 * (after > 0 ? Math.min(after, MAX_RETRY_AFTER_S) : 2 ** attempt));
         continue;
       }
       const body: unknown = await response.json().catch(() => undefined);

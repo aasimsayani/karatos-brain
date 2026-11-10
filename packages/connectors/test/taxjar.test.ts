@@ -133,14 +133,17 @@ describe("TaxJar client", () => {
     const { c } = client(fetch);
     await expect(c.list("orders", { ...Q, from: "2026-10-01" })).rejects.toThrow("transactions must be listed between YYYY/MM/DD days");
     await expect(c.list("orders", { ...Q, to: "2026/10/1" })).rejects.toThrow(TaxjarApiError);
+    await expect(c.list("orders", { ...Q, from: "x2026/10/01" })).rejects.toThrow(TaxjarApiError);
+    await expect(c.list("orders", { ...Q, to: "2026/10/31x" })).rejects.toThrow(TaxjarApiError);
     await expect(c.list("orders", { ...Q, provider: "Shopify" })).rejects.toThrow("TAXJAR_PROVIDERS must be lowercase source names");
     await expect(c.list("orders", { ...Q, provider: "a&b=c" })).rejects.toThrow(TaxjarConfigError);
     expect(sent).toHaveLength(0);
   });
 
   it("says when a list answer has no list", async () => {
-    const { fetch } = scripted(json(200, { refunds: [] }));
-    await expect(client(fetch).c.list("orders", Q)).rejects.toThrow("TaxJar answered orders transactions without the orders list");
+    const { fetch } = scripted(json(200, { refunds: [] }), json(200, { orders: "1,2" }), json(200, { orders: { 0: "1" } }));
+    const { c } = client(fetch);
+    for (let i = 0; i < 3; i++) await expect(c.list("orders", Q)).rejects.toThrow("TaxJar answered orders transactions without the orders list");
   });
 
   it("reads one transaction by its escaped id and provider", async () => {
@@ -185,7 +188,7 @@ describe("TaxJar client", () => {
 
   it("explains a turned-down token, a forbidden read and other errors, with TaxJar's detail", async () => {
     const detail = (status: number, d: unknown) => json(status, { error: "x", detail: d, status });
-    const { fetch } = scripted(detail(401, "Not authorized"), detail(403, "Plan has no API"), detail(422, "Bad date"), text(500, "oops"), detail(404, "Not here"), detail(400, 7));
+    const { fetch } = scripted(detail(401, "Not authorized"), detail(403, "Plan has no API"), detail(422, "Bad date"), text(500, "oops"), detail(404, "Not here"), detail(400, 7), json(202, { regions: [] }));
     const { c } = client(fetch, { retries: 0 });
     await expect(c.list("orders", Q)).rejects.toMatchObject({ status: 401, detail: "Not authorized", message: "TaxJar turned down the API token: check TAXJAR_API_TOKEN, and that TAXJAR_ENVIRONMENT matches where it was made" });
     await expect(c.list("orders", Q)).rejects.toMatchObject({ status: 403, message: "TaxJar's account isn't allowed to read orders transactions (Plan has no API)" });
@@ -194,6 +197,7 @@ describe("TaxJar client", () => {
     // A 404 is only a missing transaction when one was asked for.
     await expect(c.list("refunds", Q)).rejects.toMatchObject({ status: 404, message: "TaxJar answered HTTP 404 for refunds transactions (Not here)" });
     await expect(c.list("refunds", Q)).rejects.toMatchObject({ status: 400, detail: undefined });
+    await expect(c.nexusRegions()).rejects.toMatchObject({ status: 202, message: "TaxJar answered HTTP 202 for nexus regions" });
   });
 
   it("says when a 200 isn't a JSON object", async () => {
@@ -261,6 +265,8 @@ describe("TaxJar reading helpers", () => {
     expect(taxjarCents("1.123456")).toBe(112);
     for (const bad of ["1.1234567", "1e3", " 1", "", "abc", null, undefined, NaN, Infinity, 1e13, -1e13, "12345678901234"]) expect(taxjarCents(bad), String(bad)).toBeNull();
     expect(taxjarCents(9_999_999_999_999)).toBe(999_999_999_999_900);
+    expect(taxjarCents("9999999999999.5")).toBe(999_999_999_999_950);
+    expect(taxjarCents("10000000000000")).toBeNull();
   });
 
   it("reads days from TaxJar's times or bare days", () => {
@@ -352,6 +358,7 @@ describe("TaxJar events", () => {
   });
 
   it("falls back to the provider it was listed under, and checks the one TaxJar names", () => {
+    expect(taxjarTransactionEvent({ ...order(), provider: "amazon" }, "orders", { ...ctx, provider: "api" }).event.payload.provider).toBe("amazon");
     for (const given of [undefined, "Shop ify", 3]) expect(taxjarTransactionEvent({ ...order(), provider: given }, "orders", { ...ctx, provider: "ebay" }).event.payload.provider).toBe("ebay");
   });
 
@@ -365,7 +372,7 @@ describe("TaxJar events", () => {
       from_city: "<b>",
       from_zip: "1",
       to_country: "us",
-      to_state: "",
+      to_state: "ca",
       line_items: [...Array.from({ length: 250 }, (_, i) => ({ id: String(i), quantity: 1, unit_price: 1 })), "not a line"],
     };
     const { ok, event } = taxjarTransactionEvent(raw, "orders", ctx);
@@ -373,6 +380,7 @@ describe("TaxJar events", () => {
     expect(event.payload).toMatchObject({ referenceId: undefined, shippingCents: null, fromCountry: undefined, fromRegion: undefined, fromCity: undefined, fromZip: undefined, toCountry: undefined, toRegion: undefined, lineCount: 251 });
     expect(event.payload.lines).toHaveLength(200);
     const odd = taxjarTransactionEvent({ ...order(), line_items: [null, { id: "a b!", product_identifier: "<x>", product_tax_code: "20010", quantity: "2", unit_price: "3", discount: null, sales_tax: Infinity }] }, "orders", ctx);
+    expect(taxjarTransactionEvent({ ...order(), line_items: [{ quantity: Infinity }, { quantity: 2.5 }] }, "orders", ctx).event.payload.lines).toMatchObject([{ quantity: null }, { quantity: 2.5 }]);
     expect(odd.event.payload.lines).toEqual([{ id: undefined, sku: undefined, taxCode: "20010", quantity: null, unitPriceCents: 300, discountCents: null, salesTaxCents: null }]);
     expect(taxjarTransactionEvent({ ...order(), line_items: "none" }, "orders", ctx).event.payload).toMatchObject({ lineCount: 0, lines: [] });
   });
@@ -521,6 +529,8 @@ describe("TaxJar connector", () => {
     const batches = await drain(connector(mock, { providers: ["api", "shopify", "api"] }).incrementalSync({ cursor: null } as never));
     const order = mock.lists.map((l) => `${l.provider}:${l.kind}`).filter((v, i, a) => a.indexOf(v) === i);
     expect(order).toEqual(["api:orders", "api:refunds", "shopify:orders", "shopify:refunds"]);
+    // A provider named twice is read once.
+    expect(mock.lists).toHaveLength(4);
     expect(mock.shows.filter((s) => s.provider === "shopify").map((s) => s.id)).toEqual(["S-1"]);
     expect(eventsOf(batches).find((e) => e.payload.transactionId === "S-1")!.payload.provider).toBe("shopify");
   });
@@ -566,6 +576,24 @@ describe("TaxJar connector", () => {
       "refunds 2026/02/01-2026/03/01",
     ]);
     expect(TAXJAR_SPAN_DAYS).toBe(31);
+  });
+
+  it("reads a last span of a single day", async () => {
+    const mock = taxjarDocMock(store({ orders: [taxjarOrder.one({ transaction_id: "LAST", transaction_date: "2026-02-01T00:00:00Z" })], refunds: [] }));
+    const cursor = JSON.stringify({ pass: { from: "2026-01-01", until: "2026-02-01", step: 0, spanFrom: "2026-01-01", offset: 0 }, done: false });
+    const batches = await drain(connector(mock).historicalImport({ cursor } as never));
+    expect(mock.lists.filter((l) => l.kind === "orders").map((l) => `${l.from}-${l.to}`)).toEqual(["2026/01/01-2026/01/31", "2026/02/01-2026/02/01"]);
+    expect(eventsOf(batches).map((e) => e.payload.transactionId)).toContain("LAST");
+  });
+
+  it("names the provider it listed under when TaxJar's record doesn't", async () => {
+    const client: TaxjarClient = {
+      list: async (kind) => (kind === "orders" ? ["X-1"] : []),
+      show: async () => ({ ...taxjarOrder.one({ transaction_id: "X-1", transaction_date: "2026-11-01T00:00:00Z" }), provider: undefined }),
+      nexusRegions: async () => [],
+    };
+    const batches = await drain(taxjarConnector({ apiToken: TOKEN, customerKey: CUSTOMER_KEY, now: NOW, client, providers: ["ebay"] }).incrementalSync({ cursor: null } as never));
+    expect(eventsOf(batches)[0]!.payload.provider).toBe("ebay");
   });
 
   it("reads each listed id once, in order, and skips one deleted since it was listed", async () => {

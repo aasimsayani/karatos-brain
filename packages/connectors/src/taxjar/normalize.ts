@@ -48,8 +48,8 @@ const REGION = /^[A-Z0-9]{1,3}$/;
 
 /** Whole cents from a TaxJar amount in currency units, which it sends as a number or a numeric string. Null when it isn't one. */
 export function taxjarCents(value: unknown): number | null {
-  const n = typeof value === "number" ? value : typeof value === "string" && /^-?\d{1,13}(\.\d{1,6})?$/.test(value) ? Number(value) : NaN;
-  return Number.isFinite(n) && Math.abs(n) < 1e13 ? Math.round(Number((n * 100).toPrecision(15))) : null;
+  const n = typeof value === "number" ? value : typeof value === "string" && /^-?\d+(\.\d{1,6})?$/.test(value) ? Number(value) : NaN;
+  return Math.abs(n) < 1e13 ? Math.round(Number((n * 100).toPrecision(15))) : null;
 }
 
 /** The YYYY-MM-DD day of a TaxJar transaction date ("2015-05-14T00:00:00Z", or a bare day), or null when it isn't a real day. */
@@ -84,7 +84,7 @@ function line(raw: unknown): Record<string, unknown> | null {
     id: word(raw.id, /^[A-Za-z0-9_.:#-]{1,64}$/),
     sku: word(raw.product_identifier, /^[A-Za-z0-9_.:#/ -]{1,64}$/),
     taxCode: word(raw.product_tax_code, /^[0-9A-Za-z]{1,10}$/),
-    quantity: typeof raw.quantity === "number" && Number.isFinite(raw.quantity) ? raw.quantity : null,
+    quantity: Number.isFinite(raw.quantity) ? raw.quantity : null,
     unitPriceCents: taxjarCents(raw.unit_price),
     discountCents: taxjarCents(raw.discount),
     salesTaxCents: taxjarCents(raw.sales_tax),
