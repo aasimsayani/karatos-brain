@@ -56,7 +56,7 @@ These are built, tested against recorded vendor responses or mocks built from ea
 | System | What the business gets | Feeds |
 | --- | --- | --- |
 | Shopify | Imports five years of orders, refunds and fulfillments, then keeps them current as orders change | Sales, Inventory, Clienteling, Marketing |
-| Inventory and POS systems | Imports item lists, stock counts, customer lists and sales from any POS that exports CSV | Sales, Inventory, Clienteling, Marketing |
+| Inventory and POS systems | Imports item lists, stock counts, customer lists and sales from any POS that exports CSV | Sales, Inventory, Clienteling, Marketing, Repairs |
 | Stripe | Imports five years of charges, refunds, disputes and payouts, then keeps them current from Stripe's events | Sales, Finance, Clienteling |
 | Chase business bank accounts and credit cards | Imports six years of Chase business checking, savings and credit card activity from CSV downloads, PDF statements or both | Finance, Compliance |
 | Bank and credit card statements (any bank) | Imports six years of bank and credit card transactions from any bank's CSV exports or PDF statements | Finance, Compliance |
