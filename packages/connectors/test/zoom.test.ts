@@ -480,7 +480,8 @@ describe("Zoom events", () => {
     expect(zoomMeetingEvent(structuredClone(meeting), structuredClone(rows), { ...ctx, receivedAt: "2026-11-11T00:00:00.000Z" }).event.idempotencyKey).toBe(a.idempotencyKey);
     const b = zoomMeetingEvent({ ...meeting, duration: 31 }, rows, ctx).event;
     expect(b.idempotencyKey).not.toBe(a.idempotencyKey);
-    expect(a.idempotencyKey).toMatch(new RegExp(`^zoom:meeting:${String(meeting.meeting_uuid).replace(/[+=]/g, "\\$&")}:[0-9a-f]{12}$`));
+    expect(a.idempotencyKey.slice(0, -13)).toBe(`zoom:meeting:${String(meeting.meeting_uuid)}`);
+    expect(a.idempotencyKey.slice(-13)).toMatch(/^:[0-9a-f]{12}$/);
     expect(a.id).toBe(`zoom_meeting_${Buffer.from(String(meeting.meeting_uuid)).toString("hex")}_${a.idempotencyKey.slice(-12)}`);
     // Two UUIDs apart only by + and / get their own ids.
     const plus = zoomMeetingEvent({ ...meeting, meeting_uuid: "abcd+efgh==" }, rows, ctx).event;
