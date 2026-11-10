@@ -176,7 +176,8 @@ describe("KaratOS website", () => {
     expect(payback).toContain("<h2>You pay us. We show you, in dollars, what we put back.</h2>");
     expect(payback).toContain(`Core costs ${CORE_PRICE} a store a month.`);
     expect(payback).toContain("the result is an estimate, not a promise");
-    expect(payback).toContain("That report is being built now.");
+    expect(payback).toContain("KaratOS keeps a ledger of what it actually returned");
+    expect(payback).not.toContain("being built now");
     expect(html).toContain('<a href="#payback">Payback</a>');
     // Every input is labeled, starts at its guess and can't go below zero.
     for (const i of PAYBACK_INPUTS) {

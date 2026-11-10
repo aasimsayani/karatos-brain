@@ -757,7 +757,7 @@ ${paybackFields}
 ${paybackRows}
       </ul>
       <p class="pb-total">About <output id="pb-total">${dollars(paybackTotal)}</output> a month, or <output id="pb-times">${(paybackTotal / corePriceDollars()).toFixed(1)}</output>× what Core costs.</p>
-      <p class="fine">An estimate from the numbers above. Once you're running, each recommendation in the Brain Console will carry its own dollar figure and how it was worked out, and a monthly report will add up what each play actually returned. That report is being built now.</p>
+      <p class="fine">An estimate from the numbers above. Once you're running, each recommendation carries its own dollar figure and how it was worked out. After you act on one, KaratOS keeps a ledger of what it actually returned, measured from your own sales and payments at 30, 60 and 90 days where it can, or entered by your team where it can't, and adds it up month by month.</p>
     </div>
   </div>
 </div></section>

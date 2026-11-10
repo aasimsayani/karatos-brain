@@ -1,0 +1,1 @@
+- Website: the payback section now says the value ledger is running (what each acted-on recommendation returned, measured at 30, 60 and 90 days) instead of "being built now".
