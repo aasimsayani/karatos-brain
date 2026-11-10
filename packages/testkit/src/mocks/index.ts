@@ -40,6 +40,7 @@ import rapnet from "./rapnet.js";
 import slack from "./slack.js";
 import square from "./square.js";
 import stuller from "./stuller.js";
+import taxjar from "./taxjar.js";
 import tiktok from "./tiktok.js";
 import trello from "./trello.js";
 import ups from "./ups.js";
@@ -88,6 +89,7 @@ export * from "./rapnet.js";
 export * from "./slack.js";
 export * from "./square.js";
 export * from "./stuller.js";
+export * from "./taxjar.js";
 export * from "./tiktok.js";
 export * from "./trello.js";
 export * from "./ups.js";
@@ -97,7 +99,7 @@ export * from "./xero.js";
 export * from "./yext.js";
 
 /** Every mock module, one per catalog integration. */
-export const DOC_MOCK_MODULES: readonly DocMockModule[] = [affirm, airtable, amazon, asana, authorize_net, avalara, bigcommerce, bill_com, birdeye, calendly, clover, custom_forms, docusign, dropbox, ebay, etsy, fedex, gia, gmail, google_ads, google_analytics, google_workspace, gusto, hubspot, idex, klaviyo, lightspeed, mailchimp, meta_ads, microsoft_onedrive, monday, nivoda, notion, pinterest, plaid, quickbooks, rapnet, slack, square, stuller, tiktok, trello, ups, wix, woocommerce, xero, yext];
+export const DOC_MOCK_MODULES: readonly DocMockModule[] = [affirm, airtable, amazon, asana, authorize_net, avalara, bigcommerce, bill_com, birdeye, calendly, clover, custom_forms, docusign, dropbox, ebay, etsy, fedex, gia, gmail, google_ads, google_analytics, google_workspace, gusto, hubspot, idex, klaviyo, lightspeed, mailchimp, meta_ads, microsoft_onedrive, monday, nivoda, notion, pinterest, plaid, quickbooks, rapnet, slack, square, stuller, taxjar, tiktok, trello, ups, wix, woocommerce, xero, yext];
 
 /** Every doc-derived mock, with empty data, for checks and the vendor docs watch. */
 export function allDocMocks(): DocMock[] {
