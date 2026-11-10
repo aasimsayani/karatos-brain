@@ -55,8 +55,6 @@ export interface JudgemeClient {
   reviews(page: number): Promise<unknown[]>;
 }
 
-const isObject = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null && !Array.isArray(value);
-
 export function judgemeClient(options: JudgemeClientOptions): JudgemeClient {
   const shopDomain = options.shopDomain?.trim().toLowerCase() ?? "";
   if (!/^[a-z0-9][a-z0-9-]{0,62}(\.[a-z0-9][a-z0-9-]{0,62}){1,4}$/.test(shopDomain)) throw new JudgemeConfigError("JUDGEME_SHOP_DOMAIN is missing or not a domain such as example.myshopify.com");
@@ -84,11 +82,11 @@ export function judgemeClient(options: JudgemeClientOptions): JudgemeClient {
       const { status } = response;
       if (status === 401 || status === 403) throw new JudgemeConfigError(`Judge.me turned down the token (HTTP ${status}): check JUDGEME_API_TOKEN and JUDGEME_SHOP_DOMAIN`);
       if (status !== 200) throw new JudgemeApiError(`Judge.me answered HTTP ${status} for the reviews`, status);
-      const body: unknown = await response.json().catch(() => undefined);
-      if (!isObject(body) || !Array.isArray(body.reviews)) throw new JudgemeApiError("Judge.me answered the reviews without the reviews list", 200);
+      const body = (await response.json().catch(() => undefined)) as Record<string, unknown> | null | undefined;
+      if (!Array.isArray(body?.reviews)) throw new JudgemeApiError("Judge.me answered the reviews without the reviews list", 200);
       // A page Judge.me says is another one would read the same reviews over and over.
-      if (body.current_page !== undefined && Number(body.current_page) !== page) throw new JudgemeApiError(`Judge.me answered page ${String(body.current_page).slice(0, 12)} when asked for page ${page}`, 200);
-      return body.reviews;
+      if (body!.current_page !== undefined && Number(body!.current_page) !== page) throw new JudgemeApiError(`Judge.me answered page ${String(body!.current_page).slice(0, 12)} when asked for page ${page}`, 200);
+      return body!.reviews as unknown[];
     },
   };
 }

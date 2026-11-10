@@ -86,7 +86,7 @@ describe("Judge.me client", () => {
   it("checks its settings before sending anything", () => {
     const { fetch, sent } = scripted(json(200, { reviews: [] }));
     const make = (o: Partial<Parameters<typeof judgemeClient>[0]>) => () => judgemeClient({ shopDomain: SHOP, apiToken: TOKEN, fetch, ...o });
-    for (const shopDomain of ["", "shop", "-shop.myshopify.com", "shop.-x.com", "a.b.c.d.e.f", "shop.myshopify.com/x", "shop .com", `${"a".repeat(64)}.com`, `x.${"a".repeat(64)}`, "shop_x.com", "https://shop.com", undefined]) {
+    for (const shopDomain of ["", "shop", "-shop.myshopify.com", "shop.-x.com", "a.b.c.d.e.f", "shop.myshopify.com/x", "shop .com", `${"a".repeat(64)}.com`, `x.${"a".repeat(64)}`, "shop_x.com", "_shop.com", "https://shop.com", undefined]) {
       expect(make({ shopDomain: shopDomain as string }), String(shopDomain)).toThrow("JUDGEME_SHOP_DOMAIN is missing or not a domain such as example.myshopify.com");
     }
     for (const apiToken of ["", "a".repeat(15), "a".repeat(129), `${TOKEN}!`, `${TOKEN} x`, undefined]) expect(make({ apiToken: apiToken as string }), String(apiToken)).toThrow("JUDGEME_API_TOKEN is missing or not in the expected shape");
@@ -254,6 +254,7 @@ describe("Judge.me events", () => {
     expect(JSON.stringify(payload)).not.toContain("example.test");
     expect(judgemeReviewEvent({ ...r, published: "yes", hidden: "no", verified: "Buyer", product_external_id: "8000000001" }, ctx).event.payload).toMatchObject({ published: false, hidden: false, verification: undefined, verifiedBuyer: false, kind: "product", productId: "8000000001" });
     expect(judgemeReviewEvent({ ...r, reviewer: "x", pictures: "x", title: 5, body: null, updated_at: "later" }, ctx).event.payload).toMatchObject({ customerRefs: [], reviewerRef: undefined, photos: 0, title: undefined, excerpt: undefined, editedAt: undefined });
+    for (const reviewer of [undefined, null]) expect(judgemeReviewEvent({ ...r, reviewer }, ctx).event.payload).toMatchObject({ customerRefs: [], reviewerRef: undefined });
     for (const source of ["a", "web_widget", "email-request", "a".repeat(30)]) expect(judgemeReviewEvent({ ...r, source }, ctx).event.payload.source).toBe(source);
     for (const source of ["", "1web", "Web", "we b", 5]) expect(judgemeReviewEvent({ ...r, source }, ctx).event.payload.source).toBeUndefined();
   });

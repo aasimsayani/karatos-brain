@@ -64,7 +64,7 @@ export function judgemeReviewEvent(raw: unknown, ctx: JudgemeContext): JudgemeRe
   const publishedAt = time(r.created_at);
   if (!publishedAt) problems.push("review has no time that reads");
 
-  const reviewer = isObject(r.reviewer) ? r.reviewer : {};
+  const reviewer = (r.reviewer ?? {}) as Record<string, unknown>;
   const reviewerId = judgemeId(reviewer.id);
   const productId = judgemeId(r.product_external_id);
   const pictures = Array.isArray(r.pictures) ? r.pictures : [];
@@ -75,7 +75,8 @@ export function judgemeReviewEvent(raw: unknown, ctx: JudgemeContext): JudgemeRe
     kind: productId ? "product" : "site",
     productId,
     rating,
-    needsFollowUp: rating !== undefined && rating <= JUDGEME_FOLLOW_UP_RATING,
+    // A review without a rating is dead-lettered, so this is only read when there is one.
+    needsFollowUp: rating! <= JUDGEME_FOLLOW_UP_RATING,
     title: yextMasked(r.title, 200),
     excerpt: yextMasked(r.body),
     source: label(r.source),
@@ -86,7 +87,7 @@ export function judgemeReviewEvent(raw: unknown, ctx: JudgemeContext): JudgemeRe
     hidden: r.hidden === true,
     photos: pictures.filter((p) => isObject(p) && p.hidden !== true).length,
     reviewerRef: reviewerId ? `judgeme:reviewer:${reviewerId}` : undefined,
-    customerRefs: [...new Set(formCustomerRefs(ctx.customerKey, { email: reviewer.email, phone: reviewer.phone }))].sort(),
+    customerRefs: formCustomerRefs(ctx.customerKey, { email: reviewer.email, phone: reviewer.phone }).sort(),
     publishedAt,
     editedAt: time(r.updated_at),
   };

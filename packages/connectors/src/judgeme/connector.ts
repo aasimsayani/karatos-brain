@@ -89,7 +89,8 @@ export function judgemeConnector(options: JudgemeOptions): Connector {
 
   /** Reads a pass to its end. `done` is what the checkpoint says of the import while the pass runs, and `doneAtEnd` once it ends. */
   async function* walk(pass: JudgemePass, done: boolean, doneAtEnd: boolean, nextFrom: string, receivedAt: string): AsyncIterable<SourceBatch> {
-    const from = `${pass.since}T00:00:00.000Z`;
+    // An ISO time on or after the day sorts at or after the day itself.
+    const from = pass.since;
     for (let page = pass.page; ; page++) {
       const rows = await client.reviews(page);
       // Kept when posted or changed since the pass's day; one that doesn't read is kept to be dead-lettered.
