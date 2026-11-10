@@ -3,6 +3,7 @@ import { metalsSource } from "./metals.js";
 import { plaidSource } from "./plaid.js";
 import { quickBooksSource } from "./quickbooks.js";
 import type { DemoSource } from "./source.js";
+import { supplierInvoicesSource } from "./supplier-invoices.js";
 import { twilioSource } from "./twilio.js";
 import { watchSearchSource } from "./watchsearch.js";
 
@@ -11,11 +12,12 @@ export * from "./metals.js";
 export * from "./plaid.js";
 export * from "./quickbooks.js";
 export * from "./source.js";
+export * from "./supplier-invoices.js";
 export * from "./twilio.js";
 export * from "./watchsearch.js";
 
 /** Every system the demo store runs on, in the order they sync. */
-export const DEMO_SOURCES: readonly DemoSource[] = [metalsSource, inventoryPosSource, plaidSource, quickBooksSource, twilioSource, watchSearchSource];
+export const DEMO_SOURCES: readonly DemoSource[] = [metalsSource, inventoryPosSource, supplierInvoicesSource, plaidSource, quickBooksSource, twilioSource, watchSearchSource];
 
 const sameJobAs = (what: string) => `Does the same job as ${what}, which the demo store already runs on`;
 const NOT_READ_YET = "Its records don't reach a department yet, so they wouldn't show on the dashboard";
@@ -43,7 +45,6 @@ export const DEMO_NOT_YET: Readonly<Record<string, string>> = {
   stripe: NEXT,
   refiner_statements: NEXT,
   piro: NEXT,
-  supplier_invoices: NEXT,
   amazon: NEXT,
   yext: NEXT,
   tiktok: NEXT,

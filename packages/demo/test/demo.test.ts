@@ -42,7 +42,7 @@ const seeded = async () => (brain ??= await seedDemo({ now: NOW }));
 describe("the demo store", () => {
   it("runs every demo source through its real connector without losing a record", async () => {
     const { sources } = await seeded();
-    expect(sources.map((s) => s.integration)).toEqual(["metals_api", "inventory_pos", "plaid", "quickbooks", "twilio", "watchsearch"]);
+    expect(sources.map((s) => s.integration)).toEqual(["metals_api", "inventory_pos", "supplier_invoices", "plaid", "quickbooks", "twilio", "watchsearch"]);
     for (const source of sources) {
       expect(source.ingested, source.integration).toBeGreaterThan(0);
       expect(source.deadLettered, source.integration).toBe(0);
@@ -54,11 +54,13 @@ describe("the demo store", () => {
     const { recommendations } = await seeded();
     expect(recommendations.map((r) => keyOf(r.id)).sort()).toEqual(
       [
+        "rec_buying_memo_demo_diamond_exchange/M-7731/1",
         "rec_buying_watch_wanted_Rolex_126500LN",
         "rec_clienteling_lapsed_pos:generic:customer:C-1003",
         "rec_clienteling_missed_calls",
         "rec_compliance_8300_sig_payment.cash_received_order_pos:generic:sale:S-4015#0_pos_generic:sale:S-4015",
         "rec_compliance_structuring_pos:generic:customer:C-1004",
+        "rec_compliance_warranty_demo_diamond_exchange_memo_M-7731",
         "rec_finance_cash_gap",
         "rec_finance_overdue_receivables",
         "rec_inventory_aged_ES-1002",
@@ -66,6 +68,9 @@ describe("the demo store", () => {
         "rec_inventory_reorder_ES-1001",
         "rec_inventory_reorder_ES-1003",
         "rec_metals_move_gold",
+        "rec_repairs_late_T-501",
+        "rec_repairs_pickup_T-502",
+        "rec_repairs_unclaimed_T-503",
         "rec_sales_returns_ES-1004",
       ].sort(),
     );
@@ -77,6 +82,12 @@ describe("the demo store", () => {
     expect(text).toContain("$25,590.00 in cash sales over the last 30 days but only $10,690.00 in cash deposits");
     expect(text).toContain("2 callers rang the store 3 times");
     expect(text).toContain("3 dealers in your WhatsApp groups have asked for the Rolex 126500LN");
+    // Repairs from the POS's repair export, and the memo from the supplier's paperwork.
+    expect(text).toContain("Repair T-501 (14K yellow gold ring) is 5 days past its promised date");
+    expect(text).toContain("Repair T-502 (Sterling silver chain) has been ready for 52 days");
+    expect(text).toContain("Repair T-503 has been ready for 240 days");
+    expect(text).toContain("is due back in 5 days. It has sold, so settle the memo and pay $8,200.00.");
+    expect(text).toContain("Memo M-7731 from demo_diamond_exchange");
     for (const r of recommendations) {
       expect(r.organizationId).toBe(DEMO_ORGANIZATION);
       expect(r.degraded).toBe(false);
@@ -172,7 +183,7 @@ describe("the demo API", () => {
     expect((await call("GET", "/v1/recommendations", undefined, ["wrong", "x".repeat(40)].join("-"))).status).toBe(401);
     const recs = await call("GET", "/v1/recommendations?limit=200");
     expect(recs.status).toBe(200);
-    expect(recs.body.recommendations).toHaveLength(13);
+    expect(recs.body.recommendations).toHaveLength(18);
     const signals = await call("GET", "/v1/signals?kind=bank.balance");
     expect(signals.body.signals.length).toBeGreaterThan(0);
     expect((await call("GET", "/healthz", undefined, null)).status).toBe(200);
@@ -197,7 +208,7 @@ describe("the demo API", () => {
     const event = { id: "evt_1", type: "sale.completed", occurredAt: NOW.toISOString(), receivedAt: NOW.toISOString(), idempotencyKey: "x", payload: {} };
     expect(await call("POST", "/v1/events", event)).toEqual({ status: 403, body: { error: "the demo store is read-only" } });
     expect(await call("POST", "/v1/reason", {})).toEqual({ status: 403, body: { error: "the demo store is read-only" } });
-    expect((await call("GET", "/v1/recommendations")).body.recommendations).toHaveLength(13);
+    expect((await call("GET", "/v1/recommendations")).body.recommendations).toHaveLength(18);
   });
 
   it("takes Accept and Dismiss as feedback, up to its limit", async () => {

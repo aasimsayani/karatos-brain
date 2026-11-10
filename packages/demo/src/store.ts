@@ -153,3 +153,71 @@ export const DEMO_CASH_DEPOSITS: { daysAgo: number; cents: number }[] = [
   { daysAgo: 11, cents: 480_000 },
   { daysAgo: 4, cents: 589_000 },
 ];
+
+export interface DemoRepair {
+  ticketId: string;
+  customerId: string;
+  item: string;
+  work: string;
+  receivedDaysAgo: number;
+  /** Days ago the store promised it back; negative is still to come. */
+  promisedDaysAgo: number;
+  estimateCents: number;
+  declaredValueCents?: number;
+  /** As the POS writes it. */
+  status: string;
+  statusDaysAgo: number;
+}
+
+/**
+ * The repair envelopes in the safe, as the POS exports them each night:
+ * - A ring sizing is five days past its promised date and still at the bench.
+ * - A chain repair has been ready for 52 days and nobody has come for it.
+ * - A pearl restring has been ready for 240 days: time for a final notice.
+ * - Two more are on time or already collected, so they say nothing.
+ */
+export const DEMO_REPAIRS: DemoRepair[] = [
+  { ticketId: "T-501", customerId: "C-1006", item: "14K yellow gold ring", work: "Size up one and a half", receivedDaysAgo: 19, promisedDaysAgo: 5, estimateCents: 6_500, status: "At bench", statusDaysAgo: 12 },
+  { ticketId: "T-502", customerId: "C-1002", item: "Sterling silver chain", work: "Solder a broken link", receivedDaysAgo: 60, promisedDaysAgo: 53, estimateCents: 4_500, status: "Ready for pickup", statusDaysAgo: 52 },
+  { ticketId: "T-503", customerId: "C-1005", item: "Akoya pearl strand", work: "Restring with knots", receivedDaysAgo: 255, promisedDaysAgo: 241, estimateCents: 12_000, declaredValueCents: 165_000, status: "Ready for pickup", statusDaysAgo: 240 },
+  { ticketId: "T-504", customerId: "C-1001", item: "Platinum wedding band", work: "Polish and refinish", receivedDaysAgo: 3, promisedDaysAgo: -4, estimateCents: 8_500, status: "At bench", statusDaysAgo: 2 },
+  { ticketId: "T-505", customerId: "C-1008", item: "Lab-grown tennis bracelet", work: "Tighten three prongs", receivedDaysAgo: 30, promisedDaysAgo: 20, estimateCents: 9_000, status: "Picked up", statusDaysAgo: 19 },
+];
+
+export interface DemoSupplierLine {
+  /** Lowercase folder name the supplier's exports are dropped in. */
+  supplier: string;
+  type: "Memo" | "Invoice";
+  number: string;
+  daysAgo: number;
+  sku: string;
+  description: string;
+  stone: string;
+  costCents: number;
+  terms: string;
+  /** What the document says about where its diamonds came from; empty when it says nothing. */
+  statement: string;
+}
+
+/**
+ * Supplier paperwork from the last few months:
+ * - The loose oval diamond came in on a 45-day memo 40 days ago. It sold
+ *   three days ago, so the vendor is owed $8,200 before it asks, and the
+ *   memo carries no System of Warranties statement.
+ * - A bridal invoice that carries the statement, so it says nothing.
+ */
+export const DEMO_SUPPLIER_LINES: DemoSupplierLine[] = [
+  { supplier: "demo_diamond_exchange", type: "Memo", number: "M-7731", daysAgo: 40, sku: "ES-1007", description: "Loose oval diamond 1.52 ct G VS2", stone: "Natural diamond", costCents: 820_000, terms: "45 day memo", statement: "" },
+  {
+    supplier: "sample_bridal_supply",
+    type: "Invoice",
+    number: "INV-20418",
+    daysAgo: 150,
+    sku: "ES-1001",
+    description: "14K yellow gold diamond solitaire 1.00 ct",
+    stone: "Natural diamond",
+    costCents: 240_000,
+    terms: "Net 30",
+    statement: "The diamonds herein invoiced are from legitimate sources not involved in funding conflict, in compliance with United Nations resolutions. The seller hereby guarantees that these diamonds are conflict free, based on personal knowledge and/or written guarantees provided by the supplier of these diamonds.",
+  },
+];

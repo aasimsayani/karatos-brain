@@ -7,11 +7,14 @@
 | System | Connector | What it gives the dashboard |
 | --- | --- | --- |
 | Metals-API | `metals_api` | Spot prices. Gold is up 6% today, so pieces heavy in gold need repricing |
-| POS exports | `inventory_pos` | The case, customers and two years of sales: aged stock, pieces to reorder, a chain that keeps coming back, a $14,900 cash sale that needs a Form 8300, cash payments to review under the AML program, and a lapsed customer who spent over $5,000 |
+| POS exports | `inventory_pos` | The case, customers, two years of sales and the repair envelopes: aged stock, pieces to reorder, a chain that keeps coming back, a $14,900 cash sale that needs a Form 8300, cash payments to review under the AML program, a lapsed customer who spent over $5,000, a ring sizing five days late, a chain repair waiting 52 days for pickup, and a pearl restring unclaimed for 240 days |
+| Supplier invoices and memos | `supplier_invoices` | A loose diamond on a 45-day memo that sold three days ago, so the vendor is owed $8,200 before it asks, and the memo carries no System of Warranties statement |
 | Plaid | `plaid` | Bank balances and transactions. The cash deposits don't cover the cash the drawer took in |
 | QuickBooks | `quickbooks` | Invoices to trade accounts. $4,650 is more than 30 days past due |
 | Twilio | `twilio` | The phone line. Two callers didn't get through and nobody called them back |
 | WatchSearch | `watchsearch` | Two WhatsApp dealer groups. Three dealers are looking for the same Rolex |
+
+The brain reasons over the last 1,000 signals (`DEMO_REASONING_WINDOW`), well above all the demo store makes, so the earliest sources still count.
 
 Every other built connector is listed in `DEMO_NOT_YET` (`packages/demo/src/sources/index.ts`) with the reason it isn't in the demo yet. A test fails when a connector is built but neither runs in the demo nor is listed there. Another test removes each source in turn and checks that something disappears from the dashboard, so no source is there for show.
 

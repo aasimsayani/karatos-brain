@@ -1,8 +1,8 @@
 import { inventoryPosConnector, memoryFileSource } from "@karatos/connectors";
-import { DEMO_CUSTOMERS, DEMO_ITEMS, DEMO_SALES, type DemoCalendar } from "../store.js";
+import { DEMO_CUSTOMERS, DEMO_ITEMS, DEMO_REPAIRS, DEMO_SALES, type DemoCalendar } from "../store.js";
 import { csvLine, dollarsText, type DemoSource } from "./source.js";
 
-/** The exports a jewelry POS writes each night: items received, customers and sales. */
+/** The exports a jewelry POS writes each night: items received, customers, sales and repair tickets. */
 export function posExports(calendar: DemoCalendar): Record<string, string> {
   const items = [
     "SKU,Title,Category,Metal,Karat,Weight (g),Cost,Retail Price,Quantity,Vendor,On Memo,Received",
@@ -48,11 +48,28 @@ export function posExports(calendar: DemoCalendar): Record<string, string> {
       ]);
     }),
   ];
-  return { "items.csv": items.join("\n"), "customers.csv": customers.join("\n"), "sales.csv": sales.join("\n") };
+  const repairs = [
+    "Ticket,Customer ID,Item,Work,Received,Promised,Estimate,Declared Value,Status,Status Date",
+    ...DEMO_REPAIRS.map((r) =>
+      csvLine([
+        r.ticketId,
+        r.customerId,
+        r.item,
+        r.work,
+        calendar.usDate(r.receivedDaysAgo),
+        calendar.usDate(r.promisedDaysAgo),
+        dollarsText(r.estimateCents),
+        r.declaredValueCents === undefined ? undefined : dollarsText(r.declaredValueCents),
+        r.status,
+        calendar.usDate(r.statusDaysAgo),
+      ]),
+    ),
+  ];
+  return { "items.csv": items.join("\n"), "customers.csv": customers.join("\n"), "sales.csv": sales.join("\n"), "repairs.csv": repairs.join("\n") };
 }
 
 export const inventoryPosSource: DemoSource = {
   integration: "inventory_pos",
-  role: "Point of sale exports: the case, customers and every sale",
+  role: "Point of sale exports: the case, customers, every sale and the repair envelopes",
   connector: (calendar) => inventoryPosConnector({ source: memoryFileSource(posExports(calendar), calendar.at(0, 6)), now: () => calendar.now }),
 };

@@ -26,6 +26,7 @@ import {
   posCategory,
   posMetal,
   posPaymentMethod,
+  posRepairStatus,
   resolvePosProfile,
   sha256,
   type FileSource,
@@ -603,5 +604,82 @@ describe("Inventory and POS connector", () => {
     expect(events.map((e) => e.idempotencyKey)).toEqual(["pos:generic:item:SKU-TEST-0001"]);
     expect(events[0]!.occurredAt).toBe(files[0]!.modifiedAt);
     await expect(memoryFileSource({}).read("missing.csv")).rejects.toThrow(/no file named missing.csv/);
+  });
+});
+
+describe("repair tickets from the POS", () => {
+  const REPAIRS = [
+    "Ticket,Customer ID,Item,Work,Promised,Estimate,Declared Value,Received,Status,Status Date",
+    "T-1,C-1,Test ring 1,Size up two,01/06/2026,$85.00,$1500,12/20/2025,At bench,01/02/2026",
+    "T-2,C-2,Test chain 1,Solder clasp,11/20/2025,$40.00,,11/10/2025,Ready for pickup,11/18/2025",
+    "T-3,C-1,Test watch 1,Battery,01/20/2026,$25.00,,01/09/2026,Open,",
+    "T-4,C-2,Test bracelet 1,Re-tip prongs,01/12/2026,forty,,01/05/2026,Polishing,01/06/2026",
+  ].join("\n");
+  const repairsConnector = (files: Record<string, string>, profile = GENERIC_POS_PROFILE) => inventoryPosConnector({ source: memoryFileSource(files, FILE_TIME), now: NOW, profile });
+
+  it("uses only synthetic data in its fixtures", () => {
+    assertSynthetic({ REPAIRS });
+  });
+
+  it("takes repair, service ticket and job envelope exports as repairs", () => {
+    expect(["repairs.csv", "service-tickets.csv", "Job Envelopes 2026.csv"].map((n) => fileKind(n, GENERIC_POS_PROFILE))).toEqual(["repairs", "repairs", "repairs"]);
+  });
+
+  it("maps a POS's status words to the repairs department's statuses", () => {
+    expect(
+      ["Taken in", "New", "At bench", "In progress", "Sent to trade shop", "Out for stone setting", "Ready for pickup", "Awaiting pickup", "Done", "Picked up", "Delivered", "Cancelled", "Polishing"].map(posRepairStatus),
+    ).toEqual(["received", "received", "at_bench", "at_bench", "sent_out", "sent_out", "ready", "ready", "ready", "picked_up", "picked_up", "cancelled", null]);
+  });
+
+  it("records each ticket once and each status it reaches once", async () => {
+    const events = byKey(await eventsOf(repairsConnector({ "repairs.csv": REPAIRS })));
+    expect(events.get("pos:generic:repair:T-1")).toEqual({
+      id: "pos_generic:repair:T-1",
+      type: "repair.received",
+      occurredAt: "2025-12-20T00:00:00.000Z",
+      receivedAt: RECEIVED,
+      idempotencyKey: "pos:generic:repair:T-1",
+      payload: {
+        ticketId: "T-1",
+        customerId: "pos:generic:customer:C-1",
+        itemDescription: "Test ring 1",
+        work: "Size up two",
+        promisedBy: "2026-01-06",
+        estimateCents: 8_500,
+        declaredValueCents: 150_000,
+        sourceRow: "repairs.csv:2",
+      },
+    });
+    expect(events.get("pos:generic:repair:T-1:status:at_bench")).toMatchObject({ type: "repair.status_changed", occurredAt: "2026-01-02T00:00:00.000Z", payload: { ticketId: "T-1", status: "at_bench" } });
+    expect(events.get("pos:generic:repair:T-2:status:ready")).toMatchObject({ occurredAt: "2025-11-18T00:00:00.000Z", payload: { status: "ready" } });
+    // An open ticket is only received; its intake already says so.
+    expect([...events.keys()].filter((k) => k.startsWith("pos:generic:repair:T-3"))).toEqual(["pos:generic:repair:T-3"]);
+    expect(events.get("pos:generic:repair:T-2")!.payload).not.toHaveProperty("declaredValueCents");
+  });
+
+  it("feeds the repairs department, dead-letters what it can't read, and reads a re-export as only what changed", async () => {
+    const memory = new InMemoryStore();
+    const pipeline = new BrainPipeline({ memory, ...combineDepartments(RETAIL_DEPARTMENTS), now: NOW, documentation: { current: () => ({ documentIds: [], stale: false }) } });
+    const run = (files: Record<string, string>) => runSync({ connector: repairsConnector(files), mode: "historical", pipeline, memory, organizationId: TEST_ORG });
+    expect(await run({ "repairs.csv": REPAIRS })).toMatchObject({ ingested: 5, deadLettered: 2 });
+    expect(memory.deadLetters.map((d) => ({ row: (d.raw as PosEvent).payload.sourceRow, paths: d.issues.map((i) => i.path) }))).toEqual([
+      { row: "repairs.csv:5", paths: ["payload.estimateCents"] },
+      { row: "repairs.csv:5", paths: ["payload.status"] },
+    ]);
+    const recommendations = await pipeline.reason(TEST_ORG);
+    const repairs = recommendations.filter((r) => r.id.startsWith("rec_repairs_")).map((r) => r.summary);
+    expect(repairs).toEqual([
+      "Repair T-1 (Test ring 1) is 4 days past its promised date and still at bench. Call the customer with an update today.",
+      "Repair T-2 (Test chain 1) has been ready for 53 days. Remind the customer to pick it up.",
+    ]);
+    // The next night's export: the chain was picked up. Only that step is new; the unreadable row is turned down again.
+    const next = REPAIRS.replace("Ready for pickup,11/18/2025", "Picked up,01/09/2026");
+    expect(await run({ "repairs.csv": next })).toMatchObject({ ingested: 1, duplicates: 4, deadLettered: 2 });
+  });
+
+  it("reads a promised date as the store's own day, whatever its offset from UTC", async () => {
+    const profile = parsePosProfile({ ...GENERIC_POS_PROFILE, id: "test_east", utcOffset: "+10:00" });
+    const events = await eventsOf(repairsConnector({ "repairs.csv": REPAIRS }, profile));
+    expect(events.find((e) => e.idempotencyKey === "pos:test_east:repair:T-1")!.payload.promisedBy).toBe("2026-01-06");
   });
 });
