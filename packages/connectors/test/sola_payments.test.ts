@@ -108,12 +108,14 @@ describe("Sola client", () => {
     ]);
     expect([SOLA_REPORT_URL, SOLA_REPORT_COMMAND, SOLA_API_VERSION, SOLA_REPORT_PAGE]).toEqual(["https://x1.cardknox.com/reportjson", "Report:All", "5.0.0", 1000]);
     expect(await c.transactions(B, B)).toEqual([{ xRefNum: "1" }]);
+    // An answer that isn't an error keeps its rows, whatever else it says.
+    expect(await client(scripted(json(200, { xResult: "A", xError: "Note", xReportData: [{ xRefNum: "2" }] })).fetch).c.transactions(B, E)).toEqual([{ xRefNum: "2" }]);
   });
 
   it("checks the times before sending", async () => {
     const { fetch, sent } = scripted(json(200, OK));
     const { c } = client(fetch);
-    for (const [b, e] of [["2026-11-01", E], [B, "2026-11-30"], [`x${B}`, E], [B, `${E}x`], [E, B], ["2026-11-01T00:00:00", E]]) {
+    for (const [b, e] of [["2026-11-01", E], [B, "2026-11-30"], [`x${B}`, E], [`0${B}`, E], [B, `${E}x`], [B, `${E}0`], [E, B], ["2026-11-01T00:00:00", E]]) {
       await expect(c.transactions(b!, e!), `${b} ${e}`).rejects.toThrow("a report must run from one YYYY-MM-DD HH:MM:SS time to a later one");
     }
     await expect(c.transactions(E, B)).rejects.toBeInstanceOf(SolaApiError);
@@ -188,8 +190,8 @@ describe("Sola client", () => {
 
 describe("Sola reading helpers", () => {
   it("reads amounts in whole cents", () => {
-    for (const [v, c] of [["1250.00", 125_000], ["0.5", 50], ["-35.10", -3510], [" 7 ", 700], ["999999999999.99", 99_999_999_999_999]] as const) expect(solaCents(v)).toBe(c);
-    for (const v of ["", "1.234", "1,250.00", "$5", "1e3", "1234567890123", 12.5, null]) expect(solaCents(v), String(v)).toBeUndefined();
+    for (const [v, c] of [["1250.00", 125_000], ["0.5", 50], ["-35.10", -3510], [" 7 ", 700], ["999999999999.99", 99_999_999_999_999], ["0.29", 29], ["19.99", 1999], ["-0.29", -29]] as const) expect(solaCents(v)).toBe(c);
+    for (const v of ["", "12.", "-", ".5", "1.234", "1,250.00", "$5", "1e3", "1234567890123", 12.5, null]) expect(solaCents(v), String(v)).toBeUndefined();
   });
 
   it("reads Sola's times on the account's clock", () => {
@@ -199,9 +201,18 @@ describe("Sola reading helpers", () => {
     expect(solaTime(" 1/2/2026 11:59:59PM ", "America/Chicago")).toEqual({ wall: "2026-01-02 23:59:59", iso: "2026-01-03T05:59:59.000Z" });
     // In the hour the clock goes back, the earlier time; in the hour it skips, the time it would have been.
     expect(solaTime("11/1/2026 1:30:00 AM", NY)!.iso).toBe("2026-11-01T05:30:00.000Z");
-    expect(solaTime("3/8/2026 2:30:00 AM", NY)!.iso).toBe("2026-03-08T06:30:00.000Z");
+    expect(solaTime("3/8/2026 2:30:00 AM", NY)!.iso).toBe("2026-03-08T07:30:00.000Z");
+    expect(solaTime("10/25/2026 1:30:00 AM", "Europe/London")!.iso).toBe("2026-10-25T00:30:00.000Z");
+    expect(solaTime("3/29/2026 1:30:00 AM", "Europe/London")!.iso).toBe("2026-03-29T01:30:00.000Z");
+    // The hours either side of a change read with the offset in force then.
+    expect(solaTime("11/1/2026 8:00:00 AM", NY)!.iso).toBe("2026-11-01T13:00:00.000Z");
+    expect(solaTime("10/31/2026 11:00:00 PM", NY)!.iso).toBe("2026-11-01T03:00:00.000Z");
+    expect(solaTime("3/8/2026 8:00:00 AM", NY)!.iso).toBe("2026-03-08T12:00:00.000Z");
+    expect(solaTime("3/7/2026 11:00:00 PM", NY)!.iso).toBe("2026-03-08T04:00:00.000Z");
+    expect(solaTime("10/25/2026 8:00:00 AM", "Europe/London")!.iso).toBe("2026-10-25T08:00:00.000Z");
+    expect(solaTime("11/1/2026 1:00:00 pm", NY)!.iso).toBe("2026-11-01T18:00:00.000Z");
     expect(solaTime("3/8/2026 3:30:00 AM", NY)!.iso).toBe("2026-03-08T07:30:00.000Z");
-    for (const v of ["2/30/2026 1:00:00 AM", "13/1/2026 1:00:00 AM", "1/1/2026 0:00:00 AM", "1/1/2026 13:00:00 PM", "1/1/2026 1:60:00 AM", "1/1/2026 1:00:60 AM", "1/1/2026 1:00 AM", "2026-01-01T00:00:00Z", "x1/1/2026 1:00:00 AM", 5, undefined]) {
+    for (const v of ["2/30/2026 1:00:00 AM", "13/1/2026 1:00:00 AM", "1/1/2026 0:00:00 AM", "1/1/2026 13:00:00 PM", "1/1/2026 1:60:00 AM", "1/1/2026 1:00:60 AM", "1/1/2026 1:00 AM", "2026-01-01T00:00:00Z", "x1/1/2026 1:00:00 AM", "1/1/2026 1:00:00 AMx", "1/1/2026 1:00:00 PM0", 5, undefined]) {
       expect(solaTime(v, NY), String(v)).toBeUndefined();
     }
     expect(solaWallClock(Date.parse("2026-11-10T15:00:00.400Z"), NY)).toBe("2026-11-10 10:00:00");
@@ -259,6 +270,7 @@ describe("Sola events", () => {
     }
     for (const xCommand of ["cc:sale", "cc:capture", "cc:postauth", "check:sale"]) expect(payload({ xCommand }).payload, xCommand).toMatchObject({ status: "succeeded", paid: true, captured: true });
     expect(payload({ xCommand: "cc:authonly" }).payload).toMatchObject({ status: "pending", paid: false, captured: false });
+    expect(payload({ xCommand: " CC:Sale ", xResponseResult: " Approved " })).toMatchObject({ type: SOLA_CHARGE_EVENT, payload: { status: "succeeded", gatewayCommand: "cc:sale", gatewayResult: "approved" } });
     expect(payload({ xCommand: "check:sale" }).payload).toMatchObject({ method: "ach" });
     for (const xResponseResult of ["Declined", "Error", "", undefined]) expect(payload({ xResponseResult }).payload, String(xResponseResult)).toMatchObject({ status: "failed", paid: false });
     expect(payload({ xResponseResult: "Declined" }).payload.gatewayResult).toBe("declined");
@@ -340,6 +352,9 @@ describe("Sola checkpoint", () => {
       JSON.stringify({ pass: { ...pass, begin: "2021-11-10 24:00:00" }, done: false, nextFrom }),
       JSON.stringify({ pass: { ...pass, begin: "2021-11-10 23:60:00" }, done: false, nextFrom }),
       JSON.stringify({ pass: { ...pass, begin: "2021-11-10 23:59:60" }, done: false, nextFrom }),
+      JSON.stringify({ pass: { ...pass, begin: "2021-11-10 00:00:00.000" }, done: false, nextFrom }),
+      JSON.stringify({ pass: { ...pass, begin: "2021-11-10  00:00:00" }, done: false, nextFrom }),
+      JSON.stringify({ pass: { ...pass, begin: 5 }, done: false, nextFrom }),
     ]) {
       expect(() => parseSolaCursor(bad), bad).toThrow("Sola checkpoint is not in the expected shape");
     }
@@ -495,6 +510,13 @@ describe("Sola connector", () => {
     const fake: SolaClient = { transactions: async (_b, e) => (ends.push(e), []) };
     await drain(solaConnector({ apiKey: KEY, customerKey: CUSTOMER_KEY, client: fake }).incrementalSync({ cursor: null } as never));
     expect(ends).toEqual([`${solaWallClock(Date.now(), NY).slice(0, 10)} 23:59:59`]);
+    // Today is the account's day, not UTC's: at 02:00 UTC it is still the evening before in New York.
+    ends.length = 0;
+    await drain(solaConnector({ apiKey: KEY, customerKey: CUSTOMER_KEY, client: fake, now: () => new Date("2026-11-10T02:00:00Z") }).incrementalSync({ cursor: null } as never));
+    expect(ends).toEqual(["2026-11-09 23:59:59"]);
+    ends.length = 0;
+    await drain(solaConnector({ apiKey: KEY, customerKey: CUSTOMER_KEY, client: fake, historyYears: 1, now: () => new Date("2026-11-10T02:00:00Z") }).historicalImport({ cursor: null } as never));
+    expect(ends.at(-1)).toBe("2026-11-09 23:59:59");
   });
 
   it("declares its writes and turns them down while writes are off", async () => {

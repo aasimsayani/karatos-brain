@@ -66,9 +66,14 @@ export interface SolaOptions extends Partial<Pick<SolaClientOptions, "fetch" | "
 
 const day = (t: number) => new Date(t).toISOString().slice(0, 10);
 const isDay = (v: unknown): v is string => typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v) && day(Date.parse(`${v}T00:00:00Z`)) === v;
-const isWall = (v: unknown): v is string => typeof v === "string" && /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(v) && isDay(v.slice(0, 10)) && Number(v.slice(11, 13)) < 24 && Number(v.slice(14, 16)) < 60 && Number(v.slice(17)) < 60;
+/** A UTC instant as YYYY-MM-DD HH:MM:SS, or "" for one that isn't a time. */
+const wallAt = (t: number) => (Number.isNaN(t) ? "" : new Date(t).toISOString().slice(0, 19).replace("T", " "));
+// Node reads "YYYY-MM-DD HH:MM:SSZ" as UTC; anything else that parses is caught by reading the time back.
+const parseWall = (wall: string) => Date.parse(`${wall}Z`);
+/** A wall-clock time that reads back as itself, so 24:00:00 or February 30 is not one. */
+const isWall = (v: unknown): v is string => typeof v === "string" && wallAt(parseWall(v)) === v;
 const addDays = (d: string, n: number) => day(Date.parse(`${d}T00:00:00Z`) + n * DAY_MS);
-const nextSecond = (wall: string) => new Date(Date.parse(`${wall.replace(" ", "T")}Z`) + 1000).toISOString().slice(0, 19).replace("T", " ");
+const nextSecond = (wall: string) => wallAt(parseWall(wall) + 1000);
 
 export function parseSolaCursor(raw: string | null): SolaCursor | null {
   if (raw === null) return null;
@@ -104,7 +109,8 @@ export function solaConnector(options: SolaOptions): Connector {
   /** Reads a pass to its end. `done` is what the checkpoint says of the import while the pass runs, and `doneAtEnd` once it ends. */
   async function* walk(pass: SolaPass, done: boolean, doneAtEnd: boolean, nextFrom: string, receivedAt: string): AsyncIterable<SourceBatch> {
     let begin = pass.begin;
-    for (;;) {
+    let more = true;
+    while (more) {
       const spanEnd = `${[addDays(begin.slice(0, 10), SOLA_SPAN_DAYS - 1), pass.until].sort()[0]} 23:59:59`;
       const rows = await client.transactions(begin, spanEnd);
       const reads = rows.map((row) => solaTransactionEvent(row, { customerKey, timeZone, receivedAt }));
@@ -114,10 +120,9 @@ export function solaConnector(options: SolaOptions): Connector {
         const last = reads.map((r) => r.wall).filter((w): w is string => w !== undefined && w <= spanEnd).sort().at(-1);
         begin = last && last > begin ? last : nextSecond(begin);
       } else begin = `${addDays(spanEnd.slice(0, 10), 1)} 00:00:00`;
-      const more = begin.slice(0, 10) <= pass.until;
+      more = begin.slice(0, 10) <= pass.until;
       const cursor: SolaCursor = more ? { pass: { ...pass, begin }, done, nextFrom } : { pass: null, done: doneAtEnd, nextFrom };
       yield { events, cursor: JSON.stringify(cursor) };
-      if (!more) return;
     }
   }
 

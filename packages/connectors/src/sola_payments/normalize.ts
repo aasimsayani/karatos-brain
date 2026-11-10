@@ -43,6 +43,7 @@ const SOLA_TIME = /^(\d{1,2})\/(\d{1,2})\/(\d{4}) (\d{1,2}):(\d{2}):(\d{2}) ?(AM
 const short = (value: unknown) => createHash("sha256").update(JSON.stringify(value)).digest("hex").slice(0, 12);
 const own = <T>(table: Record<string, T>, key: string): T | undefined => (Object.hasOwn(table, key) ? table[key] : undefined);
 const pad = (n: number) => String(n).padStart(2, "0");
+const DAY_MS = 86_400_000;
 
 /** A report row with its field names lowercased, since Sola's casing varies between its pages. */
 export function solaRow(raw: unknown): Record<string, unknown> {
@@ -62,7 +63,7 @@ function zoneOffset(t: number, zone: string): number {
       .formatToParts(t)
       .map((p) => [p.type, Number(p.value)]),
   );
-  return Date.UTC(parts.year!, parts.month! - 1, parts.day!, parts.hour!, parts.minute!, parts.second!) - (t - (t % 1000));
+  return Date.UTC(parts.year!, parts.month! - 1, parts.day!, parts.hour!, parts.minute!, parts.second!) - t;
 }
 
 /** The wall-clock time (YYYY-MM-DD HH:MM:SS) in a zone at an instant. */
@@ -85,9 +86,11 @@ export function solaTime(v: unknown, zone: string): { wall: string; iso: string 
   const wall = new Date(asUtc).toISOString().slice(0, 19).replace("T", " ");
   // Date.UTC rolls an impossible day (2/30) into the next month, so the day must read back as itself.
   if (wall.slice(0, 10) !== `${year}-${pad(month)}-${pad(day)}`) return undefined;
-  const guess = asUtc - zoneOffset(asUtc, zone);
-  const t = asUtc - zoneOffset(guess, zone);
-  return { wall, iso: new Date(Math.min(t, guess)).toISOString() };
+  // The zone's offset a day either side: the time is one of the two, unless the clock skipped it.
+  const offsets = [zoneOffset(asUtc - DAY_MS, zone), zoneOffset(asUtc + DAY_MS, zone)];
+  const fits = offsets.map((o) => asUtc - o).filter((t) => t + zoneOffset(t, zone) === asUtc);
+  // In the hour a clock goes back both fit, and the first is the earlier. A time the clock skipped is read with the offset before the change.
+  return { wall, iso: new Date(fits[0] ?? asUtc - offsets[0]!).toISOString() };
 }
 
 export interface SolaContext {
@@ -122,7 +125,7 @@ export function solaTransactionEvent(raw: unknown, ctx: SolaContext): SolaRead {
   const voided = r.xvoid === "1" || r.xvoid === 1 || r.xvoid === true;
   const status = result !== "approved" || voided ? "failed" : command === "cc:authonly" ? "pending" : "succeeded";
   const brand = typeof r.xcardtype === "string" ? own(BRANDS, r.xcardtype.toLowerCase().replace(/[^a-z]/g, "")) : undefined;
-  const batch = typeof r.xresponsebatch === "string" && /^\d{1,20}$/.test(r.xresponsebatch) ? r.xresponsebatch : undefined;
+  const batchId = typeof r.xresponsebatch === "string" && /^\d{1,20}$/.test(r.xresponsebatch) ? `sola_payments:batch:${r.xresponsebatch}` : undefined;
   const ref = `sola_payments:transaction:${id}`;
   const common = {
     system: "Sola Payments",
@@ -134,7 +137,7 @@ export function solaTransactionEvent(raw: unknown, ctx: SolaContext): SolaRead {
     voided,
     method: command.startsWith("check:") ? "ach" : "card",
     cardBrand: brand ?? null,
-    batchId: batch ? `sola_payments:batch:${batch}` : undefined,
+    batchId,
     customerRefs: formCustomerRefs(ctx.customerKey, { email: r.xemail, phone: r.xbillphone }).sort(),
   };
   const payload: Record<string, unknown> = refund
