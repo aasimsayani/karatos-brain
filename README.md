@@ -77,6 +77,7 @@ These are built, tested against recorded vendor responses or mocks built from ea
 | Stuller | Reads every Stuller invoice from the last five years, with its lines, totals, status and tracking number | Buying, Custom orders, Inventory, Repairs |
 | GIA Report Results | Confirms each GIA certificate number the business holds, with shape, carat weight, color, clarity, cut and proportions | Appraisals, Inventory, Buying |
 | Metals-API | Keeps gold, silver, platinum and palladium spot prices current, in dollars per troy ounce | Metals, Buying |
+| Birdeye | Imports five years of reviews from every site Birdeye gathers them from, then every new or changed review | Marketing, Clienteling |
 | Klaviyo | Imports every profile, list, segment, campaign and flow, then keeps them current | Marketing, Clienteling |
 | Twilio | Imports five years of the store's texts, WhatsApp messages and calls: who, when, which line and how each one ended | Clienteling, Repairs, Marketing |
 | QuickBooks Online | Imports six years of invoices, bills, payments and journal entries, with the chart of accounts, customers and vendors | Finance, Compliance |
@@ -119,7 +120,7 @@ These are built, tested against recorded vendor responses or mocks built from ea
 
 - **The owner's money view.** Cash in each bank account, what is owed on cards, what customers owe and which invoices are more than 30 days late, on one screen in the Brain Console. The finance department already reads these from Plaid, QuickBooks and Xero and flags overdue invoices of $500 or more.
 - **Live checks with pilot stores.** The trade connectors (IDEX, Nivoda, Stuller, GIA, RapNet) are built against each vendor's docs and turn on with a pilot client's own account.
-- **Jewelry POS and the next wave.** The Edge, Jewel360 and ARMS through their exports, then Lightspeed, Podium, Birdeye, Valigara and Attentive as access arrives.
+- **Jewelry POS and the next wave.** The Edge, Jewel360 and ARMS through their exports, then Podium, Valigara and Attentive as access arrives.
 - **Plain-language reasoning.** Claude explains each recommendation and learns from the owner's accept, reject and override decisions.
 
 The [roadmap](docs/roadmap.md) has the full sequence, including jewelry POS systems, diamond feeds and manufacturing.
@@ -155,7 +156,7 @@ This section updates itself as work lands: it is generated from [docs/milestones
 <!-- progress:start -->
 <!-- Generated from docs/milestones.json and the integration catalog by npm run progress:write. Edit those, not this block. -->
 
-**Overall: 79% complete**, 64 of 81 roadmap items done. 58 of the 253 systems in the integration catalog are connected.
+**Overall: 79% complete**, 64 of 81 roadmap items done. 59 of the 253 systems in the integration catalog are connected.
 
 | Milestone | What it gives a jeweler | Progress | Target |
 | --- | --- | --- | --- |
