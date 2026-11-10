@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 
 const src = fileURLToPath(new URL("../src/", import.meta.url));
 /** Shared code for several connectors, not a connector itself. */
-const SHARED_DIRS = ["files"];
+const SHARED_DIRS = ["files", "shipping"];
 const connectorDirs = readdirSync(src).filter((name) => statSync(src + name).isDirectory() && !SHARED_DIRS.includes(name));
 
 describe("built connectors and the catalog", () => {
