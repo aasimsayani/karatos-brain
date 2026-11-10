@@ -49,7 +49,7 @@ Used by: R is retail, W is wholesale, M is manufacturing. Test with says how we 
 | Wix | R | Public API | Free sandbox | Yes | Built (A self-managed Wix app holding read permissions only; the connector checks the permissions the site granted and stops on any Manage permission, and sends only eight listed read requests. Webhooks need the app (an API key gets none). Sales, products and stock use the same events as Shopify, Square and Clover) |
 | Adobe Commerce (Magento) | R, W | Public API | Free sandbox | No | Planned (Orders, products, stock and customers through the REST API. Tested against a local Magento Open Source install, which is free) |
 | Punchmark | R | Partner | Partner | No | Planned |
-| Etsy | R, M | Public API | Unknown | No | Planned |
+| Etsy | R, M | Public API | Paid account | No | Built (Connects with the shop owner's refresh token, granted transactions_r and listings_r only. After every refresh the connector asks Etsy which scopes the token has and stops if any could change data. Etsy has no sandbox: a developer's own shop confirms the mock built from Etsy's docs) |
 | eBay | R, W | Public API | Free sandbox | No | Built (Connects with the seller's refresh token from an app the store owns. Every access token is asked for with sell.fulfillment.readonly alone, so eBay itself turns down any change, and the only API request is getOrders. No buyer details are kept, so no eBay user data is stored) |
 | Amazon (Selling Partner API) | R, W, M | Public API | Free sandbox | No | Built (Connects through a private SP-API app the seller authorizes with the Finance and Accounting, and Amazon Fulfillment, roles. Its only API requests are three GETs (orders, transactions and FBA stock) and the Login with Amazon token refresh, and it never asks for the buyer or the address. Listings, returns and settlement reports are a follow-up. Amazon sends notifications through AWS queues rather than signed webhooks, so there is no webhook to verify) |
 | TikTok Shop | R | Partner | Unknown | Yes | Planned (Orders, products and returns from TikTok's in-app shop, through an app registered in TikTok Shop Partner Center) |
@@ -404,6 +404,7 @@ A request for a path or method the docs don't list throws `UndocumentedRequestEr
 - Docusign's JWT Grant sign-in, user info and envelope status changes (eSignature REST API v2.1)
 - Dropbox's token refresh, current account, folder listing and change feed, and download endpoints (API v2)
 - eBay's Fulfillment API getOrders and createShippingFulfillment (Sell APIs, v1) with its OAuth refresh, enforcing the client credentials, the scopes the seller agreed to, the order filter, limit and offset
+- Etsy Open API v3 token refresh, token scopes, and the shop's receipt and listing reads
 - FedEx's OAuth client credentials token and Track API tracking-number call
 - GIA's Report Results API: getReport and getChangedReports
 - Gmail's message, label and history reads with Google's token refresh (API v1)
@@ -1069,6 +1070,35 @@ The key is the partner, the set, the document number and a hash of the document'
 **What it leaves out.** Names and addresses in N1 to N4 are never stored: a ship-to store or reporting location is kept as its code only. No department reasons over these events yet; they are stored for the wholesale views to come.
 
 **Testing.** The tests build synthetic interchanges in code, including other delimiters, several interchanges per file, every envelope error, and a broken document of each set.
+
+### Etsy
+
+Reads one Etsy shop through Etsy's Open API v3: its orders (receipts), with their sales and refunds, and its listings, in every state, with each product's price and stock. They arrive as the same events the eBay and Shopify connectors give, so an Etsy sale reads like any other.
+
+| Setting | What it is |
+| --- | --- |
+| `ETSY_KEYSTRING` | The KaratOS app's keystring, also its OAuth client id |
+| `ETSY_SHARED_SECRET` | The app's shared secret; with the keystring, it also encrypts the stored refresh token |
+| `ETSY_REFRESH_TOKEN` | The refresh token from connecting the shop; it only seeds the stored one |
+| `ETSY_SHOP_ID` | The numeric id of the shop to read |
+
+**Sign-in.** The shop owner connects the app at `https://www.etsy.com/oauth/connect` (with PKCE) granting exactly `transactions_r listings_r`. Every request carries `x-api-key: <keystring>:<shared secret>`, and shop reads also a bearer token, which lasts an hour. The client refreshes at `POST https://api.etsy.com/v3/public/oauth/token`, saves whatever refresh token Etsy hands back before anything else, and runs one refresh at a time. Etsy's token answer doesn't list scopes, so after every refresh the client asks Etsy's token-scopes call (`POST /v3/application/scopes`) and stops if any scope isn't a read scope, if either read scope is missing, or if the answer can't be read. The first refresh also checks `GET /v3/application/users/me`, and the connector stops if the token belongs to a different shop than `ETSY_SHOP_ID`. A 401 refreshes once.
+
+**What it reads.** Each pass reads `GET /v3/application/shops/{shop_id}/listings` with their inventory for each state (active, sold out, inactive, expired and draft), 100 at a time, then `GET /v3/application/shops/{shop_id}/receipts`, 100 at a time, oldest first. The first import reads receipts created in the last five years (`min_created`); each sync after reads receipts changed since the last pass started, less a quarter hour (`min_last_modified`). A page of receipts starts at the time the last page reached, using an offset only past receipts sharing that second, so a page never shifts as receipts change. The checkpoint keeps where the pass got to. Etsy limits calls per second and per rolling day; a 429 (or a 500, 502, 503 or 504) is waited out three times, honoring `Retry-After` up to a minute, before the sync stops and resumes from its checkpoint.
+
+**Events.**
+
+- `order.updated` for each version of a receipt: its status, whether it's paid, shipped or cancelled, the total with tax and shipping, the currency, what has been refunded, and its line count, with `marketplace: "etsy"`.
+- `sale.completed` once a receipt is paid and not cancelled, keyed by receipt so a later change never counts it twice: each line's SKU (or a stand-in from the listing and product), quantity, unit price and shop discount, and how it was paid.
+- `sale.returned` once a receipt is fully refunded, with each line's refund. A partial refund moves no stock, so it shows in the order's refunded amount only.
+- `product.updated` for each listing with its products as variants: SKU, price and stock, and whether the listing is active, a draft or archived (inactive or expired).
+- `inventory.counted` for each product's stock on Etsy, at the shop.
+
+No buyer id, name, email address or shipping address is kept, nor gift or checkout messages, the seller's email, tracking codes, or listing descriptions, tags and materials.
+
+**Writes.** Changing a listing's stock or price and marking an order shipped are declared behind the write gate and turned down while writes are off; no write scope is asked for.
+
+**Testing.** Etsy has no sandbox. The mock (`packages/testkit/src/mocks/etsy.ts`) is built from Etsy's docs and its OpenAPI spec, and its assumptions list what the first live run on a developer's own shop must confirm, among them the token-scopes answer's shape and that a transaction's price is per item.
 
 ### FedEx tracking
 
