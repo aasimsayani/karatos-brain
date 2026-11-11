@@ -46,6 +46,7 @@ export * from "./pinterest/index.js";
 export * from "./piro/index.js";
 export * from "./plaid/index.js";
 export * from "./quickbooks/index.js";
+export * from "./ramp/index.js";
 export * from "./rapnet/index.js";
 export * from "./refiner_statements/index.js";
 export * from "./rfid_counts/index.js";

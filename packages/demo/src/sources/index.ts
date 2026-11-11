@@ -87,6 +87,7 @@ export const DEMO_NOT_YET: Readonly<Record<string, string>> = {
   idex: NOT_READ_YET,
   monday: NOT_READ_YET,
   nivoda: NOT_READ_YET,
+  ramp: NOT_READ_YET,
   rapnet: NOT_READ_YET,
   stuller: NOT_READ_YET,
   trello: NOT_READ_YET,
