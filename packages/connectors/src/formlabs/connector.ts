@@ -70,13 +70,17 @@ export function parseFormlabsCursor(raw: string | null): FormlabsCursor | null {
 
 export function formlabsConnector(options: FormlabsOptions): Connector {
   const now = options.now ?? (() => new Date());
-  const client = options.client ?? formlabsClient({ ...options, now });
+  const client = options.client ?? formlabsClient(options);
   const historyYears = options.historyYears ?? 1;
   if (!Number.isInteger(historyYears) || historyYears < 1) throw new Error("historyYears must be a positive whole number");
 
+  /** Where the next later sync starts: three days before a pass ends. */
+  const overlap = (to: string) => new Date(Date.parse(to) - FORMLABS_OVERLAP_MS).toISOString();
+
   /** Reads a pass from its page to its end. `done` is what the checkpoint says of the import while the pass runs, and `doneAtEnd` once it ends. */
-  async function* walk(pass: FormlabsPass, done: boolean, doneAtEnd: boolean, nextFrom: string): AsyncIterable<SourceBatch> {
+  async function* walk(pass: FormlabsPass, done: boolean, doneAtEnd: boolean): AsyncIterable<SourceBatch> {
     const receivedAt = now().toISOString();
+    const nextFrom = overlap(pass.to);
     for (let page = pass.page; ; page++) {
       const result = await client.prints({ from: pass.from, to: pass.to }, page);
       const events = result.records.map((r) => formlabsPrintEvent(r, { receivedAt }));
@@ -86,26 +90,23 @@ export function formlabsConnector(options: FormlabsOptions): Connector {
     }
   }
 
-  /** Where the next later sync starts: three days before this pass ends. */
-  const overlap = (to: string) => new Date(Date.parse(to) - FORMLABS_OVERLAP_MS).toISOString();
-
   async function* historicalImport(context: SyncContext): AsyncIterable<SourceBatch> {
     const saved = parseFormlabsCursor(context.cursor);
     if (saved?.done) return;
-    if (saved?.pass) return yield* walk(saved.pass, false, true, saved.nextFrom);
+    if (saved?.pass) return yield* walk(saved.pass, false, true);
     const at = now();
     const from = new Date(at);
     from.setUTCFullYear(from.getUTCFullYear() - historyYears);
     const to = at.toISOString();
-    yield* walk({ from: from.toISOString(), to, page: 1 }, false, true, overlap(to));
+    yield* walk({ from: from.toISOString(), to, page: 1 }, false, true);
   }
 
   async function* incrementalSync(context: SyncContext): AsyncIterable<SourceBatch> {
     const saved = parseFormlabsCursor(context.cursor);
-    if (saved?.pass) return yield* walk(saved.pass, saved.done, saved.done, saved.nextFrom);
+    if (saved?.pass) return yield* walk(saved.pass, saved.done, saved.done);
     const to = now().toISOString();
     const done = saved?.done ?? false;
-    yield* walk({ from: saved?.nextFrom ?? overlap(to), to, page: 1 }, done, done, overlap(to));
+    yield* walk({ from: saved?.nextFrom ?? overlap(to), to, page: 1 }, done, done);
   }
 
   return { source: "formlabs", historicalImport, incrementalSync, writes: FORMLABS_WRITES };

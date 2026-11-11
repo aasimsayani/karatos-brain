@@ -76,7 +76,7 @@ describe("Formlabs client", () => {
   it("checks its client ID and secret before sending anything", () => {
     const { fetch, sent } = scripted(token());
     const make = (o: Partial<Parameters<typeof formlabsClient>[0]>) => () => formlabsClient({ clientId: ID, clientSecret: SECRET, fetch, ...o });
-    for (const clientId of ["", "   ", "x".repeat(7), "x".repeat(257), "has space", "id:colon", "id/slash", "id&x=1", undefined as never]) expect(make({ clientId }), String(clientId)).toThrow(new FormlabsConfigError("FORMLABS_CLIENT_ID is missing or not in the expected shape"));
+    for (const clientId of ["", "   ", "x".repeat(7), "x".repeat(257), "has space", "id:colon", "id/slash", "id&x=1234", undefined as never]) expect(make({ clientId }), String(clientId)).toThrow(new FormlabsConfigError("FORMLABS_CLIENT_ID is missing or not in the expected shape"));
     for (const clientSecret of ["", "x".repeat(15), "x".repeat(513), "has a space in it, so no", "tab\tin\tthe\tsecret\there", `${"x".repeat(15)}\x7f`, undefined as never]) expect(make({ clientSecret }), String(clientSecret)).toThrow(new FormlabsConfigError("FORMLABS_CLIENT_SECRET is missing or not in the expected shape"));
     expect(make({ clientId: "x".repeat(8), clientSecret: "!".repeat(16) })).not.toThrow();
     expect(make({ clientId: "Az09._~-".repeat(32), clientSecret: "~".repeat(512) })).not.toThrow();
@@ -162,12 +162,13 @@ describe("Formlabs client", () => {
     expect(err.name).toBe("FormlabsApiError");
     expect(new FormlabsConfigError("x").name).toBe("FormlabsConfigError");
     await expect(client(scripted(json(201, { access_token: ACCESS, expires_in: 900 })).fetch).c.prints(RANGE, 1)).rejects.toThrow("Formlabs sign-in answered HTTP 201");
-    for (const answer of [text(200, "not json"), json(200, null), json(200, {}), token(900, 5), token(900, 1.2345678901234568e21), token(900, "short"), token(900, "a".repeat(15)), token(900, `${"a".repeat(20)} b`), token(900, "a".repeat(8193))]) {
+    for (const answer of [text(200, "not json"), json(200, null), json(200, {}), token(900, 5), token(900, 1.2345678901234568e21), token(900, "short"), token(900, "a".repeat(15)), token(900, `${"a".repeat(20)} b`), token(900, `${"a".repeat(20)}\n`), token(900, "a".repeat(8193))]) {
       const e = (await client(scripted(answer).fetch).c.prints(RANGE, 1).catch((x: Error) => x)) as FormlabsApiError;
       expect(e.message).toBe("Formlabs sign-in answered without an access token");
       expect(e.status).toBe(200);
     }
     await expect(client(scripted(token(900, "a".repeat(8192)), page([])).fetch).c.prints(RANGE, 1)).resolves.toEqual({ records: [], more: false });
+    await expect(client(scripted(token(900, "a".repeat(16)), page([])).fetch).c.prints(RANGE, 1)).resolves.toEqual({ records: [], more: false });
   });
 
   it("says when a list answers with an error or without its runs", async () => {
@@ -191,7 +192,7 @@ describe("Formlabs client", () => {
   it("checks what it is asked for before sending", async () => {
     const { fetch, sent } = scripted(token(), page([]));
     const { c } = client(fetch);
-    for (const range of [{ from: "2026-11-01", to: RANGE.to }, { from: RANGE.from, to: "soon" }, { from: RANGE.to, to: RANGE.from }, { from: `x${RANGE.from}`, to: RANGE.to }, { from: RANGE.from, to: `${RANGE.to}x` }]) await expect(c.prints(range, 1), JSON.stringify(range)).rejects.toThrow(new FormlabsApiError("print runs are listed between two UTC times", 0));
+    for (const range of [{ from: "2026-11-01", to: RANGE.to }, { from: RANGE.from, to: "soon" }, { from: RANGE.to, to: RANGE.from }, { from: `1${RANGE.from}`, to: RANGE.to }, { from: RANGE.from, to: `${RANGE.to}x` }]) await expect(c.prints(range, 1), JSON.stringify(range)).rejects.toThrow(new FormlabsApiError("print runs are listed between two UTC times", 0));
     for (const p of [0, -1, 1.5, Number.NaN, Number.MAX_SAFE_INTEGER + 1]) await expect(c.prints(RANGE, p), String(p)).rejects.toThrow(new FormlabsApiError("page must be a whole number, 1 or more", 0));
     expect(sent).toHaveLength(0);
     await expect(c.prints({ from: RANGE.from, to: RANGE.from }, 1)).resolves.toEqual({ records: [], more: false });
@@ -250,7 +251,7 @@ describe("Formlabs reading helpers", () => {
     expect(formlabsTime("2026-01-02T03:04:05Z")).toBe("2026-01-02T03:04:05.000Z");
     expect(formlabsTime("2026-01-02T03:04:05.123456+02:00")).toBe("2026-01-02T01:04:05.123Z");
     expect(formlabsTime("2026-01-02T23:59:59-05:00")).toBe("2026-01-03T04:59:59.000Z");
-    for (const bad of ["2026-02-30T00:00:00Z", "2026-01-02T24:00:00Z", "2026-01-02T12:60:00Z", "2026-01-02T03:04:05", "2026-01-02", "2026-01-02 03:04:05Z", "2026-01-02T03:04:05.1234567Z", "2026-01-02T03:04:05+0200", "x2026-01-02T03:04:05Z", "2026-01-02T03:04:05Zx", " 2026-01-02T03:04:05Z", "", null, 5]) expect(formlabsTime(bad), String(bad)).toBeUndefined();
+    for (const bad of ["2026-02-30T00:00:00Z", "2026-01-02T24:00:00Z", "2026-01-02T12:60:00Z", "2026-01-02T03:04:05", "2026-01-02", "2026-01-02 03:04:05Z", "2026-01-02T03:04:05.1234567Z", "2026-01-02T03:04:05+0200", "2026-01-02T03:04:05z", "x2026-01-02T03:04:05Z", "2026-01-02T03:04:05Zx", " 2026-01-02T03:04:05Z", "", null, 5]) expect(formlabsTime(bad), String(bad)).toBeUndefined();
   });
 
   it("makes references", () => {
@@ -302,6 +303,8 @@ describe("Formlabs events", () => {
     const words = ["QUEUED", "PREPRINT", "PRINTING", "PAUSED", "PAUSING", "FINISHED", "ABORTING", "ABORTED", "ERROR", "WAITING_FOR_RESOLUTION", "PREHEAT", "PRECOAT", "POSTCOAT"];
     for (const w of words) expect(formlabsPrintEvent(one({ status: w }), ctx).payload.status).toBe(w.toLowerCase());
     expect(formlabsPrintEvent(one({ status: "finished" }), ctx).payload.status).toBe("unknown");
+    expect(formlabsPrintEvent(one({ estimated_duration_ms: 1.5 }), ctx).payload.estimatedDurationMs).toBeNull();
+    expect(formlabsPrintEvent(one({ guid: ["00000000-0000-4000-8000-000000000001"] }), ctx).payload.problems).toEqual(["print run has no ID that reads"]);
     for (const w of ["UNKNOWN", "SUCCESS", "FAILURE"]) expect(formlabsPrintEvent(one({ print_run_success: { print_run_success: w } }), ctx).payload.success).toBe(w.toLowerCase());
   });
 
