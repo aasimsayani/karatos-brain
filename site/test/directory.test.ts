@@ -5,7 +5,7 @@ import { pathToFileURL } from "node:url";
 import { describe, expect, it } from "vitest";
 import { INTEGRATIONS, type IntegrationSpec } from "../../packages/core/src/index.js";
 import { CONNECTED_ON, SYSTEM_DETAILS } from "../directory.js";
-import { DOMAIN_LABELS, REPO_URL, SITE_URL, directoryCategories, escapeHtml, formatDay, newestConnections, renderCard, renderDirectory, renderSite, researchUrl, researchedIds, systemDetail } from "../build.js";
+import { CORE_PRICE, DOMAIN_LABELS, REPO_URL, SITE_URL, directoryCategories, escapeHtml, formatDay, newestConnections, renderCard, renderDirectory, renderSite, researchUrl, researchedIds, systemDetail } from "../build.js";
 
 const html = renderSite();
 const dataSources = INTEGRATIONS.filter((i) => i.departments.length > 0);
@@ -228,14 +228,15 @@ describe("the partner section and the hero's proof", () => {
     expect(counts.reduce((a, b) => a + b, 0)).toBe(dataSources.length);
     expect(counts[2]).toBe(built.length);
     expect(partners).toContain("Read-only by default");
-    expect(html).toContain('<a href="#partners">Partners</a>');
+    // Partners are reached from the integrations section, not the top nav.
+    expect(html).toContain('<section id="partners">');
   });
 
   it("leads the hero with what is connected and mapped today", () => {
     const proof = html.slice(html.indexOf('<ul class="proof"'), html.indexOf("</ul>", html.indexOf('<ul class="proof"')));
     expect(proof).toContain(`<strong>${built.length}</strong><span>systems connected</span>`);
     expect(proof).toContain(`<strong>${dataSources.length}</strong><span>systems mapped</span>`);
-    expect(proof).toContain(`<strong>${directoryCategories(dataSources).length}</strong>`);
+    expect(proof).toContain(`<strong>${CORE_PRICE}</strong><span>a store a month</span>`);
   });
 });
 

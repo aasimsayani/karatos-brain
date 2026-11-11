@@ -4,7 +4,7 @@ import { contentSecurityPolicy } from "../server.js";
 import { INTEGRATIONS, selfServeIntegrations } from "../../packages/core/src/index.js";
 import { RETAIL_DEPARTMENTS } from "../../packages/retail/src/index.js";
 import { PAYBACK_INPUTS, PAYBACK_LINES, VALUE_LABELS, corePriceDollars, dollars, paybackDefaults, paybackLine } from "../build.js";
-import { CONTACT_ANCHOR, CORE_PRICE, DOMAIN_LABELS, DOMAIN_VALUE, FONTS, HOLIDAY_PILOT, MANAGED_PRICE, PLAYS, REPORT_URL, WRITE_RULES, buildingNow, domainLabel, renderValueCards, earlyAccessNote, escapeHtml, renderSite } from "../build.js";
+import { CONTACT_ANCHOR, CORE_PRICE, HERO_SYSTEMS, DOMAIN_LABELS, DOMAIN_VALUE, FONTS, HOLIDAY_PILOT, MANAGED_PRICE, PLAYS, REPORT_URL, WRITE_RULES, buildingNow, domainLabel, renderValueCards, earlyAccessNote, escapeHtml, renderSite } from "../build.js";
 
 const html = renderSite();
 const sectionOf = (id: string) => {
@@ -30,14 +30,18 @@ describe("KaratOS website", () => {
     expect(html).toContain(`<strong>${building.length}</strong><span>building now</span>`);
   });
 
-  it("explains what each built connector gives the business, and names them in the hero", () => {
+  it("explains what each built connector gives the business, and names the best-known ones in the hero", () => {
     const built = INTEGRATIONS.filter((i) => i.status === "built");
     for (const integration of built) {
       const list = `<ul class="caps" aria-label="What you get with ${escapeHtml(integration.name)}">`;
       expect(html).toContain(list);
       for (const capability of integration.capabilities ?? []) expect(html).toContain(`<li>${escapeHtml(capability)}</li>`);
-      expect(earlyAccessNote()).toContain(integration.name);
     }
+    // The hero names systems a jeweler recognises and counts the rest, so it reads in one glance.
+    const featured = HERO_SYSTEMS.filter((id) => built.some((i) => i.id === id));
+    for (const id of featured) expect(earlyAccessNote()).toContain(built.find((i) => i.id === id)!.name);
+    expect(earlyAccessNote()).toContain(`and ${built.length - featured.length} more`);
+    expect(earlyAccessNote().length).toBeLessThan(200);
     expect(html.match(/<ul class="caps"/g)?.length).toBe(built.length);
     expect(html).toContain(`<p class="note">${escapeHtml(earlyAccessNote())}</p>`);
   });
@@ -146,7 +150,7 @@ describe("KaratOS website", () => {
 
   it("shows systems working together: 4 to 6 illustrative plays, each combining 3 or 4 catalog systems into one result", () => {
     const together = sectionOf("together");
-    expect(together).toContain('<span class="eyebrow">Systems that work together</span>');
+    expect(together).toContain('<span class="eyebrow">What it solves</span>');
     expect(together).toContain("<h2>One system knows a little. Together they know what to do.</h2>");
     expect(PLAYS.length).toBeGreaterThanOrEqual(4);
     expect(PLAYS.length).toBeLessThanOrEqual(6);
@@ -275,17 +279,30 @@ describe("KaratOS website", () => {
     const hero = html.slice(html.indexOf('<div class="wrap hero">'), html.indexOf("</div>", html.indexOf('<div class="wrap hero">')));
     expect(hero).toContain("For jewelers, watch dealers, wholesalers, manufacturers and the businesses that serve them");
     expect(hero).toContain("connects the many systems");
-    expect(hero).toContain("writes back carefully");
+    // Write-back is explained in the steps and its own section; the hero stays one sentence.
+    expect(hero.match(/<p class="lede">[^<]*<\/p>/)![0].length).toBeLessThan(260);
     const how = sectionOf("how");
     const mapped = INTEGRATIONS.filter((i) => i.departments.length > 0).length;
     expect(how).toContain(`from ${mapped} systems on our map`);
     expect(how).toContain("<h3>Connect everything, read-only</h3>");
     expect(how).toContain("<h3>Act, and write back carefully</h3>");
     const nav = html.slice(html.indexOf("<nav>"), html.indexOf("</nav>"));
-    expect(nav).toContain('<a href="#together">Systems together</a>');
-    expect(nav).toContain('<a href="#write-back">Write-back</a>');
+    expect(nav).toContain('<a href="#together">What it solves</a>');
+    expect(nav).toContain('<a href="#services">Pricing</a>');
+    // Few enough links to read at a glance.
+    expect(nav.match(/<a /g)!.length).toBeLessThanOrEqual(7);
     // Every nav link lands on a section that exists.
     for (const [, id] of nav.matchAll(/href="#([^"]+)"/g)) expect(html).toContain(`id="${id}"`);
+  });
+
+  it("puts what a first-time visitor needs first, and the detail after", () => {
+    // A visitor gives the page about a minute: problems, how, payback, pilot and price come before the reference sections.
+    const at = (id: string) => html.indexOf(`<section id="${id}"`);
+    const path = ["together", "how", "payback", "pilot", "services"].map(at);
+    const detail = ["write-back", "departments", "value", "integrations", "partners"].map(at);
+    for (const i of [...path, ...detail]) expect(i).toBeGreaterThan(0);
+    expect(path).toEqual([...path].sort((a, b) => a - b));
+    expect(Math.max(...path)).toBeLessThan(Math.min(...detail));
   });
 
   it("labels every catalog domain in plain language", () => {
