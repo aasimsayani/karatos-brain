@@ -139,7 +139,7 @@ Used by: R is retail, W is wholesale, M is manufacturing. Test with says how we 
 | Integration | Used by | Access | Test with | Webhooks | Status |
 | --- | --- | --- | --- | --- | --- |
 | Geller's Blue Book | R | Partner | Partner | No | Planned (Repair pricing; reached through the POS today) |
-| nFusion Solutions metals feed | R, W, M | Public API | Paid account | No | Planned |
+| nFusion Solutions metals feed | R, W, M | Public API | Paid account | No | Built (Reads nFusion's Market Data API with a token from the nFusion dashboard; the API is GET-only market data and the client only ever sends GETs. Access needs a service agreement or a free trial and there is no sandbox: the first live token confirms the mock built from nFusion's OpenAPI spec) |
 | Metals-API | R, W, M | Public API | Free sandbox | No | Built (Spot prices for gold, silver, platinum and palladium in dollars per troy ounce. No public API changelog; the nightly sandbox run catches API changes) |
 | Kitco metal prices | R, W, M | Partner | Partner | No | Planned (Spot prices many stores quote from. Data feeds are licensed, not public; nFusion and Metals-API cover live prices until a license is in place) |
 | Tenoris | R, W, M | Partner | Partner | No | Planned (Category and price-point sales benchmarks from independent jewelers. Partner only. Found in jewelry industry sources) |
@@ -430,6 +430,7 @@ A request for a path or method the docs don't list throws `UndocumentedRequestEr
 - Microsoft's client credentials sign-in and Microsoft Graph's listings of one team's channels, channel messages and replies (v1.0), enforcing the team the app is installed in, page sizes, skip tokens and the reply expansion
 - monday.com's GraphQL API: boards, items, activity logs and updates
 - NetSuite's OAuth 2.0 client credentials token and SuiteQL (REST web services v1)
+- nFusion Solutions' Market Data API spot summary and daily spot history for gold, silver, platinum and palladium, with the token in the query string and its 403.502 rate limit
 - Nivoda's GraphQL diamond search: sign-in, diamonds_by_query and get_diamond_by_id
 - Notion's search, retrieve data source and query data source endpoints (API version 2026-03-11)
 - Quo's List calls and List messages
@@ -1900,6 +1901,31 @@ Every event keeps the row's change time as NetSuite wrote it (`changedAt`) and i
 **Rate limits.** NetSuite limits concurrent requests per account. The client waits as `Retry-After` says (up to a minute), or 1, 2 and 4 seconds, on a 429, 500, 502, 503 or 504, before the error goes to the sync runner, which resumes from its checkpoint next time. A 400 or 401 on sign-in says the client id, certificate or key is wrong or the certificate has expired; a 403 on a query says the role can't view that list. A token turned down mid-sync is replaced once.
 
 **Testing.** The tests run against a mock built from NetSuite's developer docs (`packages/testkit/src/mocks/netsuite.ts`). It checks each JWT's header, claims and signature against the certificate, the `Prefer: transient` header, the bound start, the page size and that every offset is a multiple of it. The first client's account must confirm: that the four transaction type codes and `aggregateitemlocation` columns read as the docs and community guides describe, the client id and certificate id shapes, and that times come back as `TO_CHAR` writes them.
+
+### nFusion Solutions metals feed
+
+Spot prices for gold, silver, platinum and palladium from nFusion Solutions' Market Data API at `https://api.nfusionsolutions.biz`, in US dollars per troy ounce, as the metals department's `metal.price_updated` events: the same shape the Metals-API connector gives, so either feed drives melt values for inventory and gold bought from the public, and the metals department's alert when a price moves. The connector was built from nFusion's OpenAPI spec ([apis.guru mirror](https://api.apis.guru/v2/specs/nfusionsolutions.biz/1/openapi.json)) and its [support page](https://nfusionsolutions.com/support/).
+
+| Setting | What it is |
+| --- | --- |
+| `NFUSION_TOKEN` | The Market Data API token from the nFusion dashboard, under Connections, then API Keys |
+
+**Access.** nFusion issues credentials under a service agreement, or through a [free trial](https://nfusionsolutions.com/free-trial/); there is no public pricing and no sandbox.
+
+**Sign-in.** nFusion takes the token as the `token` query parameter. nFusion doesn't publish the token's format, so the connector accepts 8 to 256 letters, digits, `_` or `-`, and checks it before anything is sent. Because the token is in the URL, a request URL is never put in an error, a log or an error's cause, and any text nFusion sends back has the token, any `token=` pair and any URL masked before it is quoted. A 401, or a 403 that isn't the rate limit, stops the sync with a message naming `NFUSION_TOKEN`.
+
+**What it reads.** Only two GETs, both with `currency=USD`, `unitofmeasure=toz` and `format=json`:
+
+- `GET /api/v1/Metals/spot/history` with `metals=gold,silver,platinum,palladium`, `start`, `end` and `interval=1d`, for daily closes. The historical import reads five years ending yesterday, 90 days a request (21 requests). The checkpoint fixes the first and last day when the import starts and counts the requests already read, so a resumed import asks for exactly the same stretches. nFusion doesn't say whether `end` is kept, so each request asks through the day after its stretch and keeps only the stretch's days.
+- `GET /api/v1/Metals/spot/summary` with the same metals, for the latest quote. Each incremental sync reads the daily closes from the last day it kept (the last 7 days the first time) through today, then the summary.
+
+**Rate limits.** nFusion asks for fewer than one call a second per service, so requests are spaced at least 1.1 seconds apart. Its rate limit answers HTTP 403 with substatus 502. nFusion doesn't say how the substatus reaches the client, so a 403 whose body says `403.502` (as IIS writes it), or that names a substatus of 502 in its body or a header, is the rate limit. It, a 429, and a 500, 502, 503 or 504 are retried three times, honoring `Retry-After` up to a minute or else waiting 1, 2 and 4 seconds, before the sync stops and resumes from its checkpoint.
+
+**Events.** Each price is `{ metal, spotPerTroyOunceCents, quote, priceDate }`. A daily close (`quote: "daily"`) is the interval's `last`, keyed by metal and day, and stands for the interval's end; a day not over yet is left for the next sync. A latest quote (`quote: "latest"`) is the summary's `last`, keyed by metal and nFusion's `timeStamp`. So a replay is a duplicate. nFusion also gives bid, ask, open, high and low, but the department's schema keeps only the metal and price, so they are left out. Each metal has its own `success` and `error` in the answer: a metal that failed, or isn't in USD per troy ounce, is dead-lettered with what was wrong, as is an interval or quote whose times or price don't read (under a cent or over a million dollars an ounce counts as not reading). A day with no close (`last` null) is skipped.
+
+**Writes.** None: the API is GET-only market data, and the client has no way to send anything else.
+
+**Testing.** There is no sandbox. The mock (`packages/testkit/src/mocks/nfusion.ts`) is built from the OpenAPI spec, and its assumptions list what the first live run with a token must confirm, among them the token's format, the `start` and `end` format, whether `end` is kept, and how the 403 substatus 502 shows.
 
 ### Nivoda
 
