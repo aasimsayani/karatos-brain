@@ -54,7 +54,7 @@ const short = (value: unknown) => createHash("sha256").update(JSON.stringify(val
 const obj = (v: unknown) => (typeof v === "object" && v !== null && !Array.isArray(v) ? (v as Record<string, unknown>) : {});
 /** A NetSuite internal id: SuiteQL writes them as digits, as a string or a number. */
 const internalId = (v: unknown) => {
-  const s = typeof v === "number" && Number.isSafeInteger(v) ? String(v) : v;
+  const s = typeof v === "number" ? String(v) : v;
   return typeof s === "string" && /^-?\d{1,12}$/.test(s) ? s : undefined;
 };
 const ref = (kind: string, v: unknown) => {
@@ -74,13 +74,15 @@ const code = (v: unknown) => {
   const t = text(v, 60);
   return t && /^[A-Za-z][A-Za-z0-9 /-]*$/.test(t) ? t.toLowerCase().replace(/[ /-]+/g, "_") : undefined;
 };
-const flag = (v: unknown) => (v === "T" || v === true ? true : v === "F" || v === false ? false : undefined);
+/** NetSuite's F (or false): only a clear no counts, so anything else reads as yes. */
+const no = (v: unknown) => v === "F" || v === false;
 const day = (v: unknown) => (typeof v === "string" && /^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/.test(v) ? v : undefined);
 const currency = (v: unknown) => (typeof v === "string" && /^[A-Z]{3}$/.test(v.trim().toUpperCase()) ? v.trim().toUpperCase() : undefined);
 /** A decimal SuiteQL writes as a number or a string. */
 const decimal = (v: unknown) => {
   const n = typeof v === "number" ? v : typeof v === "string" && /^-?\d{1,13}(\.\d{1,8})?$/.test(v) ? Number(v) : Number.NaN;
-  return Number.isFinite(n) && Math.abs(n) <= 1e12 ? n : undefined;
+  // NaN and Infinity fail this too.
+  return Math.abs(n) <= 1e12 ? n : undefined;
 };
 
 /** A NetSuite amount in whole cents, or undefined when it doesn't read. */
@@ -132,7 +134,7 @@ export function netSuiteItemEvent(raw: unknown, ctx: NetSuiteContext): NetSuiteR
     sku: reference(r.itemid),
     name: text(r.displayname, 200),
     kind: code(r.itemtype),
-    active: flag(r.isinactive) === false,
+    active: no(r.isinactive),
     changedAt,
   };
   return read("item", "accounting.item_updated", raw, problems, id, payload, ctx.receivedAt);
@@ -141,13 +143,13 @@ export function netSuiteItemEvent(raw: unknown, ctx: NetSuiteContext): NetSuiteR
 export function netSuiteVendorEvent(raw: unknown, ctx: NetSuiteContext): NetSuiteRead {
   const { r, problems, id, changedAt } = header("vendor", raw);
   // A vendor who is a person is never named.
-  const company = flag(r.isperson) === false ? text(r.companyname, 200) : undefined;
+  const company = no(r.isperson) ? text(r.companyname, 200) : undefined;
   const payload = {
     system: SYSTEM,
     vendorId: `netsuite:vendor:${id}`,
     name: company ?? `NetSuite vendor ${id}`,
     currency: currency(r.currency),
-    active: flag(r.isinactive) === false,
+    active: no(r.isinactive),
     changedAt,
   };
   return read("vendor", "accounting.vendor_updated", raw, problems, id, payload, ctx.receivedAt);

@@ -111,14 +111,15 @@ export const netSuiteHost = (accountId: string) => `https://${accountId.toLowerC
 
 const b64url = (data: string | Buffer) => Buffer.from(data).toString("base64url");
 
+const CURVES = new Map<string, "ES256" | "ES384" | "ES512">([["prime256v1", "ES256"], ["secp384r1", "ES384"], ["secp521r1", "ES512"]]);
+
 /** The JWT algorithm a key signs with: PS256 for RSA of 3072 bits or more, ES256, ES384 or ES512 for EC. */
 export function netSuiteAlgorithm(key: KeyObject): "PS256" | "ES256" | "ES384" | "ES512" {
   const details = key.asymmetricKeyDetails ?? {};
   if (key.asymmetricKeyType === "rsa" && (details.modulusLength ?? 0) >= 3072) return "PS256";
-  if (key.asymmetricKeyType === "ec") {
-    const alg = new Map([["prime256v1", "ES256"], ["secp384r1", "ES384"], ["secp521r1", "ES512"]] as const).get(details.namedCurve as "prime256v1");
-    if (alg) return alg;
-  }
+  // Only an EC key has a named curve.
+  const alg = CURVES.get(details.namedCurve as string);
+  if (alg) return alg;
   throw new NetSuiteConfigError("NETSUITE_PRIVATE_KEY must be an RSA key of 3072 or 4096 bits, or an EC key on P-256, P-384 or P-521");
 }
 
@@ -129,7 +130,7 @@ export function netSuiteAlgorithm(key: KeyObject): "PS256" | "ES256" | "ES384" |
  */
 export function netSuitePrivateKey(value: string | undefined): KeyObject {
   const raw = value?.trim() ?? "";
-  const pem = raw.startsWith("-----BEGIN") ? raw.replace(/\\n/g, "\n") : /^[A-Za-z0-9+/=\s]{1,20000}$/.test(raw) ? Buffer.from(raw, "base64").toString("utf8") : "";
+  const pem = raw.startsWith("-----BEGIN") ? raw.replace(/\\n/g, "\n") : Buffer.from(raw, "base64").toString("utf8");
   try {
     return createPrivateKey(pem);
   } catch {
@@ -192,7 +193,8 @@ export function netSuiteClient(options: NetSuiteClientOptions): NetSuiteClient {
 
   return {
     async page(list, since, offset) {
-      if (!Number.isSafeInteger(offset) || offset < 0 || offset % NETSUITE_PAGE_SIZE !== 0 || offset >= NETSUITE_MAX_ROWS) {
+      // NaN, Infinity and fractions all leave a remainder.
+      if (offset < 0 || offset % NETSUITE_PAGE_SIZE !== 0 || offset >= NETSUITE_MAX_ROWS) {
         throw new NetSuiteApiError(`a ${list} offset must be a multiple of ${NETSUITE_PAGE_SIZE} below ${NETSUITE_MAX_ROWS}`, 0);
       }
       if ((list === "stock") !== (since === null) || (since !== null && !NETSUITE_TIME.test(since))) throw new NetSuiteApiError(`a ${list} start must be a NetSuite time, and stock takes none`, 0);

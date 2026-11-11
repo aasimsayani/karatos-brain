@@ -147,6 +147,7 @@ describe("NetSuite client", () => {
       [{ privateKey: "bm90IGEga2V5" }, "NETSUITE_PRIVATE_KEY is missing"],
       [{ privateKey: ["-----BEGIN", "PRIVATE KEY-----\nAAAA\n-----END", "PRIVATE KEY-----"].join(" ") }, "NETSUITE_PRIVATE_KEY is missing"],
       [{ privateKey: generateKeyPairSync("rsa", { modulusLength: 2048 }).privateKey.export({ type: "pkcs8", format: "pem" }) as string }, "NETSUITE_PRIVATE_KEY must be an RSA key of 3072 or 4096 bits, or an EC key on P-256, P-384 or P-521"],
+      [{ privateKey: generateKeyPairSync("dsa", { modulusLength: 3072, divisorLength: 256 }).privateKey.export({ type: "pkcs8", format: "pem" }) as string }, "NETSUITE_PRIVATE_KEY must be"],
       [{ privateKey: generateKeyPairSync("ed25519").privateKey.export({ type: "pkcs8", format: "pem" }) as string }, "NETSUITE_PRIVATE_KEY must be"],
       [{ privateKey: generateKeyPairSync("ec", { namedCurve: "secp256k1" }).privateKey.export({ type: "pkcs8", format: "pem" }) as string }, "NETSUITE_PRIVATE_KEY must be"],
     ];
@@ -181,12 +182,16 @@ describe("NetSuite client", () => {
   });
 
   it("signs in with a JWT NetSuite checks, for the REST web services scope only, with EC or RSA", async () => {
-    for (const keys of [EC, RSA]) {
+    const curve = (namedCurve: string) => {
+      const pair = generateKeyPairSync("ec", { namedCurve });
+      return { ...pair, pem: pair.privateKey.export({ type: "pkcs8", format: "pem" }) as string };
+    };
+    for (const [keys, alg] of [[EC, "ES256"], [RSA, "PS256"], [curve("secp384r1"), "ES384"], [curve("secp521r1"), "ES512"]] as const) {
       const mock = netSuiteDocMock(account({ publicKey: keys.publicKey }));
       const { c } = client(mock.fetch, { privateKey: keys.pem });
       expect((await c.page("items", ALL, 0)).rows).toHaveLength(2);
       const [{ header, claims }] = mock.assertions as [{ header: Record<string, unknown>; claims: Record<string, unknown> }];
-      expect(header).toEqual({ typ: "JWT", alg: keys === EC ? "ES256" : "PS256", kid: CERT_ID });
+      expect(header).toEqual({ typ: "JWT", alg, kid: CERT_ID });
       const iat = NOW().getTime() / 1000;
       expect(claims).toEqual({ iss: CLIENT_ID, scope: "rest_webservices", aud: TOKEN_URL, iat, exp: iat + 300 });
     }
@@ -293,6 +298,9 @@ describe("NetSuite client", () => {
     const once = scripted(json(401, {}), json(200, PAGE));
     expect(await client(once.fetch).c.page("items", ALL, 0)).toEqual({ rows: [], more: false });
     expect(once.sent.map((s) => s.headers.authorization)).toEqual(["Bearer t1", "Bearer t2"]);
+    const once400 = scripted(json(400, {}));
+    await expect(client(once400.fetch).c.page("items", ALL, 0)).rejects.toMatchObject({ status: 400 });
+    expect(once400.sent).toHaveLength(1);
     for (const status of [400, 404, 201]) await expect(client(scripted(json(status, {})).fetch, { retries: 0 }).c.page("items", ALL, 0)).rejects.toMatchObject({ message: `NetSuite answered HTTP ${status} for the items`, status });
   });
 
@@ -360,6 +368,7 @@ describe("NetSuite events", () => {
     expect([netSuiteCents("2400.5"), netSuiteCents(2400.556), netSuiteCents("-12.34"), netSuiteCents("0"), netSuiteCents(1e12), netSuiteCents("1234567890123.12345678")]).toEqual([240_050, 240_056, -1234, 0, 1e14, undefined]);
     for (const v of [null, undefined, "", "1e5", "12.", ".5", "1,000", "12.123456789", "abc", Number.NaN, Number.POSITIVE_INFINITY, 1e12 + 1, {}]) expect(netSuiteCents(v), String(v)).toBeUndefined();
     expect(netSuiteCents("-1000000000000")).toBe(-1e14);
+    expect(netSuiteCents(-1e12 - 1)).toBeUndefined();
   });
 
   it("logs an item with its sku, name, kind and whether it is active", () => {
@@ -382,6 +391,7 @@ describe("NetSuite events", () => {
     expect(netSuiteItemEvent(netSuiteItem.one({ isinactive: null, itemid: "x".repeat(61), displayname: "a\u0007b" }), ctx).event.payload).toMatchObject({ active: false, sku: undefined, name: undefined });
     expect(netSuiteItemEvent(netSuiteItem.one({ itemid: "#".repeat(60), displayname: "x".repeat(200), itemtype: "Non Inventory - Part" }), ctx).event.payload).toMatchObject({ sku: "#".repeat(60), name: "x".repeat(200), kind: "non_inventory_part" });
     expect(netSuiteItemEvent(netSuiteItem.one({ displayname: "   ", itemtype: "x".repeat(61) }), ctx).event.payload).toMatchObject({ name: undefined, kind: undefined });
+    expect(netSuiteItemEvent(netSuiteItem.one({ displayname: "Ring > Band" }), ctx).event.payload.name).toBeUndefined();
   });
 
   it("names a vendor that is a company, and never one that is a person", () => {
@@ -395,6 +405,7 @@ describe("NetSuite events", () => {
     expect(netSuiteVendorEvent(netSuiteVendor.one({ isperson: false, companyname: null, currency: " eur ", isinactive: "T" }), ctx).event.payload).toMatchObject({ name: "NetSuite vendor 504", currency: "EUR", active: false });
     expect(netSuiteVendorEvent(netSuiteVendor.one({ currency: "US Dollar" }), ctx).event.payload.currency).toBeUndefined();
     expect(netSuiteVendorEvent(netSuiteVendor.one({ currency: 1 }), ctx).event.payload.currency).toBeUndefined();
+    expect(netSuiteVendorEvent(netSuiteVendor.one({ currency: "US" }), ctx).event.payload.currency).toBeUndefined();
   });
 
   it("logs each kind of transaction it reads as its own event, with whole cents", () => {
@@ -417,9 +428,9 @@ describe("NetSuite events", () => {
     const order = netSuiteTransactionEvent(netSuiteTransaction.one({ type: "SalesOrd", status: "Pending Fulfillment", duedate: null, foreignamountremaining: null }), ctx).event;
     expect(order.type).toBe("accounting.sales_order_updated");
     expect(order.payload).toMatchObject({ salesOrderId: "netsuite:transaction:9002", customerId: "netsuite:customer:302", status: "pending_fulfillment", dueDate: undefined, balanceCents: undefined });
-    const po = netSuiteTransactionEvent(netSuiteTransaction.one({ type: "PurchOrd", foreigntotal: "-500", entity: 77 }), ctx).event;
+    const po = netSuiteTransactionEvent(netSuiteTransaction.one({ type: "PurchOrd", foreigntotal: "-500", foreignamountremaining: "-12.5", entity: 77 }), ctx).event;
     expect(po.type).toBe("accounting.purchase_order_updated");
-    expect(po.payload).toMatchObject({ purchaseOrderId: "netsuite:transaction:9003", vendorId: "netsuite:vendor:77", totalCents: 50_000 });
+    expect(po.payload).toMatchObject({ purchaseOrderId: "netsuite:transaction:9003", vendorId: "netsuite:vendor:77", totalCents: 50_000, balanceCents: 1250 });
     expect(po.payload.customerId).toBeUndefined();
     const journal = netSuiteTransactionEvent(netSuiteTransaction.one({ type: "Journal", entity: null, status: "Approved for Posting" }), ctx).event;
     expect(journal.type).toBe("accounting.journal_entry_updated");
@@ -465,6 +476,8 @@ describe("NetSuite events", () => {
     expect(dead(netSuiteItemEvent([], ctx))).toMatchObject({ problems: ["item is not an object", "item has no id that reads", "item has no change time that reads"] });
     expect(dead(netSuiteVendorEvent({ id: "5", modified: "2026-01-01" }, ctx))).toEqual({ system: "NetSuite", kind: "vendor", id: "5", problems: ["vendor has no change time that reads"] });
     expect(dead(netSuiteVendorEvent({ id: "1.5", modified: T(1) }, ctx))).toMatchObject({ problems: ["vendor has no id that reads"] });
+    // Two rows wrong the same way are still two dead letters.
+    expect(netSuiteVendorEvent({ id: "1.5", modified: T(1) }, ctx).event.idempotencyKey).not.toBe(netSuiteVendorEvent({ id: "2.5", modified: T(1) }, ctx).event.idempotencyKey);
     for (const id of ["", "1234567890123", "1e3", 1.5, true, " 5"]) expect(netSuiteItemEvent({ id, modified: T(1) }, ctx).ok, String(id)).toBe(false);
     for (const id of ["-5", "123456789012", 0]) expect(netSuiteItemEvent({ id, modified: T(1) }, ctx).ok, String(id)).toBe(true);
     expect(dead(netSuiteTransactionEvent({ id: "5", modified: T(1), type: "VendBill" }, ctx))).toEqual({ system: "NetSuite", kind: "transaction", id: "5", problems: ["transaction is not a kind KaratOS reads"] });
@@ -655,6 +668,19 @@ describe("NetSuite connector", () => {
     expect([NETSUITE_OVERLAP_MS, NETSUITE_FIRST_LOOKBACK_MS]).toEqual([600_000, 3 * 86_400_000]);
   });
 
+  it("works out starts the same in any time zone", async () => {
+    const zone = process.env.TZ;
+    process.env.TZ = "America/New_York";
+    try {
+      const { c, asked } = fake({});
+      await drain(connector(netSuiteDocMock(account()), { client: c }).incrementalSync({ cursor: JSON.stringify({ done: true, marks: { items: T(25), vendors: null, transactions: null }, pass: null }) } as never));
+      expect(asked[0]).toEqual(["items", T(15), 0]);
+    } finally {
+      if (zone === undefined) delete process.env.TZ;
+      else process.env.TZ = zone;
+    }
+  });
+
   it("marks the newest change whatever order rows come in, ignores times that don't read, and keeps a mark when nothing changed", async () => {
     const rows: Partial<Record<NetSuiteList, unknown[]>> = { items: [{ modified: T(5) }, { modified: T(9) }, { modified: "x" }, null, { modified: T(7) }], stock: [{ modified: T(99) }] };
     const c: NetSuiteClient = { page: async (list) => ({ rows: rows[list] ?? [], more: false }) };
@@ -785,6 +811,9 @@ describe("NetSuite doc mock", () => {
     const header = { typ: "JWT", alg: "ES256", kid: CERT_ID };
     const claims = { iss: CLIENT_ID, scope: "rest_webservices", aud: TOKEN_URL, iat: 100, exp: 400 };
     const jwt = (h: unknown, c: unknown) => `${b64(h)}.${b64(c)}.c2ln`;
+    const asJson = await mock.fetch(TOKEN_URL, { method: "POST", headers: { "content-type": "application/json" }, body: new URLSearchParams({ grant_type: "client_credentials" }).toString() });
+    expect(asJson.status).toBe(400);
+    expect(mock.assertions).toHaveLength(0);
     expect(await sign({ grant_type: "password", client_assertion_type: type, client_assertion: jwt(header, claims) })).toBe(400);
     expect(await sign({ grant_type: "client_credentials", client_assertion_type: "x", client_assertion: jwt(header, claims) })).toBe(400);
     for (const assertion of ["", "a.b", "a.b.c.d", `${b64(header)}.!!.c`]) expect(await sign({ grant_type: "client_credentials", client_assertion_type: type, client_assertion: assertion }), assertion).toBe(400);

@@ -11,7 +11,7 @@ import { checkDocMock, docMockFetch, type DocMock, type DocMockFetch, type DocMo
  * - POST /services/rest/auth/oauth2/v1/token takes a form with grant_type
  *   client_credentials, client_assertion_type
  *   urn:ietf:params:oauth:client-assertion-type:jwt-bearer and the signed
- *   JWT, and answers {access_token, expires_in: 3600, token_type}
+ *   JWT, form encoded, and answers {access_token, expires_in: 3600, token_type}
  *   (section_162755359851).
  * - The JWT header is typ JWT, alg PS256, PS384, PS512, ES256, ES384 or
  *   ES512, and kid the certificate id; its claims are iss (the client id),
@@ -151,6 +151,7 @@ export function netSuiteDocMock(data: NetSuiteMockData): NetSuiteMock {
   ]);
 
   function token(request: DocMockRequest): DocMockResponse {
+    if (!(request.headers.get("content-type") ?? "").startsWith("application/x-www-form-urlencoded")) return { status: 400, body: { error: "invalid_request" } };
     const form = new URLSearchParams(request.body);
     if (form.get("grant_type") !== "client_credentials") return { status: 400, body: { error: "unsupported_grant_type" } };
     if (form.get("client_assertion_type") !== "urn:ietf:params:oauth:client-assertion-type:jwt-bearer") return { status: 400, body: { error: "invalid_request" } };
