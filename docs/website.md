@@ -4,7 +4,7 @@ The public site lives in [`site/`](../site). `site/build.ts` renders one static 
 
 ## Reading order
 
-A visitor gives the page about a minute, so it leads with what they need to decide: the hero (one sentence, two buttons, three figures and a short "Works today with" line naming well-known built systems from `HERO_SYSTEMS` and counting the rest), then what it solves (the plays), how it works in three short steps, payback, the holiday pilot and pricing. The reference sections follow: write-back rules, your data, departments, what each connection is worth, the integration directory and partners. The nav keeps seven links or fewer. A test checks the order and the limits on the hero sentence and the "Works today with" line.
+A visitor gives the page about a minute, so it leads with what they need to decide: the hero (one sentence, two buttons, three figures and a short "Connectors built for" line naming well-known built systems from `HERO_SYSTEMS` and counting the rest), then what it solves (the plays), how it works in three short steps, payback, the holiday pilot and pricing. The reference sections follow: write-back rules, your data, departments, what each connection is worth, the integration directory and partners. The nav keeps seven links or fewer. A test checks the order and the limits on the hero sentence and the "Connectors built for" line. The page says "built", never "connected" or "works today", because a built connector has been tested against the vendor's sandbox or sample files but not yet run on a live store account.
 
 ## The integration directory
 
@@ -12,7 +12,7 @@ The directory groups every system by category (the catalog domain), with the cat
 
 Every card carries one plain sentence on what KaratOS reads from the system, and the company behind it when that company makes several systems on the map ("By Google"). A Details panel adds how it connects, how much history is imported, whether updates arrive live, how it is tested, the departments it feeds, who uses it and what stage it is at. The sentence and company live in `SYSTEM_DETAILS` in [`site/directory.ts`](../site/directory.ts); the rest comes from the catalog. A test fails when a system joins the catalog without an entry, so every new system arrives with its details.
 
-"Newest connections" shows the eight most recently connected systems. The day each connector landed on `main` lives in `CONNECTED_ON` in the same file, and a test fails until a newly built connector has one, so each release shows what it added. The hero's figures (systems connected, mapped and categories) and the Partners section's three stages (on the map, building now, connected) are counted from the catalog.
+"Newest connectors" shows the eight most recently built connectors. The day each connector landed on `main` lives in `CONNECTED_ON` in the same file, and a test fails until a newly built connector has one, so each release shows what it added. The hero's figures (connectors built and systems mapped) and the Partners section's three stages (on the map, building now, built) are counted from the catalog.
 
 ## Partners
 
@@ -85,7 +85,7 @@ Only plain `http://` to a `.railway.internal` host is taken (or `localhost` for 
 
 ## What each connection is worth
 
-The "Value" section has one card per catalog domain that has data sources: the question that kind of system answers for the owner, why it matters, and which systems are connected today (or being built now, or how many are on the roadmap). Domains with a built system come first. The copy lives in `DOMAIN_VALUE`; a new domain with data sources stops the build until it has an entry, so the page never shows a kind of system without saying what it is worth.
+The "Value" section has one card per catalog domain that has data sources: the question that kind of system answers for the owner, why it matters, and which connectors are built (or being built now, or how many are on the roadmap). Domains with a built system come first. The copy lives in `DOMAIN_VALUE`; a new domain with data sources stops the build until it has an entry, so the page never shows a kind of system without saying what it is worth.
 
 ## Holiday pilot
 

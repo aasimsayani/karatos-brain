@@ -271,7 +271,7 @@ export function earlyAccessNote(): string {
   const names = featured.length ? featured : built.slice(0, 6).map((i) => i.name);
   const rest = built.length - names.length;
   const list = rest > 0 ? `${names.join(", ")} and ${rest} more` : names.length === 1 ? names[0]! : `${names.slice(0, -1).join(", ")} and ${names.at(-1)}`;
-  return `Works today with ${list}.`;
+  return `Connectors built for ${list}. Live store checks start with the pilot.`;
 }
 
 export function escapeHtml(value: string): string {
@@ -287,7 +287,7 @@ function statusOf(integration: IntegrationSpec, selfServe: Set<string>): { label
 
 /**
  * One card per kind of connection (catalog domain), those with built systems
- * first: the question it answers, why it matters, and what is connected today,
+ * first: the question it answers, why it matters, and which connectors are built,
  * being built now, or on the roadmap.
  */
 export function renderValueCards(dataSources: readonly IntegrationSpec[], selfServe: ReadonlySet<string>): string {
@@ -303,7 +303,7 @@ export function renderValueCards(dataSources: readonly IntegrationSpec[], selfSe
       const built = systems.filter((i) => i.status === "built");
       const next = systems.filter((i) => i.status !== "built" && selfServe.has(i.id));
       const status = built.length
-        ? `<p class="value-status live"><strong>Connected today:</strong> ${escapeHtml(built.map((i) => i.name).join(", "))}</p>`
+        ? `<p class="value-status live"><strong>Built:</strong> ${escapeHtml(built.map((i) => i.name).join(", "))}</p>`
         : next.length
           ? `<p class="value-status"><strong>Building now:</strong> ${escapeHtml(next.map((i) => i.name).join(", "))}</p>`
           : `<p class="value-status"><strong>On the roadmap:</strong> ${systems.length} ${systems.length === 1 ? "system" : "systems"}</p>`;
@@ -382,7 +382,7 @@ export function renderCard(i: IntegrationSpec, selfServe: ReadonlySet<string>, d
     ["For", segments.join(", ")],
     ["Stage", STAGE_DETAIL[status.label] ?? status.label],
   ];
-  if (CONNECTED_ON[i.id]) rows.push(["Connected", formatDay(CONNECTED_ON[i.id]!)]);
+  if (CONNECTED_ON[i.id]) rows.push(["Built", formatDay(CONNECTED_ON[i.id]!)]);
   const found = researched.has(i.id) ? `<dt>What we found</dt><dd><a href="${escapeHtml(researchUrl(i.id))}">How ${escapeHtml(i.name)} can be reached, from its own docs</a></dd>` : "";
   return `<li class="card" data-domain="${i.domain}" data-segments="${i.segments.join(" ")}" data-departments="${i.departments.join(" ")}" data-search="${escapeHtml(search)}">
   <div class="card-top"><span class="domain">${escapeHtml(detail.company ? `By ${detail.company}` : domainLabel(i.domain))}</span><span class="pill ${status.tone}">${status.label}</span></div>
@@ -408,7 +408,7 @@ export function renderDirectory(dataSources: readonly IntegrationSpec[], selfSer
     .map((domain, n) => {
       const systems = dataSources.filter((i) => i.domain === domain);
       const built = systems.filter((i) => i.status === "built").length;
-      const counts = `${systems.length} ${systems.length === 1 ? "system" : "systems"}${built ? ` · ${built} connected` : ""}`;
+      const counts = `${systems.length} ${systems.length === 1 ? "system" : "systems"}${built ? ` · ${built} built` : ""}`;
       return `<details class="group" data-group="${domain}" id="cat-${domain}"${n === 0 ? " open" : ""}>
   <summary class="group-head"><h3>${escapeHtml(domainLabel(domain))}</h3><span class="count">${counts}</span></summary>
   <ul class="cards">
@@ -722,7 +722,7 @@ footer .wrap{display:flex;flex-wrap:wrap;justify-content:space-between;gap:var(-
   <div class="actions"><a class="btn primary" href="#pilot">Join the holiday pilot</a><a class="btn ghost" href="/demo/">Try the live demo</a></div>
   <p class="note">The <a href="/demo/">live demo</a> is a made-up store running on the real connectors. No sign-up.</p>
   <ul class="proof" aria-label="KaratOS today">
-    <li><strong>${builtCount}</strong><span>systems connected</span></li>
+    <li><strong>${builtCount}</strong><span>connectors built</span></li>
     <li><strong>${dataSources.length}</strong><span>systems mapped</span></li>
     <li><strong>${CORE_PRICE}</strong><span>a store a month</span></li>
   </ul>
@@ -913,7 +913,7 @@ ${deptCards}
 <section id="value"><div class="wrap">
   <span class="eyebrow">What each connection is worth</span>
   <h2>Every system you connect answers a question the others can't.</h2>
-  <p class="section-intro">KaratOS is useful with one connection and sharper with each one. Here is the question each kind of system answers for the owner, why it matters, and what is connected today.</p>
+  <p class="section-intro">KaratOS is useful with one connection and sharper with each one. Here is the question each kind of system answers for the owner, why it matters, and which connectors are built.</p>
   <ul class="values">
 ${valueCards}
   </ul>
@@ -923,13 +923,13 @@ ${valueCards}
   <h2>Integrations</h2>
   <p class="section-intro">Every system on our map, grouped by what it does, with what KaratOS reads from it and how it connects. Open any card for the details. "Building now" means we can build and test it without waiting on anyone. Everything else follows.</p>
   <div class="newest">
-    <h3>Newest connections</h3>
+    <h3>Newest connectors</h3>
     <ul>
 ${newest}
     </ul>
   </div>
   <div class="stats">
-    <div class="stat"><strong>${builtCount}</strong><span>connected</span></div>
+    <div class="stat"><strong>${builtCount}</strong><span>built</span></div>
     <div class="stat"><strong>${dataSources.length}</strong><span>systems mapped</span></div>
     <div class="stat"><strong>${selfServe.size}</strong><span>building now</span></div>
     <div class="stat"><strong>${departments.length}</strong><span>departments served</span></div>
@@ -951,10 +951,10 @@ ${directory}
   <span class="eyebrow">For partners</span>
   <h2>Your system, read alongside everything else your customers run.</h2>
   <p class="section-intro">When a jeweler connects your system to KaratOS, it gets read next to their POS, their books and their suppliers, so your data shows up in the decisions they make every morning. That makes your product harder to replace, not easier.</p>
-  <ul class="ladder" aria-label="How a system moves from the map to connected">
+  <ul class="ladder" aria-label="How a system moves from the map to built">
     <li><strong>${dataSources.length - builtCount - selfServe.size}</strong><h3>On the map</h3><p>Every system our customers run, with how it can be reached. Each one moves up when a business asks for it or its vendor opens access.</p></li>
     <li><strong>${selfServe.size}</strong><h3>Building now</h3><p>Systems with a public API and a free sandbox. We build and test these without waiting on anyone.</p></li>
-    <li><strong>${builtCount}</strong><h3>Connected</h3><p>Built and tested, checked every night against the vendor's sandbox, and watched for changes to the vendor's API.</p></li>
+    <li><strong>${builtCount}</strong><h3>Built</h3><p>Built and tested against the vendor's sandbox or sample files, and watched for changes to the vendor's API. Each is checked on a live account as stores connect it.</p></li>
   </ul>
   <ul class="rules">
     <li><h3>Read-only by default</h3><p>A connector reads only what it needs. It asks for read scopes, and where a key can't be limited, it sends only the read requests it lists.</p></li>

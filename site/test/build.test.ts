@@ -41,7 +41,9 @@ describe("KaratOS website", () => {
     const featured = HERO_SYSTEMS.filter((id) => built.some((i) => i.id === id));
     for (const id of featured) expect(earlyAccessNote()).toContain(built.find((i) => i.id === id)!.name);
     expect(earlyAccessNote()).toContain(`and ${built.length - featured.length} more`);
-    expect(earlyAccessNote().length).toBeLessThan(200);
+    expect(earlyAccessNote().length).toBeLessThan(240);
+    // Built is not the same as running on a live account, so the hero never says "connected" or "works today".
+    expect(earlyAccessNote()).not.toMatch(/connected|works today/i);
     expect(html.match(/<ul class="caps"/g)?.length).toBe(built.length);
     expect(html).toContain(`<p class="note">${escapeHtml(earlyAccessNote())}</p>`);
   });
@@ -383,10 +385,10 @@ describe("KaratOS website", () => {
     for (const i of built) expect(value).toContain(escapeHtml(i.name));
     // Every card for a kind with a built system comes before any card without one.
     const cards = value.split('<li class="value">').slice(1);
-    const live = cards.map((c) => c.includes("Connected today:"));
+    const live = cards.map((c) => c.includes("Built:"));
     expect(live.indexOf(false)).toBe(live.filter(Boolean).length);
     expect(live.filter(Boolean).length).toBe(new Set(built.map((i) => i.domain)).size);
-    const bare = cards.find((c) => !c.includes("Connected today:") && !c.includes("Building now:"));
+    const bare = cards.find((c) => !c.includes("Built:") && !c.includes("Building now:"));
     if (bare) expect(bare).toMatch(/On the roadmap:<\/strong> \d+ system/);
   });
 
@@ -403,7 +405,7 @@ describe("KaratOS website", () => {
       );
       const cards = out.split('<li class="value">').slice(1);
       expect(cards.map((c) => c.match(/<h3>(.*)<\/h3>/)![1])).toEqual(["Connected?", "Planned &amp; only?", "Being built?"]);
-      expect(cards[0]).toContain("<strong>Connected today:</strong> c1 &lt;name&gt;</p>");
+      expect(cards[0]).toContain("<strong>Built:</strong> c1 &lt;name&gt;</p>");
       expect(cards[1]).toContain("<p>&lt;why a&gt;</p>");
       expect(cards[1]).toContain("<strong>On the roadmap:</strong> 2 systems</p>");
       expect(cards[2]).toContain("<strong>Building now:</strong> b1 &lt;name&gt;</p>");
