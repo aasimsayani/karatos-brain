@@ -57,6 +57,7 @@ import refiner_statements from "./refiner_statements.js";
 import repairshopr from "./repairshopr.js";
 import rfid_counts from "./rfid_counts.js";
 import ringcentral from "./ringcentral.js";
+import search_the_watch_market from "./search_the_watch_market.js";
 import shopify from "./shopify.js";
 import slack from "./slack.js";
 import smile_io from "./smile_io.js";
@@ -84,4 +85,4 @@ import zendesk from "./zendesk.js";
 import zoom from "./zoom.js";
 
 /** How each built connector is made from an instance's settings, by catalog id. */
-export const FACTORIES: Readonly<Record<string, ConnectorFactory>> = { acumatica_jewelshop, affirm, airtable, amazon, asana, authorize_net, avalara, bank_statements, bigcommerce, bill_com, birdeye, calendly, chase, clover, custom_forms, docusign, dropbox, ebay, edi_x12, etsy, fedex, fincen_8300, gia, gmail, google_ads, google_analytics, google_workspace, gorgias, gusto, hrd, hubspot, idex, inventory_pos, judgeme, klaviyo, lightspeed, mailchimp, meta_ads, metals_api, microsoft_onedrive, microsoft_outlook, microsoft_teams, monday, netsuite, nivoda, notion, openphone, pinterest, piro, plaid, quickbooks, ramp, rapnet, refiner_statements, repairshopr, rfid_counts, ringcentral, shopify, slack, smile_io, sola_payments, square, squarespace, stripe, stuller, supplier_invoices, taxjar, tiktok, tiktok_ads, trello, trustpilot, twilio, ups, verkada, watchsearch, wix, woocommerce, xero, yext, yotpo, zendesk, zoom };
+export const FACTORIES: Readonly<Record<string, ConnectorFactory>> = { acumatica_jewelshop, affirm, airtable, amazon, asana, authorize_net, avalara, bank_statements, bigcommerce, bill_com, birdeye, calendly, chase, clover, custom_forms, docusign, dropbox, ebay, edi_x12, etsy, fedex, fincen_8300, gia, gmail, google_ads, google_analytics, google_workspace, gorgias, gusto, hrd, hubspot, idex, inventory_pos, judgeme, klaviyo, lightspeed, mailchimp, meta_ads, metals_api, microsoft_onedrive, microsoft_outlook, microsoft_teams, monday, netsuite, nivoda, notion, openphone, pinterest, piro, plaid, quickbooks, ramp, rapnet, refiner_statements, repairshopr, rfid_counts, ringcentral, search_the_watch_market, shopify, slack, smile_io, sola_payments, square, squarespace, stripe, stuller, supplier_invoices, taxjar, tiktok, tiktok_ads, trello, trustpilot, twilio, ups, verkada, watchsearch, wix, woocommerce, xero, yext, yotpo, zendesk, zoom };
