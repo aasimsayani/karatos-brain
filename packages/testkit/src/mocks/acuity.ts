@@ -26,8 +26,6 @@ import { checkDocMock, docMockFetch, type DocMock, type DocMockFetch, type DocMo
  *   one has noShow.
  * - `GET /appointment-types` takes includeDeleted (false by default); a type
  *   has id, name, duration, price and more (appointment-types).
- * - `GET /calendars` takes nothing; a calendar has id, name, email and more
- *   (get-calendars).
  * - Errors are {status_code, message, error}: 400 bad_request, 401
  *   unauthorized, 429 too_many_requests "Rate limit reached. Limit 10req/s
  *   and 20 concurrent connections." (api-errors).
@@ -37,7 +35,6 @@ const REF = "https://developers.acuityscheduling.com/reference";
 export const ACUITY_DOC_PAGES = {
   appointments: `${REF}/get-appointments`,
   appointmentTypes: `${REF}/appointment-types`,
-  calendars: `${REF}/get-calendars`,
 } as const;
 const APPOINTMENT_QUERY = new Set(["max", "minDate", "maxDate", "calendarID", "appointmentTypeID", "canceled", "showall", "direction", "excludeForms"]);
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
@@ -49,7 +46,7 @@ const MONTHS = ["January", "February", "March", "April", "May", "June", "July", 
 const shown = (iso: string) => `${MONTHS[Number(iso.slice(5, 7)) - 1]} ${Number(iso.slice(8, 10))}, ${iso.slice(0, 4)}`;
 const local = (n: number) => new Date(Date.parse("2026-10-01T00:00:00Z") + n * 86_400_000).toISOString().slice(0, 10);
 
-/** Appointment `n`: at 10:00 New York time, `n` days after 2026-10-01, 45 minutes, paid, with a client, notes and an intake form the connector must drop. */
+/** Appointment `n`: at 10:00 New York time, `n` days after 2026-10-01, 45 minutes, paid, with a client, notes, an intake form and a calendar named after staff, all of which the connector must drop. */
 export const acuityAppointment = fixtureBuilder<AcuityMockRecord>((n) => ({
   id: 54320 + n,
   firstName: "Test",
@@ -69,7 +66,7 @@ export const acuityAppointment = fixtureBuilder<AcuityMockRecord>((n) => ({
   addonIDs: [],
   classID: null,
   duration: "45",
-  calendar: "Test Calendar 1",
+  calendar: "Test Staff 1",
   calendarID: 27238,
   canClientCancel: true,
   canClientReschedule: true,
@@ -101,17 +98,6 @@ export const acuityAppointmentType = fixtureBuilder<AcuityMockRecord>((n) => ({
   calendarIDs: [27238],
 }));
 
-/** Calendar `n`, with id 27237 + n. */
-export const acuityCalendar = fixtureBuilder<AcuityMockRecord>((n) => ({
-  id: 27237 + n,
-  name: `Test Calendar ${n}`,
-  email: `calendar${n}@example.test`,
-  replyTo: `calendar${n}@example.test`,
-  description: "",
-  location: "",
-  timezone: "America/New_York",
-}));
-
 export interface AcuityMockData {
   userId: string;
   apiKey: string;
@@ -122,7 +108,6 @@ export interface AcuityMockData {
   types?: AcuityMockRecord[];
   /** Deleted appointment types, listed only with includeDeleted=true. */
   deletedTypes?: AcuityMockRecord[];
-  calendars?: AcuityMockRecord[];
   /** 429s to answer before the next calls. */
   rateLimits?: number;
 }
@@ -190,11 +175,6 @@ export function acuityDocMock(data: AcuityMockData): AcuityMock {
     return { status: 200, body: [...(data.types ?? []), ...(includeDeleted ? (data.deletedTypes ?? []) : [])] };
   });
 
-  const calendars = guarded((request) => {
-    if ([...request.url.searchParams.keys()].length > 0) return bad("Unknown parameter.");
-    return { status: 200, body: data.calendars ?? [] };
-  });
-
   const mock = checkDocMock({
     integration: "acuity",
     baseUrl: BASE,
@@ -210,7 +190,6 @@ export function acuityDocMock(data: AcuityMockData): AcuityMock {
     routes: [
       { method: "GET", path: "/appointments", documentedAt: ACUITY_DOC_PAGES.appointments, respond: appointments },
       { method: "GET", path: "/appointment-types", documentedAt: ACUITY_DOC_PAGES.appointmentTypes, respond: appointmentTypes },
-      { method: "GET", path: "/calendars", documentedAt: ACUITY_DOC_PAGES.calendars, respond: calendars },
     ],
   });
   return {
@@ -224,7 +203,7 @@ export function acuityDocMock(data: AcuityMockData): AcuityMock {
 
 export default {
   integration: "acuity",
-  covers: "The Acuity Scheduling API's appointment, appointment type and calendar lists (v1), with Basic auth, date windows, max and the canceled list",
-  watchPages: [ACUITY_DOC_PAGES.appointments, ACUITY_DOC_PAGES.appointmentTypes, ACUITY_DOC_PAGES.calendars],
+  covers: "The Acuity Scheduling API's appointment and appointment type lists (v1), with Basic auth, date windows, max and the canceled list",
+  watchPages: [ACUITY_DOC_PAGES.appointments, ACUITY_DOC_PAGES.appointmentTypes],
   docMocks: () => [acuityDocMock({ userId: "", apiKey: "" }).mock],
 } satisfies DocMockModule;

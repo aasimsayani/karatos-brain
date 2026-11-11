@@ -8,7 +8,6 @@ import {
   UndocumentedRequestError,
   acuityAppointment,
   acuityAppointmentType,
-  acuityCalendar,
   acuityDocMock,
   assertSynthetic,
   checkConnectorSync,
@@ -63,14 +62,14 @@ const HEADERS = { accept: "application/json", authorization: BASIC, "user-agent"
 const noSleep = async () => {};
 
 const reset = () => {
-  for (const b of [acuityAppointment, acuityAppointmentType, acuityCalendar]) b.reset();
+  for (const b of [acuityAppointment, acuityAppointmentType]) b.reset();
 };
-/** Three scheduled appointments on October 2 to 4, 2026, one canceled on October 5, two types and one calendar. */
+/** Three scheduled appointments on October 2 to 4, 2026, one canceled on October 5, and two types. */
 function account(overrides: Partial<AcuityMockData> = {}): AcuityMockData {
   reset();
   const appointments = acuityAppointment.many(3);
   const canceled = [acuityAppointment.one({ id: 60001 })];
-  return { userId: USER, apiKey: API_KEY, appointments, canceled, types: acuityAppointmentType.many(2), calendars: acuityCalendar.many(1), ...overrides };
+  return { userId: USER, apiKey: API_KEY, appointments, canceled, types: acuityAppointmentType.many(2), ...overrides };
 }
 /** Appointment 1 (54321, at 2026-10-02 10:00 New York time) with overrides. */
 const appointment = (over: AcuityMockRecord = {}) => {
@@ -79,8 +78,8 @@ const appointment = (over: AcuityMockRecord = {}) => {
 };
 /** An appointment with an explicit id, at 10:00 New York time on a day. */
 const on = (id: number, day: string, over: AcuityMockRecord = {}) => appointment({ id, datetime: `${day}T10:00:00-0400`, ...over });
-const LOOKUPS: AcuityLookups = { types: new Map([["1", "Bridal consultation"], ["2", "Repair drop-off"]]), calendars: new Map([["27238", "Front counter"]]) };
-const NO_LOOKUPS: AcuityLookups = { types: new Map(), calendars: new Map() };
+const LOOKUPS: AcuityLookups = { types: new Map([["1", "Bridal consultation"], ["2", "Repair drop-off"]]) };
+const NO_LOOKUPS: AcuityLookups = { types: new Map() };
 
 const connector = (mock: AcuityMock, overrides: Partial<AcuityOptions> = {}) => acuityConnector({ userId: USER, apiKey: API_KEY, customerKey: REF_KEY, fetch: mock.fetch, sleep: noSleep, now: NOW, ...overrides });
 const eventsOf = (batches: SourceBatch[]) => batches.flatMap((b) => b.events) as AcuityEvent[];
@@ -131,26 +130,24 @@ describe("Acuity client", () => {
     expect(new AcuityApiError("x", 500, "internal_server_error")).toMatchObject({ name: "AcuityApiError", status: 500, code: "internal_server_error" });
   });
 
-  it("sends only GETs of the three lists, with Basic auth, a User-Agent and the query it builds", async () => {
+  it("sends only GETs of the two lists, with Basic auth, a User-Agent and the query it builds", async () => {
     const { fetch, sent } = scripted([empty]);
     const { c } = client(fetch);
     await c.appointments(OCT);
     await c.appointments({ minDate: "2026-10-05", maxDate: "2026-10-05", canceled: true });
     await c.appointmentTypes();
-    await c.calendars();
-    await client(fetch, { userId: ` ${USER} `, apiKey: `\t${API_KEY}\n` }).c.calendars();
+    await client(fetch, { userId: ` ${USER} `, apiKey: `\t${API_KEY}\n` }).c.appointmentTypes();
     expect(sent).toEqual([
       { url: `${ACUITY_API_BASE}/appointments?max=100&minDate=2026-10-01&maxDate=2026-10-31&canceled=false&direction=ASC&excludeForms=true`, method: "GET", headers: HEADERS },
       { url: `${ACUITY_API_BASE}/appointments?max=100&minDate=2026-10-05&maxDate=2026-10-05&canceled=true&direction=ASC&excludeForms=true`, method: "GET", headers: HEADERS },
       { url: `${ACUITY_API_BASE}/appointment-types?includeDeleted=true`, method: "GET", headers: HEADERS },
-      { url: `${ACUITY_API_BASE}/calendars`, method: "GET", headers: HEADERS },
-      { url: `${ACUITY_API_BASE}/calendars`, method: "GET", headers: HEADERS },
+      { url: `${ACUITY_API_BASE}/appointment-types?includeDeleted=true`, method: "GET", headers: HEADERS },
     ]);
     expect(Buffer.from(BASIC.slice(6), "base64").toString()).toBe(`${USER}:${API_KEY}`);
     expect(ACUITY_API_BASE).toBe("https://acuityscheduling.com/api/v1");
     expect(ACUITY_MAX).toBe(100);
     expect(ACUITY_USER_AGENT).toBe(WHATNOT_USER_AGENT);
-    expect(Object.keys(c).sort()).toEqual(["appointmentTypes", "appointments", "calendars"]);
+    expect(Object.keys(c).sort()).toEqual(["appointmentTypes", "appointments"]);
   });
 
   it("asks for the canceled list only when canceled is exactly true", async () => {
@@ -197,7 +194,6 @@ describe("Acuity client", () => {
     const what = async (call: (c: AcuityClient) => Promise<unknown>) => call(client(scripted([json(500, {})]).fetch, { retries: 0 }).c).then(() => "", (e: Error) => e.message);
     expect(await what((c) => c.appointments({ ...OCT, canceled: true }))).toBe("Acuity answered HTTP 500 for the canceled appointments");
     expect(await what((c) => c.appointmentTypes())).toBe("Acuity answered HTTP 500 for the appointment types");
-    expect(await what((c) => c.calendars())).toBe("Acuity answered HTTP 500 for the calendars");
   });
 
   it("waits out a 429 or 5xx as Retry-After says, up to a minute, else 1, 2 and 4 seconds", async () => {
@@ -237,7 +233,7 @@ describe("Acuity client", () => {
     globalThis.fetch = fetch;
     try {
       const started = Date.now();
-      await acuityClient({ userId: USER, apiKey: API_KEY }).calendars();
+      await acuityClient({ userId: USER, apiKey: API_KEY }).appointmentTypes();
       expect(Date.now() - started).toBeGreaterThanOrEqual(990);
       expect(sent).toHaveLength(2);
     } finally {
@@ -271,7 +267,7 @@ describe("Acuity events", () => {
     for (const v of ["February 29, 2026", "June 31, 2026", "June 0, 2026", "Juno 17, 2013", "June 17 2013", "17 June, 2013", "June 17, 13", "2013-06-17", "", 5, null]) expect(acuityDay(v), String(v)).toBeUndefined();
   });
 
-  it("reads names by id from calendars and appointment types", () => {
+  it("reads names by id from appointment types", () => {
     const names = acuityNames([{ id: 1, name: " Bridal consultation " }, { id: "2", name: "n".repeat(200) }, { id: 3 }, { id: 4, name: "  " }, { name: "No id" }, { id: 0, name: "Zero" }, null, 5, [1], { id: 1, name: "Bridal, again" }]);
     expect([...names]).toEqual([
       ["1", "Bridal, again"],
@@ -297,7 +293,6 @@ describe("Acuity events", () => {
       endAt: "2026-10-02T14:45:00.000Z",
       durationMinutes: 45,
       hostRefs: ["acuity:calendar:27238"],
-      calendarName: "Front counter",
       customerRefs: formCustomerRefs(REF_KEY, { email: "customer1@example.test", phone: "+1 212 555 0101" }),
       bookedOn: "2026-09-25",
       priceCents: 4500,
@@ -325,15 +320,18 @@ describe("Acuity events", () => {
     expect(CALENDLY_EVENT_TYPES).toEqual({ booked: "appointment.booked", canceled: "appointment.canceled", noShow: "appointment.no_show" });
   });
 
-  it("names the type and calendar from the lookups, else from the appointment, and never with the client's name", () => {
+  it("names the type from the lookups, else from the appointment, never with the client's name, and the calendar only by id", () => {
     const payload = (raw: AcuityMockRecord, lookups = LOOKUPS) => acuityAppointmentEvent(raw, false, lookups, REF_KEY, RECEIVED).event.payload;
-    expect(payload(appointment(), NO_LOOKUPS)).toMatchObject({ title: "Bridal consultation", calendarName: "Test Calendar 1" });
+    expect(payload(appointment(), NO_LOOKUPS)).toMatchObject({ title: "Bridal consultation", hostRefs: ["acuity:calendar:27238"] });
     expect(payload(appointment({ appointmentTypeID: 2, type: "Old name" }))).toMatchObject({ appointmentTypeId: "2", title: "Repair drop-off", kind: "repair" });
     expect(payload(appointment({ appointmentTypeID: 9, type: "Watch service" }))).toMatchObject({ appointmentTypeId: "9", title: "Watch service", kind: "repair" });
     const bare = payload(appointment({ appointmentTypeID: null, type: null, calendarID: null, calendar: " " }));
     expect(bare).toMatchObject({ kind: "other", hostRefs: [] });
-    for (const key of ["appointmentTypeId", "title", "calendarName"]) expect(bare, key).not.toHaveProperty(key);
-    expect(payload(appointment({ calendarID: 99, calendar: "c".repeat(200) }))).toMatchObject({ hostRefs: ["acuity:calendar:99"], calendarName: "c".repeat(80) });
+    for (const key of ["appointmentTypeId", "title"]) expect(bare, key).not.toHaveProperty(key);
+    const staffed = payload(appointment({ calendarID: 99, calendar: "Test Staff 9" }));
+    expect(staffed.hostRefs).toEqual(["acuity:calendar:99"]);
+    expect(JSON.stringify(staffed)).not.toMatch(/Staff|calendarName/);
+    expect(Object.keys(payload(appointment())).sort()).toEqual(["amountPaidCents", "appointmentId", "appointmentTypeId", "bookedOn", "canceled", "customerRefs", "durationMinutes", "endAt", "hostRefs", "kind", "paid", "priceCents", "startAt", "status", "system", "title"]);
     expect(payload(appointment({ appointmentTypeID: 9, type: `Engagement ${"t".repeat(200)}` })).title).toBe(`Engagement ${"t".repeat(200)}`.slice(0, 80));
     // A type named after the client is dropped, though its kind is still read from it.
     expect(payload(appointment({ appointmentTypeID: 9, type: "Customer1 ring sizing" }))).toMatchObject({ kind: "repair" });
@@ -474,19 +472,20 @@ describe("Acuity connector", () => {
     expect(w).toContain("2025-02-01..2025-02-28");
     expect(reads(mock).slice(0, 2)).toEqual(["2024-11-11..2024-11-30 scheduled", "2024-11-11..2024-11-30 canceled"]);
     expect(mock.reads.every((r) => r.max === 100)).toBe(true);
-    expect(mock.fetch.calls.slice(0, 2).map((c) => new URL(c.url).pathname)).toEqual(["/api/v1/appointment-types", "/api/v1/calendars"]);
-    expect(mock.fetch.calls).toHaveLength(2 + 56);
-    expect(memory.events.map((e) => [e.type, e.payload.appointmentId, e.payload.calendarName])).toEqual([
-      ["appointment.booked", "54321", "Test Calendar 1"],
-      ["appointment.booked", "54322", "Test Calendar 1"],
-      ["appointment.booked", "54323", "Test Calendar 1"],
-      ["appointment.canceled", "60001", "Test Calendar 1"],
+    expect(mock.fetch.calls.map((c) => new URL(c.url).pathname).filter((p) => p !== "/api/v1/appointments")).toEqual(["/api/v1/appointment-types"]);
+    expect(new URL(mock.fetch.calls[0]!.url).pathname).toBe("/api/v1/appointment-types");
+    expect(mock.fetch.calls).toHaveLength(1 + 56);
+    expect(memory.events.map((e) => [e.type, e.payload.appointmentId, e.payload.hostRefs])).toEqual([
+      ["appointment.booked", "54321", ["acuity:calendar:27238"]],
+      ["appointment.booked", "54322", ["acuity:calendar:27238"]],
+      ["appointment.booked", "54323", ["acuity:calendar:27238"]],
+      ["appointment.canceled", "60001", ["acuity:calendar:27238"]],
     ]);
     assertSynthetic(memory.events.map((e) => e.payload));
-    expect(JSON.stringify(memory.events.map((e) => e.payload))).not.toMatch(/Test Customer|example\.test|note|intake|555/);
+    expect(JSON.stringify(memory.events.map((e) => e.payload))).not.toMatch(/Test Customer|Test Staff|calendarName|example\.test|note|intake|555/);
     expect(parseAcuityCursor(report.cursor)).toEqual({ done: true, pending: [], end: null });
     const again = await runSync({ connector: connector(mock), mode: "historical", pipeline, memory, organizationId: TEST_ORG });
-    expect([again.ingested, again.batches, mock.fetch.calls.length]).toEqual([0, 0, 58]);
+    expect([again.ingested, again.batches, mock.fetch.calls.length]).toEqual([0, 0, 57]);
   });
 
   it("goes back as many years as it is told", async () => {
@@ -571,7 +570,6 @@ describe("Acuity connector", () => {
     const fake: AcuityClient = {
       appointments: async ({ minDate, maxDate, canceled: c }) => (asked.push(`${minDate}..${maxDate} ${c}`), minDate === maxDate ? [] : rows(minDate === "2026-10-01" && maxDate === "2026-10-02" ? ACUITY_MAX + 1 : 0)),
       appointmentTypes: async () => [],
-      calendars: async () => [],
     };
     await drain(acuityConnector({ userId: USER, apiKey: API_KEY, customerKey: REF_KEY, client: fake, now: NOW }).historicalImport({ organizationId: TEST_ORG, cursor: JSON.stringify({ done: false, pending: [["2026-10-01", "2026-10-02"]], end: "2026-10-02" }) }));
     expect(asked).toEqual(["2026-10-01..2026-10-02 false", "2026-10-01..2026-10-01 false", "2026-10-01..2026-10-01 true", "2026-10-02..2026-10-02 false", "2026-10-02..2026-10-02 true"]);
@@ -617,16 +615,16 @@ describe("Acuity connector", () => {
   });
 
   it("names types from the lookups each pass, and keeps what doesn't read as dead letters", async () => {
-    const data = account({ types: [], deletedTypes: [{ id: 1, name: "Engagement ring consult" }], calendars: [{ id: 27238, name: "Front counter" }] });
+    const data = account({ types: [], deletedTypes: [{ id: 1, name: "Engagement ring consult" }] });
     data.appointments![1] = { ...data.appointments![1]!, duration: "soon" };
     const mock = acuityDocMock(data);
     const { memory, pipeline } = testPipeline([], SCHEMAS);
     const report = await runSync({ connector: connector(mock), mode: "incremental", pipeline, memory, organizationId: TEST_ORG });
     expect(report).toMatchObject({ ingested: 3, deadLettered: 1 });
-    expect(memory.events.map((e) => [e.payload.title, e.payload.calendarName])).toEqual([
-      ["Engagement ring consult", "Front counter"],
-      ["Engagement ring consult", "Front counter"],
-      ["Repair drop-off", "Front counter"],
+    expect(memory.events.map((e) => [e.payload.title, e.payload.hostRefs])).toEqual([
+      ["Engagement ring consult", ["acuity:calendar:27238"]],
+      ["Engagement ring consult", ["acuity:calendar:27238"]],
+      ["Repair drop-off", ["acuity:calendar:27238"]],
     ]);
     expect(memory.deadLetters.map((d) => (d.raw as AcuityEvent).payload)).toEqual([{ system: "Acuity Scheduling", appointmentId: "54322", problems: ["appointment has no duration that reads"] }]);
   });
@@ -679,11 +677,11 @@ describe("Acuity doc mock", () => {
 
   it("uses only synthetic data, and says where it came from", () => {
     const data = account();
-    assertSynthetic([data.appointments, data.canceled, data.types, data.calendars]);
+    assertSynthetic([data.appointments, data.canceled, data.types]);
     const { mock } = acuityDocMock(data);
     expect(mock.source).toEqual({ url: ACUITY_DOC_PAGES.appointments, title: "Acuity Scheduling API reference: Get appointments", retrievedOn: "2026-11-11", version: "v1" });
     expect(mock.auth).toBe("basic");
-    expect(mock.routes.map((r) => `${r.method} ${r.path} ${r.documentedAt}`)).toEqual([`GET /appointments ${ACUITY_DOC_PAGES.appointments}`, `GET /appointment-types ${ACUITY_DOC_PAGES.appointmentTypes}`, `GET /calendars ${ACUITY_DOC_PAGES.calendars}`]);
+    expect(mock.routes.map((r) => `${r.method} ${r.path} ${r.documentedAt}`)).toEqual([`GET /appointments ${ACUITY_DOC_PAGES.appointments}`, `GET /appointment-types ${ACUITY_DOC_PAGES.appointmentTypes}`]);
     const module = DOC_MOCK_MODULES.find((m) => m.integration === "acuity")!;
     expect(module.watchPages).toEqual(Object.values(ACUITY_DOC_PAGES));
     expect(module.docMocks().map((m) => m.integration)).toEqual(["acuity"]);
@@ -695,7 +693,7 @@ describe("Acuity doc mock", () => {
     const mock = acuityDocMock(account());
     const wrong = await get(mock, "/appointments", "", { authorization: `Basic ${Buffer.from(`${USER}:other`).toString("base64")}` });
     expect([wrong.status, await wrong.json()]).toEqual([401, { status_code: 401, message: "Unauthorized", error: "unauthorized" }]);
-    expect((await get(mock, "/calendars", "", {})).status).toBe(401);
+    expect((await get(mock, "/appointment-types", "", {})).status).toBe(401);
     expect((await get(mock, "/appointment-types", "", { authorization: `Bearer ${API_KEY}` })).status).toBe(401);
     expect((await get(mock)).status).toBe(200);
   });
@@ -720,14 +718,12 @@ describe("Acuity doc mock", () => {
     expect(mock.reads.at(-1)).toEqual({ minDate: null, maxDate: null, canceled: false, max: 1, returned: 1 });
   });
 
-  it("lists appointment types, deleted ones only when asked, and calendars", async () => {
+  it("lists appointment types, deleted ones only when asked", async () => {
     reset();
-    const mock = acuityDocMock({ userId: USER, apiKey: API_KEY, types: acuityAppointmentType.many(2), deletedTypes: [{ id: 9, name: "Old" }], calendars: acuityCalendar.many(2) });
+    const mock = acuityDocMock({ userId: USER, apiKey: API_KEY, types: acuityAppointmentType.many(2), deletedTypes: [{ id: 9, name: "Old" }] });
     expect(await ids(await get(mock, "/appointment-types"))).toEqual([1, 2]);
     expect(await ids(await get(mock, "/appointment-types", "?includeDeleted=false"))).toEqual([1, 2]);
     expect(await ids(await get(mock, "/appointment-types", "?includeDeleted=true"))).toEqual([1, 2, 9]);
-    expect(await ids(await get(mock, "/calendars"))).toEqual([27238, 27239]);
-    expect(await (await get(acuityDocMock({ userId: USER, apiKey: API_KEY }), "/calendars")).json()).toEqual([]);
     expect(await (await get(acuityDocMock({ userId: USER, apiKey: API_KEY }), "/appointment-types")).json()).toEqual([]);
     for (const q of ["", "?canceled=true", "?showall=true"]) expect(await (await get(acuityDocMock({ userId: USER, apiKey: API_KEY }), "/appointments", q)).json(), q).toEqual([]);
   });
@@ -743,7 +739,6 @@ describe("Acuity doc mock", () => {
     }
     expect((await get(mock, "/appointment-types", "?includeDeleted=maybe")).status).toBe(400);
     expect((await get(mock, "/appointment-types", "?max=1")).status).toBe(400);
-    expect((await get(mock, "/calendars", "?max=1")).status).toBe(400);
   });
 
   it("throws on a look-alike host and anything the docs don't list", async () => {
@@ -752,6 +747,7 @@ describe("Acuity doc mock", () => {
     await expect(mock.fetch(`${ACUITY_API_BASE}/appointments`, { method: "POST", body: "{}", headers: { authorization: BASIC } })).rejects.toThrow(UndocumentedRequestError);
     await expect(mock.fetch(`${ACUITY_API_BASE}/appointments/54321/cancel`, { method: "PUT", body: "{}", headers: { authorization: BASIC } })).rejects.toThrow(UndocumentedRequestError);
     await expect(mock.fetch(`${ACUITY_API_BASE}/clients`, { headers: { authorization: BASIC } })).rejects.toThrow(UndocumentedRequestError);
+    await expect(mock.fetch(`${ACUITY_API_BASE}/calendars`, { headers: { authorization: BASIC } })).rejects.toThrow(UndocumentedRequestError);
     expect(mock.fetch.calls).toEqual([]);
   });
 });

@@ -9,9 +9,9 @@ export default {
   capabilities: [
     "Imports two years of appointments and the 90 days ahead, such as bridal consultations, repair drop-offs and pickups",
     "Keeps appointments from 60 days back to 90 days ahead current, so moves, cancellations and no-shows are seen",
-    "Shows each appointment's kind, type, calendar, time, length, price and amount paid",
+    "Shows each appointment's kind, type, calendar by id, time, length, price and amount paid",
     "Links a booking to the same person's form submissions, Calendly bookings and Klaviyo profile without keeping their name, email or phone",
-    "Never keeps notes, intake form answers, labels or locations, and never asks Acuity for the forms",
+    "Never keeps notes, intake form answers, labels, locations or staff and calendar names, and never asks for the forms",
     "Read-only: KaratOS never books, cancels or changes anything in Acuity Scheduling",
   ],
 } satisfies ConnectorCatalogEntry;

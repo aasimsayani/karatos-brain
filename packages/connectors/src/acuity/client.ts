@@ -5,7 +5,7 @@ import { WHATNOT_USER_AGENT } from "../whatnot/client.js";
  * HTTP Basic auth: the account's numeric user id as the username and its API
  * key as the password. The key reaches the whole account and Acuity offers
  * no read-only key or scope, so read-only is enforced here, in code: the
- * client sends GET requests to three lists, with query strings it builds
+ * client sends GET requests to two lists, with query strings it builds
  * itself, and has no way to send anything else.
  *
  * Errors come back as {status_code, message, error}. Acuity allows 10
@@ -77,8 +77,6 @@ export interface AcuityClient {
   appointments(request: AcuityAppointmentsRequest): Promise<unknown[]>;
   /** Every appointment type, deleted ones too, for their names. */
   appointmentTypes(): Promise<unknown[]>;
-  /** Every calendar, for their names. */
-  calendars(): Promise<unknown[]>;
 }
 
 /** True for a real calendar day written YYYY-MM-DD. */
@@ -104,8 +102,8 @@ export function acuityClient(options: AcuityClientOptions): AcuityClient {
   const retries = options.retries ?? 3;
   const authorization = `Basic ${Buffer.from(`${userId}:${apiKey}`, "utf8").toString("base64")}`;
 
-  async function get(path: string, what: string, query: URLSearchParams | null): Promise<unknown[]> {
-    const url = `${ACUITY_API_BASE}${path}${query ? `?${query}` : ""}`;
+  async function get(path: string, what: string, query: URLSearchParams): Promise<unknown[]> {
+    const url = `${ACUITY_API_BASE}${path}?${query}`;
     for (let attempt = 0; ; attempt++) {
       // GET only, with the credentials in the Authorization header and never in the URL.
       const response = await doFetch(url, { method: "GET", headers: { accept: "application/json", authorization, "user-agent": ACUITY_USER_AGENT } });
@@ -130,6 +128,5 @@ export function acuityClient(options: AcuityClientOptions): AcuityClient {
       return get("/appointments", canceled === true ? "canceled appointments" : "appointments", query);
     },
     appointmentTypes: () => get("/appointment-types", "appointment types", new URLSearchParams({ includeDeleted: "true" })),
-    calendars: () => get("/calendars", "calendars", null),
   };
 }

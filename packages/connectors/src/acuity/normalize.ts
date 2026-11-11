@@ -17,12 +17,13 @@ import { ACUITY_MAX } from "./client.js";
  * - the client's email address and phone number only make keyed customer
  *   references, the same ones custom forms, Calendly and Klaviyo make.
  *   Neither is kept, and nor are names, notes, intake form answers (they
- *   aren't even asked for), labels, the location, certificate codes or the
- *   confirmation link;
+ *   aren't even asked for), labels, the location, certificate codes, the
+ *   confirmation link or the calendar's name;
  * - the appointment type's name is kept only when it doesn't carry the
  *   client's name or email, the check Calendly makes of an event's title;
- * - the calendar is kept by its Acuity id and name: it is the staff member
- *   or room the appointment is with, not the client.
+ * - the calendar is kept only by its Acuity id, as Calendly keeps hosts:
+ *   it is the staff member or room the appointment is with, often named
+ *   after a person, and no staff names are kept.
  *
  * Acuity writes money as a decimal string, "10.00", kept as whole cents,
  * and the duration in minutes as a string, "60". An appointment without an
@@ -103,7 +104,7 @@ export function acuityDay(value: unknown): string | undefined {
   return `${m[3]}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
 }
 
-/** Names by id from a list of calendars or appointment types. Rows without an id or a name are left out. */
+/** Names by id from a list of appointment types. Rows without an id or a name are left out. */
 export function acuityNames(rows: readonly unknown[]): Map<string, string> {
   const names = new Map<string, string>();
   for (const row of rows) {
@@ -118,8 +119,6 @@ export function acuityNames(rows: readonly unknown[]): Map<string, string> {
 export interface AcuityLookups {
   /** Appointment type names by id. */
   types: ReadonlyMap<string, string>;
-  /** Calendar names by id. */
-  calendars: ReadonlyMap<string, string>;
 }
 
 function read(type: string, problems: string[], key: string, raw: unknown, payload: Record<string, unknown>, occurredAt: string | undefined, receivedAt: string, failed: Record<string, unknown>): AcuityRead {
@@ -156,7 +155,6 @@ export function acuityAppointmentEvent(raw: unknown, canceled: boolean, lookups:
   const typeId = acuityId(r.appointmentTypeID);
   const calendarId = acuityId(r.calendarID);
   const typeName = (typeId && lookups.types.get(typeId)) || text(r.type, TITLE_MAX * 2);
-  const calendarName = (calendarId && lookups.calendars.get(calendarId)) || text(r.calendar, NAME_MAX * 2);
   const status = r.noShow === true ? "no_show" : canceled ? "canceled" : "booked";
   const type = status === "no_show" ? CALENDLY_EVENT_TYPES.noShow : status === "canceled" ? CALENDLY_EVENT_TYPES.canceled : CALENDLY_EVENT_TYPES.booked;
 
@@ -172,7 +170,6 @@ export function acuityAppointmentEvent(raw: unknown, canceled: boolean, lookups:
     endAt,
     durationMinutes,
     hostRefs: calendarId ? [`acuity:calendar:${calendarId}`] : [],
-    calendarName: calendarName?.slice(0, NAME_MAX),
     customerRefs: formCustomerRefs(customerKey, { email: r.email, phone: r.phone }),
     bookedOn: acuityDay(r.dateCreated),
     priceCents: acuityCents(r.price),

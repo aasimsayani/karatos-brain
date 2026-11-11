@@ -25,8 +25,9 @@ import { acuityAppointmentEvent, acuityFullDayEvent, acuityNames, type AcuityEve
  *   are made, and booked well ahead. What didn't change comes back as
  *   duplicates. A change to an appointment older than that isn't seen.
  *
- * Calendars and appointment types are read once a pass, only for their
- * names. Each window is one batch, and the checkpoint holds the windows
+ * Appointment types are read once a pass, only for their names. Calendars
+ * are kept by id only, never by name, since a calendar is often a staff
+ * member. Each window is one batch, and the checkpoint holds the windows
  * still to read, the next one first, so a sync that stops resumes at the
  * window it was on.
  */
@@ -128,7 +129,7 @@ export function acuityConnector(options: AcuityOptions): Connector {
   async function* pass(state: AcuityCursor): AsyncIterable<SourceBatch> {
     if (state.done || state.end === null) return;
     const end = state.end;
-    const lookups: AcuityLookups = { types: acuityNames(await client.appointmentTypes()), calendars: acuityNames(await client.calendars()) };
+    const lookups: AcuityLookups = { types: acuityNames(await client.appointmentTypes()) };
     let pending = state.pending;
     while (pending.length > 0) {
       const window = pending[0]!;
