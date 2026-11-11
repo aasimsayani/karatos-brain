@@ -193,6 +193,7 @@ The table is generated from the [integration catalog](docs/integrations.md), so 
 | Nivoda | Reads the diamonds a saved Nivoda search finds, with grades, measurements and prices | Buying, Inventory, Appraisals, Wholesale |
 | Stuller | Reads every Stuller invoice from the last five years, with its lines, totals, status and tracking number | Buying, Custom orders, Inventory, Repairs |
 | GIA Report Results | Confirms each GIA certificate number the business holds, with shape, carat weight, color, clarity, cut and proportions | Appraisals, Inventory, Buying |
+| nFusion Solutions metals feed | Keeps gold, silver, platinum and palladium spot prices current from nFusion, in dollars per troy ounce | Metals, Buying |
 | Metals-API | Keeps gold, silver, platinum and palladium spot prices current, in dollars per troy ounce | Metals, Buying |
 | Birdeye | Imports five years of reviews from every site Birdeye gathers them from, then every new or changed review | Marketing, Clienteling |
 | Klaviyo | Imports every profile, list, segment, campaign and flow, then keeps them current | Marketing, Clienteling |
@@ -280,7 +281,7 @@ This section updates itself from [docs/milestones.json](docs/milestones.json) an
 
 **Roadmap:** 20 of 81 items done. An integration counts as done once it has run against a real or sandbox account, not when its tests pass.
 
-**Integrations:** 89 of the 253 systems in the catalog are built and tested against mocks made from each vendor's docs. 0 have been checked live so far.
+**Integrations:** 90 of the 253 systems in the catalog are built and tested against mocks made from each vendor's docs. 0 have been checked live so far.
 
 | Milestone | What it gives a jeweler | Progress | Target |
 | --- | --- | --- | --- |
