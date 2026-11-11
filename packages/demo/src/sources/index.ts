@@ -85,6 +85,7 @@ export const DEMO_NOT_YET: Readonly<Record<string, string>> = {
   zoom: NOT_READ_YET,
   yotpo: NOT_READ_YET,
   judgeme: NOT_READ_YET,
+  trustpilot: NEXT,
   calendly: NOT_READ_YET,
   custom_forms: NOT_READ_YET,
   repairshopr: NOT_READ_YET,
