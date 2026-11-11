@@ -385,5 +385,6 @@ export const CONNECTED_ON: Readonly<Record<string, string>> = {
   smile_io: "2026-11-11",
   zendesk: "2026-11-11",
   search_the_watch_market: "2026-11-11",
+  verkada: "2026-11-11",
   gusto: "2026-10-30",
 };

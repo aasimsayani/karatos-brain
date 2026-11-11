@@ -74,6 +74,7 @@ export const DEMO_NOT_YET: Readonly<Record<string, string>> = {
   smile_io: NEXT,
   zendesk: NEXT,
   search_the_watch_market: NEXT,
+  verkada: NEXT,
   notion: NOT_READ_YET,
   docusign: NOT_READ_YET,
   dropbox: NOT_READ_YET,
