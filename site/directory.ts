@@ -349,6 +349,7 @@ export const CONNECTED_ON: Readonly<Record<string, string>> = {
   sola_payments: "2026-11-10",
   yotpo: "2026-11-10",
   judgeme: "2026-11-10",
+  trustpilot: "2026-11-11",
   openphone: "2026-11-10",
   zoom: "2026-11-10",
   tiktok: "2026-11-01",
@@ -381,6 +382,7 @@ export const CONNECTED_ON: Readonly<Record<string, string>> = {
   ramp: "2026-11-11",
   aurora_payments: "2026-11-11",
   repairshopr: "2026-11-11",
+  smile_io: "2026-11-11",
   zendesk: "2026-11-11",
   gusto: "2026-10-30",
 };
