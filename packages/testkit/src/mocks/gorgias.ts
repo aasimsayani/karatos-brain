@@ -167,7 +167,7 @@ export function gorgiasDocMock(data: GorgiasMockData): GorgiasMock {
   const api = checkDocMock({
     integration: "gorgias",
     baseUrl: `https://${GORGIAS_TEST_DOMAIN}.gorgias.com`,
-    source: { url: GORGIAS_DOC_PAGES.pagination, title: "Gorgias developer docs: OAuth2, scopes, pagination, List tickets and List messages", retrievedOn: "2026-11-11" },
+    source: { url: GORGIAS_DOC_PAGES.pagination, title: "Gorgias developer docs: OAuth2, scopes, pagination, List tickets and List messages", retrievedOn: "2026-11-11", version: "REST API, unversioned" },
     assumptions: [
       "The refresh token grant takes the app's client id and secret as Basic auth, as the code exchange does",
       "The token's scope lists the app's scopes separated by spaces",

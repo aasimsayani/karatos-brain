@@ -768,7 +768,7 @@ describe("Gorgias doc mock", () => {
     expect(await c.tickets(null)).toEqual({ rows: [], next: null });
     expect(await c.messages(1, null)).toEqual({ rows: [], next: null });
     for (const retryAfter of [undefined, "2"]) {
-      const mock = gorgiasDocMock(helpdesk({ rateLimits: 1, retryAfter }));
+      const mock = gorgiasDocMock(helpdesk({ rateLimits: 1, ...(retryAfter === undefined ? {} : { retryAfter }) }));
       const r = client(mock.fetch, { retries: 0 });
       await expect(r.c.tickets(null)).rejects.toMatchObject({ status: 429 });
     }
