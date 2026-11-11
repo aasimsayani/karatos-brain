@@ -168,7 +168,7 @@ describe("HRD client", () => {
     await spy.report(NATURAL).catch(() => undefined);
     await spy.validities([NATURAL]);
     expect(seen.map((s) => [s.method, s.headers.get("api-token"), s.headers.get("accept"), s.headers.get("content-type"), s.body])).toEqual([
-      ["GET", TOKEN, "application/xml", null, undefined],
+      ["GET", TOKEN, "application/xml", null, null],
       ["POST", TOKEN, "application/xml", "application/json", JSON.stringify([NATURAL])],
     ]);
   });
@@ -211,7 +211,7 @@ describe("HRD client", () => {
   it("answers a token HRD turns down with an error that never shows it", async () => {
     for (const status of [400, 403]) {
       const client = hrdClient({ apiToken: TOKEN, sleep: noSleep, fetch: async () => new Response(`bad token ${TOKEN}`, { status }) });
-      const error = await client.report(NATURAL).catch((e: unknown) => e as Error);
+      const error = (await client.report(NATURAL).catch((e: unknown) => e)) as Error;
       expect(error).toBeInstanceOf(HrdConfigError);
       expect(error.message).toBe(`HRD turned down HRD_API_TOKEN (HTTP ${status})`);
       expect(error.message).not.toContain(TOKEN);
@@ -233,7 +233,7 @@ describe("HRD client", () => {
       const w: number[] = [];
       let calls = 0;
       const c = hrdClient({ apiToken: TOKEN, retries: 2, sleep: async (ms) => void w.push(ms), fetch: async () => (calls++, new Response("", { status, headers: { "retry-after": after } })) });
-      const error = await c.report(NATURAL).catch((e: unknown) => e as HrdApiError);
+      const error = (await c.report(NATURAL).catch((e: unknown) => e)) as HrdApiError;
       expect(error).toBeInstanceOf(HrdApiError);
       expect(error.status).toBe(status);
       expect(calls).toBe(3);
@@ -266,7 +266,7 @@ describe("HRD client", () => {
     await expect(answer(200, "<Report/>").validities([NATURAL])).rejects.toThrow("HRD answered the validity check without its list");
     expect(await answer(200, "<report><reportnumber>220000000003</reportnumber></report>").report(NATURAL)).toMatchObject({ kind: "found" });
     expect(await answer(200, "<validreports/>").validities([NATURAL])).toEqual(new Map());
-    const error = await answer(200, "<x>secret</x>").report(NATURAL).catch((e: unknown) => e as HrdApiError);
+    const error = (await answer(200, "<x>secret</x>").report(NATURAL).catch((e: unknown) => e)) as HrdApiError;
     expect([error.status, error.name, error.message.includes("secret")]).toEqual([200, "HrdApiError", false]);
     const thrown = hrdClient({ apiToken: TOKEN, sleep: noSleep, fetch: async () => ({ status: 200, headers: new Headers(), text: async () => Promise.reject(new TypeError("stream broke")) }) as unknown as Response });
     await expect(thrown.report(NATURAL)).rejects.toThrow(TypeError);
@@ -492,10 +492,10 @@ describe("HRD connector", () => {
     expect(() => connector(mock, { batchSize: 1 })).not.toThrow();
     const many = Array.from({ length: 60 }, (_, i) => String(230000000000 + i));
     const counted = hrdDocMock(data());
-    const defaults = await collect(connector(counted, { reportNumbers: async () => many, batchSize: undefined, now: DAYTIME }).historicalImport({ organizationId: TEST_ORG, cursor: null }));
+    const defaults = await collect(hrdConnector({ apiToken: TOKEN, fetch: counted.fetch, sleep: noSleep, reportNumbers: async () => many, now: DAYTIME }).historicalImport({ organizationId: TEST_ORG, cursor: null }));
     expect(counted.operations).toHaveLength(50);
     expect(defaults).toHaveLength(2);
-    expect(await collect(connector(hrdDocMock(data()), { reportNumbers: async () => many, batchSize: undefined, maxLookups: 26, now: DAYTIME }).historicalImport({ organizationId: TEST_ORG, cursor: null }))).toHaveLength(2);
+    expect(await collect(hrdConnector({ apiToken: TOKEN, fetch: hrdDocMock(data()).fetch, sleep: noSleep, reportNumbers: async () => many, maxLookups: 26, now: DAYTIME }).historicalImport({ organizationId: TEST_ORG, cursor: null }))).toHaveLength(2);
   });
 
   it("checks validity once a night, looks a reissued report up again and flags one HRD no longer lists", async () => {

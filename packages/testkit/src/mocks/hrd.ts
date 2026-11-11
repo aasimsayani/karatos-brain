@@ -135,7 +135,7 @@ export function hrdDocMock(data: HrdMockData): HrdMock {
   const api = checkDocMock({
     integration: "hrd",
     baseUrl: BASE,
-    source: { url: GUIDE, title: "Public MyHRD API (former MyHRD webservice)", retrievedOn: "2026-11-10" },
+    source: { url: GUIDE, title: "Public MyHRD API (former MyHRD webservice)", retrievedOn: "2026-11-10", version: "undated guide, with the Star/Melee report" },
     assumptions: [
       "A report number HRD has no report for answers 404",
       "The validity check's answer has one child element per valid report, whatever its name",

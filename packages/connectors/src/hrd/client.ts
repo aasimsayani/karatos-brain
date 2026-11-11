@@ -85,7 +85,7 @@ export function hrdClient(options: HrdClientOptions): HrdClient {
     for (let attempt = 0; ; attempt++) {
       if (sent) await sleep(HRD_SPACING_MS);
       sent = true;
-      response = await doFetch(`${HRD_API_URL}${path}`, { method: init.method, headers, body: init.body });
+      response = await doFetch(`${HRD_API_URL}${path}`, { method: init.method, headers, body: init.body ?? null });
       if (!RETRIED.has(response.status) || attempt >= retries) break;
       const after = Number(response.headers.get("retry-after"));
       await sleep(after > 0 ? 1000 * Math.min(after, MAX_RETRY_AFTER_S) : 1000 * 2 ** attempt);
