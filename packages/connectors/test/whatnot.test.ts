@@ -176,7 +176,7 @@ describe("Whatnot client", () => {
     await expect(at(json(403, { type: "missing-scope", title: "Missing scope", status: 403, required_scopes: ["read:inventory"] }))).rejects.toThrow(
       new WhatnotConfigError(`Whatnot turned down the access token (HTTP 403) (missing-scope): Missing scope; ${scopes}`),
     );
-    await expect(at(json(403, { type: "Seller Not Approved!" }))).rejects.toThrow(new WhatnotConfigError(`Whatnot turned down the access token (HTTP 403); ${scopes}`));
+    await expect(at(json(403, { type: "Seller Not Approved" }))).rejects.toThrow(new WhatnotConfigError(`Whatnot turned down the access token (HTTP 403); ${scopes}`));
     await expect(at(() => new Response("nope", { status: 401 }))).rejects.toBeInstanceOf(WhatnotConfigError);
     await expect(at(json(404, { type: "endpoint-not-found", detail: "d".repeat(250) }))).rejects.toThrow(new WhatnotApiError(`Whatnot answered HTTP 404 for the orders (endpoint-not-found): ${"d".repeat(200)}`, 404, "endpoint-not-found"));
     await expect(at(json(422, { detail: [{ loc: ["query", "limit"], msg: "too big", type: "less_than_equal" }] }))).rejects.toThrow(/^Whatnot answered HTTP 422 for the orders$/);
@@ -468,6 +468,8 @@ describe("Whatnot events", () => {
     expect(problems(null)).toEqual(["product is not an object", "product has no id that reads"]);
     expect(problems([])).toEqual(["product is not an object", "product has no id that reads"]);
     expect(problems(product({ id: 12301 }))).toEqual(["product has no id that reads"]);
+    expect(problems(product({ id: "p".repeat(65) }))).toEqual(["product has no id that reads"]);
+    expect(problems(product({ id: "p".repeat(64) }))).toEqual([]);
     expect(problems(product(), [variant({ id: null })])).toEqual(["variant 1 has no id that reads"]);
     expect(problems(product(), [variant(), "x"])).toEqual(["variant 2 has no id that reads"]);
     const dead = whatnotProductEvents(product({ id: "a b" }), [], RECEIVED)[0]!.event;

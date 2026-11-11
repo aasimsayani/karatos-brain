@@ -244,7 +244,7 @@ export function whatnotProductEvents(raw: unknown, variants: readonly unknown[],
   const read_ = variants.map((v, i) => {
     const variant = obj(v);
     const variantId = whatnotId(variant.id);
-    if (variant !== v || !variantId) problems.push(`variant ${i + 1} has no id that reads`);
+    if (!variantId) problems.push(`variant ${i + 1} has no id that reads`);
     const quantity = obj(variant.inventory).available_quantity;
     return {
       raw: v,

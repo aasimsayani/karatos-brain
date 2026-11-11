@@ -57,7 +57,7 @@ export function parseWhatnotCursor(raw: string | null): WhatnotCursor | null {
   } catch {
     throw new Error(MESSAGE);
   }
-  if (typeof c !== "object" || c === null || Array.isArray(c)) throw new Error(MESSAGE);
+  if (typeof c !== "object" || c === null) throw new Error(MESSAGE);
   const r = c as Record<string, unknown>;
   if (Object.keys(r).sort().join(",") !== "done,page,step") throw new Error(MESSAGE);
   const doneOk = r.done === true && r.step === null && r.page === null;
@@ -127,7 +127,7 @@ export function whatnotConnector(options: WhatnotOptions): Connector {
 
   async function* historicalImport(context: SyncContext): AsyncIterable<SourceBatch> {
     const saved = parseWhatnotCursor(context.cursor);
-    if (saved?.done) return;
+    // A finished import has no list left to read, so it yields nothing.
     yield* pass(saved ?? START, false);
   }
 

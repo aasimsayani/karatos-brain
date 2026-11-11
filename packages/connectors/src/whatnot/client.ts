@@ -126,11 +126,12 @@ export function whatnotClient(options: WhatnotClientOptions): WhatnotClient {
         throw new WhatnotConfigError(`Whatnot turned down the access token (HTTP ${response.status})${text}; WHATNOT_ACCESS_TOKEN must be a Whatnot seller API token with the ${WHATNOT_SCOPES.join(" and ")} scopes`);
       }
       if (response.status !== 200) throw new WhatnotApiError(`Whatnot answered HTTP ${response.status} for the ${what}${text}`, response.status, type);
-      const page = (typeof body === "object" && body !== null && !Array.isArray(body) ? body : null) as { data?: unknown; next_cursor?: unknown } | null;
+      const page = body as { data?: unknown; next_cursor?: unknown } | null;
+      const data = page?.data;
       const next = page?.next_cursor ?? null;
-      if (!page || !Array.isArray(page.data) || (next !== null && !isWhatnotCursor(next))) throw new WhatnotApiError(`Whatnot answered the ${what} without a page that reads`, 200);
+      if (!Array.isArray(data) || (next !== null && !isWhatnotCursor(next))) throw new WhatnotApiError(`Whatnot answered the ${what} without a page that reads`, 200);
       if (next !== null && next === cursor) throw new WhatnotApiError(`Whatnot answered the ${what} with the same cursor again`, 200);
-      return { data: page.data, nextCursor: next };
+      return { data, nextCursor: next };
     }
   }
 
