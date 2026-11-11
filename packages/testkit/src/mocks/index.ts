@@ -11,6 +11,7 @@ import bigcommerce from "./bigcommerce.js";
 import bill_com from "./bill_com.js";
 import birdeye from "./birdeye.js";
 import calendly from "./calendly.js";
+import cin7 from "./cin7.js";
 import clover from "./clover.js";
 import custom_forms from "./custom_forms.js";
 import docusign from "./docusign.js";
@@ -83,6 +84,7 @@ export * from "./bigcommerce.js";
 export * from "./bill_com.js";
 export * from "./birdeye.js";
 export * from "./calendly.js";
+export * from "./cin7.js";
 export * from "./clover.js";
 export * from "./custom_forms.js";
 export * from "./docusign.js";
@@ -145,7 +147,7 @@ export * from "./zendesk.js";
 export * from "./zoom.js";
 
 /** Every mock module, one per catalog integration. */
-export const DOC_MOCK_MODULES: readonly DocMockModule[] = [affirm, airtable, amazon, asana, authorize_net, avalara, bci_e_jewelry, bigcommerce, bill_com, birdeye, calendly, clover, custom_forms, docusign, dropbox, ebay, etsy, fedex, gia, gmail, google_ads, google_analytics, google_workspace, gorgias, gusto, hrd, hubspot, idex, judgeme, katana, klaviyo, lightspeed, mailchimp, meta_ads, microsoft_onedrive, microsoft_outlook, microsoft_teams, monday, netsuite, nivoda, notion, openphone, pinterest, plaid, quickbooks, ramp, rapnet, repairshopr, ringcentral, search_the_watch_market, shipstation, slack, smile_io, sola_payments, square, squarespace, stuller, taxjar, tiktok, tiktok_ads, trello, trustpilot, ups, verkada, wix, woocommerce, xero, yext, yotpo, zendesk, zoom];
+export const DOC_MOCK_MODULES: readonly DocMockModule[] = [affirm, airtable, amazon, asana, authorize_net, avalara, bci_e_jewelry, bigcommerce, bill_com, birdeye, calendly, cin7, clover, custom_forms, docusign, dropbox, ebay, etsy, fedex, gia, gmail, google_ads, google_analytics, google_workspace, gorgias, gusto, hrd, hubspot, idex, judgeme, katana, klaviyo, lightspeed, mailchimp, meta_ads, microsoft_onedrive, microsoft_outlook, microsoft_teams, monday, netsuite, nivoda, notion, openphone, pinterest, plaid, quickbooks, ramp, rapnet, repairshopr, ringcentral, search_the_watch_market, shipstation, slack, smile_io, sola_payments, square, squarespace, stuller, taxjar, tiktok, tiktok_ads, trello, trustpilot, ups, verkada, wix, woocommerce, xero, yext, yotpo, zendesk, zoom];
 
 /** Every doc-derived mock, with empty data, for checks and the vendor docs watch. */
 export function allDocMocks(): DocMock[] {
