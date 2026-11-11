@@ -27,6 +27,7 @@ import hrd from "./hrd.js";
 import hubspot from "./hubspot.js";
 import idex from "./idex.js";
 import judgeme from "./judgeme.js";
+import klarna from "./klarna.js";
 import klaviyo from "./klaviyo.js";
 import lightspeed from "./lightspeed.js";
 import mailchimp from "./mailchimp.js";
@@ -83,6 +84,7 @@ export * from "./hrd.js";
 export * from "./hubspot.js";
 export * from "./idex.js";
 export * from "./judgeme.js";
+export * from "./klarna.js";
 export * from "./klaviyo.js";
 export * from "./lightspeed.js";
 export * from "./mailchimp.js";
@@ -113,7 +115,7 @@ export * from "./yotpo.js";
 export * from "./zoom.js";
 
 /** Every mock module, one per catalog integration. */
-export const DOC_MOCK_MODULES: readonly DocMockModule[] = [affirm, airtable, amazon, asana, authorize_net, avalara, bigcommerce, bill_com, birdeye, calendly, clover, custom_forms, docusign, dropbox, ebay, etsy, fedex, gia, gmail, google_ads, google_analytics, google_workspace, gusto, hrd, hubspot, idex, judgeme, klaviyo, lightspeed, mailchimp, meta_ads, microsoft_onedrive, monday, nivoda, notion, openphone, pinterest, plaid, quickbooks, ramp, rapnet, slack, sola_payments, square, stuller, taxjar, tiktok, trello, ups, wix, woocommerce, xero, yext, yotpo, zoom];
+export const DOC_MOCK_MODULES: readonly DocMockModule[] = [affirm, airtable, amazon, asana, authorize_net, avalara, bigcommerce, bill_com, birdeye, calendly, clover, custom_forms, docusign, dropbox, ebay, etsy, fedex, gia, gmail, google_ads, google_analytics, google_workspace, gusto, hrd, hubspot, idex, judgeme, klarna, klaviyo, lightspeed, mailchimp, meta_ads, microsoft_onedrive, monday, nivoda, notion, openphone, pinterest, plaid, quickbooks, ramp, rapnet, slack, sola_payments, square, stuller, taxjar, tiktok, trello, ups, wix, woocommerce, xero, yext, yotpo, zoom];
 
 /** Every doc-derived mock, with empty data, for checks and the vendor docs watch. */
 export function allDocMocks(): DocMock[] {
