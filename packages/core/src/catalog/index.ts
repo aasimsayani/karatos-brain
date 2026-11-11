@@ -61,6 +61,7 @@ import stuller from "./stuller.js";
 import supplier_invoices from "./supplier_invoices.js";
 import taxjar from "./taxjar.js";
 import tiktok from "./tiktok.js";
+import tiktok_ads from "./tiktok_ads.js";
 import trello from "./trello.js";
 import twilio from "./twilio.js";
 import ups from "./ups.js";
@@ -73,4 +74,4 @@ import yotpo from "./yotpo.js";
 import zoom from "./zoom.js";
 
 /** Each built connector's own catalog fields, by catalog id. */
-export const CONNECTOR_CATALOG: Readonly<Record<string, ConnectorCatalogEntry>> = { affirm, airtable, amazon, asana, authorize_net, avalara, bank_statements, bigcommerce, bill_com, birdeye, calendly, chase, clover, custom_forms, deputy, docusign, dropbox, ebay, edi_x12, etsy, fedex, fincen_8300, gia, gmail, google_ads, google_analytics, google_workspace, gusto, hrd, hubspot, idex, inventory_pos, judgeme, klaviyo, lightspeed, mailchimp, meta_ads, metals_api, microsoft_onedrive, monday, nivoda, notion, openphone, pinterest, piro, plaid, quickbooks, ramp, rapnet, refiner_statements, repairshopr, rfid_counts, shopify, slack, sola_payments, square, stripe, stuller, supplier_invoices, taxjar, tiktok, trello, twilio, ups, watchsearch, wix, woocommerce, xero, yext, yotpo, zoom };
+export const CONNECTOR_CATALOG: Readonly<Record<string, ConnectorCatalogEntry>> = { affirm, airtable, amazon, asana, authorize_net, avalara, bank_statements, bigcommerce, bill_com, birdeye, calendly, chase, clover, custom_forms, deputy, docusign, dropbox, ebay, edi_x12, etsy, fedex, fincen_8300, gia, gmail, google_ads, google_analytics, google_workspace, gusto, hrd, hubspot, idex, inventory_pos, judgeme, klaviyo, lightspeed, mailchimp, meta_ads, metals_api, microsoft_onedrive, monday, nivoda, notion, openphone, pinterest, piro, plaid, quickbooks, ramp, rapnet, refiner_statements, repairshopr, rfid_counts, shopify, slack, sola_payments, square, stripe, stuller, supplier_invoices, taxjar, tiktok, tiktok_ads, trello, twilio, ups, watchsearch, wix, woocommerce, xero, yext, yotpo, zoom };
