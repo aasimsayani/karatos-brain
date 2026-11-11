@@ -484,7 +484,7 @@ describe("Squarespace connector", () => {
       { pass: { from: F, to: T, step: "orders", cursor: "o2" }, done: false, nextFrom: N },
       { pass: null, done: true, nextFrom: N },
     ]);
-    expect(all.map((b) => b.events[0]!.type)).toEqual(["product.updated", "product.updated", "inventory.counted", "order.updated", "order.updated"]);
+    expect(all.map((b) => (b.events[0] as SquarespaceEvent).type)).toEqual(["product.updated", "product.updated", "inventory.counted", "order.updated", "order.updated"]);
     expect(eventsOf(all).every((e) => e.receivedAt === RECEIVED)).toBe(true);
     asked.length = 0;
     pages.orders = [null];
@@ -493,7 +493,7 @@ describe("Squarespace connector", () => {
     expect(asked).toEqual(["orders:o9:2026-01-01T00:00:00.000Z:2026-02-01T00:00:00.000Z"]);
     expect(rest.map((b) => parseSquarespaceCursor(b.cursor ?? null))).toEqual([{ pass: null, done: true, nextFrom: "2026-01-31T00:00:00.000Z" }]);
     // Events are dated when they are read, not when the pass began.
-    expect(rest[0]!.events[0]!.receivedAt).toBe(RECEIVED);
+    expect((rest[0]!.events[0] as SquarespaceEvent).receivedAt).toBe(RECEIVED);
     asked.length = 0;
     expect(await drain(make().historicalImport({ cursor: JSON.stringify({ ...mid, done: true }) } as never))).toEqual([]);
     expect(asked).toEqual([]);
@@ -636,7 +636,7 @@ describe("Squarespace doc mock", () => {
     expect(await (await empty.fetch("https://api.squarespace.com/v2/commerce/products", { headers: { authorization: `Bearer ${KEY_VALUE}`, "user-agent": "test" } })).json()).toEqual({ products: [], pagination: { hasNextPage: false, nextPageCursor: null, nextPageUrl: null } });
     expect((await empty.fetch("https://api.squarespace.com/1.0/commerce/orders", { headers: { authorization: `Bearer ${KEY_VALUE}`, "user-agent": "test" } })).status).toBe(403);
     const bare = squarespaceDocMock({ apiKey: KEY_VALUE });
-    for (const [path, field] of [["/1.0/commerce/inventory", "inventory"], ["/1.0/commerce/orders", "result"]]) expect(((await (await bare.fetch(`https://api.squarespace.com${path}`, { headers: { authorization: `Bearer ${KEY_VALUE}`, "user-agent": "test" } })).json()) as Record<string, unknown[]>)[field], path).toEqual([]);
+    for (const [path, field] of [["/1.0/commerce/inventory", "inventory"], ["/1.0/commerce/orders", "result"]] as const) expect(((await (await bare.fetch(`https://api.squarespace.com${path}`, { headers: { authorization: `Bearer ${KEY_VALUE}`, "user-agent": "test" } })).json()) as Record<string, unknown[]>)[field], path).toEqual([]);
     await expect(mock.fetch("https://api.squarespace.com/1.0/commerce/inventory/adjustments", { method: "POST" })).rejects.toThrow("not in the vendor's docs");
   });
 });
