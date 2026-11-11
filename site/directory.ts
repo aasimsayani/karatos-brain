@@ -381,5 +381,6 @@ export const CONNECTED_ON: Readonly<Record<string, string>> = {
   ramp: "2026-11-11",
   repairshopr: "2026-11-11",
   zendesk: "2026-11-11",
+  shipstation: "2026-11-11",
   gusto: "2026-10-30",
 };

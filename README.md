@@ -118,6 +118,7 @@ These are built, tested against recorded vendor responses or mocks built from ea
 | HRD Antwerp report check | Confirms each HRD Antwerp report number the business holds, with shape, carat weight, color, clarity, cut, polish, symmetry and proportions | Appraisals, Inventory, Buying |
 | Supplier invoices and memos | Imports six years of supplier invoice and memo lines: items, quantities, costs, memo terms and due dates | Buying, Inventory, Compliance, Finance |
 | RFID and barcode tray counts | Imports two years of tray and case counts: what was read, when, and by whom | Inventory, Compliance |
+| ShipStation | Imports two years of shipments and labels, then the shipments changed since the last sync and the last 30 days of labels on each sync | Sales, Inventory, Compliance |
 | FedEx | Follows every FedEx package on the business's list, from label created to delivered or returned | Inventory, Repairs, Compliance |
 | UPS | Follows every UPS package on the business's list, from label created to delivered or returned | Inventory, Repairs, Compliance |
 | BILL | Imports six years of supplier bills with their due dates, balances, payment status and approval status | Finance, Buying |
@@ -174,7 +175,7 @@ This section updates itself as work lands: it is generated from [docs/milestones
 <!-- progress:start -->
 <!-- Generated from docs/milestones.json and the integration catalog by npm run progress:write. Edit those, not this block. -->
 
-**Overall: 80% complete**, 65 of 81 roadmap items done. 77 of the 253 systems in the integration catalog are connected.
+**Overall: 80% complete**, 65 of 81 roadmap items done. 78 of the 253 systems in the integration catalog are connected.
 
 | Milestone | What it gives a jeweler | Progress | Target |
 | --- | --- | --- | --- |
