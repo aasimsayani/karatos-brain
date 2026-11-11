@@ -193,7 +193,7 @@ Used by: R is retail, W is wholesale, M is manufacturing. Test with says how we 
 | Postscript | R | Partner | Partner | Yes | Planned (Shopify SMS marketing. Custom API access is limited to enterprise plans and integration partners) |
 | Yotpo reviews and loyalty | R | Public API | Paid account | Yes | Built (Reads the store's reviews with its store ID and API secret, and its Loyalty members' points with the Loyalty GUID and API key when given. Neither can be limited to reading, so the client only ever sends a token request and two GETs. Yotpo has no sandbox: the first client's store confirms the mock built from Yotpo's docs) |
 | Judge.me | R | Public API | Paid account | Yes | Built (Reads the shop's reviews with its domain and an API token: an OAuth token with read_reviews only, or the private token, which also writes. The client only ever sends GETs of the review list. Judge.me has no sandbox: the first client's shop confirms the mock built from Judge.me's docs) |
-| Smile.io | R | Public API | Paid account | No | Planned (Loyalty points, VIP tiers and referrals. The API needs the Plus or Enterprise plan) |
+| Smile.io | R | Public API | Paid account | No | Built (Reads customers, points transactions and VIP tiers with a merchant API key made with read scopes only, which needs Smile's Plus or Enterprise plan. Referrals have no list in Smile's API. The first client's key confirms the mock built from Smile's docs) |
 | Trustpilot | R, W | Public API | Paid account | No | Built (Reads the store's public service reviews and trust score with only a Trustpilot application's API key, which reaches only public endpoints and can't reply or invite; the API secret is never used. Product reviews and invitations need a business user's token, so they aren't read. API access needs Trustpilot's API module: the first client's business unit confirms the mock built from Trustpilot's docs) |
 | Pinterest | R, M | Public API | Free sandbox | No | Built (Connects a Pinterest business account through an app the store owns, holding boards:read, pins:read and user_accounts:read only; the connector stops if the token holds anything more. Its only API requests are the Pin list and two analytics reads. Pinterest's analytics reach back 90 days, so the first import reads 90 days of metrics and every Pin) |
 | TikTok | R | Public API | Free sandbox | No | Built (Connects the store's own TikTok account through an app the store owns, holding user.info.basic, user.info.stats and video.list only; the connector stops if the token holds anything more. Its only API requests are the profile read and the video list) |
@@ -436,6 +436,7 @@ A request for a path or method the docs don't list throws `UndocumentedRequestEr
 - RepairShopr's ticket, estimate and invoice lists (API v1)
 - RingCentral's JWT sign-in, an extension's call log and its message store (REST API v1.0)
 - Slack's auth.test, conversations.list, conversations.history and conversations.replies, with both rate-limit regimes (Web API)
+- Smile.io's List VIP tiers, List customers and List points transactions
 - Sola Payments' transaction report (Report:All)
 - Square's read endpoints with its OAuth refresh and token status check (API version 2026-09-16)
 - A Squarespace site's Commerce APIs: products (v2), inventory and orders, enforcing the key, its Read Only permissions, the User-Agent, cursors and the modified window
@@ -2234,6 +2235,33 @@ Reads the messages and threads in the channels the KaratOS app's bot has been in
 **Webhooks.** `verifySlackWebhook` checks `X-Slack-Signature`: `v0=` and the hex HMAC-SHA256 of `v0:<X-Slack-Request-Timestamp>:<raw body>` under `SLACK_SIGNING_SECRET`, compared in constant time, and refuses a timestamp more than 300 seconds from now, before the body is parsed. `slackUrlVerification` gives the challenge to answer Slack's `url_verification`. `handleWebhook` turns a verified `event_callback` for a message posted, edited (`message_changed`) or deleted (`message_deleted`) in a channel or private channel into the same events the sync makes, so a webhook for a synced message, or a delivery Slack retries, is a duplicate. Subscribing needs the `message.channels` and `message.groups` bot events. The instance doesn't take webhooks yet; the scheduled sync picks up the same messages.
 
 **Testing.** Until a sandbox is set up, the tests run against a mock built from Slack's docs (`packages/testkit/src/mocks/slack.ts`), which pages by cursor, filters channels by membership and scope, answers `not_in_channel`, `missing_scope`, `invalid_auth` and `ratelimited` the way the docs describe, and holds a non-Marketplace app to 15-message pages. What the docs leave out is in its assumptions, checked on the first live run. For the nightly run, join the Slack Developer Program, create a free developer sandbox workspace holding only synthetic messages, create an internal app there with the four read scopes above, install it, invite the bot to a test channel and a test private channel, and add the bot token as the `SANDBOX_SLACK_BOT_TOKEN` GitHub Actions secret.
+
+### Smile.io
+
+Reads the store's Smile.io loyalty program: each customer's points balance and VIP tier, and every points transaction, so staff see a customer's points and tier at the counter and marketing spots lapsed members early.
+
+| Setting | What it is |
+| --- | --- |
+| `SMILE_API_KEY` | A merchant API key made with only `customer:read`, `points_transaction:read` and `vip_tier:read` |
+| `CUSTOMER_REF_KEY` | The instance's key for customer references |
+
+**Read-only by design.** Smile scopes each merchant key, and a key with only read scopes can't add or take away points. Smile has no call that lists a key's scopes, so the setup asks for those three read scopes and nothing else, and the client sends only GET requests to `https://api.smile.io/v1`: List VIP tiers, List customers (with their VIP status) and List points transactions, with parameters it builds itself from checked values and Smile's page cursor, never from a link in an answer. Adjusting a customer's points is declared behind the write gate, needing approval, turned off, and the client has no request to send it. Merchant keys need Smile's Plus or Enterprise plan.
+
+**What it reads.** Smile lists customers and points transactions newest first, 250 a page, and can filter them to those changed since a time. The first import reads everything changed in the last five years, customers first. Each later sync reads what changed since the newest change the last one saw, less five minutes; the first later sync looks back two days. An unchanged record read again is a duplicate. Each sync reads the VIP tiers first, to name each customer's tier. Each page is one batch, and the checkpoint keeps the list, its start, the newest change seen and Smile's cursor, so a resumed sync goes on from that page.
+
+**Events.**
+- `loyalty.customer_updated` for each customer, as Yotpo's are: their program state (candidate, member or disabled), points balance, VIP tier and its id, when the tier ends, their progress in the current period and when it ends, how much more keeps the tier, the next tier and how much more reaches it, and when they joined and last changed.
+- `loyalty.points_changed` for each points transaction: the customer, the points added or taken away, whether they were earned or spent, and when.
+
+Each event is keyed by a digest of what was kept. A customer without an id, a creation time, a state or a points balance, or a transaction without an id, a customer, a points change or a time, is dead-lettered.
+
+**Privacy.** Names, birthdays, referral links, and a transaction's description and internal note are never read into an event. Customers' emails become the same customer references custom forms, Klaviyo, Quo and Yotpo make (an HMAC under `CUSTOMER_REF_KEY`).
+
+**Referrals.** Smile's API has a referral object but no call that lists referrals, so they aren't read.
+
+**Rate limits.** Each key gets 10 requests a second. The client waits as `Retry-After` says (up to a minute), or 1, 2 and 4 seconds, on a 429, 500 or 503, before the error goes to the sync runner, which resumes from its checkpoint next time. A 401 says the key is wrong or the plan lost API access; a 403 names the scope the key is missing.
+
+**Testing.** Merchant keys need a paid plan. The tests run against a mock built from Smile's developer docs (`packages/testkit/src/mocks/smile_io.ts`). It checks the bearer key, each list's scope, the parameters each list takes, the sort and the page size. It lists what the first client's key must confirm: that a read-only key can't write, that `updated_at_min` holds across pages, that points and tier changes move `updated_at`, and the time format.
 
 ### Sola Payments
 
