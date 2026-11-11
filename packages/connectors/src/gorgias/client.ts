@@ -116,7 +116,7 @@ export function gorgiasClient(options: GorgiasClientOptions): GorgiasClient {
     if (cursor !== null && !GORGIAS_CURSOR.test(cursor)) throw new GorgiasApiError("Gorgias's page cursor isn't in the expected shape", 0);
     const url = new URL(path, base);
     for (const [k, v] of Object.entries(query)) url.searchParams.set(k, v);
-    if (cursor !== null) url.searchParams.set("cursor", cursor);
+    if (cursor) url.searchParams.set("cursor", cursor);
     let refreshed = false;
     for (let attempt = 0; ; attempt++) {
       const response = await doFetch(url.toString(), { method: "GET", headers: { Authorization: `Bearer ${await signIn()}`, Accept: "application/json" } });

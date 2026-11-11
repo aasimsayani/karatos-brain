@@ -75,7 +75,7 @@ export function parseGorgiasCursor(raw: string | null): GorgiasCursor | null {
   try {
     c = JSON.parse(raw);
   } catch {
-    c = null;
+    // Not JSON: fails the checks below.
   }
   const r = (c ?? {}) as Record<string, unknown>;
   if (typeof r.done === "boolean" && (r.mark === null || isTime(r.mark))) {
@@ -102,7 +102,7 @@ export function gorgiasConnector(options: GorgiasOptions): Connector {
     for (let n = 0; n < MAX_MESSAGE_PAGES; n++) {
       const page = await client.messages(ticketId, cursor);
       rows.push(...page.rows);
-      if (page.next === null) return rows;
+      if (!page.next) return rows;
       cursor = page.next;
     }
     throw new Error(`Gorgias listed more than ${MAX_MESSAGE_PAGES} pages of messages on one ticket`);
@@ -119,14 +119,15 @@ export function gorgiasConnector(options: GorgiasOptions): Connector {
       let reached = false;
       for (const row of page.rows) {
         const read = gorgiasTicketEvent(row, ctx);
-        const changed = read.ok ? read.event.occurredAt! : null;
-        if (changed !== null && changed < pass.floor) {
+        // An unreadable ticket has no time, and undefined is never before the floor.
+        if (read.event.occurredAt! < pass.floor) {
           reached = true;
           break;
         }
         events.push(read.event);
         if (!read.ok) continue;
-        if (pass.top === null || changed! > pass.top) pass.top = changed;
+        const changed = read.event.occurredAt!;
+        if (pass.top === null || changed > pass.top) pass.top = changed;
         for (const message of await messagesOf((row as { id: number }).id)) events.push(gorgiasMessageEvent(message, ctx).event);
       }
       const last = reached || page.next === null;

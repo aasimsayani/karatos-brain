@@ -303,6 +303,14 @@ describe("Gorgias client", () => {
     expect(slept).toEqual([1000]);
   });
 
+  it("a 401 doesn't use up a retry", async () => {
+    const { fetch, sent } = scripted(signedIn, json(401, {}), signedIn, json(429, {}), json(200, PAGE));
+    const { c, slept } = client(fetch, { retries: 1 });
+    await c.tickets(null);
+    expect(sent.map((s) => s.method)).toEqual(["POST", "GET", "POST", "GET", "GET"]);
+    expect(slept).toEqual([1000]);
+  });
+
   it("waits for real, and uses the global fetch, when none is given", async () => {
     const real = globalThis.fetch;
     const { fetch, sent } = scripted(signedIn, json(429, {}, { "Retry-After": "0.001" }), json(200, PAGE));
@@ -391,6 +399,7 @@ describe("Gorgias events", () => {
     expect(gorgiasTicketEvent(ticket({ tags: many }), ctx).event.payload.tags).toEqual(many.slice(0, 20).map((t) => t.name));
     expect(gorgiasTicketEvent(ticket({ tags: undefined }), ctx).event.payload.tags).toEqual([]);
     expect(gorgiasTicketEvent(ticket({ tags: [{ name: "x".repeat(40) }] }), ctx).event.payload.tags).toEqual(["x".repeat(40)]);
+    expect(gorgiasTicketEvent(ticket({ tags: [{ name: " Bridal " }, { name: "a<b>" }, { name: "<b" }, { name: "a>" }] }), ctx).event.payload.tags).toEqual(["bridal"]);
   });
 
   it("notes a closed, spam, trashed, snoozed or scored ticket, and drops what doesn't read", () => {
@@ -402,6 +411,9 @@ describe("Gorgias events", () => {
     for (const channel of ["Email", "<x>", "x".repeat(41), 5, "1chat"]) expect(gorgiasTicketEvent(ticket({ channel }), ctx).event.payload.channel).toBeUndefined();
     expect(gorgiasTicketEvent(ticket({ channel: `c${"h".repeat(39)}` }), ctx).event.payload.channel).toBe(`c${"h".repeat(39)}`);
     expect(gorgiasTicketEvent(ticket({ channel: "facebook-messenger_2" }), ctx).event.payload.channel).toBe("facebook-messenger_2");
+    for (const bad of ["a<b>", "a>", "Chat", 5]) expect(gorgiasTicketEvent(ticket({ channel: bad, via: bad }), ctx).event.payload).toMatchObject({ channel: undefined, via: undefined });
+    const times = gorgiasTicketEvent(ticket({ last_received_message_datetime: g(5), last_message_datetime: g(4) }), ctx).event.payload;
+    expect(times).toMatchObject({ lastReceivedAt: before(5), lastMessageAt: before(4) });
     for (const assignee_user of [null, {}, { id: 0 }, { id: "7" }]) expect(gorgiasTicketEvent(ticket({ assignee_user }), ctx).event.payload.assignedTo).toBeUndefined();
     for (const customer of [null, {}, { email: "not an email" }]) expect(gorgiasTicketEvent(ticket({ customer }), ctx).event.payload.customerRefs).toEqual([]);
     expect(gorgiasTicketEvent(ticket({ spam: "true", from_agent: 1, is_unread: "yes" }), ctx).event.payload).toMatchObject({ spam: false, startedByStore: false, unread: false });
@@ -466,7 +478,8 @@ describe("Gorgias events", () => {
     expect(gorgiasMessageEvent(message({ failed_datetime: "x", deleted_datetime: 5 }), ctx).event.payload).toMatchObject({ failed: false, deleted: false });
     for (const body_text of [undefined, null, 5]) expect(gorgiasMessageEvent(message({ body_text }), ctx).event.payload.textLength).toBeUndefined();
     expect(gorgiasMessageEvent(message({ body_text: "" }), ctx).event.payload.textLength).toBe(0);
-    for (const attachments of [undefined, null, {}]) expect(gorgiasMessageEvent(message({ attachments }), ctx).event.payload.attachmentCount).toBe(0);
+    for (const bad of ["a<b>", "Email", 5]) expect(gorgiasMessageEvent(message({ channel: bad, via: bad }), ctx).event.payload).toMatchObject({ channel: undefined, via: undefined });
+    for (const attachments of [undefined, null, {}, "abc"]) expect(gorgiasMessageEvent(message({ attachments }), ctx).event.payload.attachmentCount).toBe(0);
     for (const rule_id of [0, "3", null]) expect(gorgiasMessageEvent(message({ rule_id }), ctx).event.payload.byRule).toBe(false);
     expect(gorgiasMessageEvent(message({ from_agent: true, sender: { id: -1 } }), ctx).event.payload.sentBy).toBeUndefined();
     expect(gorgiasMessageEvent(message({ sent_datetime: "later" }), ctx).event.payload.sentAt).toBe("2026-01-01T00:01:00.000Z");
@@ -494,6 +507,8 @@ describe("Gorgias events", () => {
     expect(gorgiasMessageEvent(7, ctx).event.payload.problems).toEqual(["message is not an object", "message has no id that reads", "message has no ticket that reads", "message has no time that reads", "message doesn't say whether it is public and who wrote it"]);
     expect(gorgiasMessageEvent(message({ public: "yes" }), ctx).ok).toBe(false);
     expect(gorgiasMessageEvent(message({ from_agent: null }), ctx).ok).toBe(false);
+    // Two rows with the same problems are still two dead letters.
+    expect(gorgiasTicketEvent({ id: 0 }, ctx).event.idempotencyKey).not.toBe(gorgiasTicketEvent({ id: -1 }, ctx).event.idempotencyKey);
   });
 });
 
@@ -527,6 +542,7 @@ describe("Gorgias checkpoint", () => {
     for (const raw of bad) expect(() => parseGorgiasCursor(raw), raw).toThrow("Gorgias checkpoint is not in the expected shape");
     expect(parseGorgiasCursor(cursor({ pass: { ...pass, extra: 1 }, done: false, mark: null, more: 2 }))).toEqual({ pass, done: false, mark: null });
     expect(GORGIAS_CURSOR.test("abc=")).toBe(true);
+    expect(() => parseGorgiasCursor("")).toThrow("Gorgias checkpoint is not in the expected shape");
   });
 });
 
@@ -640,6 +656,22 @@ describe("Gorgias connector", () => {
     const rest = await drain(connector(mock).incrementalSync({ cursor: batches[0]!.cursor } as never));
     expect(eventsOf(rest)).toHaveLength(1);
     expect(parseGorgiasCursor(rest.at(-1)!.cursor ?? null)).toEqual({ pass: null, done: true, mark: before(1) });
+  });
+
+  it("stops a pass at the first ticket older than its floor, taking one changed right at it, and marks the newest seen", async () => {
+    gorgiasTicket.reset();
+    const floor = before(10);
+    const at = (ago: number) => gorgiasTicket.one({ updated_datetime: g(ago) });
+    // Out of order, as Gorgias shouldn't send them: the pass trusts the first older one to end it.
+    const pages = [{ rows: [at(5), at(2), at(10), at(11), at(1)], next: "page2" }, { rows: [at(3)], next: null }];
+    const asked: (string | null)[] = [];
+    const fake: GorgiasClient = { tickets: async (cursor) => (asked.push(cursor), pages[asked.length - 1]!), messages: async () => ({ rows: [], next: null }) };
+    const c = connector(gorgiasDocMock(helpdesk()), { client: fake });
+    const batches = await drain(c.incrementalSync({ cursor: JSON.stringify({ pass: { floor, top: null, cursor: null }, done: true, mark: null }) } as never));
+    expect(asked).toEqual([null]);
+    expect(eventsOf(batches).map((e) => e.occurredAt)).toEqual([before(5), before(2), before(10)]);
+    expect(eventsOf(batches).every((e) => e.receivedAt === RECEIVED)).toBe(true);
+    expect(parseGorgiasCursor(batches.at(-1)!.cursor ?? null)).toEqual({ pass: null, done: true, mark: before(2) });
   });
 
   it("dead-letters what it can't read and carries on, reading no messages for it", async () => {

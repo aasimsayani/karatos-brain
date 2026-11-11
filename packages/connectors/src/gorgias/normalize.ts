@@ -54,7 +54,7 @@ const user = (v: unknown) => (idOf(v) ? `gorgias_user:${v}` : undefined);
 export function gorgiasTime(value: unknown): string | null {
   const m = typeof value === "string" ? /^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2}:\d{2})(\.\d{1,6})?(?:Z|\+00:00)?$/.exec(value) : null;
   if (!m) return null;
-  const t = Date.parse(`${m[1]}T${m[2]}${(m[3] ?? "").slice(0, 4)}Z`);
+  const t = Date.parse(`${m[1]}T${m[2]}${m[3] ?? ""}Z`);
   // Date.parse rolls an impossible day (Feb 30) into the next month, so the day must read back as itself.
   return t >= 0 && new Date(t).toISOString().slice(0, 10) === m[1] ? new Date(t).toISOString() : null;
 }
@@ -104,7 +104,7 @@ export function gorgiasTicketEvent(raw: unknown, ctx: GorgiasContext): GorgiasRe
   const score = obj(t.satisfaction_survey).score;
   const payload: Record<string, unknown> = {
     system: SYSTEM,
-    ticketId: id ? `gorgias:ticket:${id}` : undefined,
+    ticketId: `gorgias:ticket:${id}`,
     customerRefs: formCustomerRefs(ctx.customerKey, { email: obj(t.customer).email }),
     status,
     channel: word(t.channel),
@@ -141,7 +141,7 @@ export function gorgiasMessageEvent(raw: unknown, ctx: GorgiasContext): GorgiasR
   if (typeof m.public !== "boolean" || typeof m.from_agent !== "boolean") problems.push("message doesn't say whether it is public and who wrote it");
 
   // An internal note is the store talking to itself; otherwise the store wrote out, or the customer wrote in.
-  const direction = m.public === false ? "internal" : m.from_agent === true ? "outbound" : "inbound";
+  const direction = !m.public ? "internal" : m.from_agent === true ? "outbound" : "inbound";
   const source = obj(m.source);
   const customers = direction === "inbound" ? [obj(source.from).address] : direction === "outbound" ? (Array.isArray(source.to) ? source.to : []).map((r) => obj(r).address) : [];
   const refs = [...new Set(customers.slice(0, 10).flatMap((email) => formCustomerRefs(ctx.customerKey, { email })))].sort();
@@ -149,8 +149,8 @@ export function gorgiasMessageEvent(raw: unknown, ctx: GorgiasContext): GorgiasR
     system: SYSTEM,
     channel: word(m.channel),
     via: word(m.via),
-    messageId: id ? `gorgias:message:${id}` : undefined,
-    conversationId: ticket ? `gorgias:ticket:${ticket}` : undefined,
+    messageId: `gorgias:message:${id}`,
+    conversationId: `gorgias:ticket:${ticket}`,
     customerRefs: refs,
     direction,
     sentBy: m.from_agent === true ? user(obj(m.sender).id) : undefined,
