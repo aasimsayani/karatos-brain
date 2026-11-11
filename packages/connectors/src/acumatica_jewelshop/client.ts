@@ -102,7 +102,9 @@ export interface AcumaticaClient {
 
 /** The instance's address as https://host[/path], or a config error. */
 export function acumaticaBaseUrl(raw: unknown): string {
-  const t = typeof raw === "string" ? raw.trim().replace(/\/+$/, "") : "";
+  let t = typeof raw === "string" ? raw.trim() : "";
+  // Trailing slashes are cut one at a time, not with a regex that slows on a long run of them.
+  while (t.endsWith("/")) t = t.slice(0, -1);
   let u: URL | null = null;
   try {
     u = new URL(t);

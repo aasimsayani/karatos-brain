@@ -86,6 +86,10 @@ describe("Acumatica settings", () => {
     expect(acumaticaBaseUrl(" https://example.acumatica.com/ ")).toBe("https://example.acumatica.com");
     expect(acumaticaBaseUrl("https://erp.example.test/Instance//")).toBe("https://erp.example.test/Instance");
     expect(acumaticaBaseUrl("https://erp.example.test:8443/Instance")).toBe("https://erp.example.test:8443/Instance");
+    // A long run of slashes reads quickly.
+    const started = Date.now();
+    expect(acumaticaBaseUrl(`https://erp.example.test/${"/".repeat(100_000)}`)).toBe("https://erp.example.test");
+    expect(Date.now() - started).toBeLessThan(1000);
     const bad = ["", "erp.example.test", "http://erp.example.test", "https://localhost", "https://10.0.0.1", "https://user:pw@erp.example.test", "https://user@erp.example.test", "https://:pw@erp.example.test", "https://erp.example.test/?x=1", "https://erp.example.test/#x", "https://erp.example.test?x=1", "https://erp.example.test/Instance?x=1", "https://erp.example.test/Instance#x", "https://ERP.example.test", "https://erp.example.test/a b", "ftp://erp.example.test", "https://-.example.test.", 5, null];
     for (const raw of bad) expect(() => acumaticaBaseUrl(raw), String(raw)).toThrow(new AcumaticaConfigError("ACUMATICA_URL must be the instance's https address, such as https://example.acumatica.com or https://erp.example.test/Instance"));
   });
