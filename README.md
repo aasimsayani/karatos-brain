@@ -242,6 +242,7 @@ The table is generated from the [integration catalog](docs/integrations.md), so 
 | BILL | Imports six years of supplier bills with their due dates, balances, payment status and approval status | Finance, Buying |
 | Ramp | Imports five years of company card transactions, then each one Ramp says changed since the last sync | Finance, Buying |
 | NetSuite | Imports every item and vendor and six years of orders, invoices and journal entries, then what changed on each sync | Finance, Inventory, Manufacturing, Wholesale, Buying |
+| Cin7 Core | Imports every product, customer and supplier and five years of sales and purchases, then what changed on each sync | Inventory, Sales, Wholesale, Buying |
 | Asana | Imports five years of tasks from every project you can see, such as repairs, custom orders and production jobs, then keeps them current | Repairs, Custom orders, Buying |
 | Trello | Imports five years of cards from every board you can see, such as repairs, custom orders and buying, then keeps them current | Repairs, Custom orders, Buying |
 | Airtable | Imports five years of records from every base you share, such as memo logs, repair intake and custom orders, then keeps them current | Repairs, Custom orders, Buying, Inventory |
@@ -275,7 +276,7 @@ This section updates itself from [docs/milestones.json](docs/milestones.json) an
 
 **Roadmap:** 20 of 81 items done. An integration counts as done once it has run against a real or sandbox account, not when its tests pass.
 
-**Integrations:** 84 of the 253 systems in the catalog are built and tested against mocks made from each vendor's docs. 0 have been checked live so far.
+**Integrations:** 85 of the 253 systems in the catalog are built and tested against mocks made from each vendor's docs. 0 have been checked live so far.
 
 | Milestone | What it gives a jeweler | Progress | Target |
 | --- | --- | --- | --- |
