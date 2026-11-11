@@ -33,7 +33,8 @@ export interface TikTokAdsContext {
 
 export const TIKTOK_ADS_EVENTS = { campaign: "ads.campaign_reported" } as const;
 
-const obj = (v: unknown) => (v && typeof v === "object" && !Array.isArray(v) ? (v as Record<string, unknown>) : {});
+// Anything but an object reads as a record without the fields asked for.
+const obj = (v: unknown) => (v ?? {}) as Record<string, unknown>;
 const digest = (v: unknown) => createHash("sha256").update(JSON.stringify(v)).digest("hex").slice(0, 16);
 const defined = (fields: Record<string, unknown>) => Object.fromEntries(Object.entries(fields).filter(([, v]) => v !== undefined));
 
@@ -56,10 +57,10 @@ export function tiktokAdsCount(value: unknown): number | undefined {
  * Undefined for anything else.
  */
 export function tiktokAdsCents(value: unknown): number | undefined {
-  if (typeof value === "number") return Number.isFinite(value) && value >= 0 && value <= 1e13 ? Math.round(value * 100) : undefined;
+  if (typeof value === "number") return value >= 0 && value <= 1e13 ? Math.round(value * 100) : undefined;
   const m = typeof value === "string" ? /^(\d{1,13})(?:\.(\d{1,20}))?$/.exec(value) : null;
   if (!m) return undefined;
-  const fraction = (m[2] ?? "").padEnd(3, "0");
+  const fraction = (m[2] ?? "").padEnd(2, "0");
   return Number(m[1]) * 100 + Number(fraction.slice(0, 2)) + (Number(fraction[2]) >= 5 ? 1 : 0);
 }
 

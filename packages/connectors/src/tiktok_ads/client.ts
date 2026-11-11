@@ -97,15 +97,14 @@ export interface TikTokAdsClient {
 
 const ADVERTISER_ID = /^\d{1,20}$/;
 const TOKEN = /^[A-Za-z0-9_.-]{20,512}$/;
-const DAY = /^\d{4}-\d{2}-\d{2}$/;
 const DAY_MS = 86_400_000;
 const MAX_WAIT_MS = 64_000;
 
 /** A YYYY-MM-DD day as epoch milliseconds, or NaN when it isn't a real day. */
 export function tiktokAdsDayMs(value: unknown): number {
-  if (typeof value !== "string" || !DAY.test(value)) return Number.NaN;
-  const ms = Date.parse(`${value}T00:00:00Z`);
-  return new Date(ms).toISOString().slice(0, 10) === value ? ms : Number.NaN;
+  const ms = typeof value === "string" ? Date.parse(`${value}T00:00:00Z`) : Number.NaN;
+  // A day reads back as itself, which rules out any other shape and days like 02-30.
+  return !Number.isNaN(ms) && new Date(ms).toISOString().slice(0, 10) === value ? ms : Number.NaN;
 }
 
 /**

@@ -96,6 +96,7 @@ describe("TikTok Ads normalizer", () => {
     expect(tiktokAdsCount("1000")).toBe(1000);
     expect(tiktokAdsCount("0")).toBe(0);
     expect(tiktokAdsCount(42)).toBe(42);
+    expect(tiktokAdsCount(0)).toBe(0);
     expect(tiktokAdsCount("9".repeat(15))).toBe(999_999_999_999_999);
     for (const bad of ["9".repeat(16), "1.5", "-1", " 1", "1 ", "", 1.5, -1, Number.MAX_SAFE_INTEGER + 1, null, "x"]) expect(tiktokAdsCount(bad), String(bad)).toBeUndefined();
     expect(tiktokAdsCents("123.45")).toBe(12345);
@@ -106,6 +107,8 @@ describe("TikTok Ads normalizer", () => {
     expect(tiktokAdsCents(`1.${"9".repeat(20)}`)).toBe(200);
     expect(tiktokAdsCents("9".repeat(13))).toBe(999_999_999_999_900);
     expect(tiktokAdsCents(12.34)).toBe(1234);
+    expect(tiktokAdsCents(0.125)).toBe(13);
+    expect(tiktokAdsCents("0.1")).toBe(10);
     expect(tiktokAdsCents(0)).toBe(0);
     expect(tiktokAdsCents(1e13)).toBe(1e15);
     for (const bad of ["9".repeat(14), `1.${"0".repeat(21)}`, "-1", "1.", ".5", "1,5", " 1", "", -0.01, 1e13 + 1, Number.NaN, Number.POSITIVE_INFINITY, null, "x"]) expect(tiktokAdsCents(bad), String(bad)).toBeUndefined();
@@ -211,11 +214,12 @@ describe("TikTok Ads client", () => {
   it("checks its settings before sending anything", () => {
     const { fetch, sent } = scripted(page([]));
     const make = (o: Partial<TikTokAdsClientOptions>) => () => tiktokAdsClient({ ...base(fetch), ...o });
-    for (const accessToken of ["", "x".repeat(19), "x".repeat(513), `${"x".repeat(20)} y`, `${"x".repeat(20)}/`, `${"x".repeat(20)}+`, undefined as never]) expect(make({ accessToken }), String(accessToken)).toThrow(new TikTokAdsConfigError("TIKTOK_ADS_ACCESS_TOKEN is missing or not in the expected shape"));
-    for (const advertiserId of ["", "x", "1".repeat(21), "12a", " ", "-1", undefined as never]) expect(make({ advertiserId }), String(advertiserId)).toThrow(new TikTokAdsConfigError("TIKTOK_ADS_ADVERTISER_ID must be the advertiser's numeric ID"));
+    for (const accessToken of ["", "x".repeat(19), "x".repeat(513), `${"x".repeat(20)} y`, `${"x".repeat(20)}/`, `${"x".repeat(20)}+`, `${"x".repeat(10)}\n${"x".repeat(10)}`, `${"x".repeat(10)}\r${"x".repeat(10)}`, undefined as never]) expect(make({ accessToken }), String(accessToken)).toThrow(new TikTokAdsConfigError("TIKTOK_ADS_ACCESS_TOKEN is missing or not in the expected shape"));
+    for (const advertiserId of ["", "x", "1".repeat(21), "12a", " ", "-1", "1&=2", "1=2", undefined as never]) expect(make({ advertiserId }), String(advertiserId)).toThrow(new TikTokAdsConfigError("TIKTOK_ADS_ADVERTISER_ID must be the advertiser's numeric ID"));
     for (const environment of ["staging", "prod", "sandbox-ads"]) expect(make({ environment }), environment).toThrow(new TikTokAdsConfigError("TIKTOK_ADS_ENVIRONMENT must be production or sandbox"));
     expect(make({ accessToken: "Az09_.-".repeat(3), advertiserId: "1" })).not.toThrow();
     expect(make({ accessToken: "x".repeat(512), advertiserId: "1".repeat(20) })).not.toThrow();
+    expect(make({ accessToken: "x".repeat(20) })).not.toThrow();
     expect(sent).toHaveLength(0);
     expect(tiktokAdsClient(base()).baseUrl).toBe(PROD);
     expect(tiktokAdsClient({ ...base(), environment: " Sandbox " }).baseUrl).toBe("https://sandbox-ads.tiktok.com/open_api/v1.3");
@@ -271,6 +275,8 @@ describe("TikTok Ads client", () => {
     expect([busy.status, busy.code]).toEqual([503, undefined]);
     expect(((await client(scripted(() => new Response("{}", { status: 429 })).fetch).c.report(Q).catch((e: Error) => e)) as Error).message).toBe("TikTok kept rate-limiting the sync (HTTP 429); the next sync resumes from the checkpoint");
     expect(((await client(scripted(coded(51001)).fetch).c.report(Q).catch((e: Error) => e)) as Error).message).toBe("TikTok kept failing (code 51001); the next sync resumes from the checkpoint");
+    // A rate limit TikTok gives with a server error still reads as a rate limit.
+    expect(((await client(scripted(answer({ code: 40100, message: "secret detail", data: {} }, 500)).fetch).c.report(Q).catch((e: Error) => e)) as Error).message).toBe("TikTok kept rate-limiting the sync (code 40100); the next sync resumes from the checkpoint");
     const long = client(scripted(coded(40100)).fetch, { retries: 8 });
     await long.c.report(Q).catch(() => undefined);
     expect(long.slept).toEqual([1000, 2000, 4000, 8000, 16_000, 32_000, 64_000, 64_000]);
@@ -388,6 +394,12 @@ describe("TikTok Ads connector", () => {
     // A finished import stays finished.
     asked.length = 0;
     expect(await drain(make().historicalImport({ cursor: JSON.stringify({ ...mid, done: true }) } as never))).toEqual([]);
+    // An empty page TikTok says more follow is read past, not taken as the window's end.
+    asked.length = 0;
+    const gap: TikTokAdsClient = { advertiserId: ADVERTISER, baseUrl: PROD, report: async (q) => (asked.push(`${q.start}..${q.end}#${q.page}`), { rows: q.page === 1 ? [] : [row()], more: q.page === 1 }) };
+    await drain(tiktokAdsConnector({ ...base(), client: gap, now: NOW }).historicalImport({ cursor: JSON.stringify({ ...mid, windowStart: mid.until, page: 1 }) } as never));
+    expect(asked).toEqual(["2025-02-05..2025-02-05#1", "2025-02-05..2025-02-05#2"]);
+    asked.length = 0;
     // An incremental checkpoint doesn't stand in for the import.
     await drain(make({ now: () => new Date("2025-01-10T00:00:00Z") }).historicalImport({ cursor: JSON.stringify({ ...mid, pass: "incremental" }) } as never));
     expect(asked[0]).toBe("2024-01-10..2024-02-08#1");
@@ -425,6 +437,10 @@ describe("TikTok Ads connector", () => {
     // A checkpoint from a clock ahead of this one still starts no later than today.
     await drain(make().incrementalSync({ cursor: JSON.stringify({ ...hist, until: "2026-12-31" }) } as never));
     expect(asked).toEqual(["2026-10-20..2026-10-20"]);
+    asked.length = 0;
+    // An unfinished import doesn't stand in for a later pass.
+    await drain(make().incrementalSync({ cursor: JSON.stringify({ ...hist, done: false, windowStart: "2025-06-01", page: 3 }) } as never));
+    expect(asked).toEqual(["2026-09-12..2026-10-11", "2026-10-12..2026-10-20"]);
     asked.length = 0;
     // An interrupted later pass resumes; a finished one starts again.
     const mid: TikTokAdsCursor = { pass: "incremental", done: false, from: "2026-09-01", until: "2026-10-15", windowStart: "2026-10-01", page: 1 };
