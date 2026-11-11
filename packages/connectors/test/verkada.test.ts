@@ -154,7 +154,7 @@ describe("Verkada client", () => {
     for (const status of [400, 401, 403]) {
       await expect(client(scripted(json(status, {})).fetch).c.cameras()).rejects.toThrow(new VerkadaConfigError("Verkada turned down VERKADA_API_KEY: check it, that it hasn't expired, and VERKADA_REGION"));
     }
-    for (const status of [404, 501]) await expect(client(scripted(json(status, {})).fetch).c.cameras()).rejects.toMatchObject({ message: `Verkada answered HTTP ${status} for a token`, status });
+    for (const status of [206, 404, 501]) await expect(client(scripted(json(status, {})).fetch).c.cameras()).rejects.toMatchObject({ message: `Verkada answered HTTP ${status} for a token`, status });
     for (const body of [{}, { token: 5 }, { token: "a b" }, { token: "" }, { token: "x".repeat(4097) }]) {
       await expect(client(scripted(json(200, body)).fetch).c.cameras(), JSON.stringify(body)).rejects.toMatchObject({ message: "Verkada answered without a token", status: 200 });
     }
@@ -226,9 +226,12 @@ describe("Verkada client", () => {
     t += 100;
     await c.cameras();
     expect(slept).toEqual([VERKADA_SPACING_MS, 150]);
+    t += VERKADA_SPACING_MS - 1;
+    await c.cameras();
+    expect(slept).toEqual([VERKADA_SPACING_MS, 150, 1]);
     t += VERKADA_SPACING_MS;
     await c.cameras();
-    expect(slept).toEqual([VERKADA_SPACING_MS, 150]);
+    expect(slept).toEqual([VERKADA_SPACING_MS, 150, 1]);
     expect(VERKADA_SPACING_MS).toBe(250);
   });
 
@@ -297,6 +300,7 @@ describe("Verkada events", () => {
     const [inOnly] = verkadaTrafficEvents(answer({ trend_in: [[T0, T0 + H, 0]], trend_out: [], camera_name: "x".repeat(200), camera_site: " Annex " }), "cam-1", "line-1", ctx);
     expect(inOnly!.payload).toMatchObject({ entered: 0, exited: undefined, camera: "x".repeat(200), site: "Annex" });
     expect(verkadaTrafficEvents(answer({ camera_name: "x".repeat(201), camera_site: "a\u0007" }), "cam-1", "line-1", ctx)[0]!.payload).toMatchObject({ camera: undefined, site: undefined });
+    expect(verkadaTrafficEvents(answer({ camera_name: "a>b", camera_site: "a<b" }), "cam-1", "line-1", ctx)[0]!.payload).toMatchObject({ camera: undefined, site: undefined });
     expect(verkadaTrafficEvents(answer({ camera_name: 5 }), "cam-1", "line-1", ctx)[0]!.payload.camera).toBeUndefined();
     expect(verkadaTrafficEvents(answer({ trend_in: [], trend_out: [] }), "cam-1", "line-1", ctx)).toEqual([]);
   });
@@ -357,7 +361,10 @@ describe("Verkada checkpoint", () => {
       { ...good, pass: { ...p, from: TO, to: TO } },
       { ...good, pass: { ...p, lines: "cam-1|line-1" } },
       { ...good, pass: { ...p, lines: [], line: 0 } },
-      { ...good, pass: { ...p, lines: ["cam-1"] } },
+      { ...good, pass: { ...p, lines: ["cam-1", "x|y"] } },
+      { ...good, pass: { ...p, lines: [["a|b"], "x|y"] } },
+      { ...good, pass: { ...p, to: p.to + 1 } },
+      { ...good, mark: 3600 * 2 ** 53 },
       { ...good, pass: { ...p, lines: ["cam 1|line-1", "x|y"] } },
       { ...good, pass: { ...p, lines: [5, "x|y"] } },
       { ...good, pass: { ...p, lines: ["a|b|c", "x|y"] } },
@@ -401,6 +408,7 @@ describe("Verkada connector", () => {
       ["verkada:camera:cam-test-2", "line-test-2b", iso(TO - H), 5],
     ]);
     expect(parseVerkadaCursor(report.cursor)).toEqual({ done: true, mark: TO, pass: null });
+    expect(new Set(memory.events.map((e) => e.receivedAt))).toEqual(new Set([RECEIVED]));
     assertSynthetic(memory.events);
     const again = await runSync({ connector: connector(mock), mode: "historical", pipeline, memory, organizationId: TEST_ORG });
     expect(again.ingested).toBe(0);

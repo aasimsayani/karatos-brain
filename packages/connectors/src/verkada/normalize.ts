@@ -56,7 +56,7 @@ function deadLetter(problems: string[], raw: unknown, ctx: VerkadaContext): Verk
 
 /** The hours of one answer for one camera's preset line, as events, with a dead letter for each hour that doesn't read. */
 export function verkadaTrafficEvents(raw: unknown, cameraId: string, presetId: string, ctx: VerkadaContext): VerkadaEvent[] {
-  const r = (typeof raw === "object" && raw !== null && !Array.isArray(raw) ? raw : {}) as Record<string, unknown>;
+  const r = (raw ?? {}) as Record<string, unknown>;
   const problems: string[] = [];
   if (r.camera_id !== cameraId) problems.push("the answer is not for the camera asked about");
   if (!Array.isArray(r.trend_in) || !Array.isArray(r.trend_out)) problems.push("the answer has no counts in and out");

@@ -117,10 +117,9 @@ export function verkadaClient(options: VerkadaClientOptions): VerkadaClient {
 
   /** A GET with the token, signed in again once if the token is turned down. */
   async function get(path: string, query: [string, string][], what: string): Promise<unknown> {
-    const url = new URL(`${base}${path}`);
-    for (const [name, value] of query) url.searchParams.set(name, value);
+    const url = `${base}${path}${query.length > 0 ? `?${new URLSearchParams(query)}` : ""}`;
     for (let fresh = false; ; fresh = true) {
-      const response = await send(url.toString(), { method: "GET", headers: { "x-verkada-auth": await signIn(), accept: "application/json" } });
+      const response = await send(url, { method: "GET", headers: { "x-verkada-auth": await signIn(), accept: "application/json" } });
       if (response.status === 401 && !fresh) {
         token = null;
         continue;

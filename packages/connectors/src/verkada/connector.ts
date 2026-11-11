@@ -83,7 +83,6 @@ export function parseVerkadaCursor(raw: string | null): VerkadaCursor | null {
     r.pass === null ||
     (hourOf(p.from) &&
       hourOf(p.to) &&
-      p.from < p.to &&
       Array.isArray(lines) &&
       lines.length <= VERKADA_MAX_LINES &&
       lines.every((l) => typeof l === "string" && LINE.test(l)) &&
