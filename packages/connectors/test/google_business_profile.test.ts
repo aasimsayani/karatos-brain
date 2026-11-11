@@ -607,7 +607,7 @@ describe("Google Business Profile connector", () => {
   it("reads each location once, and skips one whose name doesn't read", async () => {
     const mock = gbpDocMock(account({ locations: [{ name: "locations/1001" }, { name: "locations/1001", title: "Again" }, { title: "No name" }], reviews: {} }));
     const first = (await drain(connector(mock, { historyYears: 1 }).historicalImport({ organizationId: TEST_ORG, cursor: null })))[0]!;
-    expect(first.events.map((e) => e.idempotencyKey.split(":")[1])).toEqual(["location", "location", "unreadable_location"]);
+    expect(eventsOf([first]).map((e) => e.idempotencyKey.split(":")[1])).toEqual(["location", "location", "unreadable_location"]);
     expect((JSON.parse(first.cursor) as GbpCursor).pass!.locations).toEqual(["1001"]);
   });
 
