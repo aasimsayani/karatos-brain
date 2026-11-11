@@ -188,12 +188,12 @@ Used by: R is retail, W is wholesale, M is manufacturing. Test with says how we 
 | Quo (formerly OpenPhone) | R | Public API | Paid account | Yes | Built (Reads calls and texts with the workspace's Quo API key. Quo keys have full access, so the client only ever sends List calls and List messages. No sandbox: the first client's key confirms the mock built from Quo's docs) |
 | Zoom | R, W, M | Public API | Paid account | Yes | Built (Reads the account's meeting history and who joined each meeting through a Server-to-Server OAuth app the account's admin makes, given only two report read scopes. The client checks each token's scopes and won't read with one that can change anything. Zoom keeps reports for paid plans only, so the first client's app confirms the mock built from Zoom's docs) |
 | Gorgias | R | Public API | Paid account | Yes | Built (Reads tickets and messages as a Gorgias app connected with tickets:read; the client stops if the token has a scope that writes. Gorgias API keys carry their user's full permissions and Observers can't make one, so it uses an app made in Gorgias's partner portal. The first client's connection confirms the mock built from Gorgias's docs) |
-| Zendesk | R, W, M | Public API | Paid account | Yes | Planned (Helpdesk tickets and customer conversations. Zendesk offers a 14-day trial, and sponsored test accounts only to Marketplace partners) |
+| Zendesk | R, W, M | Public API | Paid account | Yes | Built (Reads Zendesk's incremental ticket and user exports with an admin-made OAuth token scoped to tickets:read and users:read; the client stops if the token has a scope that writes, and keeps each rotated refresh token encrypted in the instance's database. The first client's connection confirms the mock built from Zendesk's docs) |
 | Apple Messages for Business | R | Partner | Partner | No | Planned (iMessage conversations with customers, reached through a messaging service provider Apple has approved) |
 | Postscript | R | Partner | Partner | Yes | Planned (Shopify SMS marketing. Custom API access is limited to enterprise plans and integration partners) |
 | Yotpo reviews and loyalty | R | Public API | Paid account | Yes | Built (Reads the store's reviews with its store ID and API secret, and its Loyalty members' points with the Loyalty GUID and API key when given. Neither can be limited to reading, so the client only ever sends a token request and two GETs. Yotpo has no sandbox: the first client's store confirms the mock built from Yotpo's docs) |
 | Judge.me | R | Public API | Paid account | Yes | Built (Reads the shop's reviews with its domain and an API token: an OAuth token with read_reviews only, or the private token, which also writes. The client only ever sends GETs of the review list. Judge.me has no sandbox: the first client's shop confirms the mock built from Judge.me's docs) |
-| Smile.io | R | Public API | Paid account | No | Planned (Loyalty points, VIP tiers and referrals. The API needs the Plus or Enterprise plan) |
+| Smile.io | R | Public API | Paid account | No | Built (Reads customers, points transactions and VIP tiers with a merchant API key made with read scopes only, which needs Smile's Plus or Enterprise plan. Referrals have no list in Smile's API. The first client's key confirms the mock built from Smile's docs) |
 | Trustpilot | R, W | Public API | Paid account | No | Planned (Company reviews and trust score. The API needs Trustpilot's API module add-on) |
 | Pinterest | R, M | Public API | Free sandbox | No | Built (Connects a Pinterest business account through an app the store owns, holding boards:read, pins:read and user_accounts:read only; the connector stops if the token holds anything more. Its only API requests are the Pin list and two analytics reads. Pinterest's analytics reach back 90 days, so the first import reads 90 days of metrics and every Pin) |
 | TikTok | R | Public API | Free sandbox | No | Built (Connects the store's own TikTok account through an app the store owns, holding user.info.basic, user.info.stats and video.list only; the connector stops if the token holds anything more. Its only API requests are the profile read and the video list) |
@@ -437,6 +437,7 @@ A request for a path or method the docs don't list throws `UndocumentedRequestEr
 - RepairShopr's ticket, estimate and invoice lists (API v1)
 - RingCentral's JWT sign-in, an extension's call log and its message store (REST API v1.0)
 - Slack's auth.test, conversations.list, conversations.history and conversations.replies, with both rate-limit regimes (Web API)
+- Smile.io's List VIP tiers, List customers and List points transactions
 - Sola Payments' transaction report (Report:All)
 - Square's read endpoints with its OAuth refresh and token status check (API version 2026-09-16)
 - A Squarespace site's Commerce APIs: products (v2), inventory and orders, enforcing the key, its Read Only permissions, the User-Agent, cursors and the modified window
@@ -451,6 +452,7 @@ A request for a path or method the docs don't list throws `UndocumentedRequestEr
 - Xero's Accounting API endpoints with its token refresh
 - Yext's Management API v2 location and review lists, enforcing the API key header, the version date, the account, the app's access, page sizes, update-date ranges and page tokens tied to their query
 - Yotpo's access token, Retrieve all reviews (Reviews v1) and recently updated Loyalty customers (Loyalty v2)
+- Zendesk's OAuth token refresh and its cursor-based ticket and user exports
 - Zoom's Server-to-Server OAuth token, meeting history and meeting participant reports (API v2)
 
 Where a vendor has a free sandbox (Affirm, Airtable, Amazon (Selling Partner API), Asana, Authorize.net, Avalara AvaTax, BigCommerce, BILL, Calendly, Clover, Custom forms, Docusign, Dropbox, eBay, FedEx, GIA Report Results, Gmail, Google Ads, Google Analytics 4, Google Workspace and Drive, Gusto, HubSpot, Klaviyo, Lightspeed Retail, Mailchimp, Meta Ads, Microsoft OneDrive and SharePoint files, Monday.com, Notion, Pinterest, Plaid, QuickBooks Online, Ramp, Slack, Sola Payments (formerly Cardknox), Square, TikTok, TikTok Ads, Trello, UPS, Wix, WooCommerce, Xero and Yext so far), its mock is a stand-in until a developer account is set up for the nightly run.
@@ -2260,6 +2262,33 @@ Reads the messages and threads in the channels the KaratOS app's bot has been in
 
 **Testing.** Until a sandbox is set up, the tests run against a mock built from Slack's docs (`packages/testkit/src/mocks/slack.ts`), which pages by cursor, filters channels by membership and scope, answers `not_in_channel`, `missing_scope`, `invalid_auth` and `ratelimited` the way the docs describe, and holds a non-Marketplace app to 15-message pages. What the docs leave out is in its assumptions, checked on the first live run. For the nightly run, join the Slack Developer Program, create a free developer sandbox workspace holding only synthetic messages, create an internal app there with the four read scopes above, install it, invite the bot to a test channel and a test private channel, and add the bot token as the `SANDBOX_SLACK_BOT_TOKEN` GitHub Actions secret.
 
+### Smile.io
+
+Reads the store's Smile.io loyalty program: each customer's points balance and VIP tier, and every points transaction, so staff see a customer's points and tier at the counter and marketing spots lapsed members early.
+
+| Setting | What it is |
+| --- | --- |
+| `SMILE_API_KEY` | A merchant API key made with only `customer:read`, `points_transaction:read` and `vip_tier:read` |
+| `CUSTOMER_REF_KEY` | The instance's key for customer references |
+
+**Read-only by design.** Smile scopes each merchant key, and a key with only read scopes can't add or take away points. Smile has no call that lists a key's scopes, so the setup asks for those three read scopes and nothing else, and the client sends only GET requests to `https://api.smile.io/v1`: List VIP tiers, List customers (with their VIP status) and List points transactions, with parameters it builds itself from checked values and Smile's page cursor, never from a link in an answer. Adjusting a customer's points is declared behind the write gate, needing approval, turned off, and the client has no request to send it. Merchant keys need Smile's Plus or Enterprise plan.
+
+**What it reads.** Smile lists customers and points transactions newest first, 250 a page, and can filter them to those changed since a time. The first import reads everything changed in the last five years, customers first. Each later sync reads what changed since the newest change the last one saw, less five minutes; the first later sync looks back two days. An unchanged record read again is a duplicate. Each sync reads the VIP tiers first, to name each customer's tier. Each page is one batch, and the checkpoint keeps the list, its start, the newest change seen and Smile's cursor, so a resumed sync goes on from that page.
+
+**Events.**
+- `loyalty.customer_updated` for each customer, as Yotpo's are: their program state (candidate, member or disabled), points balance, VIP tier and its id, when the tier ends, their progress in the current period and when it ends, how much more keeps the tier, the next tier and how much more reaches it, and when they joined and last changed.
+- `loyalty.points_changed` for each points transaction: the customer, the points added or taken away, whether they were earned or spent, and when.
+
+Each event is keyed by a digest of what was kept. A customer without an id, a creation time, a state or a points balance, or a transaction without an id, a customer, a points change or a time, is dead-lettered.
+
+**Privacy.** Names, birthdays, referral links, and a transaction's description and internal note are never read into an event. Customers' emails become the same customer references custom forms, Klaviyo, Quo and Yotpo make (an HMAC under `CUSTOMER_REF_KEY`).
+
+**Referrals.** Smile's API has a referral object but no call that lists referrals, so they aren't read.
+
+**Rate limits.** Each key gets 10 requests a second. The client waits as `Retry-After` says (up to a minute), or 1, 2 and 4 seconds, on a 429, 500 or 503, before the error goes to the sync runner, which resumes from its checkpoint next time. A 401 says the key is wrong or the plan lost API access; a 403 names the scope the key is missing.
+
+**Testing.** Merchant keys need a paid plan. The tests run against a mock built from Smile's developer docs (`packages/testkit/src/mocks/smile_io.ts`). It checks the bearer key, each list's scope, the parameters each list takes, the sort and the page size. It lists what the first client's key must confirm: that a read-only key can't write, that `updated_at_min` holds across pages, that points and tier changes move `updated_at`, and the time format.
+
 ### Sola Payments
 
 Reads the card and check payments and refunds that go through a store's Sola Payments gateway (formerly Cardknox), so finance can reconcile them, layaway installments included, against sales and deposits. Payments arrive as the same `payment.charge_updated` and `payment.refund_updated` events the Stripe and Authorize.net connectors give.
@@ -2812,6 +2841,36 @@ Reads a store's Yotpo reviews and, when Loyalty is set up, its members' points a
 **Rate limits.** Yotpo allows 5 requests a second per store. The client waits out a 429, 500, 502, 503 or 504 three times, honoring `Retry-After` in seconds up to a minute, before the error goes to the sync runner, which resumes from its checkpoint next time. A 401 on reviews drops the token so the next read asks for a new one.
 
 **Testing.** Yotpo has no sandbox, so the tests run against a mock built from Yotpo's docs (`packages/testkit/src/mocks/yotpo.ts`). It checks the store ID, secret, token, Loyalty GUID and key, the filters and paging, and lists what the first client's store must confirm: the order reviews come back in, that a page past the last is empty, and the day `since_updated_at` is read in.
+
+### Zendesk
+
+Reads the store's Zendesk helpdesk: every ticket and every customer who opened one, so clienteling, sales and repairs see what customers asked about and how fast the store answered.
+
+| Setting | What it is |
+| --- | --- |
+| `ZENDESK_SUBDOMAIN` | The helpdesk's subdomain: `store` for store.zendesk.com |
+| `ZENDESK_CLIENT_ID` | The unique identifier of the OAuth client an admin made for KaratOS |
+| `ZENDESK_CLIENT_SECRET` | That client's secret |
+| `ZENDESK_REFRESH_TOKEN` | The refresh token from an admin authorizing the client for `tickets:read` and `users:read` |
+| `CUSTOMER_REF_KEY` | The instance's key for customer references |
+
+**Read-only by design.** KaratOS doesn't use a Zendesk API token, which carries its admin's full permissions. An admin authorizes an OAuth client for only `tickets:read` and `users:read`, and every refresh asks for those two scopes again, which can only narrow the token. If the token answer lists a scope that isn't a read scope, the client stops before reading anything. It sends only three requests to the store's own `https://{subdomain}.zendesk.com`: the refresh-token sign-in and the cursor-based ticket and user exports, with parameters it builds itself from checked values and Zendesk's cursor, never from a link in an answer. Adding an internal note and tagging a ticket are declared behind the write gate, each needing approval, turned off, and the client has no request to send them.
+
+**Rotating refresh tokens.** Zendesk's refresh tokens are single-use: each refresh returns a new one and retires the old. The newest is saved, encrypted under a key derived from the client secret, in the instance's database before it is used, as QuickBooks's is; `ZENDESK_REFRESH_TOKEN` is the seed, and replacing it there wins over the stored one. Each refresh asks for a 90-day refresh token, Zendesk's longest, so a sync at least that often keeps the connection alive.
+
+**What it reads.** Zendesk's incremental exports list every record that changed since a time, oldest change first, up to 1,000 a page, and end with a cursor that picks up from there next time. The first import starts the ticket and user exports five years back and reads each to its end, tickets first. Each later sync goes on from the cursors the last one ended with, so it reads only what changed; with no checkpoint it starts two days back. An unchanged record read again is a duplicate. Each page is one batch, and the checkpoint keeps both cursors.
+
+**Events.**
+- `communication.ticket_updated` for each ticket, as Gorgias's are: status, type, priority, the channel it came in by, tags (lowercased, up to 20), the requester, submitter and assignee (Zendesk user ids), its organization, group and brand, the satisfaction rating (offered, unoffered, good or bad), whether it is public, and when it was created, is due and last changed.
+- `customer.profile_updated` for each end user, never staff: `zendesk_user:{id}` as the customer, the customer references of their email and phone, their organization and tags, and whether they are verified, suspended or deleted. Zendesk doesn't record marketing consent, so none is claimed.
+
+Each event is keyed by a digest of what was kept. A ticket without an id, a creation time or a status, or a user without an id or a creation time, is dead-lettered.
+
+**Privacy.** Subjects, descriptions, comments, names, notes, details and custom fields are never read into an event. Emails and phone numbers become the same customer references custom forms, Klaviyo, Quo and Gorgias make (an HMAC under `CUSTOMER_REF_KEY`), so one person lines up across systems without the address being kept. A ticket's requester and the customer's profile share the Zendesk user id.
+
+**Rate limits.** The ticket export allows 10 requests a minute, and the user export 20. The client waits as `Retry-After` says (up to a minute), or 1, 2 and 4 seconds, on a 429, 503 or 504, before the error goes to the sync runner, which resumes from its checkpoint next time. It signs in again once on a 401. A 403 says the token can't read the exports, which need an admin's authorization; a 404 says the subdomain is wrong.
+
+**Testing.** Zendesk trials are vendor accounts. The tests run against a mock built from Zendesk's developer docs (`packages/testkit/src/mocks/zendesk.ts`). It checks the JSON refresh grant, that each refresh retires the last tokens, the bearer token, the parameters each export takes and its order. It lists what the first client's connection must confirm: that a token with `tickets:read` and `users:read` can read the exports, that a narrowed refresh keeps only those scopes, the scope's shape, how a finished export's cursor picks up later changes, the time format and the satisfaction scores.
 
 ### Zoom
 
