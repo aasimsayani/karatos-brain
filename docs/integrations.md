@@ -184,11 +184,11 @@ Used by: R is retail, W is wholesale, M is manufacturing. Test with says how we 
 | Microsoft 365 Outlook mail and calendar | R, W, M | Public API | Paid account | No | Built (Read-only: the app is meant to hold Exchange's Application Mail.ReadBasic and Application Calendars.Read roles for one mailbox only, through RBAC for Applications, and the client stops if its token carries any permission that isn't a read one. Mail.ReadBasic can't see bodies, previews or attachments. Change notifications aren't built; the scheduled sync reads Graph's deltas. Microsoft Graph's changelog is watched through this entry) |
 | Any other mailbox (IMAP) | R, W, M | Public API | Sample files | No | Planned (Read-only mail from any provider that offers IMAP, for stores not on Google or Microsoft) |
 | Microsoft Teams | R, W, M | Public API | Paid account | No | Built (Read-only: the app is meant to hold only ChannelMessage.Read.Group and ChannelSettings.Read.Group, the resource-specific consent permissions a team grants when it installs the app, so it reads that one team and nothing else, and the client stops if its token carries any permission that isn't a read one. Message text is never kept. Change notifications aren't built; the scheduled sync lists each channel's newest changes. Microsoft Graph's changelog is watched through the Outlook entry) |
-| RingCentral | R, W, M | Public API | Paid account | Yes | Planned (Business phone call logs, texts and voicemail. RingCentral replaced its free developer account with a low-cost package) |
+| RingCentral | R, W, M | Public API | Paid account | Yes | Built (Reads one extension's calls, texts and voicemail with a JWT credential, under an app given only ReadCallLog and ReadMessages; the client stops if the token can do more. RingCentral's developer sandbox needs a paid account, so the first client's credential confirms the mock built from RingCentral's guide) |
 | Quo (formerly OpenPhone) | R | Public API | Paid account | Yes | Built (Reads calls and texts with the workspace's Quo API key. Quo keys have full access, so the client only ever sends List calls and List messages. No sandbox: the first client's key confirms the mock built from Quo's docs) |
 | Zoom | R, W, M | Public API | Paid account | Yes | Built (Reads the account's meeting history and who joined each meeting through a Server-to-Server OAuth app the account's admin makes, given only two report read scopes. The client checks each token's scopes and won't read with one that can change anything. Zoom keeps reports for paid plans only, so the first client's app confirms the mock built from Zoom's docs) |
-| Gorgias | R | Public API | Paid account | Yes | Planned (E-commerce helpdesk tickets from email, chat and social, common with Shopify jewelry brands) |
-| Zendesk | R, W, M | Public API | Paid account | Yes | Planned (Helpdesk tickets and customer conversations. Zendesk offers a 14-day trial, and sponsored test accounts only to Marketplace partners) |
+| Gorgias | R | Public API | Paid account | Yes | Built (Reads tickets and messages as a Gorgias app connected with tickets:read; the client stops if the token has a scope that writes. Gorgias API keys carry their user's full permissions and Observers can't make one, so it uses an app made in Gorgias's partner portal. The first client's connection confirms the mock built from Gorgias's docs) |
+| Zendesk | R, W, M | Public API | Paid account | Yes | Built (Reads Zendesk's incremental ticket and user exports with an admin-made OAuth token scoped to tickets:read and users:read; the client stops if the token has a scope that writes, and keeps each rotated refresh token encrypted in the instance's database. The first client's connection confirms the mock built from Zendesk's docs) |
 | Apple Messages for Business | R | Partner | Partner | No | Planned (iMessage conversations with customers, reached through a messaging service provider Apple has approved) |
 | Postscript | R | Partner | Partner | Yes | Planned (Shopify SMS marketing. Custom API access is limited to enterprise plans and integration partners) |
 | Yotpo reviews and loyalty | R | Public API | Paid account | Yes | Built (Reads the store's reviews with its store ID and API secret, and its Loyalty members' points with the Loyalty GUID and API key when given. Neither can be limited to reading, so the client only ever sends a token request and two GETs. Yotpo has no sandbox: the first client's store confirms the mock built from Yotpo's docs) |
@@ -412,6 +412,7 @@ A request for a path or method the docs don't list throws `UndocumentedRequestEr
 - The Google Ads API's `googleAds:search` and `googleAds:mutate` (REST, v26) with Google's token refresh, enforcing the developer token, the adwords scope, the account and manager headers, GAQL fields and page tokens tied to their query
 - The Google Analytics Data API's `runReport` (v1beta) with Google's token refresh, enforcing analytics scopes, date ranges and the rule that item-scoped fields can't be mixed with session ones
 - Google Drive (files and changes, v3), Sheets (`values:batchGet`, v4) and Calendar (`events.list` with sync tokens, v3) with Google's token refresh, enforcing each API's documented scopes so `drive.metadata.readonly` can't read Sheets values
+- Gorgias's OAuth token, List tickets and List messages
 - Gusto's payroll list and payroll endpoints with its token refresh and token_info
 - HRD Antwerp's public MyHRD API: report data and report validity
 - HubSpot's CRM search, archived list, batch association and token info endpoints (date version 2026-09)
@@ -434,6 +435,7 @@ A request for a path or method the docs don't list throws `UndocumentedRequestEr
 - Ramp's token and card transactions endpoints (Developer API v1)
 - Rapaport's token service and Price List API: the full list and its changes
 - RepairShopr's ticket, estimate and invoice lists (API v1)
+- RingCentral's JWT sign-in, an extension's call log and its message store (REST API v1.0)
 - Slack's auth.test, conversations.list, conversations.history and conversations.replies, with both rate-limit regimes (Web API)
 - Sola Payments' transaction report (Report:All)
 - Square's read endpoints with its OAuth refresh and token status check (API version 2026-09-16)
@@ -449,6 +451,7 @@ A request for a path or method the docs don't list throws `UndocumentedRequestEr
 - Xero's Accounting API endpoints with its token refresh
 - Yext's Management API v2 location and review lists, enforcing the API key header, the version date, the account, the app's access, page sizes, update-date ranges and page tokens tied to their query
 - Yotpo's access token, Retrieve all reviews (Reviews v1) and recently updated Loyalty customers (Loyalty v2)
+- Zendesk's OAuth token refresh and its cursor-based ticket and user exports
 - Zoom's Server-to-Server OAuth token, meeting history and meeting participant reports (API v2)
 
 Where a vendor has a free sandbox (Affirm, Airtable, Amazon (Selling Partner API), Asana, Aurora Payments, Authorize.net, Avalara AvaTax, BigCommerce, BILL, Calendly, Clover, Custom forms, Docusign, Dropbox, eBay, FedEx, GIA Report Results, Gmail, Google Ads, Google Analytics 4, Google Workspace and Drive, Gusto, HubSpot, Klaviyo, Lightspeed Retail, Mailchimp, Meta Ads, Microsoft OneDrive and SharePoint files, Monday.com, Notion, Pinterest, Plaid, QuickBooks Online, Ramp, Slack, Sola Payments (formerly Cardknox), Square, TikTok, TikTok Ads, Trello, UPS, Wix, WooCommerce, Xero and Yext so far), its mock is a stand-in until a developer account is set up for the nightly run.
@@ -1340,6 +1343,34 @@ Reads the Drive folder a business shares with Brain A, the Sheets ranges it list
 
 **Testing.** Until a test account is set up, the tests run against a mock built from Google's docs (`packages/testkit/src/mocks/google_workspace.ts`), which enforces each API's documented scopes, answers 401 without a valid access token, pages files, changes and events, keeps per-stream change feeds, expires sync tokens with 410, and returns whole resources (owners, titles, descriptions, links) so the tests check the connector drops them. Its assumptions are listed in the mock and checked on the first live run. Google has no Workspace sandbox: for the nightly run, make a Google account for testing that holds only a synthetic folder, spreadsheet and calendar, create an OAuth client in a test Cloud project with the consent screen in Testing and that account as a test user, connect it with the three read-only scopes, and add `SANDBOX_GOOGLE_WORKSPACE_CLIENT_ID`, `SANDBOX_GOOGLE_WORKSPACE_CLIENT_SECRET`, `SANDBOX_GOOGLE_WORKSPACE_REFRESH_TOKEN`, `SANDBOX_GOOGLE_WORKSPACE_FOLDER_ID` and `SANDBOX_GOOGLE_WORKSPACE_SHEETS_RANGE` (one `spreadsheetId/Sheet!A1:C10` entry) as GitHub Actions secrets. When the run fails with `invalid_grant`, reconnect the test account and update the secret.
 
+### Gorgias
+
+Reads the store's Gorgias helpdesk: every ticket from email, chat and social, and every message on it, so clienteling, sales and repairs see what online customers asked about and how fast the store answered.
+
+| Setting | What it is |
+| --- | --- |
+| `GORGIAS_DOMAIN` | The helpdesk's subdomain: `store` for store.gorgias.com |
+| `GORGIAS_CLIENT_ID` | The client id of the KaratOS app in Gorgias's partner portal |
+| `GORGIAS_CLIENT_SECRET` | That app's client secret |
+| `GORGIAS_REFRESH_TOKEN` | The refresh token from the store connecting the app to its helpdesk |
+| `CUSTOMER_REF_KEY` | The instance's key for customer references |
+
+**Read-only by design.** Gorgias API keys carry the full permissions of the user who made them, and the read-only Observer role can't make one, so KaratOS doesn't use a key. It uses an app that asks only for `openid`, `offline` and `tickets:read`. Each sign-in's token lists the app's scopes, and the client stops before reading anything if one of them isn't a read scope, or if the token doesn't say. It sends only three requests to the store's own `https://{domain}.gorgias.com`: the refresh-token sign-in, List tickets and List messages, with parameters it builds itself from checked values and Gorgias's page cursor, never from a link in an answer. Adding an internal note and tagging a ticket are declared behind the write gate, each needing approval, turned off, and the client has no request to send them.
+
+**What it reads.** Gorgias lists tickets by when they last changed, newest first, 100 a page, with a cursor and no time filter. So a pass reads tickets newest first and stops at the first one that last changed before its floor, reading each ticket's messages (oldest first) as it goes. The first import's floor is five years back. Each later sync's floor is the newest change the last pass saw, less five minutes: a new message or a status change moves its ticket to the front, so only changed tickets are read. An unchanged ticket or message is a duplicate. The first later sync looks back two days. Each page of tickets is one batch, and the checkpoint keeps the floor, the newest change seen and Gorgias's cursor, so a resumed pass goes on from the page it reached.
+
+**Events.**
+- `communication.ticket_updated` for each ticket: status, channel and how it came in, tags (the store's own labels, lowercased, up to 20), the assigned agent (Gorgias's user id), whether the store started it, spam, trashed or unread, the satisfaction score, and when it was created, opened, last received a message, last had a message, was closed, is snoozed until and last changed.
+- `communication.message_logged` for each message: the channel, the ticket as its conversation, inbound, outbound or an internal note, the agent who wrote it, how long its text was, how many attachments, whether a rule sent it, whether it failed or was deleted, and when it was sent and opened.
+
+Each event is keyed by a digest of what was kept. A ticket without an id, a creation time or a status, or a message without an id, a ticket, a time or who wrote it, is dead-lettered.
+
+**Privacy.** Message text, HTML, subjects, attachments, customer names and notes are never read into an event. Customers' emails become the same customer references custom forms, Klaviyo, Quo and AvaTax make (an HMAC under `CUSTOMER_REF_KEY`), so one person lines up across systems without the address being kept. Staff are Gorgias's user ids.
+
+**Rate limits.** Apps get 80 requests in 20 seconds. The client waits as `Retry-After` says (up to a minute), or 1, 2 and 4 seconds, on a 429, 503 or 504, before the error goes to the sync runner, which resumes from its checkpoint next time. It signs in again once on a 401. A 403 says the app lacks `tickets:read`; a 404 says the subdomain is wrong.
+
+**Testing.** Gorgias apps are made in its partner portal. The tests run against a mock built from Gorgias's developer docs (`packages/testkit/src/mocks/gorgias.ts`). It checks the Basic auth and the refresh grant, the bearer token, the parameters each list takes, the sort and the page size. It lists what the first client's connection must confirm: how the refresh grant authenticates, that the scope is space-separated, that a new message moves its ticket's `updated_datetime`, that times are UTC, and the satisfaction score's shape.
+
 ### Gusto
 
 Reads one company's processed payrolls from Gusto's App Integrations API, asking for API version `2026-06-15` on every request. Read-only is enforced twice. The app holds only the `payrolls:read` scope, and after every token refresh the client calls `GET /v1/token_info` and stops if the token belongs to a company other than `GUSTO_COMPANY_UUID`, holds any scope that doesn't end in `:read`, or doesn't say which scopes it holds. The client also sends GET requests to two payroll endpoints only, and its only POST is the token refresh. It declares no writes: payroll stays with a person in Gusto.
@@ -2142,6 +2173,33 @@ A count with a row that can't be read (no tag, a tag that isn't an EPC or barcod
 
 **Testing.** Synthetic exports only: a count with found, missing and wrong-tray pieces, repeated reads, counts with and without session ids, a count where nothing was read, day-first dates and a store offset, unreadable rows, a blank line, an export saved again under another name, and resuming after a crash. The department tests cover a short count valued from receipts, a wrong-tray piece, and a later clean count clearing the reminder.
 
+### RingCentral
+
+Reads every call, text and voicemail on the store's RingCentral line (one extension). They arrive as the same `communication.call_logged` and `communication.message_logged` events Quo's and Twilio's give, so clienteling, repairs and sales see who called or wrote, and how fast the store answered, whichever phone system it uses.
+
+| Setting | What it is |
+| --- | --- |
+| `RINGCENTRAL_CLIENT_ID` | The client id of the store's private KaratOS app, made for the JWT auth flow |
+| `RINGCENTRAL_CLIENT_SECRET` | That app's client secret |
+| `RINGCENTRAL_JWT` | A JWT credential made by the user whose extension is the store's line, allowed for that app only |
+| `CUSTOMER_REF_KEY` | The instance's key for customer references |
+
+**Read-only by design.** The app is given only Read Call Log and Read Messages. Each sign-in's token says which permissions the app has, and the client stops before reading anything if one of them isn't a read permission (ReadCallLog, ReadMessages, ReadAccounts, ReadContacts or ReadPresence) or if the token doesn't say. It sends only three requests to `https://platform.ringcentral.com`: the JWT sign-in, the extension's call log and its message store, with parameters it builds itself from checked values and a page number, never from a link in an answer. Sending a text and placing a RingOut call are declared behind the write gate, turned off, and the client has no request to send them.
+
+**What it reads.** A JWT signs in as one user, and the extension call log and message store are scoped to that user, so KaratOS reads only the store line's extension. RingCentral's sync APIs can't return more than 250 call records at a time, so they can't import history. So a pass lists the calls and then the texts and voicemail in a span, 250 a page. The first import covers two years. Each later sync starts where the last pass started, less a day, because a call ends after it starts and a text is read or a voicemail deleted after it arrives. An unchanged one is a duplicate. The first later sync looks back two days. Each page is one batch, and the checkpoint keeps the span, the step and the page, so a resumed pass goes on from the page it reached. The connector polls, so it needs no public route for webhooks.
+
+**Events.**
+- `communication.call_logged` for each call: voice or fax, inbound or outbound, RingCentral's action and result, whether an inbound call was missed (Missed, Voicemail, Rejected, Busy, No Answer, Hang Up, Abandoned or Declined), whether the caller withheld their number, duration, and when it started.
+- `communication.message_logged` for each text or voicemail: the channel (`sms` or `voicemail`), the conversation, direction, status, whether it was read or deleted, how long a text was, how long a voicemail ran and whether it was transcribed, and when it arrived and last changed.
+
+Each event is keyed by a digest of what was kept. A call or message without an id, a time, a direction or a result (for a call) or a text or voicemail type (for a message) is dead-lettered.
+
+**Privacy.** Calls, texts and voicemail are the customer's own words, so no text, subject, voicemail audio, transcript or recording is read into an event, and caller names and locations are dropped. Customers' numbers become the same customer references Quo, custom forms, Klaviyo and AvaTax make (an HMAC under `CUSTOMER_REF_KEY`), so one person lines up across systems without the number being kept. Withheld callers and short codes get no reference.
+
+**Rate limits.** The client waits as `Retry-After` says (up to a minute), or 1, 2 and 4 seconds, on a 429, 503 or 504, before the error goes to the sync runner, which resumes from its checkpoint next time. It signs in again once on a 401. A 403 names the permission the app is missing.
+
+**Testing.** RingCentral's developer sandbox needs an account. The tests run against a mock built from RingCentral's developer guide (`packages/testkit/src/mocks/ringcentral.ts`). It checks the Basic auth and the JWT grant, the bearer token, the parameters each list takes and the page size. It lists what the first client's credential must confirm: that the token's scope is space-separated, that the call log pages like the message store, which results mean a missed call, and that changes land within a day.
+
 ### Shopify
 
 Reads the GraphQL Admin API (`https://<store>.myshopify.com/admin/api/<version>/graphql.json`). The app must be made in the Shopify Dev Dashboard by the store owner, so the app and store share an organization; otherwise the token request fails with `shop_not_permitted`. The version is pinned to `SHOPIFY_API_VERSION`, or to 2026-07, the version the connector was tested with. The client only sends queries, so a mutation is rejected before it leaves the server.
@@ -2751,6 +2809,36 @@ Reads a store's Yotpo reviews and, when Loyalty is set up, its members' points a
 **Rate limits.** Yotpo allows 5 requests a second per store. The client waits out a 429, 500, 502, 503 or 504 three times, honoring `Retry-After` in seconds up to a minute, before the error goes to the sync runner, which resumes from its checkpoint next time. A 401 on reviews drops the token so the next read asks for a new one.
 
 **Testing.** Yotpo has no sandbox, so the tests run against a mock built from Yotpo's docs (`packages/testkit/src/mocks/yotpo.ts`). It checks the store ID, secret, token, Loyalty GUID and key, the filters and paging, and lists what the first client's store must confirm: the order reviews come back in, that a page past the last is empty, and the day `since_updated_at` is read in.
+
+### Zendesk
+
+Reads the store's Zendesk helpdesk: every ticket and every customer who opened one, so clienteling, sales and repairs see what customers asked about and how fast the store answered.
+
+| Setting | What it is |
+| --- | --- |
+| `ZENDESK_SUBDOMAIN` | The helpdesk's subdomain: `store` for store.zendesk.com |
+| `ZENDESK_CLIENT_ID` | The unique identifier of the OAuth client an admin made for KaratOS |
+| `ZENDESK_CLIENT_SECRET` | That client's secret |
+| `ZENDESK_REFRESH_TOKEN` | The refresh token from an admin authorizing the client for `tickets:read` and `users:read` |
+| `CUSTOMER_REF_KEY` | The instance's key for customer references |
+
+**Read-only by design.** KaratOS doesn't use a Zendesk API token, which carries its admin's full permissions. An admin authorizes an OAuth client for only `tickets:read` and `users:read`, and every refresh asks for those two scopes again, which can only narrow the token. If the token answer lists a scope that isn't a read scope, the client stops before reading anything. It sends only three requests to the store's own `https://{subdomain}.zendesk.com`: the refresh-token sign-in and the cursor-based ticket and user exports, with parameters it builds itself from checked values and Zendesk's cursor, never from a link in an answer. Adding an internal note and tagging a ticket are declared behind the write gate, each needing approval, turned off, and the client has no request to send them.
+
+**Rotating refresh tokens.** Zendesk's refresh tokens are single-use: each refresh returns a new one and retires the old. The newest is saved, encrypted under a key derived from the client secret, in the instance's database before it is used, as QuickBooks's is; `ZENDESK_REFRESH_TOKEN` is the seed, and replacing it there wins over the stored one. Each refresh asks for a 90-day refresh token, Zendesk's longest, so a sync at least that often keeps the connection alive.
+
+**What it reads.** Zendesk's incremental exports list every record that changed since a time, oldest change first, up to 1,000 a page, and end with a cursor that picks up from there next time. The first import starts the ticket and user exports five years back and reads each to its end, tickets first. Each later sync goes on from the cursors the last one ended with, so it reads only what changed; with no checkpoint it starts two days back. An unchanged record read again is a duplicate. Each page is one batch, and the checkpoint keeps both cursors.
+
+**Events.**
+- `communication.ticket_updated` for each ticket, as Gorgias's are: status, type, priority, the channel it came in by, tags (lowercased, up to 20), the requester, submitter and assignee (Zendesk user ids), its organization, group and brand, the satisfaction rating (offered, unoffered, good or bad), whether it is public, and when it was created, is due and last changed.
+- `customer.profile_updated` for each end user, never staff: `zendesk_user:{id}` as the customer, the customer references of their email and phone, their organization and tags, and whether they are verified, suspended or deleted. Zendesk doesn't record marketing consent, so none is claimed.
+
+Each event is keyed by a digest of what was kept. A ticket without an id, a creation time or a status, or a user without an id or a creation time, is dead-lettered.
+
+**Privacy.** Subjects, descriptions, comments, names, notes, details and custom fields are never read into an event. Emails and phone numbers become the same customer references custom forms, Klaviyo, Quo and Gorgias make (an HMAC under `CUSTOMER_REF_KEY`), so one person lines up across systems without the address being kept. A ticket's requester and the customer's profile share the Zendesk user id.
+
+**Rate limits.** The ticket export allows 10 requests a minute, and the user export 20. The client waits as `Retry-After` says (up to a minute), or 1, 2 and 4 seconds, on a 429, 503 or 504, before the error goes to the sync runner, which resumes from its checkpoint next time. It signs in again once on a 401. A 403 says the token can't read the exports, which need an admin's authorization; a 404 says the subdomain is wrong.
+
+**Testing.** Zendesk trials are vendor accounts. The tests run against a mock built from Zendesk's developer docs (`packages/testkit/src/mocks/zendesk.ts`). It checks the JSON refresh grant, that each refresh retires the last tokens, the bearer token, the parameters each export takes and its order. It lists what the first client's connection must confirm: that a token with `tickets:read` and `users:read` can read the exports, that a narrowed refresh keeps only those scopes, the scope's shape, how a finished export's cursor picks up later changes, the time format and the satisfaction scores.
 
 ### Zoom
 
