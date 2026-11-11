@@ -756,8 +756,11 @@ describe("Cin7 Core doc mock", () => {
       expect(z.Total).toBe(2);
       const later = (await (await get(cin7DocMock(account()), `/customer?ModifiedSince=${cin7Before(29.99)}`)).json()) as Body;
       expect(later.Total).toBe(1);
+      const laterZ = (await (await get(cin7DocMock(account()), `/customer?ModifiedSince=${encodeURIComponent(before(29.99))}`)).json()) as Body;
+      expect(laterZ.Total).toBe(1);
     } finally {
-      process.env.TZ = zone;
+      if (zone === undefined) delete process.env.TZ;
+      else process.env.TZ = zone;
     }
   });
 
