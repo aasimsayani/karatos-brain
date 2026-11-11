@@ -100,8 +100,8 @@ export function stwmClient(options: StwmClientOptions): StwmClient {
         method: "GET",
         headers: { authorization: `Bearer ${key}`, accept: "application/json" },
       });
-      const header = response.headers.get("x-ratelimit-remaining");
-      if (header !== null && /^\d{1,9}$/.test(header)) left = Number(header);
+      const header = response.headers.get("x-ratelimit-remaining") ?? "";
+      if (/^\d{1,9}$/.test(header)) left = Number(header);
       if (RETRIED.has(response.status) && attempt < retries) {
         await sleep(5000 * 2 ** attempt);
         continue;
@@ -111,7 +111,7 @@ export function stwmClient(options: StwmClientOptions): StwmClient {
       if (response.status === 404) return null;
       if (response.status !== 200) throw new StwmApiError(`Search The Watch Market answered HTTP ${response.status} for ${what}`, response.status);
       const body = (await response.json().catch(() => undefined)) as unknown;
-      if (typeof body !== "object" || body === null || Array.isArray(body) || (body as { status?: unknown }).status !== 1) {
+      if ((body as { status?: unknown } | null | undefined)?.status !== 1) {
         throw new StwmApiError(`Search The Watch Market answered ${what} with something other than a success`, 200);
       }
       return body as Record<string, unknown>;

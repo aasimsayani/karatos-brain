@@ -382,7 +382,7 @@ describe("Search The Watch Market events", () => {
       system: "Search The Watch Market",
       problems: ["the prices are not for the model asked about"],
     });
-    for (const currency of [undefined, "XYZ", "usd", 5]) expect(dead(prices({ currency }), days()).problems, String(currency)).toEqual(["the prices have no known currency"]);
+    for (const currency of [undefined, "XYZ", "usd", 5, ["USD"]]) expect(dead(prices({ currency }), days()).problems, String(currency)).toEqual(["the prices have no known currency"]);
     for (const field of ["listing_count", "min", "max", "mean", "market_value"]) {
       for (const v of [undefined, -1, 1.5, "100"]) expect(dead(prices({ [field]: v }), days()).problems, `${field} ${v}`).toEqual([`the prices have no whole ${field}`]);
     }
@@ -395,6 +395,7 @@ describe("Search The Watch Market events", () => {
       problems: ["the prices are not for the model asked about", "the prices have no known currency", "the prices have no whole listing_count", "the prices have no whole min", "the prices have no whole max", "the prices have no whole mean", "the prices have no whole market_value", "the days to sell are not for the model asked about"],
     });
     expect(dead("x", null).problems).toHaveLength(7);
+    expect(stwmWeekEvents({ group_id: 8, weeks: [] }, "TEST-7", MODEL, ctx)[0]!.idempotencyKey).not.toBe(stwmWeekEvents({ group_id: 9, weeks: [] }, "TEST-7", MODEL, ctx)[0]!.idempotencyKey);
     expect(stwmPriceEvents(prices({ group_id: 8 }), days(), "TEST-7", MODEL, ctx)[0]!.idempotencyKey).not.toBe(stwmPriceEvents(prices({ group_id: 9 }), days(), "TEST-7", MODEL, ctx)[0]!.idempotencyKey);
     for (const currency of STWM_CURRENCIES) expect(stwmPriceEvents(prices({ currency }), null, "TEST-7", MODEL, ctx)[0]!.occurredAt).toBe(RECEIVED);
   });
@@ -426,6 +427,10 @@ describe("Search The Watch Market events", () => {
     expect(events[0]!.idempotencyKey).toMatch(/^stwm:week:7:2026-10-26:[0-9a-f]{12}$/);
     expect(events[0]!.id).toBe(events[0]!.idempotencyKey.replace(/:/g, "_"));
     expect(STWM_WEEK_EVENT).toBe("watch_market.price_week");
+    const recount = stwmWeekEvents({ status: 1, group_id: 7, weeks: [{ ...week("2026-10-26"), count: 31 }] }, "TEST-7", MODEL, ctx);
+    expect(recount[0]!.idempotencyKey).not.toBe(events[0]!.idempotencyKey);
+    const order = stwmWeekEvents({ group_id: 7, weeks: [{ week: "2026-10-26", count: 1, mean: { GBP: 1, EUR: 2 }, min: { GBP: 1, EUR: 2 }, max: { GBP: 1, EUR: 2 } }] }, "TEST-7", MODEL, ctx);
+    expect((order[0]!.payload.prices as { currency: string }[]).map((x) => x.currency)).toEqual(["EUR", "GBP"]);
     const again = stwmWeekEvents({ status: 1, group_id: 7, weeks: [week("2026-10-26")] }, "TEST-7", MODEL, { ...ctx, day: "2026-11-12" });
     expect(again[0]!.idempotencyKey).toBe(events[0]!.idempotencyKey);
   });
@@ -467,6 +472,10 @@ describe("Search The Watch Market events", () => {
     const bad: [unknown, string[]][] = [
       [week("2026-02-30"), ["a week has no date"]],
       [week("2026-1-5"), ["a week has no date"]],
+      [{ ...week("2026-10-26"), week: ["2026-10-26"] }, ["a week has no date"]],
+      [{ week: "2026-10-26", count: 1, mean: { GBP: 1 } }, ["a week has a price that isn't a whole number"]],
+      [{ week: "2026-10-26", count: 1, min: { GBP: 1 } }, ["a week has a price that isn't a whole number"]],
+      [{ week: "2026-10-26", count: 1, max: { GBP: 1 } }, ["a week has a price that isn't a whole number"]],
       [week("x"), ["a week has no date"]],
       [{ ...week("2026-10-26"), week: 5 }, ["a week has no date"]],
       [{ ...week("2026-10-26"), count: -1 }, ["a week has no whole count"]],
@@ -509,6 +518,7 @@ describe("Search The Watch Market events", () => {
 describe("Search The Watch Market references and checkpoint", () => {
   it("reads the references, without repeats, in order", () => {
     expect(parseStwmReferences(" TEST-1 ,\n\ntest-1, Test Diver 2,TEST-1 ,  ")).toEqual(["TEST-1", "Test Diver 2"]);
+    expect(parseStwmReferences("A\nB")).toEqual(["A", "B"]);
     expect(parseStwmReferences(Array.from({ length: STWM_MAX_REFERENCES }, (_, i) => `R${i}`).join(","))).toHaveLength(STWM_MAX_REFERENCES);
     expect(() => parseStwmReferences(Array.from({ length: STWM_MAX_REFERENCES + 1 }, (_, i) => `R${i}`).join(","))).toThrow(`STWM_REFERENCES lists more than ${STWM_MAX_REFERENCES} references`);
     for (const raw of ["", " , \n "]) expect(() => parseStwmReferences(raw)).toThrow("STWM_REFERENCES lists no reference");
@@ -545,6 +555,8 @@ describe("Search The Watch Market references and checkpoint", () => {
       { ...good, done: 1 },
       { ...good, models: undefined },
       { ...good, models: {} },
+      { ...good, models: "x" },
+      { ...good, models: [{ length: 2, 0: "TEST-1", 1: { groupId: 1 } }] },
       { ...good, models: [m[0]] },
       { ...good, models: [[m[0], m[1], 1]] },
       { ...good, models: [[5, m[1]]] },
@@ -567,6 +579,8 @@ describe("Search The Watch Market references and checkpoint", () => {
       },
       { ...good, pass: { ...p, day: 5 } },
       { ...good, pass: { ...p, day: "2026-11-1" } },
+      { ...good, pass: { ...p, day: "2026-1-11" } },
+      { ...good, pass: { ...p, day: ["2026-11-11"] } },
       { ...good, pass: { ...p, day: "x2026-11-11" } },
       { ...good, pass: { ...p, day: "2026-11-11x" } },
       { ...good, pass: { ...p, next: 0 } },

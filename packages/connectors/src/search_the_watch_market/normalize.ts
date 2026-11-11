@@ -47,7 +47,8 @@ const dayOf = (d: string) => {
   const t = Date.parse(`${d}T00:00:00Z`);
   return Number.isNaN(t) ? undefined : new Date(t).toISOString().slice(0, 10);
 };
-const asObject = (v: unknown) => (typeof v === "object" && v !== null && !Array.isArray(v) ? (v as Record<string, unknown>) : null);
+/** Fields of an answer that may be anything; a field of a string or number reads as missing. */
+const rec = (v: unknown) => (v ?? {}) as Record<string, unknown>;
 
 function event(type: string, key: string, occurredAt: string | undefined, payload: Record<string, unknown>, ctx: StwmContext): StwmEvent {
   return {
@@ -76,8 +77,8 @@ const modelFields = (reference: string, model: StwmModel) => ({
 /** A model's prices and days to sell, as the day's observation; none when the API has no prices for it. */
 export function stwmPriceEvents(prices: unknown, daysToSell: unknown, reference: string, model: StwmModel, ctx: StwmContext): StwmEvent[] {
   if (prices === null) return [];
-  const p = asObject(prices) ?? {};
-  const d = asObject(daysToSell) ?? {};
+  const p = rec(prices);
+  const d = rec(daysToSell);
   const problems: string[] = [];
   if (p.group_id !== model.groupId) problems.push("the prices are not for the model asked about");
   if (typeof p.currency !== "string" || !CURRENCIES.has(p.currency)) problems.push("the prices have no known currency");
@@ -103,15 +104,15 @@ export function stwmPriceEvents(prices: unknown, daysToSell: unknown, reference:
 /** A model's weekly price history, one event for each week, with a dead letter for each week that doesn't read. */
 export function stwmWeekEvents(history: unknown, reference: string, model: StwmModel, ctx: StwmContext): StwmEvent[] {
   if (history === null) return [];
-  const h = asObject(history) ?? {};
+  const h = rec(history);
   if (h.group_id !== model.groupId || !Array.isArray(h.weeks)) return [deadLetter(STWM_WEEK_EVENT, ["the history is not a list of weeks for the model asked about"], { reference, groupId: model.groupId, history }, ctx)];
   const out: StwmEvent[] = [];
   for (const raw of h.weeks as unknown[]) {
-    const w = asObject(raw) ?? {};
-    const week = typeof w.week === "string" && dayOf(w.week) === w.week ? w.week : undefined;
-    const mean = new Map(Object.entries(asObject(w.mean) ?? {}));
-    const low = new Map(Object.entries(asObject(w.min) ?? {}));
-    const high = new Map(Object.entries(asObject(w.max) ?? {}));
+    const w = rec(raw);
+    const week = dayOf(String(w.week)) === w.week ? (w.week as string) : undefined;
+    const mean = new Map(Object.entries(rec(w.mean)));
+    const low = new Map(Object.entries(rec(w.min)));
+    const high = new Map(Object.entries(rec(w.max)));
     const prices = STWM_CURRENCIES.filter((c) => mean.has(c) || low.has(c) || high.has(c)).map((currency) => ({
       currency,
       low: low.get(currency),

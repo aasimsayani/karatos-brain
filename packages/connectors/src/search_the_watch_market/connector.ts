@@ -89,8 +89,8 @@ export function parseStwmCursor(raw: string | null): StwmCursor | null {
   const p = (r.pass ?? {}) as Record<string, unknown>;
   const refs = p.references as unknown[];
   const models = r.models as unknown[];
-  const okModels = Array.isArray(models) && models.length <= STWM_MAX_REFERENCES && models.every((m) => Array.isArray(m) && m.length === 2 && typeof m[0] === "string" && stwmText(m[0]) === m[0] && isModel(m[1]));
-  const okPass = r.pass === null || (Array.isArray(refs) && refs.length > 0 && refs.length <= STWM_MAX_REFERENCES && refs.every((x) => typeof x === "string" && stwmText(x) === x) && typeof p.day === "string" && /^\d{4}-\d{2}-\d{2}$/.test(p.day) && Number.isSafeInteger(p.next) && (p.next as number) > 0 && (p.next as number) < refs.length);
+  const okModels = Array.isArray(models) && models.length <= STWM_MAX_REFERENCES && models.every((m) => Array.isArray(m) && m.length === 2 && stwmText(m[0]) === m[0] && isModel(m[1]));
+  const okPass = r.pass === null || (Array.isArray(refs) && refs.length <= STWM_MAX_REFERENCES && refs.every((x) => stwmText(x) === x) && typeof p.day === "string" && /^\d{4}-\d{2}-\d{2}$/.test(p.day) && Number.isSafeInteger(p.next) && (p.next as number) > 0 && (p.next as number) < refs.length);
   if (typeof r.done === "boolean" && okModels && okPass)
     return {
       done: r.done,
