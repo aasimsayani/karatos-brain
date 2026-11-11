@@ -355,6 +355,7 @@ export const CONNECTED_ON: Readonly<Record<string, string>> = {
   pinterest: "2026-10-31",
   ebay: "2026-10-30",
   meta_ads: "2026-10-30",
+  tiktok_ads: "2026-11-11",
   google_ads: "2026-10-30",
   google_analytics: "2026-10-30",
   mailchimp: "2026-10-30",
