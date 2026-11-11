@@ -9,6 +9,7 @@ describe("the Squarespace factory", () => {
     expect(skipReason("squarespace", { CUSTOMER_REF_KEY: secret })).toBe("missing SQUARESPACE_API_KEY");
     expect(skipReason("squarespace", { CUSTOMER_REF_KEY: secret })).not.toContain(secret);
     expect(skipReason("squarespace", { SQUARESPACE_API_KEY: secret })).toBe("missing CUSTOMER_REF_KEY");
+    expect(skipReason("squarespace", {})).toBe("missing SQUARESPACE_API_KEY, CUSTOMER_REF_KEY");
     expect(skipReason("squarespace", SETTINGS)).toBeNull();
   });
 

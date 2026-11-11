@@ -90,8 +90,8 @@ export function squarespaceListParams(list: SquarespaceList, query: SquarespaceP
     return new URLSearchParams({ cursor: query.cursor });
   }
   if (list !== "orders") return new URLSearchParams();
-  const { from, to } = query;
-  if (from === undefined || to === undefined || !TIME.test(from) || !TIME.test(to) || from > to) throw new SquarespaceConfigError("orders are listed between two UTC times");
+  const { from = "", to = "" } = query;
+  if (!TIME.test(from) || !TIME.test(to) || from > to) throw new SquarespaceConfigError("orders are listed between two UTC times");
   return new URLSearchParams({ modifiedAfter: from, modifiedBefore: to });
 }
 

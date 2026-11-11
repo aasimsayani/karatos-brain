@@ -62,7 +62,7 @@ const flag = (v: unknown): boolean | null => (typeof v === "boolean" ? v : null)
 export function squarespaceTime(v: unknown): string | undefined {
   const m = typeof v === "string" ? TIME.exec(v) : null;
   if (!m) return undefined;
-  const t = Date.parse(`${m[1]}T${m[2]}${(m[3] ?? "").slice(0, 4)}${m[4]}`);
+  const t = Date.parse(`${m[1]}T${m[2]}${m[3] ?? ""}${m[4]}`);
   // Date.parse rolls a day like 02-30 into the next month, so the day must read back as itself.
   if (Number.isNaN(t) || new Date(Date.parse(`${m[1]}T00:00:00Z`)).toISOString().slice(0, 10) !== m[1]) return undefined;
   return new Date(t).toISOString();
@@ -71,7 +71,7 @@ export function squarespaceTime(v: unknown): string | undefined {
 /** A MonetaryAmount's value (a number, or a decimal string) in whole cents, or null. Half a cent rounds away from zero. */
 export function squarespaceCents(amount: unknown): number | null {
   const raw = obj(amount).value;
-  const v = typeof raw === "string" && /^-?\d{1,12}(\.\d{1,6})?$/.test(raw) ? Number(raw) : raw;
+  const v = typeof raw === "string" && /^-?\d+(\.\d{1,6})?$/.test(raw) ? Number(raw) : raw;
   if (typeof v !== "number" || !(Math.abs(v) < 1e12)) return null;
   const cents = Math.round(Math.abs(v) * 100);
   return v < 0 ? -cents : cents;

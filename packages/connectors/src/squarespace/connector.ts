@@ -61,7 +61,7 @@ export function parseSquarespaceCursor(raw: string | null): SquarespaceCursor | 
   try {
     c = JSON.parse(raw);
   } catch {
-    c = null;
+    // Unreadable JSON leaves c undefined, which the checks below turn down.
   }
   // Anything but an object reads as a checkpoint without the fields asked for.
   const r = (c ?? {}) as Record<string, unknown>;

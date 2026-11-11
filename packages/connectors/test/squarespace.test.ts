@@ -1,3 +1,4 @@
+import { createHmac } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import { runSync, type SourceBatch } from "@karatos/core";
 import { TEST_ORG, assertSynthetic, assertWritesRefused, checkConnectorSync, squarespaceDocMock, squarespaceOrder, squarespaceProduct, squarespaceStock, testPipeline, type SquarespaceMock, type SquarespaceMockData, type SquarespaceMockRecord } from "@karatos/connector-testkit";
@@ -222,6 +223,7 @@ describe("Squarespace reading helpers", () => {
     expect(squarespaceTime("2026-01-02T03:04:05Z")).toBe("2026-01-02T03:04:05.000Z");
     expect(squarespaceTime("2026-01-02T03:04:05.123456789Z")).toBe("2026-01-02T03:04:05.123Z");
     expect(squarespaceTime("2026-01-02T03:04:05.5-05:00")).toBe("2026-01-02T08:04:05.500Z");
+    expect(squarespaceTime("2026-01-02T03:04:05.9999Z")).toBe("2026-01-02T03:04:05.999Z");
     for (const bad of ["2026-02-30T00:00:00Z", "2026-01-02T24:00:00Z", "2026-01-02T12:60:00Z", "2026-01-02T03:04:05", "2026-01-02", "2026-01-02 03:04:05Z", "2026-01-02T03:04:05.1234567890Z", "2026-01-02T03:04:05+0200", "2026-01-02T03:04:05z", "x2026-01-02T03:04:05Z", "2026-01-02T03:04:05Zx", "", null, 5]) expect(squarespaceTime(bad), String(bad)).toBeUndefined();
   });
 
@@ -245,6 +247,7 @@ describe("Squarespace reading helpers", () => {
     expect(squarespaceCustomerRef(CUSTOMER_KEY, "e00000000000000000000001")).toBe(a);
     expect(squarespaceCustomerRef("j".repeat(64), "e00000000000000000000001")).not.toBe(a);
     expect(squarespaceCustomerRef(CUSTOMER_KEY, "e00000000000000000000002")).not.toBe(a);
+    expect(a).toBe(`squarespace_customer:${createHmac("sha256", CUSTOMER_KEY).update("squarespace_customer:e00000000000000000000001").digest("hex").slice(0, 32)}`);
   });
 });
 
@@ -301,6 +304,7 @@ describe("Squarespace events", () => {
       { variantId: null, sku: null, priceCents: null, salePriceCents: null, onSale: null, stock: null, unlimited: null },
       { variantId: null, sku: null, priceCents: null, salePriceCents: null, onSale: null, stock: null, unlimited: null },
     ]);
+    expect((squarespaceProductEvent(product({ name: "   ", variants: [{ id: "" }] }), CTX).payload as { name: unknown; variants: { variantId: unknown }[] })).toMatchObject({ name: null, variants: [{ variantId: null }] });
     const bare = squarespaceProductEvent(product({ type: null, variants: undefined }), CTX).payload;
     expect([bare.type, bare.variants, bare.currency]).toEqual([null, [], null]);
     expect((squarespaceProductEvent(product({ variants: [{ sku: ` ${"S".repeat(70)} `, stock: { quantity: 1.5 } }] }), CTX).payload.variants as Record<string, unknown>[])[0]).toMatchObject({ sku: "S".repeat(60), stock: null });
@@ -371,6 +375,8 @@ describe("Squarespace events", () => {
     for (const hidden of ["buyer@example.test", "Buyer", "1 Test St", "Testville", "Test engraving", "Test internal note", "Ring size", "e00000000000000000000001"]) expect(all, hidden).not.toContain(hidden);
     expect(squarespaceOrderEvent(order(), { ...CTX, receivedAt: "2027-01-01T00:00:00.000Z" }).idempotencyKey).toBe(e.idempotencyKey);
     expect(squarespaceOrderEvent(order({ fulfillmentStatus: "FULFILLED" }), CTX).idempotencyKey).not.toBe(e.idempotencyKey);
+    // A change only to what is never kept is the same event.
+    expect(squarespaceOrderEvent(order({ customerEmail: "other@example.test" }), CTX).idempotencyKey).toBe(e.idempotencyKey);
   });
 
   it("keeps what reads of an order and its lines", () => {
@@ -486,6 +492,8 @@ describe("Squarespace connector", () => {
     const rest = await drain(make().historicalImport({ cursor: JSON.stringify(mid) } as never));
     expect(asked).toEqual(["orders:o9:2026-01-01T00:00:00.000Z:2026-02-01T00:00:00.000Z"]);
     expect(rest.map((b) => parseSquarespaceCursor(b.cursor ?? null))).toEqual([{ pass: null, done: true, nextFrom: "2026-01-31T00:00:00.000Z" }]);
+    // Events are dated when they are read, not when the pass began.
+    expect(rest[0]!.events[0]!.receivedAt).toBe(RECEIVED);
     asked.length = 0;
     expect(await drain(make().historicalImport({ cursor: JSON.stringify({ ...mid, done: true }) } as never))).toEqual([]);
     expect(asked).toEqual([]);
@@ -512,10 +520,15 @@ describe("Squarespace connector", () => {
     expect(sync.ingested).toBe(2);
     expect(parseSquarespaceCursor(sync.cursor)).toEqual({ pass: null, done: false, nextFrom: "2026-11-11T15:00:00.000Z" });
     // A later sync resumed mid-pass keeps its times and what it knew of the import.
-    const fake: SquarespaceClient = { list: async () => ({ records: [], next: null }) };
+    let calls = 0;
+    const fake: SquarespaceClient = { list: async () => ({ records: [], next: calls++ === 0 ? "o4" : null }) };
     const mid = JSON.stringify({ pass: { from: "2026-11-01T00:00:00.000Z", to: "2026-11-10T00:00:00.000Z", step: "orders", cursor: "o3" }, done: true, nextFrom: "2026-11-09T00:00:00.000Z" });
     const rest = await drain(squarespaceConnector({ ...base(), customerKey: CUSTOMER_KEY, client: fake, now: NOW }).incrementalSync({ cursor: mid } as never));
-    expect(rest.map((b) => parseSquarespaceCursor(b.cursor ?? null))).toEqual([{ pass: null, done: true, nextFrom: "2026-11-09T00:00:00.000Z" }]);
+    expect(rest.map((b) => parseSquarespaceCursor(b.cursor ?? null))).toEqual([
+      { pass: { from: "2026-11-01T00:00:00.000Z", to: "2026-11-10T00:00:00.000Z", step: "orders", cursor: "o4" }, done: true, nextFrom: "2026-11-09T00:00:00.000Z" },
+      { pass: null, done: true, nextFrom: "2026-11-09T00:00:00.000Z" },
+    ]);
+    calls = 1;
     const midImport = mid.replace('"done":true', '"done":false');
     expect(parseSquarespaceCursor((await drain(squarespaceConnector({ ...base(), customerKey: CUSTOMER_KEY, client: fake, now: NOW }).incrementalSync({ cursor: midImport } as never))).at(-1)!.cursor ?? null)!.done).toBe(false);
     const after = squarespaceDocMock(account());
