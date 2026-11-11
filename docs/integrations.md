@@ -183,8 +183,8 @@ Used by: R is retail, W is wholesale, M is manufacturing. Test with says how we 
 | Google Merchant Center | R | Public API | Free sandbox | No | Planned (Product listings, disapprovals and free listing clicks through the Merchant API, which replaced the Content API for Shopping in 2026) |
 | Microsoft 365 Outlook mail and calendar | R, W, M | Public API | Paid account | No | Built (Read-only: the app is meant to hold Exchange's Application Mail.ReadBasic and Application Calendars.Read roles for one mailbox only, through RBAC for Applications, and the client stops if its token carries any permission that isn't a read one. Mail.ReadBasic can't see bodies, previews or attachments. Change notifications aren't built; the scheduled sync reads Graph's deltas. Microsoft Graph's changelog is watched through this entry) |
 | Any other mailbox (IMAP) | R, W, M | Public API | Sample files | No | Planned (Read-only mail from any provider that offers IMAP, for stores not on Google or Microsoft) |
-| Microsoft Teams | R, W, M | Public API | Paid account | Yes | Planned (Channel messages where staff hand off repairs, custom orders and sales, like Slack. Microsoft Graph has one changelog, watched through the Outlook entry) |
-| RingCentral | R, W, M | Public API | Paid account | Yes | Planned (Business phone call logs, texts and voicemail. RingCentral replaced its free developer account with a low-cost package) |
+| Microsoft Teams | R, W, M | Public API | Paid account | No | Built (Read-only: the app is meant to hold only ChannelMessage.Read.Group and ChannelSettings.Read.Group, the resource-specific consent permissions a team grants when it installs the app, so it reads that one team and nothing else, and the client stops if its token carries any permission that isn't a read one. Message text is never kept. Change notifications aren't built; the scheduled sync lists each channel's newest changes. Microsoft Graph's changelog is watched through the Outlook entry) |
+| RingCentral | R, W, M | Public API | Paid account | Yes | Built (Reads one extension's calls, texts and voicemail with a JWT credential, under an app given only ReadCallLog and ReadMessages; the client stops if the token can do more. RingCentral's developer sandbox needs a paid account, so the first client's credential confirms the mock built from RingCentral's guide) |
 | Quo (formerly OpenPhone) | R | Public API | Paid account | Yes | Built (Reads calls and texts with the workspace's Quo API key. Quo keys have full access, so the client only ever sends List calls and List messages. No sandbox: the first client's key confirms the mock built from Quo's docs) |
 | Zoom | R, W, M | Public API | Paid account | Yes | Built (Reads the account's meeting history and who joined each meeting through a Server-to-Server OAuth app the account's admin makes, given only two report read scopes. The client checks each token's scopes and won't read with one that can change anything. Zoom keeps reports for paid plans only, so the first client's app confirms the mock built from Zoom's docs) |
 | Gorgias | R | Public API | Paid account | Yes | Planned (E-commerce helpdesk tickets from email, chat and social, common with Shopify jewelry brands) |
@@ -423,6 +423,7 @@ A request for a path or method the docs don't list throws `UndocumentedRequestEr
 - Meta's Marketing API ad account insights and `/me/permissions` (Graph API v26.0), enforcing the token, ads_read, the ad account, campaign level by day, the fields and cursors tied to their read
 - Microsoft's client credentials sign-in and Microsoft Graph's driveItem delta (v1.0)
 - Microsoft's client credentials sign-in and Microsoft Graph's message and calendar view deltas (v1.0) for one mailbox, enforcing Mail.ReadBasic's hidden fields, the RBAC scope, state tokens and the calendar window
+- Microsoft's client credentials sign-in and Microsoft Graph's listings of one team's channels, channel messages and replies (v1.0), enforcing the team the app is installed in, page sizes, skip tokens and the reply expansion
 - monday.com's GraphQL API: boards, items, activity logs and updates
 - Nivoda's GraphQL diamond search: sign-in, diamonds_by_query and get_diamond_by_id
 - Notion's search, retrieve data source and query data source endpoints (API version 2026-03-11)
@@ -433,6 +434,7 @@ A request for a path or method the docs don't list throws `UndocumentedRequestEr
 - Ramp's token and card transactions endpoints (Developer API v1)
 - Rapaport's token service and Price List API: the full list and its changes
 - RepairShopr's ticket, estimate and invoice lists (API v1)
+- RingCentral's JWT sign-in, an extension's call log and its message store (REST API v1.0)
 - Slack's auth.test, conversations.list, conversations.history and conversations.replies, with both rate-limit regimes (Web API)
 - Sola Payments' transaction report (Report:All)
 - Square's read endpoints with its OAuth refresh and token status check (API version 2026-09-16)
@@ -1690,6 +1692,29 @@ Reads one Exchange Online mailbox's Inbox, Sent Items and calendar through Micro
 
 **Testing.** Until a test tenant is set up, the tests run against a mock built from Microsoft's docs (`packages/testkit/src/mocks/microsoft_outlook.ts`): the client credentials sign-in with a roles claim, the two folders' message delta with its `$select` and `$filter`, the calendar view's delta over its window, skip and delta tokens, `@removed` entries, 403 out of scope, 410 for expired tokens and 429 throttling. Microsoft's free developer tenant now goes only to Visual Studio subscribers, so a live check needs a paid Microsoft 365 tenant with a test mailbox holding only synthetic mail.
 
+### Microsoft Teams
+
+Reads one team's channel messages and replies through Microsoft Graph (v1.0), so the hand-offs about repairs, custom orders and sales that happen in Teams show up next to the rest of the business: who passes work to whom, in which channel and thread, and when. It never keeps a message's text, subject or attachments, a channel's name or anyone's display name.
+
+**Permissions.** Make an app registration with no Microsoft Graph permissions in Entra at all, then a Teams app package whose manifest names its client id under `webApplicationInfo` and asks, under `authorization.permissions.resourceSpecific`, for the Application permissions `ChannelMessage.Read.Group` and `ChannelSettings.Read.Group` and nothing else. Upload it as a custom app in the Teams admin center and have an owner of the one team install it there. That resource-specific consent lets the app read that team's channels and messages and no other team, chat or mailbox in the tenant. The client checks the roles claim of every token Microsoft issues and stops if it holds anything but ChannelMessage.Read.All, ChannelSettings.Read.All or Channel.ReadBasic.All (tenant-wide reads an admin might have consented instead). Read-only is also enforced in code: besides the token request, the client sends only three GETs (the team's `channels`, each channel's `messages` with `$expand=replies`, and a thread's `replies`), builds every parameter itself, and never fetches a paging link as given: it reads the skip token out of each and builds the next request. The writes it may do later (`post_alert`, `post_daily_summary`) are declared and stay behind the write gate.
+
+| Setting | What it is |
+| --- | --- |
+| `MICROSOFT_TENANT_ID` | The directory (tenant) id, shared with OneDrive and Outlook |
+| `MICROSOFT_TEAMS_CLIENT_ID`, `MICROSOFT_TEAMS_CLIENT_SECRET` | The Teams app's client id and a client secret. Its own app, apart from OneDrive's and Outlook's, since each holds only its own read permissions |
+| `MICROSOFT_TEAMS_TEAM_ID` | The group id of the one team the app is installed in |
+| `CORRESPONDENT_HASH_KEY` | The instance's key for people references, shared with Gmail and Slack |
+
+**What it reads.** Graph has no change feed for a team's channels that an app scoped to one team can read, so each sync lists the team's channels, then each channel's threads, 50 to a page, each with its replies. Graph sorts threads by their last change, the message or any reply, so a sync stops at the first thread that hasn't changed since the newest change the last sync read, less five minutes; the threads around that line come again as duplicates. The historical import reads back five years. A thread with more replies than the listing carries has the rest read from its own replies listing, up to 5,000. Every page is one batch, and its checkpoint keeps the channel being read, Graph's skip token and, for each channel, the newest change already read, so a resumed sync asks again from the page it was on. A channel added later is read from the start. 429s, 503s and 504s are retried, honouring Retry-After up to a minute.
+
+**Events.** `communication.message_logged` keeps the channel, message and thread references, whether it is a reply, when it was posted and last edited, who posted it (`teams_user:<hash>` for a person, `teams_app:<hash>` for an app), its importance, and how many attachments, mentions and reactions it has. A message or reply Teams says was deleted is `communication.message_deleted`. Join, rename and other system notices are skipped. A message without an id or a time that reads is dead-lettered listing why.
+
+**Personal data.** Never kept: message text (it is where customers' names, numbers and ring details turn up), subjects, summaries, attachments and their links, who was mentioned or reacted, channel names and descriptions, and every display name. A person becomes `teams_user:<hash>`, an HMAC-SHA256 of their Entra object id under `CORRESPONDENT_HASH_KEY`, so the same person is the same reference in every channel but can't be turned back into them. Channel and message ids are kept as short digests. Keeping redacted text for chosen channels, as Slack can, is a later step.
+
+**Push.** Graph can send change notifications for channel messages, but a subscription needs a public endpoint, renewing within an hour and, for some uses, Microsoft's metered billing; it isn't built, and the scheduled sync lists the same messages.
+
+**Testing.** Until a test tenant is set up, the tests run against a mock built from Microsoft's docs (`packages/testkit/src/mocks/microsoft_teams.ts`): the client credentials sign-in with a roles claim, the channels listing with `$select`, channel messages with `$top` and `$expand=replies` sorted by each thread's last change, a thread's replies, skip tokens, deleted messages, 403 for a team that didn't install the app and 429 throttling. A live check needs a paid Microsoft 365 tenant with a test team holding only synthetic messages. Whether Microsoft also requires its protected-API request form for `ChannelMessage.Read.Group` is checked on that first live run.
+
 ### Monday.com
 
 Reads monday.com's GraphQL API (`https://api.monday.com/v2`), pinned to API version 2026-07 with the `API-Version` header, so a new current version can't change answers under the connector. Retail, wholesale and manufacturing businesses track custom orders, repairs and production on monday.com boards; the connector brings every board the token can see into the brain as neutral work-tracking events.
@@ -2116,6 +2141,33 @@ A count with a row that can't be read (no tag, a tag that isn't an EPC or barcod
 **What the inventory department does with it.** It looks at each tray's latest count. When pieces are missing it names up to five tags (with their SKUs) and says how many more, adds up what the store paid for those whose SKU it has seen received, and asks the store to check the safe, repair envelopes and pieces out on memo or approval before calling it a loss. Pieces read in the wrong tray are pointed out too. A piece missing one night and found the next drops off, because only the latest count of a tray counts.
 
 **Testing.** Synthetic exports only: a count with found, missing and wrong-tray pieces, repeated reads, counts with and without session ids, a count where nothing was read, day-first dates and a store offset, unreadable rows, a blank line, an export saved again under another name, and resuming after a crash. The department tests cover a short count valued from receipts, a wrong-tray piece, and a later clean count clearing the reminder.
+
+### RingCentral
+
+Reads every call, text and voicemail on the store's RingCentral line (one extension). They arrive as the same `communication.call_logged` and `communication.message_logged` events Quo's and Twilio's give, so clienteling, repairs and sales see who called or wrote, and how fast the store answered, whichever phone system it uses.
+
+| Setting | What it is |
+| --- | --- |
+| `RINGCENTRAL_CLIENT_ID` | The client id of the store's private KaratOS app, made for the JWT auth flow |
+| `RINGCENTRAL_CLIENT_SECRET` | That app's client secret |
+| `RINGCENTRAL_JWT` | A JWT credential made by the user whose extension is the store's line, allowed for that app only |
+| `CUSTOMER_REF_KEY` | The instance's key for customer references |
+
+**Read-only by design.** The app is given only Read Call Log and Read Messages. Each sign-in's token says which permissions the app has, and the client stops before reading anything if one of them isn't a read permission (ReadCallLog, ReadMessages, ReadAccounts, ReadContacts or ReadPresence) or if the token doesn't say. It sends only three requests to `https://platform.ringcentral.com`: the JWT sign-in, the extension's call log and its message store, with parameters it builds itself from checked values and a page number, never from a link in an answer. Sending a text and placing a RingOut call are declared behind the write gate, turned off, and the client has no request to send them.
+
+**What it reads.** A JWT signs in as one user, and the extension call log and message store are scoped to that user, so KaratOS reads only the store line's extension. RingCentral's sync APIs can't return more than 250 call records at a time, so they can't import history. So a pass lists the calls and then the texts and voicemail in a span, 250 a page. The first import covers two years. Each later sync starts where the last pass started, less a day, because a call ends after it starts and a text is read or a voicemail deleted after it arrives. An unchanged one is a duplicate. The first later sync looks back two days. Each page is one batch, and the checkpoint keeps the span, the step and the page, so a resumed pass goes on from the page it reached. The connector polls, so it needs no public route for webhooks.
+
+**Events.**
+- `communication.call_logged` for each call: voice or fax, inbound or outbound, RingCentral's action and result, whether an inbound call was missed (Missed, Voicemail, Rejected, Busy, No Answer, Hang Up, Abandoned or Declined), whether the caller withheld their number, duration, and when it started.
+- `communication.message_logged` for each text or voicemail: the channel (`sms` or `voicemail`), the conversation, direction, status, whether it was read or deleted, how long a text was, how long a voicemail ran and whether it was transcribed, and when it arrived and last changed.
+
+Each event is keyed by a digest of what was kept. A call or message without an id, a time, a direction or a result (for a call) or a text or voicemail type (for a message) is dead-lettered.
+
+**Privacy.** Calls, texts and voicemail are the customer's own words, so no text, subject, voicemail audio, transcript or recording is read into an event, and caller names and locations are dropped. Customers' numbers become the same customer references Quo, custom forms, Klaviyo and AvaTax make (an HMAC under `CUSTOMER_REF_KEY`), so one person lines up across systems without the number being kept. Withheld callers and short codes get no reference.
+
+**Rate limits.** The client waits as `Retry-After` says (up to a minute), or 1, 2 and 4 seconds, on a 429, 503 or 504, before the error goes to the sync runner, which resumes from its checkpoint next time. It signs in again once on a 401. A 403 names the permission the app is missing.
+
+**Testing.** RingCentral's developer sandbox needs an account. The tests run against a mock built from RingCentral's developer guide (`packages/testkit/src/mocks/ringcentral.ts`). It checks the Basic auth and the JWT grant, the bearer token, the parameters each list takes and the page size. It lists what the first client's credential must confirm: that the token's scope is space-separated, that the call log pages like the message store, which results mean a missed call, and that changes land within a day.
 
 ### Shopify
 
