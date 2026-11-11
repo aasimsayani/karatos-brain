@@ -34,6 +34,7 @@ export const DEMO_NOT_YET: Readonly<Record<string, string>> = {
   lightspeed: sameJobAs("the POS exports"),
   clover: sameJobAs("the POS exports"),
   woocommerce: NEXT,
+  squarespace: NEXT,
   bigcommerce: sameJobAs("the POS exports"),
   wix: sameJobAs("the POS exports"),
   xero: sameJobAs("QuickBooks"),
