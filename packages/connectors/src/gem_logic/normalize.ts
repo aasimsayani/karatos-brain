@@ -31,15 +31,15 @@ const TIME = /^(\d{4}-\d{2}-\d{2})(?:[T ]((?:[01]\d|2[0-3]):\d{2}:\d{2})(\.\d{1,
 const short = (value: unknown) => createHash("sha256").update(JSON.stringify(value)).digest("hex").slice(0, 12);
 // Anything but an object reads as a record without the fields asked for.
 const record = (v: unknown) => (v ?? {}) as Record<string, unknown>;
-const text = (v: unknown, max = 60): string | null => (typeof v === "string" && v.trim() !== "" ? v.trim().slice(0, max) : null);
+const text = (v: unknown, max: number): string | null => (typeof v === "string" && v.trim() !== "" ? v.trim().slice(0, max) : null);
 /** An ID Gem Logic writes as a positive whole number or a string, as text, or undefined. */
 export const gemLogicId = (v: unknown): string | undefined => {
   const s = Number.isSafeInteger(v) && (v as number) > 0 ? String(v) : v;
   return typeof s === "string" && ID.test(s) ? s.toLowerCase() : undefined;
 };
-/** A size or weight: a number, or a decimal string, 0 or more. */
+/** A size or weight under a billion: a number, or a decimal string, 0 or more. */
 const measure = (v: unknown): number | null => {
-  const n = typeof v === "string" && /^\d{1,9}(\.\d{1,6})?$/.test(v.trim()) ? Number(v) : v;
+  const n = typeof v === "string" && /^\d+(\.\d{1,6})?$/.test(v.trim()) ? Number(v) : v;
   return Number.isFinite(n) && (n as number) >= 0 && (n as number) < 1e9 ? (n as number) : null;
 };
 

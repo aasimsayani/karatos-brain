@@ -89,6 +89,9 @@ describe("Gem Logic client", () => {
     expect(gemLogicInstance("shop-1.gem-logic.com")).toBe("shop-1");
     expect(gemLogicInstance("example.gem-logic.com.example")).toBeNull();
     expect(gemLogicInstance("example.gem-logicxcom")).toBeNull();
+    expect(gemLogicInstance("xhttps://example")).toBeNull();
+    expect(gemLogicInstance("ab.gem-logic.comcd")).toBeNull();
+    expect(gemLogicInstance("examplexgem-logic.com")).toBeNull();
     expect(gemLogicInstance("https://example.gem-logic.com//")).toBeNull();
     expect(gemLogicClient({ apiKey: KEY, instance: "https://shop.gem-logic.com" }).baseUrl).toBe("https://shop.gem-logic.com/api");
   });
@@ -252,9 +255,11 @@ describe("Gem Logic events", () => {
     expect(odd).toMatchObject({ marketplace: null, sku: "S".repeat(80), status: null, imageCount: null, weight: 4.5, height: null, length: null, width: null });
     const more = gemLogicProductEvent(one({ status: "S".repeat(50), images: [], item_weight: Number.POSITIVE_INFINITY, item_height: "2", item_length: 0, item_width: 999_999_999.5, item_sku: 5 }), ctx).payload;
     expect(more).toMatchObject({ status: "S".repeat(40), imageCount: 0, weight: null, height: 2, length: 0, width: 999_999_999.5, sku: null });
-    for (const v of ["4.", "-1", "1234567890", "1.1234567", true, null]) expect(gemLogicProductEvent(one({ item_weight: v }), ctx).payload.weight, String(v)).toBeNull();
+    for (const v of ["4.", ".5", "-1", "1234567890", "1.1234567", true, null]) expect(gemLogicProductEvent(one({ item_weight: v }), ctx).payload.weight, String(v)).toBeNull();
     expect(gemLogicProductEvent(one({ item_weight: "123456789.123456" }), ctx).payload.weight).toBe(123456789.123456);
     expect(gemLogicProductEvent(one({ item_weight: " 4.5 " }), ctx).payload.weight).toBe(4.5);
+    const local = gemLogicProductEvent(one({ created: "2026-01-02 03:04:05" }), ctx);
+    expect([local.occurredAt, local.payload.createdAt]).toEqual(["2026-01-02T03:04:05.000Z", "2026-01-02T03:04:05.000Z"]);
   });
 
   it("keys each version by its channel and what was kept, so an unchanged one is a duplicate", () => {
@@ -343,6 +348,10 @@ describe("Gem Logic connector", () => {
     const second = await runSync({ connector: connector(again), mode: "historical", pipeline, memory, organizationId: TEST_ORG });
     expect(second.ingested).toBe(0);
     expect(again.reads).toHaveLength(0);
+    // Once done, the import reads nothing, even with a later sync's pass under way.
+    const busy = gemLogicDocMock(shop());
+    expect(await drain(connector(busy).historicalImport({ cursor: JSON.stringify({ pass: { index: 0, marketplaceId: "1", page: 1 }, done: true }) } as never))).toEqual([]);
+    expect(busy.reads).toHaveLength(0);
   });
 
   it("resumes where its checkpoint stands, or from the start when that channel has moved", async () => {
