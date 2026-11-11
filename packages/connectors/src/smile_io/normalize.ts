@@ -96,7 +96,6 @@ export function smileCustomerEvent(raw: unknown, ctx: SmileContext): SmileRead {
   const vip = obj(c.vip_status);
   // vip_tier_id on the customer is the older field Smile is retiring.
   const tier = idOf(vip.vip_tier_id) ?? idOf(c.vip_tier_id);
-  const next = idOf(vip.next_vip_tier_id);
   const payload: Record<string, unknown> = {
     system: SYSTEM,
     loyaltyCustomerId: `smile_io:customer:${id}`,
@@ -110,7 +109,8 @@ export function smileCustomerEvent(raw: unknown, ctx: SmileContext): SmileRead {
     vipProgress: amount(vip.progress_value),
     vipPeriodEnd: time(vip.current_vip_period_end),
     toRetainVipTier: amount(vip.delta_to_retain_vip_tier),
-    nextVipTier: next ? ctx.tiers.get(next) : undefined,
+    // Only tiers that read are in the map, so any other id names none.
+    nextVipTier: ctx.tiers.get(vip.next_vip_tier_id as number),
     toNextVipTier: amount(vip.delta_to_next_vip_tier),
     createdAt,
     updatedAt,

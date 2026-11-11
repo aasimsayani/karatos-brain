@@ -99,7 +99,7 @@ const ctx = { customerKey: CUSTOMER_KEY, receivedAt: RECEIVED, tiers: smileTierN
 describe("Smile.io client", () => {
   it("checks its key before sending anything", () => {
     const { fetch, sent } = scripted(json(200, PAGE));
-    for (const apiKey of ["", "test_" + "0".repeat(20), "api_short", "oa2_" + "0".repeat(20), `api_${"0".repeat(20)} x`, `api_${"0".repeat(257)}`, `api_${"0".repeat(20)}!`, `xapi_${"0".repeat(20)}`]) {
+    for (const apiKey of ["", "test_" + "0".repeat(20), "api_short", `api_${"0".repeat(7)}`, "oa2_" + "0".repeat(20), `api_${"0".repeat(20)} x`, `api_${"0".repeat(257)}`, `api_${"0".repeat(20)}!`, `xapi_${"0".repeat(20)}`]) {
       expect(() => smileClient({ apiKey, fetch }), apiKey).toThrow("SMILE_API_KEY is missing or not in the expected shape: a merchant API key starts with api_");
     }
     expect(() => smileClient({ apiKey: ` api_${"a".repeat(8)} `, fetch })).not.toThrow();
@@ -224,7 +224,7 @@ describe("Smile.io events", () => {
 
   it("names tiers from the program's list, dropping ones that don't read", () => {
     expect([...smileTierNames(SMILE_TEST_TIERS)]).toEqual([[1, "Silver"], [2, "Gold"], [3, "Rose Gold"]]);
-    const odd = smileTierNames([null, "x", { id: 0, name: "Zero" }, { id: 4, name: "<b>" }, { id: 5, name: 5 }, { id: 6, name: " Platinum " }, { id: 7, name: "x".repeat(41) }, { id: 8, name: "x".repeat(40) }, { id: 9, name: "a<b" }, { id: "10", name: "Ten" }]);
+    const odd = smileTierNames([null, "x", { id: 0, name: "Zero" }, { id: 4, name: "<b>" }, { id: 5, name: 5 }, { id: 6, name: " Platinum " }, { id: 7, name: "x".repeat(41) }, { id: 8, name: "x".repeat(40) }, { id: 9, name: "a<b" }, { id: "10", name: "Ten" }, { id: 11, name: "<b" }]);
     expect([...odd]).toEqual([[6, "Platinum"], [8, "x".repeat(40)]]);
   });
 
@@ -349,6 +349,7 @@ describe("Smile.io checkpoint", () => {
       cursor({ done: true, marks }),
       cursor({ done: true, marks, pass: { ...pass, list: "referrals" } }),
       cursor({ done: true, marks, pass: { ...pass, since: null } }),
+      cursor({ done: true, marks, pass: { ...pass, since: "2026-11-01T00:00:00Z" } }),
       cursor({ done: true, marks, pass: { ...pass, top: "x" } }),
       cursor({ done: true, marks, pass: { ...pass, top: undefined } }),
       cursor({ done: true, marks, pass: { ...pass, cursor: "a b" } }),
@@ -421,6 +422,13 @@ describe("Smile.io connector", () => {
     expect(mock.reads.map((r) => r.query.updated_at_min)).toEqual([before(48), before(48)]);
     expect(SMILE_FIRST_LOOKBACK_MS).toBe(48 * HOUR_MS);
     expect(batches.map((b) => parseSmileCursor(b.cursor as string)!.done)).toEqual([false, false]);
+  });
+
+  it("keeps a finished import finished on every page of a later sync", async () => {
+    const fake: SmileClient = { vipTiers: async () => [], page: async (_list, _since, cursor) => ({ rows: [], next: cursor ? null : "abc=" }) };
+    const state = { done: true, marks: { customers: before(2), points_transactions: before(2) }, pass: null };
+    const batches = await drain(connector(smileDocMock(program()), { client: fake }).incrementalSync({ cursor: JSON.stringify(state) } as never));
+    expect(batches.map((b) => parseSmileCursor(b.cursor as string)!.done)).toEqual([true, true, true, true]);
   });
 
   it("marks each list's newest change, whatever order the rows come in, and ignores times that don't read", async () => {

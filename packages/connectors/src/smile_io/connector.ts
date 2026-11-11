@@ -105,7 +105,8 @@ export function smileConnector(options: SmileOptions): Connector {
       const events = page.rows.map((row) => (pass.list === "customers" ? smileCustomerEvent(row, ctx) : smilePointsEvent(row, ctx)).event);
       for (const row of page.rows) {
         const changed = quoTime((row as { updated_at?: unknown } | null)?.updated_at);
-        if (changed !== null && (pass.top === null || changed > pass.top)) pass = { ...pass, top: changed };
+        // "" sorts before any time, so a row with no time that reads never moves the mark.
+        if ((changed ?? "") > (pass.top ?? "")) pass = { ...pass, top: changed };
       }
       let last = false;
       if (page.next) pass = { ...pass, cursor: page.next };

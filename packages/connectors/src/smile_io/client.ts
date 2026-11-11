@@ -69,7 +69,6 @@ export interface SmileClient {
   page(list: SmileList, since: string | null, cursor: string | null): Promise<SmilePage>;
 }
 
-const isObject = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null && !Array.isArray(value);
 const SCOPE: Record<string, string> = { vip_tiers: "vip_tier:read", customers: "customer:read", points_transactions: "points_transaction:read" };
 
 export function smileClient(options: SmileClientOptions): SmileClient {
@@ -93,8 +92,8 @@ export function smileClient(options: SmileClientOptions): SmileClient {
       if (status === 401) throw new SmileConfigError("Smile turned down SMILE_API_KEY: check it, and that the store is still on a plan with API access");
       if (status === 403) throw new SmileConfigError(`SMILE_API_KEY can't read ${path}: make a key with ${SCOPE[path]}`);
       if (status !== 200) throw new SmileApiError(`Smile answered HTTP ${status} for ${path}`, status);
-      const body: unknown = await response.json().catch(() => undefined);
-      if (!isObject(body) || !Array.isArray(body[path])) throw new SmileApiError(`Smile answered ${path} without a list`, 200);
+      const body = ((await response.json().catch(() => undefined)) ?? {}) as Record<string, unknown>;
+      if (!Array.isArray(body[path])) throw new SmileApiError(`Smile answered ${path} without a list`, 200);
       return body;
     }
   }
@@ -109,7 +108,7 @@ export function smileClient(options: SmileClientOptions): SmileClient {
       if (since) query.updated_at_min = since;
       if (cursor) query.cursor = cursor;
       const body = await get(list, query);
-      const next = isObject(body.metadata) ? body.metadata.next_cursor : undefined;
+      const next = (body.metadata as Record<string, unknown> | null | undefined)?.next_cursor;
       if (next !== null && (typeof next !== "string" || !SMILE_CURSOR.test(next))) throw new SmileApiError(`Smile's ${list} page had no next cursor in the expected shape`, 200);
       return { rows: body[list] as unknown[], next };
     },
