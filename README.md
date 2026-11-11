@@ -115,6 +115,7 @@ These are built, tested against recorded vendor responses or mocks built from ea
 | UPS | Follows every UPS package on the business's list, from label created to delivered or returned | Inventory, Repairs, Compliance |
 | BILL | Imports six years of supplier bills with their due dates, balances, payment status and approval status | Finance, Buying |
 | Ramp | Imports five years of company card transactions, then each one Ramp says changed since the last sync | Finance, Buying |
+| Katana | Imports five years of manufacturing orders, then each one changed since the last sync, deleted ones as cancelled | Manufacturing, Inventory, Buying |
 | Asana | Imports five years of tasks from every project you can see, such as repairs, custom orders and production jobs, then keeps them current | Repairs, Custom orders, Buying |
 | Trello | Imports five years of cards from every board you can see, such as repairs, custom orders and buying, then keeps them current | Repairs, Custom orders, Buying |
 | Airtable | Imports five years of records from every base you share, such as memo logs, repair intake and custom orders, then keeps them current | Repairs, Custom orders, Buying, Inventory |
@@ -166,7 +167,7 @@ This section updates itself as work lands: it is generated from [docs/milestones
 <!-- progress:start -->
 <!-- Generated from docs/milestones.json and the integration catalog by npm run progress:write. Edit those, not this block. -->
 
-**Overall: 80% complete**, 65 of 81 roadmap items done. 69 of the 253 systems in the integration catalog are connected.
+**Overall: 80% complete**, 65 of 81 roadmap items done. 70 of the 253 systems in the integration catalog are connected.
 
 | Milestone | What it gives a jeweler | Progress | Target |
 | --- | --- | --- | --- |

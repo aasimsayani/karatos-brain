@@ -245,7 +245,7 @@ export const SYSTEM_DETAILS: Readonly<Record<string, SystemDetail>> = {
   matrixgold: { about: "Custom design files and metal weight estimates." },
   formlabs: { about: "Print jobs for wax and resin models." },
   netsuite: { about: "Items, orders, purchase orders and the books." },
-  katana: { about: "Manufacturing orders, materials, stock and costs." },
+  katana: { about: "Manufacturing orders with their costs and material shortages, and stock by location." },
   cin7: { about: "Inventory, purchasing and sales across channels." },
   rightclick_wise_choice: { about: "Stock, bills of materials, job bags and costing." },
   bci_e_jewelry: { about: "Items, memos, production and sales documents on Business Central." },
@@ -373,5 +373,6 @@ export const CONNECTED_ON: Readonly<Record<string, string>> = {
   rfid_counts: "2026-11-10",
   hrd: "2026-11-10",
   ramp: "2026-11-11",
+  katana: "2026-11-11",
   gusto: "2026-10-30",
 };
