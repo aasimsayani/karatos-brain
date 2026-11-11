@@ -79,6 +79,12 @@ export interface IntegrationSpec {
   changelog: string | null;
   /** built: a connector exists and is tested; it is verified live on the first client account before sign-off. */
   status: "planned" | "built" | "deferred";
+  /**
+   * The day (YYYY-MM-DD) a built connector last ran end to end against a
+   * real or vendor sandbox account, rather than mocks made from the docs.
+   * Until it has, the README counts it as built but not yet done.
+   */
+  liveCheckedOn?: string;
   note?: string;
   /**
    * What a business gets once this system is connected, one plain sentence
