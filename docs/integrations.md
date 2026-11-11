@@ -145,7 +145,7 @@ Used by: R is retail, W is wholesale, M is manufacturing. Test with says how we 
 | Tenoris | R, W, M | Partner | Partner | No | Planned (Category and price-point sales benchmarks from independent jewelers. Partner only. Found in jewelry industry sources) |
 | Edge Retail Academy and Edge Pulse | R | Partner | Partner | No | Planned (Peer KPI benchmarks, inventory aging, turn and open-to-buy guidance. Partner only. Exhibited at Centurion) |
 | TheWatchSearch (by TheWatchCloud) | R, W | File export | Sample files | No | Built (Reads the WhatsApp group chat exports the store already has, since TheWatchSearch publishes no API or export. A partner feed from TheWatchCloud comes later) |
-| Search The Watch Market Business API | R, W | Public API | Paid account | No | Planned (Prices, 13-week price history, days to sell and recent listings by reference. Public API on a paid plan. Found in luxury watch trade research) |
+| Search The Watch Market Business API | R, W | Public API | Paid account | No | Built (Reads market prices, days to sell and 13 weeks of price history for the references the store follows, with a Business API key on a paid plan. The first client's key confirms the mock built from the vendor's API reference) |
 | ElixIQ.io (formerly WatchFind.io) | R, W | Unknown | Unknown | No | Planned (Turns dealer WhatsApp group messages into structured watch listings with alerts. No API or export documented; start with scheduled exports. Found in luxury watch trade research) |
 | WatchCharts API | R, W | Public API | Paid account | No | Planned (Market prices, price history, retail prices and appraisals by reference. Public API on a paid, credit-based plan. Found in luxury watch trade research) |
 | EveryWatch | R, W | Partner | Partner | No | Planned (Auction results, dealer listings and price analytics. Data through an enterprise program; partner only. Found in luxury watch trade research) |
@@ -437,6 +437,7 @@ A request for a path or method the docs don't list throws `UndocumentedRequestEr
 - Rapaport's token service and Price List API: the full list and its changes
 - RepairShopr's ticket, estimate and invoice lists (API v1)
 - RingCentral's JWT sign-in, an extension's call log and its message store (REST API v1.0)
+- Search The Watch Market's resolve, model prices, days to sell and history
 - Slack's auth.test, conversations.list, conversations.history and conversations.replies, with both rate-limit regimes (Web API)
 - Smile.io's List VIP tiers, List customers and List points transactions
 - Sola Payments' transaction report (Report:All)
@@ -2230,6 +2231,25 @@ Each event is keyed by a digest of what was kept. A call or message without an i
 **Rate limits.** The client waits as `Retry-After` says (up to a minute), or 1, 2 and 4 seconds, on a 429, 503 or 504, before the error goes to the sync runner, which resumes from its checkpoint next time. It signs in again once on a 401. A 403 names the permission the app is missing.
 
 **Testing.** RingCentral's developer sandbox needs an account. The tests run against a mock built from RingCentral's developer guide (`packages/testkit/src/mocks/ringcentral.ts`). It checks the Basic auth and the JWT grant, the bearer token, the parameters each list takes and the page size. It lists what the first client's credential must confirm: that the token's scope is space-separated, that the call log pages like the message store, which results mean a missed call, and that changes land within a day.
+
+### Search The Watch Market
+
+Reads the market prices, days to sell and 13 weeks of price history for each watch reference the store follows, so the store sees a fair price and how fast a reference sells before it buys, takes a trade-in or prices a watch.
+
+| Setting | What it is |
+| --- | --- |
+| `STWM_API_KEY` | The Business API key, from API Access in the store's account |
+| `STWM_REFERENCES` | The references or names the store follows, comma or newline separated, up to 200 |
+
+**Read-only by design.** The Business API only answers GETs. The connector sends four, with the key as a Bearer token: resolving a reference to its model group, the model's latest prices, its days to sell, and its weekly price history. It declares no writes.
+
+**What it reads.** The API keeps no history past 13 weeks, so the historical import is one pass over the references and each later sync is another. Each reference is resolved to its model once, and the model is kept in the checkpoint, so later passes spend three calls on it. Two references for the same model are read once. Each reference is one batch, and the checkpoint keeps the pass's references, its day and its place, so a resumed sync goes on from there.
+
+**Events.** `watch_market.price_observed` for each model each day it is read: the reference, brand, model number and name, the currency, the number of listings, the low, high and mean asking price, the market value, and the days half and 95% of listings take to sell. `watch_market.price_week` for each complete week of history: the low, high and mean in each currency quoted, and the number of listings. A reference that matches no model, and an answer that doesn't read, are dead-lettered.
+
+**Allowance.** A plan allows 1,000 or 5,000 calls a day, shared with the vendor's own assistant access, and resets at midnight UTC. The client keeps the allowance left from `X-RateLimit-Remaining`, and a pass stops early, to go on next time, when 25 calls would be left. A 429 isn't retried, since it lasts until midnight; the sync runner keeps the checkpoint. A 500 or 503 is waited out 5, 10 and 20 seconds. Calls are spaced a quarter second apart.
+
+**Testing.** The Business API needs a paid plan. The tests run against a mock built from the vendor's API reference (`packages/testkit/src/mocks/search_the_watch_market.ts`). It lists what the first client's key must confirm: the key's shape, that a week's date is its first day, and how a 429 answers.
 
 ### Shopify
 
