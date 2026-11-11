@@ -106,6 +106,7 @@ These are built, tested against recorded vendor responses or mocks built from ea
 | Judge.me | Imports five years of product and store reviews, then the reviews posted or changed in the last two days on each sync | Marketing, Clienteling |
 | Pinterest | Imports every Pin the store has made, with its title, the page it links to and its 90-day and lifetime metrics | Marketing, Sales |
 | TikTok | Imports every public video the store posted in the last two years, with its title, link, length and views, likes, comments and shares | Marketing |
+| TikTok Ads | Imports two years of daily TikTok ad spend, impressions, reach, clicks and purchases for every campaign, then keeps them current | Marketing |
 | Yext | Imports two years of reviews from Google, Yelp, Facebook and the other sites Yext watches, with the rating, an excerpt and where to answer it | Marketing, Clienteling |
 | Amazon (Selling Partner API) | Imports two years of Amazon orders with their status, totals and lines, counted as sales next to the store and website | Sales, Inventory, Finance |
 | HRD Antwerp report check | Confirms each HRD Antwerp report number the business holds, with shape, carat weight, color, clarity, cut, polish, symmetry and proportions | Appraisals, Inventory, Buying |
@@ -168,7 +169,7 @@ This section updates itself as work lands: it is generated from [docs/milestones
 <!-- progress:start -->
 <!-- Generated from docs/milestones.json and the integration catalog by npm run progress:write. Edit those, not this block. -->
 
-**Overall: 80% complete**, 65 of 81 roadmap items done. 71 of the 253 systems in the integration catalog are connected.
+**Overall: 80% complete**, 65 of 81 roadmap items done. 72 of the 253 systems in the integration catalog are connected.
 
 | Milestone | What it gives a jeweler | Progress | Target |
 | --- | --- | --- | --- |
