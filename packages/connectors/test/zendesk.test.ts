@@ -751,7 +751,7 @@ describe("Zendesk connector", () => {
     const s = (asked[0] as { start: number }).start;
     expect(Math.abs(s - (Math.floor(Date.now() / 1000) - ZENDESK_FIRST_LOOKBACK_S))).toBeLessThan(5);
     const batches = await drain(zendeskConnector({ ...rest, client: { page: async () => ({ rows: [zendeskTicket.one()], cursor: "c", end: true }) } }).incrementalSync({ cursor: null } as never));
-    expect(Math.abs(Date.parse(batches[0]!.events[0]!.receivedAt) - Date.now())).toBeLessThan(5000);
+    expect(Math.abs(Date.parse((batches[0]!.events[0] as ZendeskEvent).receivedAt) - Date.now())).toBeLessThan(5000);
   });
 
   it("declares its writes and turns them down while writes are off", async () => {
