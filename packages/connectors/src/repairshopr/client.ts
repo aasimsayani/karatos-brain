@@ -120,9 +120,9 @@ export function repairShoprClient(options: RepairShoprClientOptions): RepairShop
       const body = (await response.json().catch(() => null)) as Record<string, unknown> | null;
       const records = body?.[q.list] ?? body?.data;
       if (!Array.isArray(records)) throw new RepairShoprApiError(`RepairShopr answered without a list of ${q.list}`, status);
-      const meta = (body!.meta ?? {}) as Record<string, unknown>;
+      const pages = (body!.meta as { total_pages?: unknown } | null | undefined)?.total_pages;
       // With a page count, that says when to stop; without one, an empty page does.
-      const more = Number.isSafeInteger(meta.total_pages) ? q.page < (meta.total_pages as number) : records.length > 0;
+      const more = Number.isSafeInteger(pages) ? q.page < (pages as number) : records.length > 0;
       return { records, more };
     },
   };

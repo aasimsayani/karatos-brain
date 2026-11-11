@@ -116,6 +116,7 @@ describe("RepairShopr client", () => {
     expect(repairShoprSubdomain("https://x.repairshopr.com//")).toBeNull();
     expect(repairShoprSubdomain("xhttps://x.repairshopr.com")).toBeNull();
     expect(repairShoprSubdomain("x.repairshopr.comx")).toBeNull();
+    expect(repairShoprSubdomain("ex/ample")).toBeNull();
     expect(repairShoprClient({ apiToken: TOKEN, subdomain: "https://Shop.repairshopr.com/" }).baseUrl).toBe("https://shop.repairshopr.com/api/v1");
   });
 
@@ -326,6 +327,7 @@ describe("RepairShopr events", () => {
     });
     const all = JSON.stringify(e);
     for (const hidden of ["crown", "Customer"]) expect(all, hidden).not.toContain(hidden);
+    expect(repairShoprEvent("estimates", one(repairShoprEstimate, { status: "S".repeat(80) }), ctx).payload.status).toBe("S".repeat(60));
     expect(repairShoprEvent("estimates", one(repairShoprEstimate, { subtotal: 450, tax: "x", total: null, date: "later" }), ctx).payload).toMatchObject({ subtotalCents: 45_000, taxCents: null, totalCents: null, date: null });
   });
 
@@ -349,6 +351,7 @@ describe("RepairShopr events", () => {
       techMarkedPaid: true,
       updatedAt: "2026-01-12T01:00:00.000Z",
     });
+    expect(repairShoprEvent("invoices", one(repairShoprInvoice, { is_paid: true, tech_marked_paid: false }), ctx).payload).toMatchObject({ paid: true, techMarkedPaid: false });
     const all = JSON.stringify(e);
     for (const hidden of ["Picked", "PO-1", "pdf", "Customer"]) expect(all, hidden).not.toContain(hidden);
     expect(repairShoprEvent("invoices", one(repairShoprInvoice, { ticket_id: null, location_id: "1", is_paid: "yes", verified_paid: true, tech_marked_paid: 0, due_date: "2026-01-20" }), ctx).payload).toMatchObject({ ticketId: null, locationId: null, paid: null, verifiedPaid: true, techMarkedPaid: null, dueDate: "2026-01-20" });
@@ -426,6 +429,15 @@ describe("RepairShopr connector", () => {
     const { memory, pipeline } = testPipeline();
     const report = await runSync({ connector: connector(mock), mode: "historical", pipeline, memory, organizationId: TEST_ORG });
     expect(report.ingested).toBe(6);
+    const events = eventsOf(await drain(connector(repairShoprDocMock(shop())).historicalImport({ cursor: null } as never)));
+    expect(events.map((e) => [e.type, Object.keys(e.payload)[1]])).toEqual([
+      ["repair.ticket_updated", "ticketId"],
+      ["repair.ticket_updated", "ticketId"],
+      ["repair.estimate_updated", "estimateId"],
+      ["repair.estimate_updated", "estimateId"],
+      ["repair.invoice_updated", "invoiceId"],
+      ["repair.invoice_updated", "invoiceId"],
+    ]);
     expect(mock.reads).toEqual([
       { list: "tickets", query: { since_updated_at: "2021-11-11T15:00:00.000Z", page: "1" } },
       { list: "estimates", query: { created_after: "2021-11-11T15:00:00.000Z", page: "1" } },

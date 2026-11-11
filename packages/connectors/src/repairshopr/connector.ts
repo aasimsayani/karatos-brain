@@ -83,14 +83,13 @@ export function repairShoprConnector(options: RepairShoprOptions): Connector {
   async function* walk(at: RepairShoprPass, since: (list: RepairShoprList) => string, cursor: Omit<RepairShoprCursor, "pass">, doneAtEnd: boolean, receivedAt: string): AsyncIterable<SourceBatch> {
     for (let i = REPAIRSHOPR_LISTS.indexOf(at.list), page = at.page; i < REPAIRSHOPR_LISTS.length; i++, page = 1) {
       const list = REPAIRSHOPR_LISTS[i]!;
-      for (;;) {
+      for (; ; page++) {
         const result = await client.list({ list, since: since(list), page });
         const events = result.records.map((r) => repairShoprEvent(list, r, { receivedAt }));
         const next: RepairShoprPass | null = result.more ? { list, page: page + 1 } : i + 1 < REPAIRSHOPR_LISTS.length ? { list: REPAIRSHOPR_LISTS[i + 1]!, page: 1 } : null;
         const saved: RepairShoprCursor = next ? { ...cursor, pass: next } : { ...cursor, pass: null, done: doneAtEnd };
         yield { events, cursor: JSON.stringify(saved) };
         if (!result.more) break;
-        page++;
       }
     }
   }
