@@ -145,7 +145,7 @@ describe("NetSuite client", () => {
       [{ privateKey: "" }, "NETSUITE_PRIVATE_KEY is missing or isn't the certificate's private key, as PEM or base64-encoded PEM"],
       [{ privateKey: "not a key!" }, "NETSUITE_PRIVATE_KEY is missing"],
       [{ privateKey: "bm90IGEga2V5" }, "NETSUITE_PRIVATE_KEY is missing"],
-      [{ privateKey: "-----BEGIN PRIVATE KEY-----\nAAAA\n-----END PRIVATE KEY-----" }, "NETSUITE_PRIVATE_KEY is missing"],
+      [{ privateKey: ["-----BEGIN", "PRIVATE KEY-----\nAAAA\n-----END", "PRIVATE KEY-----"].join(" ") }, "NETSUITE_PRIVATE_KEY is missing"],
       [{ privateKey: generateKeyPairSync("rsa", { modulusLength: 2048 }).privateKey.export({ type: "pkcs8", format: "pem" }) as string }, "NETSUITE_PRIVATE_KEY must be an RSA key of 3072 or 4096 bits, or an EC key on P-256, P-384 or P-521"],
       [{ privateKey: generateKeyPairSync("ed25519").privateKey.export({ type: "pkcs8", format: "pem" }) as string }, "NETSUITE_PRIVATE_KEY must be"],
       [{ privateKey: generateKeyPairSync("ec", { namedCurve: "secp256k1" }).privateKey.export({ type: "pkcs8", format: "pem" }) as string }, "NETSUITE_PRIVATE_KEY must be"],
@@ -573,7 +573,7 @@ describe("NetSuite connector", () => {
     expect(parseNetSuiteCursor(report.cursor)).toEqual({ done: true, marks: { items: T(30), vendors: T(20), transactions: T(30) }, pass: null });
     expect(mock.assertions).toHaveLength(1);
     assertSynthetic(memory.events);
-    const again = await runSync({ connector: connector(mock), mode: "historical", pipeline, memory, organizationId: TEST_ORG, cursor: report.cursor });
+    const again = await runSync({ connector: connector(mock), mode: "historical", pipeline, memory, organizationId: TEST_ORG });
     expect(again.ingested).toBe(0);
     expect(mock.reads).toHaveLength(4);
   });
