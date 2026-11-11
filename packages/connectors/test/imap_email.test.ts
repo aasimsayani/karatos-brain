@@ -839,7 +839,7 @@ describe("IMAP client", () => {
       const c = await imapClient(clientOptions(s)).open();
       const error = (await errorOf(c.fetch("1"))) as ImapError;
       expect([error.retryable, s.closed], answer).toEqual([false, 1]);
-      expect(error.message).toMatch(new RegExp(`^the IMAP server at ${HOST.replace(/\./g, "\\.")}:993 sent a FETCH response that doesn't read`));
+      expect(error.message.startsWith(`the IMAP server at ${HOST}:993 sent a FETCH response that doesn't read`), error.message).toBe(true);
     }
     const tooLong = imapFakeServer(mailbox(), { script: (c) => (c.command === "UID FETCH" ? `* SEARCH ${"1 ".repeat(40)}\r\n{tag} OK done\r\n` : undefined) });
     const t = await imapClient(clientOptions(tooLong, { maxLine: 50 })).open();

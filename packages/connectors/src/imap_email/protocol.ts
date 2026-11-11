@@ -150,7 +150,7 @@ export interface ImapResponse {
 }
 
 const STATUS = new Set(["OK", "NO", "BAD", "BYE", "PREAUTH"]);
-const TAG = /^[!#-'*,-[\]-z|~]+$/;
+const TAG = /^[!#$%&'*,\-./0-9:;<=>?@A-Z[\]^_`a-z|~]+$/;
 
 /** Reads a response's tag, kind, number and status code. */
 export function readImapResponse(raw: ImapRawResponse): ImapResponse {
