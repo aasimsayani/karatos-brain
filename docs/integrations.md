@@ -72,7 +72,7 @@ Used by: R is retail, W is wholesale, M is manufacturing. Test with says how we 
 | wJewel | R | Unknown | Unknown | No | Planned (Jewelry POS with layaways, appraisals, CRM and repairs. No API found; start with scheduled exports. Found in jewelry industry sources) |
 | ChainDrive | R, W | File export | Partner | No | Planned (Retail management used by jewelry chains: sales, inventory and merchandising. No public API; start with scheduled exports. Found in jewelry industry sources) |
 | iJewel3D | R, W, M | Public API | Free sandbox | No | Planned (Hosted 3D jewelry models, ring configurator and AR try-on. Public API with a free sandbox. No public API changelog found; the nightly sandbox run catches API changes. Likely exhibited at JCK 2026 as i-Jewel) |
-| Whatnot Seller API | R, W | Partner | Free sandbox | Yes | Planned (Live-shopping products, listings, orders and sale webhooks. Seller API by approval; partner only. Exhibited at JIS Fall 2026) |
+| Whatnot | R, W | Public API | Paid account | Yes | Built (Reads with a seller API token the account owner creates in Whatnot's developer dashboard with only read:orders and read:inventory, and the client only ever sends GETs. Whatnot's REST API has no sandbox: the first seller's account confirms the mock built from Whatnot's docs) |
 | Kickflip jewelry configurator | R, M | Unknown | Unknown | No | Planned (Custom jewelry configurator: configuration summaries and engraving files per order. No API found. Found in jewelry industry sources) |
 | Custom Ring Builder | R | Partner | Partner | No | Planned (Shopify ring builder with live diamond feeds. Partner only. Found in jewelry industry sources) |
 | Keyideas RingBuilder | R | File export | Partner | No | Planned (Shopify ring builder with diamond and gemstone feeds. No public API; partner only, start with its CSV exports. Found in jewelry industry sources) |
@@ -456,6 +456,7 @@ A request for a path or method the docs don't list throws `UndocumentedRequestEr
 - Trustpilot's public business unit and service reviews (v1)
 - UPS's OAuth client credentials token and Tracking API details call
 - Verkada's API token, occupancy trends cameras and occupancy trends
+- The Whatnot Seller API's order, order item, product and variant lists (REST v2), with bearer tokens, scopes, cursors and direction
 - A Wix site's read endpoints (eCommerce orders, Catalog V3 and V1, Contacts V5) with the app token, its permissions and cursor paging
 - A WooCommerce store's REST API v3 read endpoints with its key permissions and page headers
 - Xero's Accounting API endpoints with its token refresh
@@ -2882,6 +2883,32 @@ Everything else in a message, chatter included, is dropped.
 **What the brain does with it.** When three or more dealers have asked for the same reference in the last 14 days, buying recommends offering one to them, with the lowest price other dealers in the groups are asking.
 
 **Testing.** The tests use synthetic exports in both phones' styles, with fictional dealers and 555 numbers. They cover the date and price readers, every runSync scenario, re-exports, the history cutoff and a real folder.
+
+### Whatnot
+
+Reads one Whatnot seller's account through the Whatnot Seller API, REST v2, at `https://api.whatnot.com/seller-api/rest/v2` ([introduction](https://developers.whatnot.com/getting-started/introduction)): its orders from live shows and the marketplace, with their line items, and its products with each variant's price and available stock. They arrive as the same events the Etsy and eBay connectors give, so a Whatnot sale reads like any other, with `channel: "event"` for a sale in a live show.
+
+| Setting | What it is |
+| --- | --- |
+| `WHATNOT_ACCESS_TOKEN` | A seller API token: a personal access token (`wn_pat_tk_...`) the account owner creates, or an OAuth app token (`wn_access_tk_...`) |
+
+**Sign-in.** Requests carry `Authorization: Bearer <token>` and a User-Agent naming KaratOS ([authentication](https://developers.whatnot.com/getting-started/authentication)). Only the account owner can create tokens, on the Personal access tokens tab of Whatnot's developer dashboard. Create the token with exactly two permissions, `read:orders` and `read:inventory`, and nothing else: no write permission, and not `read:customers`, since no buyer details are kept. Whatnot shows the token once; it can expire after 7, 30, 60 or 90 days, on a custom date, or never. The token is checked before anything is sent: it must start `wn_pat_tk_` or `wn_access_tk_`. A 401 or 403 stops the sync with a message saying the token must be a Whatnot seller API token with `read:orders` and `read:inventory`, and Whatnot's problem type, such as `missing-scope`, when it gives one. The client sends GET requests to the four lists below and has no way to send anything else.
+
+**What it reads.** `GET /orders`, then `GET /orders/{order_id}/items` for each order, then `GET /products`, then `GET /products/{product_id}/variants` for each product, 50 a page, following `next_cursor` ([orders](https://developers.whatnot.com/api-reference/tag/orders), [products](https://developers.whatnot.com/api-reference/tag/products)). Whatnot's lists take only `limit`, `cursor` and `reverse`: there is no created-since or updated-since filter. So the historical import reads every order oldest first, then every product oldest first, and stops for good. Each later sync reads orders newest first and stops after a page where every order was created more than 60 days ago, then reads every product again (sellers list few). What didn't change comes back as duplicates. A change to an order older than 60 days isn't seen until the next historical import. Each page is a batch, and the checkpoint keeps Whatnot's cursor, so a sync that stops resumes at the same page. Whatnot allows 10 requests a second per seller and app ([rate limits](https://developers.whatnot.com/getting-started/rate-limits)); a 429 (or a 500, 502, 503 or 504) is retried three times, honoring `Retry-After` up to a minute or else waiting 1, 2 and 4 seconds, before the sync stops and resumes from its checkpoint. Errors are read as problem details ([errors](https://developers.whatnot.com/errors)).
+
+**Events.**
+
+- `order.updated` for each version of an order: its status (pending, pending fulfillment, completed, cancelled or failed), whether it's paid, completed or cancelled, the format (auction, buy it now, giveaway), the show it sold in, the subtotal, shipping, tax, seller discount and total in whole cents, the currency and its line count, with `marketplace: "whatnot"`. It is keyed by the order's id, status and last update.
+- `sale.completed` once an order is ready to fulfill, completed or cancelled and its lines all read, keyed by order so a later change never counts it twice: each line's SKU (or `whatnot-variant-<id>` when the seller set none), quantity and unit price. Whatnot doesn't say how the buyer paid, so the payment is `other`. A giveaway with nothing paid is no sale.
+- `sale.returned` once an order is cancelled, keyed by order, with each line refunded in full. A cancelled order gives both the sale and the return, so it nets to zero whether or not the sale was seen before it was cancelled. Whatnot's REST API has no refunds, so a partial refund isn't seen.
+- `product.updated` for each product, with its variants' SKUs, prices and available quantities, keyed by a digest of what is kept. Whatnot's products have no status, so each is `ACTIVE`.
+- `inventory.counted` for each variant's available quantity at Whatnot's default location, keyed by the variant, the quantity and the product's last update.
+
+No buyer id, username or display name is kept, nor item or product descriptions, media, or dashboard links. An order, line, product or count that doesn't read is dead-lettered with what was wrong, never guessed.
+
+**Writes.** Cancelling an order is declared behind the write gate, needing approval each time and at most five a day, and turned down while writes are off. The token has no write scope and the client has no way to send it.
+
+**Testing.** Whatnot's REST API has no sandbox. The mock (`packages/testkit/src/mocks/whatnot.ts`) is built from Whatnot's API reference, and its assumptions list what the first live run on a seller's account must confirm, among them the key orders and products are sorted by and that the product lists need `read:inventory`.
 
 ### Wix
 
