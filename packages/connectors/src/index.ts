@@ -59,6 +59,7 @@ export * from "./shipping/index.js";
 export * from "./shipstation/index.js";
 export * from "./shopify/index.js";
 export * from "./slack/index.js";
+export * from "./smile_io/index.js";
 export * from "./sola_payments/index.js";
 export * from "./square/index.js";
 export * from "./squarespace/index.js";
