@@ -350,6 +350,7 @@ export const CONNECTED_ON: Readonly<Record<string, string>> = {
   yotpo: "2026-11-10",
   judgeme: "2026-11-10",
   trustpilot: "2026-11-11",
+  netsuite: "2026-11-11",
   openphone: "2026-11-10",
   zoom: "2026-11-10",
   tiktok: "2026-11-01",
