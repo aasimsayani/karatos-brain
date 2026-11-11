@@ -84,7 +84,7 @@ export const SYSTEM_DETAILS: Readonly<Record<string, SystemDetail>> = {
   cardone_fintech: { about: "Payments and financing offered to the store's customers." },
   american_first_finance: { about: "Consumer financing and lease-to-own applications, funded contracts and settlements." },
   aurora_payments: { about: "Card transactions, batches, deposits and processing fees." },
-  sola_payments: { about: "Payment gateway transactions, customers and recurring layaway payments." },
+  sola_payments: { about: "Card and check payments and refunds through the gateway, layaway installments included." },
   wells_fargo_jewelry_advantage: { about: "Financed sales and merchant summaries from the store's Wells Fargo program." },
   owl_financial: { about: "Collateral loans to the business and the pieces pledged against them." },
 
@@ -346,6 +346,7 @@ export const CONNECTED_ON: Readonly<Record<string, string>> = {
   birdeye: "2026-11-10",
   etsy: "2026-11-10",
   taxjar: "2026-11-10",
+  sola_payments: "2026-11-10",
   yotpo: "2026-11-10",
   judgeme: "2026-11-10",
   openphone: "2026-11-10",
