@@ -35,6 +35,7 @@ import plaid from "./plaid.js";
 import quickbooks from "./quickbooks.js";
 import shopify from "./shopify.js";
 import slack from "./slack.js";
+import sola_payments from "./sola_payments.js";
 import square from "./square.js";
 import stripe from "./stripe.js";
 import tiktok from "./tiktok.js";
@@ -47,4 +48,4 @@ import xero from "./xero.js";
 import yext from "./yext.js";
 
 /** Every connector's nightly sandbox check. */
-export const SANDBOX_CHECKS: SandboxCheck[] = [affirm, airtable, amazon, asana, authorize_net, avalara, bigcommerce, bill_com, calendly, clover, custom_forms, docusign, dropbox, ebay, fedex, gia, gmail, google_ads, google_analytics, google_workspace, gusto, hubspot, klaviyo, lightspeed, mailchimp, meta_ads, metals_api, microsoft_onedrive, monday, notion, pinterest, plaid, quickbooks, shopify, slack, square, stripe, tiktok, trello, twilio, ups, wix, woocommerce, xero, yext];
+export const SANDBOX_CHECKS: SandboxCheck[] = [affirm, airtable, amazon, asana, authorize_net, avalara, bigcommerce, bill_com, calendly, clover, custom_forms, docusign, dropbox, ebay, fedex, gia, gmail, google_ads, google_analytics, google_workspace, gusto, hubspot, klaviyo, lightspeed, mailchimp, meta_ads, metals_api, microsoft_onedrive, monday, notion, pinterest, plaid, quickbooks, shopify, slack, sola_payments, square, stripe, tiktok, trello, twilio, ups, wix, woocommerce, xero, yext];
