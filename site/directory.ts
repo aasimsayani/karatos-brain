@@ -385,6 +385,7 @@ export const CONNECTED_ON: Readonly<Record<string, string>> = {
   formlabs: "2026-11-11",
   smile_io: "2026-11-11",
   zendesk: "2026-11-11",
+  google_business_profile: "2026-11-11",
   cin7: "2026-11-11",
   shipstation: "2026-11-11",
   bci_e_jewelry: "2026-11-11",
