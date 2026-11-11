@@ -243,7 +243,7 @@ export const SYSTEM_DETAILS: Readonly<Record<string, SystemDetail>> = {
   acumatica_jewelshop: { about: "Inventory, production, memo and the books from JewelShop." },
   diamtrade: { about: "Diamond and jewelry inventory, memo and trading records." },
   matrixgold: { about: "Custom design files and metal weight estimates." },
-  formlabs: { about: "Print jobs for wax and resin models." },
+  formlabs: { about: "Print runs for wax and resin models, from queue to finished." },
   netsuite: { about: "Items, orders, purchase orders and the books." },
   katana: { about: "Manufacturing orders, materials, stock and costs." },
   cin7: { about: "Inventory, purchasing and sales across channels." },
@@ -374,5 +374,6 @@ export const CONNECTED_ON: Readonly<Record<string, string>> = {
   hrd: "2026-11-10",
   ramp: "2026-11-11",
   repairshopr: "2026-11-11",
+  formlabs: "2026-11-11",
   gusto: "2026-10-30",
 };
