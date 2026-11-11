@@ -206,6 +206,7 @@ The table is generated from the [integration catalog](docs/integrations.md), so 
 | PIRO | Imports five years of PIRO manufacturing jobs: status, stage, style, order number, metal, dates and weights | Manufacturing, Inventory, Wholesale |
 | EDI with retail partners (X12 850, 855, 856, 810, 846, 852) | Imports two years of purchase orders (850), inventory reports (846) and sell-through (852) from retail partners | Inventory, Sales, Wholesale |
 | Calendly | Imports two years of appointments and the year ahead, such as bridal consultations, repair drop-offs and pickups, then keeps them current | Clienteling, Custom orders, Repairs |
+| Acuity Scheduling | Imports two years of appointments and the 90 days ahead, such as bridal consultations, repair drop-offs and pickups | Clienteling, Custom orders, Repairs |
 | Avalara AvaTax | Imports five years of sales tax for every sale, return and purchase, then keeps it current as transactions are committed, voided or adjusted | Compliance, Finance |
 | TaxJar | Imports five years of the sales and refunds recorded in TaxJar, from each source named, then the last 31 days again on each sync | Compliance, Finance |
 | FinCEN Form 8300 cash reporting | Imports five years of Form 8300 filings: date filed, sales covered, cash, and the BSA Tracking ID or BSA ID | Compliance |
@@ -281,7 +282,7 @@ This section updates itself from [docs/milestones.json](docs/milestones.json) an
 
 **Roadmap:** 20 of 81 items done. An integration counts as done once it has run against a real or sandbox account, not when its tests pass.
 
-**Integrations:** 90 of the 253 systems in the catalog are built and tested against mocks made from each vendor's docs. 0 have been checked live so far.
+**Integrations:** 91 of the 253 systems in the catalog are built and tested against mocks made from each vendor's docs. 0 have been checked live so far.
 
 | Milestone | What it gives a jeweler | Progress | Target |
 | --- | --- | --- | --- |
