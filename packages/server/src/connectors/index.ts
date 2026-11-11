@@ -40,6 +40,7 @@ import meta_ads from "./meta_ads.js";
 import metals_api from "./metals_api.js";
 import microsoft_onedrive from "./microsoft_onedrive.js";
 import microsoft_outlook from "./microsoft_outlook.js";
+import microsoft_teams from "./microsoft_teams.js";
 import monday from "./monday.js";
 import nivoda from "./nivoda.js";
 import notion from "./notion.js";
@@ -76,4 +77,4 @@ import yotpo from "./yotpo.js";
 import zoom from "./zoom.js";
 
 /** How each built connector is made from an instance's settings, by catalog id. */
-export const FACTORIES: Readonly<Record<string, ConnectorFactory>> = { affirm, airtable, amazon, asana, authorize_net, avalara, bank_statements, bigcommerce, bill_com, birdeye, calendly, chase, clover, custom_forms, docusign, dropbox, ebay, edi_x12, etsy, fedex, fincen_8300, gia, gmail, google_ads, google_analytics, google_workspace, gusto, hrd, hubspot, idex, inventory_pos, judgeme, katana, klaviyo, lightspeed, mailchimp, meta_ads, metals_api, microsoft_onedrive, microsoft_outlook, monday, nivoda, notion, openphone, pinterest, piro, plaid, quickbooks, ramp, rapnet, refiner_statements, repairshopr, rfid_counts, shopify, slack, sola_payments, square, squarespace, stripe, stuller, supplier_invoices, taxjar, tiktok, tiktok_ads, trello, twilio, ups, watchsearch, wix, woocommerce, xero, yext, yotpo, zoom };
+export const FACTORIES: Readonly<Record<string, ConnectorFactory>> = { affirm, airtable, amazon, asana, authorize_net, avalara, bank_statements, bigcommerce, bill_com, birdeye, calendly, chase, clover, custom_forms, docusign, dropbox, ebay, edi_x12, etsy, fedex, fincen_8300, gia, gmail, google_ads, google_analytics, google_workspace, gusto, hrd, hubspot, idex, inventory_pos, judgeme, katana, klaviyo, lightspeed, mailchimp, meta_ads, metals_api, microsoft_onedrive, microsoft_outlook, microsoft_teams, monday, nivoda, notion, openphone, pinterest, piro, plaid, quickbooks, ramp, rapnet, refiner_statements, repairshopr, rfid_counts, shopify, slack, sola_payments, square, squarespace, stripe, stuller, supplier_invoices, taxjar, tiktok, tiktok_ads, trello, twilio, ups, watchsearch, wix, woocommerce, xero, yext, yotpo, zoom };
