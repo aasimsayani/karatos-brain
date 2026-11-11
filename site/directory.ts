@@ -296,7 +296,7 @@ export const SYSTEM_DETAILS: Readonly<Record<string, SystemDetail>> = {
   watch_register: { about: "Serial number checks against lost and stolen watches before buying one." },
   art_loss_register: { about: "Due-diligence searches for stolen valuables before buying." },
   repairdesk: { about: "Repair tickets, intake checklists, warranty claims and serialized stock." },
-  repairshopr: { about: "Repair tickets and their status." },
+  repairshopr: { about: "Repair tickets, estimates and invoices, from intake to payment." },
 };
 
 /**
@@ -374,5 +374,6 @@ export const CONNECTED_ON: Readonly<Record<string, string>> = {
   hrd: "2026-11-10",
   ramp: "2026-11-11",
   klarna: "2026-11-11",
+  repairshopr: "2026-11-11",
   gusto: "2026-10-30",
 };
