@@ -124,8 +124,8 @@ export function trustpilotDocMock(data: TrustpilotMockData): TrustpilotMock {
         path: "/business-units/{unit}",
         documentedAt: TRUSTPILOT_DOC_PAGES.unit,
         respond(request, params): DocMockResponse {
-          const refused = gate(request);
-          if (refused) return refused;
+          const denied = gate(request);
+          if (denied) return denied;
           if (params.unit !== unit.id) return { status: 404, body: { message: "Not found" } };
           return { status: 200, body: unit };
         },
@@ -135,8 +135,8 @@ export function trustpilotDocMock(data: TrustpilotMockData): TrustpilotMock {
         path: "/business-units/{unit}/reviews",
         documentedAt: TRUSTPILOT_DOC_PAGES.reviews,
         respond(request, params): DocMockResponse {
-          const refused = gate(request);
-          if (refused) return refused;
+          const denied = gate(request);
+          if (denied) return denied;
           if (params.unit !== unit.id) return { status: 404, body: { message: "Not found" } };
           const q = Object.fromEntries(request.url.searchParams);
           for (const name of Object.keys(q)) if (!REVIEW_PARAMS.includes(name)) return { status: 400, body: { message: `Unknown parameter ${name}` } };
