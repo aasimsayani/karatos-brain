@@ -70,6 +70,7 @@ export * from "./taxjar/index.js";
 export * from "./tiktok/index.js";
 export * from "./tiktok_ads/index.js";
 export * from "./trello/index.js";
+export * from "./trustpilot/index.js";
 export * from "./twilio/index.js";
 export * from "./ups/index.js";
 export * from "./watchsearch/index.js";
