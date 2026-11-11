@@ -237,6 +237,7 @@ The table is generated from the [integration catalog](docs/integrations.md), so 
 | Amazon (Selling Partner API) | Imports two years of Amazon orders with their status, totals and lines, counted as sales next to the store and website | Sales, Inventory, Finance |
 | Squarespace Commerce | Reads the whole catalog with each variant's price, sale price and stock, on every sync | Sales, Inventory, Clienteling, Marketing |
 | HRD Antwerp report check | Confirms each HRD Antwerp report number the business holds, with shape, carat weight, color, clarity, cut, polish, symmetry and proportions | Appraisals, Inventory, Buying |
+| Extend product protection | Imports every product protection contract and order Extend holds for the store, then what changed | Sales, Repairs, Clienteling |
 | Supplier invoices and memos | Imports six years of supplier invoice and memo lines: items, quantities, costs, memo terms and due dates | Buying, Inventory, Compliance, Finance |
 | RFID and barcode tray counts | Imports two years of tray and case counts: what was read, when, and by whom | Inventory, Compliance |
 | ShipStation | Imports two years of shipments and labels, then the shipments changed since the last sync and the last 30 days of labels on each sync | Sales, Inventory, Compliance |
@@ -281,7 +282,7 @@ This section updates itself from [docs/milestones.json](docs/milestones.json) an
 
 **Roadmap:** 20 of 81 items done. An integration counts as done once it has run against a real or sandbox account, not when its tests pass.
 
-**Integrations:** 90 of the 253 systems in the catalog are built and tested against mocks made from each vendor's docs. 0 have been checked live so far.
+**Integrations:** 91 of the 253 systems in the catalog are built and tested against mocks made from each vendor's docs. 0 have been checked live so far.
 
 | Milestone | What it gives a jeweler | Progress | Target |
 | --- | --- | --- | --- |
