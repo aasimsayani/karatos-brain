@@ -60,6 +60,7 @@ export * from "./rfid_counts/index.js";
 export * from "./ringcentral/index.js";
 export * from "./search_the_watch_market/index.js";
 export * from "./shipping/index.js";
+export * from "./shipstation/index.js";
 export * from "./shopify/index.js";
 export * from "./slack/index.js";
 export * from "./smile_io/index.js";
