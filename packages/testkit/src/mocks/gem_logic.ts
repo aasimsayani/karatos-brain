@@ -76,7 +76,7 @@ export function gemLogicDocMock(data: GemLogicMockData): GemLogicMock {
   const api = checkDocMock({
     integration: "gem_logic",
     baseUrl: "https://example.gem-logic.com",
-    source: { url: DOCS.api, title: "Gem Logic API", retrievedOn: "2026-11-11" },
+    source: { url: DOCS.api, title: "Gem Logic API", retrievedOn: "2026-11-11", version: "unversioned /api/" },
     assumptions: [
       "Lists answer as a plain JSON list; a paged list answers count, next, previous and results, and takes page",
       "Products come in a stable order, oldest ID first",
