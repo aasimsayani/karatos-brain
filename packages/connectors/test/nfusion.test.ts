@@ -32,7 +32,6 @@ import {
   NFUSION_WRITES,
   NfusionApiError,
   NfusionConfigError,
-  WHATNOT_USER_AGENT,
   isNfusionRateLimit,
   nfusionCents,
   nfusionClient,
@@ -144,7 +143,7 @@ describe("nFusion client", () => {
     expect(NFUSION_API_BASE).toBe("https://api.nfusionsolutions.biz");
     expect(NFUSION_SUMMARY_PATH).toBe("/api/v1/Metals/spot/summary");
     expect(NFUSION_HISTORY_PATH).toBe("/api/v1/Metals/spot/history");
-    expect(NFUSION_USER_AGENT).toBe(WHATNOT_USER_AGENT);
+    expect(NFUSION_USER_AGENT).toBe("KaratOS/1.0 (+https://github.com/aasimsayani/karatos-brain)");
     expect(Object.keys(c).sort()).toEqual(["spotHistory", "spotSummary"]);
   });
 
@@ -327,7 +326,16 @@ describe("nFusion values", () => {
     expect(nfusionTime("2026-11-11T10:30:00-05:00")).toBe("2026-11-11T15:30:00.000Z");
     expect(nfusionTime("2026-11-11T15:30")).toBe("2026-11-11T15:30:00.000Z");
     expect(nfusionTime("2026-11-11T15:30:00")).toBe("2026-11-11T15:30:00.000Z");
-    for (const v of ["2026-11-11", "2026-02-30T00:00:00Z", "2026-13-01T00:00:00Z", "2026-11-11T25:00:00Z", "2026-11-11 15:30:00Z", "2026-11-11T15:30:00+0500", "x2026-11-11T15:30:00Z", "2026-11-11T15:30:00Zx", "", 1_700_000_000, null, undefined]) {
+    // A time without a zone is UTC, whatever zone the server runs in.
+    const zone = process.env.TZ;
+    process.env.TZ = "America/New_York";
+    try {
+      expect(nfusionTime("2026-11-11T15:30")).toBe("2026-11-11T15:30:00.000Z");
+    } finally {
+      if (zone === undefined) delete process.env.TZ;
+      else process.env.TZ = zone;
+    }
+    for (const v of ["2026-11-11", "2026-02-30T00:00:00Z", "2026-13-01T00:00:00Z", "2026-11-11T25:00:00Z", "2026-11-11 15:30:00Z", "2026-11-11T15:30:00+0500", "x2026-11-11T15:30:00Z", "2026-11-11T15:30:00Zx", "2026-11-11T15:30:00.1234567891Z", "", 1_700_000_000, null, undefined]) {
       expect(nfusionTime(v), String(v)).toBeUndefined();
     }
     expect(nfusionDay("2026-11-11T00:00:00-05:00")).toBe("2026-11-11");
@@ -405,9 +413,11 @@ describe("nFusion events", () => {
     expect(at(element(null, { success: false, error: "e".repeat(300) }))).toEqual([`nFusion did not answer it: ${"e".repeat(200)}`]);
     expect(at(element(goldSummary(), { success: "true" }))).toEqual(["nFusion did not answer it"]);
     expect(at(element(goldSummary(), { success: false, error: 5 }))).toEqual(["nFusion did not answer it"]);
+    expect(at(element(goldSummary(), { success: false, error: " \n " }))).toEqual(["nFusion did not answer it"]);
     expect(at(element(null))).toEqual(["element has no data"]);
     expect(at(element([goldSummary()], { requestedSymbol: "rhodium" }))).toEqual(["element has no data", "element is not for gold, silver, platinum or palladium"]);
     expect(at(element(goldSummary({ baseCurrency: "EUR" })))).toEqual(["element is not in USD"]);
+    expect(at(element(goldSummary({ baseCurrency: undefined })))).toEqual(["element is not in USD"]);
     expect(at(element(goldSummary(), { requestedUnitOfMeasure: "g" }))).toEqual(["element is not per troy ounce"]);
     expect(at(element(goldSummary({ timeStamp: "2026-11-11" })))).toEqual(["summary has no timeStamp that reads"]);
     expect(at(element(goldSummary({ last: null })))).toEqual(["summary has no last price that reads"]);

@@ -1,5 +1,4 @@
 import type { PricedMetal } from "../metals_api/client.js";
-import { WHATNOT_USER_AGENT } from "../whatnot/client.js";
 
 /**
  * A small client for nFusion Solutions' Market Data API (metals and
@@ -20,7 +19,7 @@ import { WHATNOT_USER_AGENT } from "../whatnot/client.js";
 
 export const NFUSION_API_BASE = "https://api.nfusionsolutions.biz";
 /** The same User-Agent the other connectors send. */
-export const NFUSION_USER_AGENT = WHATNOT_USER_AGENT;
+export const NFUSION_USER_AGENT = "KaratOS/1.0 (+https://github.com/aasimsayani/karatos-brain)";
 export const NFUSION_SUMMARY_PATH = "/api/v1/Metals/spot/summary";
 export const NFUSION_HISTORY_PATH = "/api/v1/Metals/spot/history";
 /** The least time between two requests: nFusion asks for under one call a second per service. */
@@ -33,7 +32,6 @@ export const NFUSION_MIN_INTERVAL_MS = 1100;
  * the query string.
  */
 const TOKEN = /^[A-Za-z0-9_-]{8,256}$/;
-const DATE = /^\d{4}-\d{2}-\d{2}$/;
 const MAX_WAIT_S = 60;
 const RETRIED = new Set([429, 500, 502, 503, 504]);
 const METAL_NAMES = new Set<string>(["gold", "silver", "platinum", "palladium"]);
@@ -76,7 +74,7 @@ export interface NfusionClient {
   spotHistory(metals: readonly PricedMetal[], start: string, end: string): Promise<unknown[]>;
 }
 
-const isDay = (value: string) => DATE.test(value) && !Number.isNaN(Date.parse(`${value}T00:00:00Z`)) && new Date(`${value}T00:00:00Z`).toISOString().slice(0, 10) === value;
+const isDay = (value: string) => !Number.isNaN(Date.parse(`${value}T00:00:00Z`)) && new Date(`${value}T00:00:00Z`).toISOString().slice(0, 10) === value;
 
 /**
  * Whether a 403 is nFusion's rate limit. nFusion says only "HTTP 403 with
@@ -87,7 +85,7 @@ const isDay = (value: string) => DATE.test(value) && !Number.isNaN(Date.parse(`$
 export function isNfusionRateLimit(status: number, headers: Headers, text: string): boolean {
   if (status !== 403) return false;
   if (/\b403\.502\b/.test(text) || /sub-?status\W{0,20}502\b/i.test(text)) return true;
-  for (const [name, value] of headers) if (/sub-?status/i.test(name) && value.trim() === "502") return true;
+  for (const [name, value] of headers) if (/sub-?status/i.test(name) && value === "502") return true;
   return false;
 }
 

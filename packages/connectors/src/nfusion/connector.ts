@@ -55,12 +55,11 @@ export interface NfusionRecentCursor {
   day: string;
 }
 
-const DATE = /^\d{4}-\d{2}-\d{2}$/;
 const DAY_MS = 86_400_000;
-const isDay = (v: unknown): v is string => typeof v === "string" && DATE.test(v) && !Number.isNaN(Date.parse(`${v}T00:00:00Z`)) && isoDay(new Date(`${v}T00:00:00Z`)) === v;
+const isDay = (v: unknown): v is string => typeof v === "string" && !Number.isNaN(Date.parse(`${v}T00:00:00Z`)) && isoDay(new Date(`${v}T00:00:00Z`)) === v;
 const isoDay = (d: Date) => d.toISOString().slice(0, 10);
 const addDays = (day: string, n: number) => isoDay(new Date(Date.parse(`${day}T00:00:00Z`) + n * DAY_MS));
-const daysBetween = (from: string, to: string) => Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / DAY_MS);
+const daysBetween = (from: string, to: string) => (Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / DAY_MS;
 
 function parse(raw: string, keys: string, message: string): Record<string, unknown> {
   let c: unknown;
@@ -69,7 +68,7 @@ function parse(raw: string, keys: string, message: string): Record<string, unkno
   } catch {
     throw new Error(message);
   }
-  if (typeof c !== "object" || c === null || Array.isArray(c) || Object.keys(c).sort().join(",") !== keys) throw new Error(message);
+  if (typeof c !== "object" || c === null || Object.keys(c).sort().join(",") !== keys) throw new Error(message);
   return c as Record<string, unknown>;
 }
 
@@ -136,7 +135,8 @@ export function nfusionConnector(options: NfusionOptions): Connector {
     let day = from;
     for (const stretch of nfusionWindows(from, today)) {
       const { events, lastDay } = await read(stretch.from, stretch.through);
-      if (lastDay !== null && lastDay > day) day = lastDay;
+      // Each stretch is later than the one before, so its last day is the latest yet.
+      if (lastDay !== null) day = lastDay;
       const cursor: NfusionRecentCursor = { day };
       yield { events, cursor: JSON.stringify(cursor) };
     }
