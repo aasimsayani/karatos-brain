@@ -128,6 +128,8 @@ describe("ShipStation client", () => {
     expect(sent).toHaveLength(0);
     expect(await c.page("shipments", before(1), 1)).toEqual({ rows: [], pages: 1 });
     expect(SHIPSTATION_MAX_PAGE).toBe(2000);
+    const top = client(scripted(json(200, { ...PAGE, page: SHIPSTATION_MAX_PAGE })).fetch).c;
+    expect(await top.page("shipments", before(1), SHIPSTATION_MAX_PAGE)).toEqual({ rows: [], pages: 1 });
   });
 
   it("says when an answer has no list, no page count, or another page", async () => {
@@ -238,6 +240,7 @@ describe("ShipStation events", () => {
   it("logs a shipment with its insured value next to what was paid, and no name, address, phone, email or note", () => {
     const { ok, event } = shipStationShipmentEvent(shipment(), ctx);
     expect(ok).toBe(true);
+    expect(event.type).toBe("shipment.updated");
     expect(event).toEqual({
       id: event.idempotencyKey.replace(/:/g, "_"),
       type: SHIPSTATION_SHIPMENT_EVENT,
@@ -293,7 +296,7 @@ describe("ShipStation events", () => {
 
   it("counts items and keeps up to 20 skus, sorted, and leaves out what doesn't read", () => {
     const items = Array.from({ length: 25 }, (_, i) => ({ sku: `SKU-${String(i).padStart(2, "0")}`, quantity: 2 }));
-    const p = shipStationShipmentEvent(shipment({ items: [...items, { sku: "SKU-00", quantity: 1 }, { sku: "a b", quantity: 1 }, { sku: "<b>", quantity: 0 }] }), ctx).event.payload;
+    const p = shipStationShipmentEvent(shipment({ items: [...[...items].reverse(), { sku: "SKU-00", quantity: 1 }, { sku: "a b", quantity: 1 }, { sku: "<b>", quantity: 0 }] }), ctx).event.payload;
     expect(p.items).toBe(52);
     expect(p.skus).toEqual(items.slice(0, 20).map((i) => i.sku));
     expect(shipStationShipmentEvent(shipment({ items: [{ quantity: 1 }, { quantity: -1 }] }), ctx).event.payload).toMatchObject({ items: undefined, skus: [] });
@@ -371,6 +374,9 @@ describe("ShipStation events", () => {
     expect(shipStationLabelEvent(label({ tracking_number: "1ZTEST1", shipment_cost: null, insurance_cost: null, packages: null, confirmation: null }), ctx).event.payload).toMatchObject({ trackingNumber: undefined, currency: undefined, signatureRequired: false });
     expect(shipStationLabelEvent(label({ tracking_number: "A".repeat(41) }), ctx).event.payload.trackingNumber).toBeUndefined();
     expect(shipStationLabelEvent(label({ tracking_number: 12345678 }), ctx).event.payload.trackingNumber).toBeUndefined();
+    expect(shipStationLabelEvent(label({ tracking_number: "1Z 999 AA1" }), ctx).event.payload.trackingNumber).toBeUndefined();
+    expect(shipStationLabelEvent(label({ is_international: "true" }), ctx).event.payload.international).toBe(false);
+    expect(shipStationShipmentEvent(shipment({ external_order_id: "<b" }), ctx).event.payload.orderRef).toBeUndefined();
   });
 
   it("is a duplicate when read again unchanged, and a new event when it changes", () => {

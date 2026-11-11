@@ -69,7 +69,7 @@ export function shipStationMoney(v: unknown): { cents: number; currency: string 
 /** Amounts added up, when every one reads and all are in one currency. */
 function total(amounts: unknown[]): { cents: number; currency: string } | undefined {
   const read = amounts.map(shipStationMoney);
-  if (read.length === 0 || read.some((m) => !m) || new Set(read.map((m) => m!.currency)).size !== 1) return undefined;
+  if (read.some((m) => !m) || new Set(read.map((m) => m!.currency)).size !== 1) return undefined;
   return { cents: read.reduce((sum, m) => sum + m!.cents, 0), currency: read[0]!.currency };
 }
 

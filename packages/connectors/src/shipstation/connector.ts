@@ -111,7 +111,8 @@ export function shipStationConnector(options: ShipStationOptions): Connector {
       let last = false;
       if (pass.page < page.pages && page.rows.length === SHIPSTATION_PAGE_SIZE && pass.page < SHIPSTATION_MAX_PAGE) pass = { ...pass, page: pass.page + 1 };
       else {
-        if (pass.list === "shipments") shipmentsMark = pass.top ?? shipmentsMark;
+        // Only a shipments pass moves top, so a labels pass keeps the mark.
+        shipmentsMark = pass.top ?? shipmentsMark;
         const next = LISTS[LISTS.indexOf(pass.list) + 1];
         if (next) pass = { list: next, since: sinceFor(next), page: 1, top: null };
         else last = true;
