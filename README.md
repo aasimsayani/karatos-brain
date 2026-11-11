@@ -101,6 +101,7 @@ These are built, tested against recorded vendor responses or mocks built from ea
 | Etsy | Imports five years of Etsy orders, then reads every order changed since the last sync | Sales, Inventory, Marketing |
 | eBay | Imports the two years of eBay orders that eBay keeps, then reads every order changed since the last sync | Sales, Inventory |
 | Formlabs 3D printing | Imports a year of print runs, then the runs made in the last few days on each sync | Custom orders, Manufacturing |
+| Microsoft 365 Outlook mail and calendar | Imports five years of the mailbox's Inbox and Sent Items, then keeps up with every new, changed and removed message | Clienteling, Buying, Custom orders, Repairs |
 | Quo (formerly OpenPhone) | Imports two years of calls and texts on every Quo line, then rereads the last day on each sync | Clienteling, Repairs, Sales |
 | Zoom | Imports six months of the account's past meetings, then the last two days again on each sync | Clienteling, Custom orders, Sales |
 | Yotpo reviews and loyalty | Imports five years of product and store reviews, then the reviews changed in the last two days on each sync | Marketing, Clienteling |
@@ -170,7 +171,7 @@ This section updates itself as work lands: it is generated from [docs/milestones
 <!-- progress:start -->
 <!-- Generated from docs/milestones.json and the integration catalog by npm run progress:write. Edit those, not this block. -->
 
-**Overall: 80% complete**, 65 of 81 roadmap items done. 73 of the 253 systems in the integration catalog are connected.
+**Overall: 80% complete**, 65 of 81 roadmap items done. 74 of the 253 systems in the integration catalog are connected.
 
 | Milestone | What it gives a jeweler | Progress | Target |
 | --- | --- | --- | --- |
