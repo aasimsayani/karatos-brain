@@ -4,6 +4,7 @@ import affirm from "./affirm.js";
 import airtable from "./airtable.js";
 import amazon from "./amazon.js";
 import asana from "./asana.js";
+import aurora_payments from "./aurora_payments.js";
 import authorize_net from "./authorize_net.js";
 import avalara from "./avalara.js";
 import bank_statements from "./bank_statements.js";
@@ -71,4 +72,4 @@ import yotpo from "./yotpo.js";
 import zoom from "./zoom.js";
 
 /** How each built connector is made from an instance's settings, by catalog id. */
-export const FACTORIES: Readonly<Record<string, ConnectorFactory>> = { affirm, airtable, amazon, asana, authorize_net, avalara, bank_statements, bigcommerce, bill_com, birdeye, calendly, chase, clover, custom_forms, docusign, dropbox, ebay, edi_x12, etsy, fedex, fincen_8300, gia, gmail, google_ads, google_analytics, google_workspace, gusto, hrd, hubspot, idex, inventory_pos, judgeme, klaviyo, lightspeed, mailchimp, meta_ads, metals_api, microsoft_onedrive, monday, nivoda, notion, openphone, pinterest, piro, plaid, quickbooks, ramp, rapnet, refiner_statements, rfid_counts, shopify, slack, sola_payments, square, stripe, stuller, supplier_invoices, taxjar, tiktok, trello, twilio, ups, watchsearch, wix, woocommerce, xero, yext, yotpo, zoom };
+export const FACTORIES: Readonly<Record<string, ConnectorFactory>> = { affirm, airtable, amazon, asana, aurora_payments, authorize_net, avalara, bank_statements, bigcommerce, bill_com, birdeye, calendly, chase, clover, custom_forms, docusign, dropbox, ebay, edi_x12, etsy, fedex, fincen_8300, gia, gmail, google_ads, google_analytics, google_workspace, gusto, hrd, hubspot, idex, inventory_pos, judgeme, klaviyo, lightspeed, mailchimp, meta_ads, metals_api, microsoft_onedrive, monday, nivoda, notion, openphone, pinterest, piro, plaid, quickbooks, ramp, rapnet, refiner_statements, rfid_counts, shopify, slack, sola_payments, square, stripe, stuller, supplier_invoices, taxjar, tiktok, trello, twilio, ups, watchsearch, wix, woocommerce, xero, yext, yotpo, zoom };

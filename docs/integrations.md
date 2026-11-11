@@ -252,7 +252,7 @@ Used by: R is retail, W is wholesale, M is manufacturing. Test with says how we 
 | Afterpay | R | Public API | Partner | No | Planned (Pay-over-time orders, refunds and settlements; sandbox credentials come from an Afterpay account manager) |
 | cardONE Fintech | R | Unknown | Unknown | No | Planned (Payments and financing for jewelers; product still being confirmed. No API found. Exhibited at JCK 2026) |
 | American First Finance | R | Partner | Partner | No | Planned (Consumer financing and lease-to-own: applications, funded contracts and settlements. Merchant partner only. Exhibited at JCK 2026) |
-| Aurora Payments | R | Unknown | Unknown | No | Planned (Merchant card processing: transactions, batches, deposits and fees. No API confirmed; start with statements. Exhibited at JCK 2026) |
+| Aurora Payments | R | Public API | Free sandbox | Yes | Built (Reads with a Flute API key (Aurora Payments renamed itself Flute). A merchant's own key can reach every endpoint, so the client only ever asks for a token and lists settlement batches and their transactions. The vendor docs watch follows Flute's changelog, and a nightly run against Flute's sandbox checks the connector) |
 | Sola Payments (formerly Cardknox) | R, W | Public API | Free sandbox | No | Built (Reads the gateway's transaction report with one API key. Sola's keys can't be limited to reports, so the client only ever posts Report:All to the reporting address, never the gateway. Sola publishes no API changelog, so the vendor docs watch follows its reporting page and the nightly sandbox run catches changes; until a sandbox is set up, the mock built from Sola's docs stands in) |
 | Wells Fargo Jewelry Advantage | R | File export | Paid account | No | Planned (Consumer financing program for jewelers. No API; start with merchant summary report exports. Exhibited at Centurion) |
 | OWL Financial Group | R, W, M | Unknown | Unknown | No | Planned (Collateral loans for jewelers and the pledged pieces behind them. No API found. Exhibited at Centurion) |
@@ -393,6 +393,7 @@ A request for a path or method the docs don't list throws `UndocumentedRequestEr
 - Airtable's whoami, list bases, base schema and list records endpoints (Web API v0)
 - Amazon's Selling Partner API orders search (v2026-01-01), finance transactions (v2024-06-19) and FBA inventory summaries, with the Login with Amazon token refresh, enforcing the access token header, the app's roles, date ranges, page sizes and page tokens tied to their query
 - Asana's current user, project, section, task and story endpoints (REST API 1.0)
+- Flute's (Aurora Payments') token, settlement batches and transactions (API v1)
 - Authorize.net's Transaction Reporting requests on its JSON API
 - AvaTax's connection check, company and transaction endpoints (REST API v2)
 - BigCommerce's v2 order and store paths and v3 catalog, inventory, customer, refund and price list paths
@@ -445,7 +446,7 @@ A request for a path or method the docs don't list throws `UndocumentedRequestEr
 - Yotpo's access token, Retrieve all reviews (Reviews v1) and recently updated Loyalty customers (Loyalty v2)
 - Zoom's Server-to-Server OAuth token, meeting history and meeting participant reports (API v2)
 
-Where a vendor has a free sandbox (Affirm, Airtable, Amazon (Selling Partner API), Asana, Authorize.net, Avalara AvaTax, BigCommerce, BILL, Calendly, Clover, Custom forms, Docusign, Dropbox, eBay, FedEx, GIA Report Results, Gmail, Google Ads, Google Analytics 4, Google Workspace and Drive, Gusto, HubSpot, Klaviyo, Lightspeed Retail, Mailchimp, Meta Ads, Microsoft OneDrive and SharePoint files, Monday.com, Notion, Pinterest, Plaid, QuickBooks Online, Ramp, Slack, Sola Payments (formerly Cardknox), Square, TikTok, Trello, UPS, Wix, WooCommerce, Xero and Yext so far), its mock is a stand-in until a developer account is set up for the nightly run.
+Where a vendor has a free sandbox (Affirm, Airtable, Amazon (Selling Partner API), Asana, Aurora Payments, Authorize.net, Avalara AvaTax, BigCommerce, BILL, Calendly, Clover, Custom forms, Docusign, Dropbox, eBay, FedEx, GIA Report Results, Gmail, Google Ads, Google Analytics 4, Google Workspace and Drive, Gusto, HubSpot, Klaviyo, Lightspeed Retail, Mailchimp, Meta Ads, Microsoft OneDrive and SharePoint files, Monday.com, Notion, Pinterest, Plaid, QuickBooks Online, Ramp, Slack, Sola Payments (formerly Cardknox), Square, TikTok, Trello, UPS, Wix, WooCommerce, Xero and Yext so far), its mock is a stand-in until a developer account is set up for the nightly run.
 
 <!-- registry:mocks:end -->
 
@@ -623,6 +624,28 @@ Custom fields are kept only for types that hold no free text: number, single sel
 **Webhooks.** None yet. The scheduled sync polls.
 
 **Testing.** The tests run against a mock built from Asana's API reference (`packages/testkit/src/mocks/asana.ts`). Like Asana, it returns only the fields `opt_fields` names, so the tests show a task's name and notes never come back. It answers 401 for the wrong token, filters tasks by project and `modified_since`, pages with `offset`, and can answer 429 with `Retry-After` and 400 for an expired offset. Its assumptions are listed in the mock and checked on the first sandbox run. For the nightly run, make a free Asana workspace for testing only, add a project or two of synthetic tasks, make a personal access token as a user who belongs only to that workspace, and add it as the `SANDBOX_ASANA_ACCESS_TOKEN` GitHub Actions secret.
+
+### Aurora Payments
+
+Reads a business's card and ACH settlement batches from Aurora Payments, which renamed itself Flute in 2026, with each transaction in them, so a deposit on the bank statement can be matched to the sales, refunds and fees behind it. Batches arrive as `payout.updated` and their transactions as `balance.transaction_recorded`.
+
+| Setting | What it is |
+| --- | --- |
+| `AURORA_CLIENT_ID` | The client ID of a Flute API key made for KaratOS |
+| `AURORA_CLIENT_SECRET` | That key's client secret |
+| `AURORA_ENVIRONMENT` | Optional: `production` (the default) or `sandbox` |
+
+**Read-only by design.** Flute signs a request in with a token that lasts about 15 minutes, made from the API key with the client credentials grant. A merchant's own key can reach every endpoint, writes included; only a key made under a partner whose permissions allow just the reads is limited. Where the business is under a partner, ask for a key allowed only List Transactions, Get Transaction Details and Get Settlement Batches. Either way, the client keeps to the reads: it sends one POST, for a token, to Flute's OAuth server (`oauth.api.flute.com`, or `sandbox.oauth.api.flute.com`), and otherwise only GET requests to the settlement batches and transactions lists. Refunding and voiding a transaction are declared behind the write gate, turned off, and the client has no request to send them. Flute's own error text is never repeated in an error, only the HTTP status.
+
+**What it reads.** The first import lists five years of settlement batches by when they were batched (`dateFrom`, `dateTo`), oldest first, 50 to a page, and reads each batch's transactions (`batchId`) before the next batch. Each later sync lists the batches from a week before the last pass started, so a batch that was open then is read again once it settles. Each settlement batch, with its transactions, is one batch and one checkpoint, which keeps the pass's dates and how many batches it has read. A list's `total` says when it ends; without one, a short page does.
+
+**Events.** A batch has the processor's batch number, the processor, whether it is open or settled, its transaction count, and its sales, refunds and net in cents. A transaction has its batch, type (sale, refund, void and the rest), status, payment method (card or ACH), where it came from (a terminal, an invoice, the API), its currency, and its base, total, surcharge, tax, tip and discount amounts in cents. Each is keyed by a digest of what was kept, so an unchanged record is a duplicate and a batch that settles is a new event. One without an ID or a time that reads is dead-lettered; a batch dead-lettered for its time still has its transactions read.
+
+**Privacy.** No customer name, company, email, phone or masked card number is kept, nor the merchant's own name for a payment method or terminal.
+
+**Rate limits.** Flute documents a 429 but no numbers. The client waits out a 429, 500, 502, 503 or 504 three times, honoring `Retry-After` in seconds up to a minute, before the error goes to the sync runner, which resumes from its checkpoint next time. A token turned down mid-pass is replaced once.
+
+**Testing.** The tests run against a mock built from Flute's docs (`packages/testkit/src/mocks/aurora_payments.ts`), and a nightly run against Flute's sandbox checks the real API once `SANDBOX_AURORA_CLIENT_ID` and `SANDBOX_AURORA_CLIENT_SECRET` are set. The mock lists what the sandbox run must confirm: that `dateFrom` and `dateTo` match `batchDateTime` inclusively, that the lists sort oldest first by those fields, and that `batchId` on the transactions list matches a card batch as well as an ACH one.
 
 ### Authorize.net
 
