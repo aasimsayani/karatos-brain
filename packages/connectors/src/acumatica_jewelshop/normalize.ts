@@ -44,7 +44,8 @@ const TIME = /^(\d{4}-\d{2}-\d{2})T((?:[01]\d|2[0-3]):\d{2}:\d{2})(\.\d{1,7})?(Z
 const KEY = /^[A-Za-z0-9][A-Za-z0-9 ._/#-]{0,59}$/;
 
 const short = (v: unknown) => createHash("sha256").update(JSON.stringify(v)).digest("hex").slice(0, 12);
-const obj = (v: unknown) => (v && typeof v === "object" && !Array.isArray(v) ? (v as Record<string, unknown>) : {});
+// Anything but an object reads as a record without the fields asked for.
+const obj = (v: unknown) => (v ?? {}) as Record<string, unknown>;
 /** A field's value, unwrapped from { value }. */
 const field = (r: Record<string, unknown>, name: string): unknown => obj(r[name]).value;
 const text = (v: unknown, max: number): string | null => (typeof v === "string" && v.trim() !== "" ? v.trim().slice(0, max) : null);
@@ -53,7 +54,7 @@ const keyOf = (v: unknown): string | undefined => {
   return KEY.test(t) ? t : undefined;
 };
 const ref = (kind: string, id: string) => `acumatica:${kind}:${id.toLowerCase()}`;
-const quantity = (v: unknown): number | null => (Number.isFinite(v) && Math.abs(v as number) < 1e12 ? (v as number) : null);
+const quantity = (v: unknown): number | null => (typeof v === "number" && Math.abs(v) < 1e12 ? v : null);
 
 /** A keyed reference for an Acumatica customer account code, the same on every order of that customer. */
 export function acumaticaCustomerRef(key: string, code: string): string {

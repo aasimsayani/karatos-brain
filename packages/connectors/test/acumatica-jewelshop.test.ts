@@ -86,14 +86,14 @@ describe("Acumatica settings", () => {
     expect(acumaticaBaseUrl(" https://example.acumatica.com/ ")).toBe("https://example.acumatica.com");
     expect(acumaticaBaseUrl("https://erp.example.test/Instance//")).toBe("https://erp.example.test/Instance");
     expect(acumaticaBaseUrl("https://erp.example.test:8443/Instance")).toBe("https://erp.example.test:8443/Instance");
-    const bad = ["", "erp.example.test", "http://erp.example.test", "https://localhost", "https://10.0.0.1", "https://user:pw@erp.example.test", "https://erp.example.test/?x=1", "https://erp.example.test/#x", "https://ERP.example.test", "https://erp.example.test/a b", "ftp://erp.example.test", "https://-.example.test.", 5, null];
+    const bad = ["", "erp.example.test", "http://erp.example.test", "https://localhost", "https://10.0.0.1", "https://user:pw@erp.example.test", "https://user@erp.example.test", "https://:pw@erp.example.test", "https://erp.example.test/?x=1", "https://erp.example.test/#x", "https://erp.example.test?x=1", "https://erp.example.test/Instance?x=1", "https://erp.example.test/Instance#x", "https://ERP.example.test", "https://erp.example.test/a b", "ftp://erp.example.test", "https://-.example.test.", 5, null];
     for (const raw of bad) expect(() => acumaticaBaseUrl(raw), String(raw)).toThrow(new AcumaticaConfigError("ACUMATICA_URL must be the instance's https address, such as https://example.acumatica.com or https://erp.example.test/Instance"));
   });
 
   it("checks the credentials and version before sending anything", () => {
     const { fetch, sent } = scripted(token());
     const make = (o: Partial<AcumaticaClientOptions>) => () => acumaticaClient({ ...base(fetch), ...o });
-    for (const clientId of ["", "x@Company", "00000000-0000-4000-8000-000000000001", "00000000-0000-4000-8000-000000000001@", `00000000-0000-4000-8000-000000000001@${"c".repeat(65)}`, "00000000-0000-4000-8000-00000000000g@Company", "x00000000-0000-4000-8000-000000000001@Company", "00000000-0000-4000-8000-000000000001@Company!", undefined as never]) expect(make({ clientId }), String(clientId)).toThrow(new AcumaticaConfigError("ACUMATICA_CLIENT_ID must be the connected application's ID, a GUID, an @ and the tenant"));
+    for (const clientId of ["", "x@Company", "00000000-0000-4000-8000-000000000001", "00000000-0000-4000-8000-000000000001@", `00000000-0000-4000-8000-000000000001@${"c".repeat(65)}`, "00000000-0000-4000-8000-00000000000g@Company", "x00000000-0000-4000-8000-000000000001@Company", "0000000g-0000-4000-8000-000000000001@Company", "00000000-0000-4000-8000-000000000001@Co&x=1", "00000000-0000-4000-8000-000000000001@Company!", undefined as never]) expect(make({ clientId }), String(clientId)).toThrow(new AcumaticaConfigError("ACUMATICA_CLIENT_ID must be the connected application's ID, a GUID, an @ and the tenant"));
     for (const clientSecret of ["", "x".repeat(7), "x".repeat(513), "has a space", `${"x".repeat(8)}\x7f`, undefined as never]) expect(make({ clientSecret }), String(clientSecret)).toThrow(new AcumaticaConfigError("ACUMATICA_CLIENT_SECRET is missing or not in the expected shape"));
     for (const username of ["", "a b", "x".repeat(129), `a\x7f`, undefined as never]) expect(make({ username }), String(username)).toThrow(new AcumaticaConfigError("ACUMATICA_USERNAME is missing or not in the expected shape"));
     for (const password of ["", "x".repeat(513), undefined as never]) expect(make({ password }), String(password)).toThrow(new AcumaticaConfigError("ACUMATICA_PASSWORD is missing"));
@@ -123,8 +123,9 @@ describe("Acumatica settings", () => {
     expect(Object.keys(ACUMATICA_ENTITIES)).toEqual(["StockItem", "SalesOrder"]);
     expect(ACUMATICA_PAGE_SIZE).toBe(500);
     expect(Object.fromEntries(acumaticaListParams("SalesOrder", { ...Q, from: Q.to })).$filter).toContain("gt datetimeoffset'2026-11-11T15:00:00.000+00:00'");
+    expect(() => acumaticaListParams("" as never, Q)).toThrow(new AcumaticaConfigError("Acumatica reads only StockItem and SalesOrder"));
     expect(() => acumaticaListParams("Customer" as never, Q)).toThrow(new AcumaticaConfigError("Acumatica reads only StockItem and SalesOrder"));
-    for (const q of [{ ...Q, from: "2026-11-01" }, { ...Q, to: "soon" }, { ...Q, from: Q.to, to: Q.from }, { ...Q, from: `1${Q.from}` }, { ...Q, to: `${Q.to}x` }, { from: null, to: `1${Q.to}`, skip: 0 }]) expect(() => acumaticaListParams("SalesOrder", q), JSON.stringify(q)).toThrow(new AcumaticaConfigError("records are listed between two UTC times"));
+    for (const q of [{ ...Q, from: "2026-11-01" }, { ...Q, from: "2026-11-01T00:00:00Z" }, { ...Q, to: "soon" }, { ...Q, from: Q.to, to: Q.from }, { ...Q, from: `1${Q.from}` }, { ...Q, to: `${Q.to}x` }, { from: null, to: `1${Q.to}`, skip: 0 }]) expect(() => acumaticaListParams("SalesOrder", q), JSON.stringify(q)).toThrow(new AcumaticaConfigError("records are listed between two UTC times"));
     for (const skip of [-1, 1.5, Number.NaN, Number.MAX_SAFE_INTEGER + 1]) expect(() => acumaticaListParams("SalesOrder", { ...Q, skip }), String(skip)).toThrow(new AcumaticaConfigError("skip must be a whole number, 0 or more"));
   });
 });
@@ -210,7 +211,7 @@ describe("Acumatica client", () => {
     expect([e.message, e.status, e.name]).toEqual(["Acumatica sign-in answered HTTP 404", 404, "AcumaticaApiError"]);
     expect(new AcumaticaConfigError("x").name).toBe("AcumaticaConfigError");
     await expect(client(scripted(json(201, { access_token: ACCESS })).fetch).c.list("SalesOrder", Q)).rejects.toThrow("Acumatica sign-in answered HTTP 201");
-    for (const answer of [() => new Response("not json"), json(200, null), json(200, {}), token(900, 5), token(900, "a".repeat(15)), token(900, `${"a".repeat(20)} b`), token(900, `${"a".repeat(20)}\n`), token(900, "a".repeat(8193))]) {
+    for (const answer of [() => new Response("not json"), json(200, null), json(200, {}), token(900, 5), token(900, 1_234_567_890_123_456), token(900, "a".repeat(15)), token(900, `${"a".repeat(20)} b`), token(900, `${"a".repeat(20)}\n`), token(900, "a".repeat(8193))]) {
       const x = (await client(scripted(answer).fetch).c.list("SalesOrder", Q).catch((y: Error) => y)) as AcumaticaApiError;
       expect([x.message, x.status]).toEqual(["Acumatica sign-in answered without an access token", 200]);
     }
@@ -379,7 +380,7 @@ describe("Acumatica events", () => {
   });
 
   it("keeps what reads of an item, and skips warehouse lines that don't", () => {
-    const odd = acumaticaItemEvents(item({ InventoryID: v(" Ring 7/A#1 "), Description: v(` ${"D".repeat(130)} `), ItemClass: v("C".repeat(50)), ItemStatus: v("  "), ItemType: null, BaseUOM: v("U".repeat(30)), DefaultPrice: v("1"), WarehouseDetails: [{ WarehouseID: v(" WH 2 "), QtyOnHand: v(1.5) }, { WarehouseID: v(""), QtyOnHand: v(1) }, { QtyOnHand: v(1) }, "x", { WarehouseID: v("NEG"), QtyOnHand: v(-2) }, { WarehouseID: v("BIG"), QtyOnHand: v(1e12) }, { WarehouseID: v("NAN"), QtyOnHand: v("3") }] }), CTX);
+    const odd = acumaticaItemEvents(item({ InventoryID: v(" Ring 7/A#1 "), Description: v(` ${"D".repeat(130)} `), ItemClass: v("C".repeat(50)), ItemStatus: v("  "), ItemType: null, BaseUOM: v("U".repeat(30)), DefaultPrice: v("1"), WarehouseDetails: [{ WarehouseID: v(" WH 2 "), QtyOnHand: v(1.5) }, { WarehouseID: v(""), QtyOnHand: v(1) }, { QtyOnHand: v(1) }, "x", { WarehouseID: v("NEG"), QtyOnHand: v(-2) }, { WarehouseID: v("BIG"), QtyOnHand: v(1e12) }, { WarehouseID: v("NAN"), QtyOnHand: v("3") }, null] }), CTX);
     expect(odd[0]!.payload).toMatchObject({ productId: "acumatica:item:ring 7/a#1", sku: "Ring 7/A#1", title: "D".repeat(120), itemClass: "C".repeat(40), status: null, itemType: null, unit: "U".repeat(20), priceCents: null });
     expect(odd.slice(1).map((e) => [e.payload.locationId, e.payload.onHand])).toEqual([
       ["acumatica:warehouse:wh 2", 1.5],
@@ -401,6 +402,7 @@ describe("Acumatica events", () => {
     expect(acumaticaItemEvents(item({ InventoryID: v("-bad2"), LastModified: v("soon") }), CTX)[0]!.idempotencyKey).not.toBe(e[0]!.idempotencyKey);
     const t = acumaticaItemEvents(item({ LastModified: v("2026-10-02T00:00:00") }), CTX);
     expect(t[0]!.payload.problems).toEqual(["stock item has no time that reads"]);
+    expect(t[0]!.idempotencyKey).toMatch(/^acumatica:unreadable_item:[0-9a-f]{12}$/);
     // Its counts still read, as they don't hang on its time.
     expect(t).toHaveLength(3);
     for (const id of [5, "", "x".repeat(61), "a\tb", "a:b"]) expect(acumaticaItemEvents(item({ InventoryID: v(id) }), CTX)[0]!.payload.problems, String(id)).toEqual(["stock item has no inventory ID that reads"]);
@@ -424,6 +426,8 @@ describe("Acumatica events", () => {
     expect(odd).toMatchObject({ status: "S".repeat(40), createdAt: null, currency: null, totalCents: null, quantity: null, customerId: null });
     expect(acumaticaOrderEvent(order({ CurrencyID: v("USDX") }), CTX).payload.currency).toBeNull();
     expect(acumaticaOrderEvent(order({ OrderedQty: v(2.5) }), CTX).payload.quantity).toBe(2.5);
+    expect(acumaticaOrderEvent(order({ OrderedQty: v(-1e12) }), CTX).payload.quantity).toBeNull();
+    expect(acumaticaOrderEvent(order({ OrderedQty: v(-3) }), CTX).payload.quantity).toBe(-3);
   });
 
   it("dead-letters an order that doesn't read, listing why", () => {
@@ -620,16 +624,13 @@ describe("Acumatica connector", () => {
   });
 
   it("counts a token's lifetime on the connector's clock", async () => {
+    // Each look at the clock is two hours on, so every read finds the hour-long token run out.
     let clock = NOW().getTime();
-    const mock = acumaticaDocMock(account());
-    const fetch = mock.fetch;
-    const c = acumaticaConnector({ ...base(fetch), customerKey: KEY, now: () => new Date(clock) });
-    const real = acumaticaClient({ ...base(fetch), now: () => new Date(clock) });
-    await real.list("StockItem", { from: null, to: Q.to, skip: 0 });
-    clock += 2 * 3_600_000;
-    await real.list("StockItem", { from: null, to: Q.to, skip: 0 });
-    expect(mock.signIns).toBe(2);
-    await drain(c.historicalImport({ cursor: null } as never));
+    acumaticaStockItem.reset();
+    const stockItems = Array.from({ length: 501 }, () => acumaticaStockItem.one({ WarehouseDetails: [], LastModified: v("2026-10-02T00:00:00+00:00") }));
+    const mock = acumaticaDocMock(account({ stockItems }));
+    await drain(connector(mock, { now: () => new Date((clock += 2 * 3_600_000)) }).historicalImport({ cursor: null } as never));
+    expect(mock.reads).toHaveLength(3);
     expect(mock.signIns).toBe(3);
   });
 

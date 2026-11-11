@@ -109,8 +109,8 @@ export function acumaticaBaseUrl(raw: unknown): string {
   } catch {
     u = null;
   }
-  // A name with a dot, not an address, and nothing but a path after it.
-  const ok = u !== null && u.protocol === "https:" && /^[a-z0-9-]+(\.[a-z0-9-]+)+$/.test(u.hostname) && !/^[\d.]+$/.test(u.hostname) && !u.username && !u.password && !u.search && !u.hash && `${u.origin}${u.pathname.replace(/^\/$/, "")}` === t;
+  // A name with a dot, not an address. Reading back as its origin and path rules out a user, password, query or hash.
+  const ok = u !== null && u.protocol === "https:" && /^[a-z0-9-]+(\.[a-z0-9-]+)+$/.test(u.hostname) && !/^[\d.]+$/.test(u.hostname) && `${u.origin}${u.pathname.replace(/\/$/, "")}` === t;
   if (!ok) throw new AcumaticaConfigError("ACUMATICA_URL must be the instance's https address, such as https://example.acumatica.com or https://erp.example.test/Instance");
   return t;
 }

@@ -79,7 +79,7 @@ export function parseAcumaticaCursor(raw: string | null): AcumaticaCursor | null
 export function acumaticaConnector(options: AcumaticaOptions): Connector {
   const customerKey = checkCustomerRefKey(options.customerKey);
   const now = options.now ?? (() => new Date());
-  const client = options.client ?? acumaticaClient({ ...options, now });
+  const client = options.client ?? acumaticaClient(options);
   const historyYears = options.historyYears ?? 5;
   if (!Number.isInteger(historyYears) || historyYears < 1) throw new Error("historyYears must be a positive whole number");
 
@@ -91,15 +91,14 @@ export function acumaticaConnector(options: AcumaticaOptions): Connector {
     const nextFrom = new Date(Date.parse(start.to) - ACUMATICA_OVERLAP_MS).toISOString();
     let pass = start;
     try {
-      for (;;) {
+      for (let last = false; !last; ) {
         // Stock items are read whole; orders by when they were modified.
         const result = await client.list(pass.step, { from: pass.step === "StockItem" ? null : pass.from, to: pass.to, skip: pass.skip });
         const events = eventsOf(pass.step, result.records, ctx);
-        const last = !result.more && pass.step === "SalesOrder";
+        last = !result.more && pass.step === "SalesOrder";
         pass = result.more ? { ...pass, skip: pass.skip + result.records.length } : { ...pass, step: "SalesOrder", skip: 0 };
         const cursor: AcumaticaCursor = last ? { pass: null, done: doneAtEnd, nextFrom } : { pass, done, nextFrom };
         yield { events, cursor: JSON.stringify(cursor) };
-        if (last) return;
       }
     } finally {
       await client.signOut();
