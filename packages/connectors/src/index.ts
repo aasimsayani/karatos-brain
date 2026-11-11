@@ -82,6 +82,7 @@ export * from "./trustpilot/index.js";
 export * from "./twilio/index.js";
 export * from "./ups/index.js";
 export * from "./verkada/index.js";
+export * from "./watchbase_datafeed/index.js";
 export * from "./watchsearch/index.js";
 export * from "./whatnot/index.js";
 export * from "./wix/index.js";

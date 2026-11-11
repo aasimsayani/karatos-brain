@@ -260,6 +260,7 @@ The table is generated from the [integration catalog](docs/integrations.md), so 
 | Whatnot | Imports every Whatnot order and product, then keeps the last 60 days of orders and every product current | Sales, Inventory, Marketing |
 | TheWatchSearch (by TheWatchCloud) | Turns the dealer WhatsApp groups the store is in into a feed of offers: brand, reference, buy or sell, price, year, condition and set | Buying, Sales, Inventory |
 | Search The Watch Market Business API | Gives a fair market price for each reference the store follows: listings, low, high, mean and market value | Buying, Appraisals, Sales, Inventory |
+| WatchBase Data Feed | Reads the reference specs of every watch of the brands the store deals in, from WatchBase | Inventory, Sales, Marketing |
 | RepairShopr | Imports five years of repair tickets, estimates and invoices, then what changed | Repairs, Clienteling |
 <!-- connected:end -->
 
@@ -281,7 +282,7 @@ This section updates itself from [docs/milestones.json](docs/milestones.json) an
 
 **Roadmap:** 20 of 81 items done. An integration counts as done once it has run against a real or sandbox account, not when its tests pass.
 
-**Integrations:** 90 of the 253 systems in the catalog are built and tested against mocks made from each vendor's docs. 0 have been checked live so far.
+**Integrations:** 91 of the 253 systems in the catalog are built and tested against mocks made from each vendor's docs. 0 have been checked live so far.
 
 | Milestone | What it gives a jeweler | Progress | Target |
 | --- | --- | --- | --- |
