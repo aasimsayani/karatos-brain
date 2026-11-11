@@ -7,6 +7,7 @@ export * from "./asana/index.js";
 export * from "./authorize_net/index.js";
 export * from "./avalara/index.js";
 export * from "./bank_statements/index.js";
+export * from "./bci_e_jewelry/index.js";
 export * from "./bigcommerce/index.js";
 export * from "./bill_com/index.js";
 export * from "./birdeye/index.js";
