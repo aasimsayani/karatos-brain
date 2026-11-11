@@ -186,7 +186,7 @@ export const SYSTEM_DETAILS: Readonly<Record<string, SystemDetail>> = {
   gia: { about: "GIA grading reports for the store's certificates, and any changes GIA makes to them." },
   igi: { about: "IGI report details checked against the stones in stock." },
   gemguide_appraisal: { about: "Appraisals written in GemGuide, with their values and descriptions." },
-  hrd: { about: "HRD Antwerp report details checked against the stones in stock." },
+  hrd: { about: "HRD Antwerp diamond and jewellery reports for the store's report numbers, and whether HRD still lists them as valid." },
   gcal: { about: "GCAL report details checked against the stones in stock.", company: "Sarine" },
   agl: { about: "AGL colored stone and pearl reports checked against the stones in stock." },
   ogitech_diatrue: { about: "Lab-grown diamond screening results for each parcel or piece." },
@@ -371,5 +371,6 @@ export const CONNECTED_ON: Readonly<Record<string, string>> = {
   bill_com: "2026-11-10",
   lightspeed: "2026-11-10",
   rfid_counts: "2026-11-10",
+  hrd: "2026-11-10",
   gusto: "2026-10-30",
 };

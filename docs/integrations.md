@@ -108,7 +108,7 @@ Used by: R is retail, W is wholesale, M is manufacturing. Test with says how we 
 | GIA Report Results | R, W, M | Public API | Free sandbox | No | Built (Looks up each certificate number on the business's list once, then follows GIA's free changed-reports feed. GIA's free plan includes a sandbox key; lookups of reports the business didn't submit cost per lookup. The docs watch follows the API changelog, and the nightly sandbox run catches API changes) |
 | IGI report verification | R, W | Unknown | Unknown | No | Planned (Web lookup only; no API found) |
 | GemGuide Appraisal Software | R | Unknown | Unknown | No | Planned |
-| HRD Antwerp report check | R, W | Unknown | Unknown | No | Planned (Web lookup through MyHRD only; no API found) |
+| HRD Antwerp report check | R, W | Public API | Sample files | No | Built (Looks up each HRD report number on the business's list once through the public MyHRD API, then checks each night that the reports are still valid. HRD issues a token on request through MyHRD, free of charge as far as its docs say. HRD publishes no API changelog, so the docs watch follows the API guide) |
 | GCAL report verification | R, W | Unknown | Unknown | No | Planned (Web lookup through GCAL by Sarine only; no API found) |
 | AGL report verification | R, W | Unknown | Unknown | No | Planned (Colored stone and pearl reports from American Gemological Laboratories. Web lookup only; no API found) |
 | Supplier invoices and memos | R, W, M | File export | Sample files | No | Built (CSV exports of invoices and memos from any supplier, read for memo terms and System of Warranties and Kimberley Process statements) |
@@ -412,6 +412,7 @@ A request for a path or method the docs don't list throws `UndocumentedRequestEr
 - The Google Analytics Data API's `runReport` (v1beta) with Google's token refresh, enforcing analytics scopes, date ranges and the rule that item-scoped fields can't be mixed with session ones
 - Google Drive (files and changes, v3), Sheets (`values:batchGet`, v4) and Calendar (`events.list` with sync tokens, v3) with Google's token refresh, enforcing each API's documented scopes so `drive.metadata.readonly` can't read Sheets values
 - Gusto's payroll list and payroll endpoints with its token refresh and token_info
+- HRD Antwerp's public MyHRD API: report data and report validity
 - HubSpot's CRM search, archived list, batch association and token info endpoints (date version 2026-09)
 - IDEX's Onsite feeds: the natural full feed and the lab-grown full file
 - Judge.me's review list (REST v1)
@@ -1336,6 +1337,33 @@ Reads one company's processed payrolls from Gusto's App Integrations API, asking
 **Webhooks.** `verifyGustoWebhook` checks `X-Gusto-Signature`, the HMAC-SHA256 of the raw body keyed with the verification token. Gusto's docs don't say whether the digest is hex or base64, so both are accepted, compared in constant time; the nightly sandbox run is where that gets confirmed. Gusto retries a delivery for up to three days and signs no timestamp, so `gustoWebhookEvent` returns the event's uuid to drop replays by, and only events for this company. A payroll event is a prompt to sync, not data. The instance doesn't take webhooks yet; the scheduled sync picks every change up.
 
 **Testing.** The tests run against a mock built from Gusto's docs (`packages/testkit/src/mocks/gusto.ts`), which replaces refresh tokens and revokes the old one on first use of the new access token, answers `token_info`, needs the API version header and enforces the one-year window and paging. For the nightly run, create a Gusto developer account, make a demo company with a few synthetic employees and processed payrolls, connect it to a test app with only `payrolls:read`, and add `SANDBOX_GUSTO_CLIENT_ID`, `SANDBOX_GUSTO_CLIENT_SECRET`, `SANDBOX_GUSTO_REDIRECT_URI`, `SANDBOX_GUSTO_COMPANY_UUID` and `SANDBOX_GUSTO_REFRESH_TOKEN` as GitHub Actions secrets. The nightly run can't save the replacement refresh token, so expect `invalid_grant` after its first use until the run can store tokens.
+
+### HRD Antwerp report check
+
+Looks up the HRD Antwerp reports behind the report numbers the business holds, through HRD's public MyHRD API, and checks each night that they are still valid. It confirms what each stone or jewel is before it is sold, insured or bought, and flags a number HRD has no report for.
+
+| Setting | What it is |
+| --- | --- |
+| `HRD_API_TOKEN` | A MyHRD API token, requested through API Access in MyHRD |
+| `HRD_REPORT_NUMBERS_FILE` | A text or CSV file of report numbers, one per line in the first column. Blank lines and lines starting with `#` are skipped; a line holding anything else stops the sync, naming the line but not its contents |
+| `HRD_MAX_LOOKUPS_PER_SYNC` | Optional. The most numbers one sync looks up, 50 when unset |
+
+**What it reads.** Each sync looks up the numbers on the list it hasn't looked up yet, 25 to a checkpoint. HRD allows 1000 lookups a day and 100 requests in 15 minutes, so a sync looks up at most `HRD_MAX_LOOKUPS_PER_SYNC` and the rest wait for the next one. Then, once a night while HRD answers it (19:00 to 04:00 UTC), it asks which of the reports it found are still valid, 1000 numbers to a request. A report whose valid-from date moved has been reissued and is looked up again on the next sync. A number taken off the list is neither looked up again nor checked.
+
+The client sends two requests only, `GET /GetReport/{reportNumber}` and `POST /GetReportValidities`, to `https://my.hrdantwerp.com/api/public` and nowhere else, with report numbers it checked: up to two capital letters and 6 to 14 digits. It waits a quarter second between requests, and waits out a 429 or a 5xx three times; a 400 says the token was turned down without showing it. Answers are XML, read by a small reader that refuses document type declarations and entities of its own, so nothing in an answer is expanded or fetched.
+
+**Events.**
+
+| Event | From | Key |
+| --- | --- | --- |
+| `grading.report_retrieved` | A report found by lookup. For a diamond: report type, kind (natural or lab-grown diamond, melee or other), issue date, shape, carat weight as a number, color, clarity, cut, polish, symmetry, fluorescence, measurements, inscription, remarks, hearts and arrows, origin and proportions. For a jewel: jewel type, metal, diamond count, total carat weight, description, remarks, the stones and which report types exist | report number and a hash of what is kept, so a changed report is a new event and the same one read again is a duplicate |
+| `grading.report_unavailable` | A number HRD has no report for (`not_found`), or a report the validity check no longer lists (`no_longer_valid`) | report number and reason, so it is recorded once |
+
+A report's time is its issue date; one without a readable date or number is dead-lettered with the raw event kept. PDF links are not kept, since they need the token to open. No department reasons over these events yet.
+
+**Writes.** None. Report results are HRD's to change.
+
+**Testing.** The tests run against a mock built from HRD's API guide (`packages/testkit/src/mocks/hrd.ts`), with synthetic diamond and jewel reports. HRD offers no sandbox; a token comes on request through MyHRD.
 
 ### HubSpot
 

@@ -27,6 +27,7 @@ export * from "./google_ads/index.js";
 export * from "./google_analytics/index.js";
 export * from "./google_workspace/index.js";
 export * from "./gusto/index.js";
+export * from "./hrd/index.js";
 export * from "./hubspot/index.js";
 export * from "./idex/index.js";
 export * from "./inventory_pos/index.js";
