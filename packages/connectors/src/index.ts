@@ -74,6 +74,7 @@ export * from "./trello/index.js";
 export * from "./trustpilot/index.js";
 export * from "./twilio/index.js";
 export * from "./ups/index.js";
+export * from "./verkada/index.js";
 export * from "./watchsearch/index.js";
 export * from "./wix/index.js";
 export * from "./woocommerce/index.js";
