@@ -174,7 +174,7 @@ Used by: R is retail, W is wholesale, M is manufacturing. Test with says how we 
 | Yelp | R | Public API | Paid account | No | Planned (Business details, rating and up to three review excerpts per call; full reviews are not in the API. Yelp's API is now a paid plan with a trial) |
 | The Knot Pro | R | Unknown | Paid account | No | Planned (Leads and reviews from engaged couples on The Knot and WeddingWire vendor listings. No public API found; start with the lead notification emails) |
 | Calendly | R | Public API | Free sandbox | No | Built (Read-only: a personal access token with only the users:read and scheduled_events:read scopes, and the client sends only its three listed reads. No webhooks, since subscribing needs a paid plan and the webhooks:write scope; the sync polls instead) |
-| Acuity Scheduling | R | Public API | Paid account | Yes | Planned |
+| Acuity Scheduling | R | Public API | Paid account | No | Built (Reads with the account's numeric user id and API key over Basic auth. The key reaches the whole account and Acuity has no read-only key or scope, so read-only is enforced in code: the client only ever sends GETs. API access needs the Premium or Powerhouse plan, and there is no sandbox) |
 | Mailchimp | R | Public API | Free sandbox | Yes | Built (A Mailchimp API key can't be limited to reading, so the client sends its five listed GET reads only and throws before anything else. Every read names the fields it wants, so names, phone numbers, addresses and merge fields never leave Mailchimp) |
 | Google Analytics 4 | R, W | Public API | Free sandbox | No | Built (Connects with analytics.readonly only and stops if the token holds anything more. Its only API request is runReport for the one property in the settings, built from two fixed reports) |
 | Google Ads | R | Public API | Free sandbox | No | Built (Google Ads has one scope, which can change campaigns, so the client keeps the connection read-only: its only API request is googleAds:search for the one account in the settings, built from one fixed report, and it never calls mutate. Connect it as a Google Ads user with Read only access. Production accounts need a developer token with Basic access) |
@@ -389,6 +389,7 @@ A request for a path or method the docs don't list throws `UndocumentedRequestEr
 <!-- registry:mocks:start -->
 <!-- Generated from the mock modules in packages/testkit/src/mocks/ by npm run registry:write. Edit those, not this block. -->
 
+- The Acuity Scheduling API's appointment and appointment type lists (v1), with Basic auth, date windows, max and the canceled list
 - An Acumatica instance's token endpoint, stock items, sales orders and sign-out on the contract-based REST API (Default 24.200.001)
 - Affirm's transaction, transaction event, daily settlement and dispute reads
 - Afterpay's List Payments on its production and sandbox hosts, with Basic auth, created-date windows, ordering, limit and offset
@@ -535,6 +536,38 @@ Each connector keeps everything about itself in its own files, and every list th
 
 <!-- registry:connector-docs:start -->
 <!-- Generated from docs/integrations/<id>.md by npm run registry:write. Edit those, not this block. -->
+
+### Acuity Scheduling
+
+Reads one Acuity Scheduling account through the Acuity API v1, at `https://acuityscheduling.com/api/v1` ([developer docs](https://developers.acuityscheduling.com)): its appointments, scheduled and canceled, with its appointment types read only for their names. They arrive as the same events the Calendly connector gives, so an appointment reads alike whichever system booked it. API access needs the Premium or Powerhouse plan ([help article](https://help.acuityscheduling.com/hc/en-us/articles/16676949253389-Using-custom-CSS-and-APIs)).
+
+| Setting | What it is |
+| --- | --- |
+| `ACUITY_USER_ID` | The account's numeric user id, from Integrations > API > View credentials |
+| `ACUITY_API_KEY` | The account's API key, shown beside the user id |
+| `CUSTOMER_REF_KEY` | Generated. Keys the customer references (below); the same key custom forms, Calendly and Klaviyo use |
+
+**Sign-in and read-only.** Requests use HTTP Basic auth with the numeric user id as the username and the API key as the password, and a User-Agent naming KaratOS ([quick start](https://developers.acuityscheduling.com/reference/quick-start.md)). The key reaches the whole account: Acuity has no read-only key, and its OAuth has only the one `api-v1` scope ([OAuth2](https://developers.acuityscheduling.com/docs/oauth2)). So read-only is enforced in code: the client sends GET requests to two lists, `/appointments` and `/appointment-types`, with query strings it builds itself, and has no way to send anything else. Both settings are checked before anything is sent: the user id must be digits, and the key 16 to 128 visible characters. A 401 or 403 stops the sync with a message naming both settings and where to find them.
+
+**What it reads.** `GET /appointments` has no paging: no offset, page or cursor, only `max` and a `minDate`/`maxDate` window, and the docs give `max` a default of 100 and no upper bound ([get appointments](https://developers.acuityscheduling.com/reference/get-appointments)). So the connector walks the calendar in windows of at most a month, oldest first, and asks for each window twice: `canceled=false` for scheduled appointments and `canceled=true` for canceled ones, each with `max=100`, `direction=ASC` and `excludeForms=true`, so intake forms are never even sent. A window that comes back with 100 of either list may have more, so it is split in half and each half read again, down to a single day. A single day that still fills a request is read as far as it goes, and a marker saying which day and list were cut short is dead-lettered, so nothing goes missing silently. The historical import reads from two years ago to 90 days ahead and stops for good once done. Each later sync reads from 60 days back to 90 days ahead, since appointments are moved, paid, cancelled and marked no-shows after they are made, and booked ahead; what didn't change comes back as duplicates. A change to an appointment older than 60 days isn't seen. Each pass first reads `GET /appointment-types?includeDeleted=true` ([appointment types](https://developers.acuityscheduling.com/reference/appointment-types)) for their names. Each window is one batch, and the checkpoint holds the windows still to read, the next one first, so a sync that stops resumes at the window it was on. Acuity allows 10 requests a second and 20 connections at once ([errors](https://developers.acuityscheduling.com/docs/api-errors)); a 429 (or a 500, 502, 503 or 504) is retried three times, honoring `Retry-After` up to a minute or else waiting 1, 2 and 4 seconds, before the sync stops and resumes from its checkpoint.
+
+**Events.**
+
+| Event | From | Key |
+| --- | --- | --- |
+| `appointment.booked` | A scheduled appointment | appointment id and a digest of what is kept |
+| `appointment.canceled` | A canceled appointment | appointment id and digest |
+| `appointment.no_show` | An appointment marked a no-show (`noShow`) | appointment id and digest |
+
+Each one carries the appointment's id, its type's id and name, its kind (bridal, custom design, repair, appraisal, pickup, consultation or other, read from the type's name as Calendly does), whether it was canceled, its start, end and length in minutes, the calendar as `acuity:calendar:<id>` only (a calendar is often named after a staff member, and no staff names are kept), the day it was booked, and its price and amount paid in whole cents with whether it is paid. The time of the event is the appointment's start, since Acuity gives only the day an appointment was booked and no time it was cancelled. An appointment read again unchanged is a duplicate. One whose id, start time or duration doesn't read is dead-lettered listing what was wrong, never guessed.
+
+**Privacy.** Names, email addresses, phone numbers, calendar names, notes, intake form answers, labels, the location, certificate codes and the confirmation link are never kept. The client's email address and phone number are used only to make customer references, made exactly the way custom forms and Calendly make them, so a booking, a form submission and a Klaviyo profile from the same address name the same customer. The type's name is kept only when it doesn't hold any word of the client's name or email address, the check Calendly makes of an event's title.
+
+**Writes.** Cancelling an appointment is declared behind the write gate, needing approval each time and at most five a day, and turned down while writes are off. The client has no way to send it.
+
+**Webhooks.** None yet; the scheduled sync polls.
+
+**Testing.** Acuity has no sandbox, and API access needs a paid plan. The mock (`packages/testkit/src/mocks/acuity.ts`) is built from Acuity's API reference, and its assumptions list what the first live run on an account must confirm, among them the `minDate`/`maxDate` format (the docs type them only as dates) and that `max=100` is safe.
 
 ### Acumatica JewelShop
 
