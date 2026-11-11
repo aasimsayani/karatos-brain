@@ -612,7 +612,7 @@ describe("Outlook connector", () => {
       [0, true, "i3", "s2", "c3"],
     ]);
     expect(cursors.every((c) => c.pass === "historical" && c.since === SINCE && c.until === UNTIL)).toBe(true);
-    expect(all.map((b) => b.events[0]!.type)).toEqual(["communication.message_logged", "communication.message_logged", "communication.message_logged", "calendar.appointment_updated", "calendar.appointment_updated"]);
+    expect(all.map((b) => (b.events[0] as OutlookEvent).type)).toEqual(["communication.message_logged", "communication.message_logged", "communication.message_logged", "calendar.appointment_updated", "calendar.appointment_updated"]);
     expect(eventsOf(all).every((e) => e.receivedAt === RECEIVED)).toBe(true);
     expect((eventsOf(all)[2]!.payload as { direction: string }).direction).toBe("sent");
     // Resumed mid-pass, it asks again from the page it was on.
@@ -731,7 +731,8 @@ describe("Outlook connector", () => {
   it("reads up to now when no clock is given", async () => {
     const mock = outlookDocMock(account());
     const before = Date.now();
-    await drain(outlookConnector({ ...options(mock), now: undefined }).historicalImport({ cursor: null } as never));
+    const { now: _, ...clockless } = options(mock);
+    await drain(outlookConnector(clockless).historicalImport({ cursor: null } as never));
     const end = Date.parse(new URL(graphCalls(mock)[2]!).searchParams.get("endDateTime")!);
     expect(end - OUTLOOK_AHEAD_MS).toBeGreaterThanOrEqual(before - 1);
     expect(end - OUTLOOK_AHEAD_MS).toBeLessThanOrEqual(Date.now());
