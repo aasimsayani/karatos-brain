@@ -204,7 +204,7 @@ export const SYSTEM_DETAILS: Readonly<Record<string, SystemDetail>> = {
   tenoris: { about: "Sales benchmarks by category and price point from independent jewelers." },
   edge_retail_academy: { about: "Peer benchmarks for turn, inventory aging and open-to-buy." },
   watchsearch: { about: "Watch listings shared in the dealer WhatsApp groups the store is in." },
-  search_the_watch_market: { about: "Watch prices, 13-week price history, days to sell and recent listings by reference." },
+  search_the_watch_market: { about: "Watch prices, 13-week price history and days to sell by reference." },
   elixiq: { about: "Watch listings pulled from dealer WhatsApp groups, with alerts." },
   watchcharts_api: { about: "Watch market prices, price history, retail prices and appraisals by reference.", company: "WatchCharts" },
   everywatch: { about: "Watch auction results, dealer listings and price analytics." },
@@ -385,6 +385,7 @@ export const CONNECTED_ON: Readonly<Record<string, string>> = {
   gem_logic: "2026-11-11",
   smile_io: "2026-11-11",
   zendesk: "2026-11-11",
+  search_the_watch_market: "2026-11-11",
   verkada: "2026-11-11",
   gusto: "2026-10-30",
 };
