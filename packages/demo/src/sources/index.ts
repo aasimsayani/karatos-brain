@@ -74,6 +74,7 @@ export const DEMO_NOT_YET: Readonly<Record<string, string>> = {
   smile_io: NEXT,
   zendesk: NEXT,
   whatnot: NEXT,
+  afterpay: NEXT,
   google_business_profile: NEXT,
   cin7: NEXT,
   shipstation: NEXT,
