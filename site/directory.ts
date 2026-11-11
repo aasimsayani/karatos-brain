@@ -80,8 +80,6 @@ export const SYSTEM_DETAILS: Readonly<Record<string, SystemDetail>> = {
   bill_com: { about: "Supplier bills, approvals and vendor payments." },
   ramp: { about: "Company card purchases with their category, GL account, receipt and approval state." },
   klarna: { about: "What Klarna paid out, with each sale, return, fee and commission behind it." },
-  afterpay: { about: "Pay-over-time orders, refunds and settlements.", company: "Block" },
-  klarna: { about: "Pay-over-time orders, captures, refunds and settlements." },
   afterpay: { about: "Pay-over-time orders and refunds.", company: "Block" },
   cardone_fintech: { about: "Payments and financing offered to the store's customers." },
   american_first_finance: { about: "Consumer financing and lease-to-own applications, funded contracts and settlements." },
