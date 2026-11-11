@@ -12,6 +12,7 @@ import birdeye from "./birdeye.js";
 import calendly from "./calendly.js";
 import clover from "./clover.js";
 import custom_forms from "./custom_forms.js";
+import deputy from "./deputy.js";
 import docusign from "./docusign.js";
 import dropbox from "./dropbox.js";
 import ebay from "./ebay.js";
@@ -68,6 +69,7 @@ export * from "./birdeye.js";
 export * from "./calendly.js";
 export * from "./clover.js";
 export * from "./custom_forms.js";
+export * from "./deputy.js";
 export * from "./docusign.js";
 export * from "./dropbox.js";
 export * from "./ebay.js";
@@ -113,7 +115,7 @@ export * from "./yotpo.js";
 export * from "./zoom.js";
 
 /** Every mock module, one per catalog integration. */
-export const DOC_MOCK_MODULES: readonly DocMockModule[] = [affirm, airtable, amazon, asana, authorize_net, avalara, bigcommerce, bill_com, birdeye, calendly, clover, custom_forms, docusign, dropbox, ebay, etsy, fedex, gia, gmail, google_ads, google_analytics, google_workspace, gusto, hrd, hubspot, idex, judgeme, klaviyo, lightspeed, mailchimp, meta_ads, microsoft_onedrive, monday, nivoda, notion, openphone, pinterest, plaid, quickbooks, ramp, rapnet, slack, sola_payments, square, stuller, taxjar, tiktok, trello, ups, wix, woocommerce, xero, yext, yotpo, zoom];
+export const DOC_MOCK_MODULES: readonly DocMockModule[] = [affirm, airtable, amazon, asana, authorize_net, avalara, bigcommerce, bill_com, birdeye, calendly, clover, custom_forms, deputy, docusign, dropbox, ebay, etsy, fedex, gia, gmail, google_ads, google_analytics, google_workspace, gusto, hrd, hubspot, idex, judgeme, klaviyo, lightspeed, mailchimp, meta_ads, microsoft_onedrive, monday, nivoda, notion, openphone, pinterest, plaid, quickbooks, ramp, rapnet, slack, sola_payments, square, stuller, taxjar, tiktok, trello, ups, wix, woocommerce, xero, yext, yotpo, zoom];
 
 /** Every doc-derived mock, with empty data, for checks and the vendor docs watch. */
 export function allDocMocks(): DocMock[] {

@@ -301,7 +301,7 @@ Used by: R is retail, W is wholesale, M is manufacturing. Test with says how we 
 | JSA crime alerts | R, W, M | File export | Sample files | No | Planned (Crime alerts and bulletins the Jewelers' Security Alliance emails its members. No API; read from the alert emails in the connected mailbox) |
 | RFID and barcode tray counts | R, W, M | File export | Sample files | No | Built (Count exports from RFID readers and barcode scanners, saved as CSV, one row per tag) |
 | Homebase | R | Partner | Partner | No | Planned (Staff schedules and time clock, so labor can be set against sales. API keys need the Enterprise plan and a request to Homebase support) |
-| Deputy | R, W, M | Public API | Unknown | Yes | Planned (Staff rosters and timesheets, so labor can be set against sales or bench work) |
+| Deputy | R, W, M | Public API | Paid account | Yes | Built (Reads with a permanent token. Deputy has no read-only token or access level, so the client only ever sends the Resource API search for the six records it uses. The vendor docs watch follows Deputy's API changelog; until a trial install is set up, the mock built from Deputy's docs stands in) |
 | Asana | R, W, M | Public API | Free sandbox | No | Built (Read-only: the client sends only its five listed GETs and names every field it reads. A personal access token can do whatever its user can, so make it as a user with access to only the projects to sync, or use an OAuth app limited to read scopes. No webhooks yet; the sync polls) |
 | Trello | R, W, M | Public API | Free sandbox | No | Built (Read-only: a token authorized with scope=read, which the connector checks before every sync, turning away one that can write. The client sends only its six listed GETs and never asks for card names or descriptions. No webhooks yet; the sync polls) |
 | Airtable | R, W, M | Public API | Free sandbox | No | Built (Read-only: the client sends only its four listed GETs and names every field it reads. It stops if an OAuth token has a write scope; a personal access token's scopes aren't reported, so make it with data.records:read and schema.bases:read only. No webhooks yet; the sync polls) |
@@ -401,6 +401,7 @@ A request for a path or method the docs don't list throws `UndocumentedRequestEr
 - Calendly's current user, scheduled event and invitee endpoints (API v2)
 - Clover's REST API v3 read endpoints with its v2 OAuth token refresh, including its 90-day cap on orders, payments and refunds
 - Typeform's Create API (a form's definition) and Responses API
+- Deputy's Resource API search for locations, areas, team members, shifts, timesheets and leave (API v1)
 - Docusign's JWT Grant sign-in, user info and envelope status changes (eSignature REST API v2.1)
 - Dropbox's token refresh, current account, folder listing and change feed, and download endpoints (API v2)
 - eBay's Fulfillment API getOrders and createShippingFulfillment (Sell APIs, v1) with its OAuth refresh, enforcing the client credentials, the scopes the seller agreed to, the order filter, limit and offset
@@ -951,6 +952,27 @@ await fetch(instanceFormsUrl, {
 `verifyFormWebhook` checks the signature over the raw body before it is parsed, and refuses a timestamp more than five minutes from the instance's clock either way, so a captured submission can't be replayed later and the timestamp can't be changed without breaking the signature. Keep the server's clock synced. `signFormWebhook` makes the same headers for a sender written in Node, and `formWebhookEvents` turns a verified body into the event.
 
 **Testing.** Until a Typeform test account is set up, the tests run against a mock built from Typeform's docs (`packages/testkit/src/mocks/typeform.ts`), which answers a form's definition and its responses only, pages with `before` newest first, filters by `since` and `until`, refuses a page size over 1000, answers 401 without the token, and names the responses host in the form's links. Its assumptions are listed in the mock and checked on the first sandbox run. Fixtures are synthetic and carry the personal data a real submission would, so the tests can check none of it is kept. For the nightly run, create a free Typeform account, build a test form and fill it in with made-up answers, create a personal token with `forms:read` and `responses:read`, and add `SANDBOX_CUSTOM_FORMS_TYPEFORM_TOKEN` and `SANDBOX_CUSTOM_FORMS_TYPEFORM_FORM_ID` as GitHub Actions secrets.
+
+### Deputy
+
+Reads a business's Deputy schedules and worked hours, with their cost, by location and area, so labor can be set against sales and bench output by day. Locations, areas, team members, shifts, timesheets and leave each arrive as a `labor.*` event.
+
+| Setting | What it is |
+| --- | --- |
+| `DEPUTY_ACCESS_TOKEN` | A Deputy permanent token made for KaratOS |
+| `DEPUTY_INSTALL` | The install's host, like `example.na.deputy.com` |
+
+**Read-only by design.** A Deputy token acts as the person who made it, with their access level, and Deputy has no read-only level or token scope. The client keeps to the reads: it sends only the Resource API search (`POST /api/v1/resource/<Object>/QUERY`, which Deputy uses for reads too) for the six records the connector uses, to the one install the settings name. Make the token as someone who can see costs (a Location Manager or System Administrator), on a Client ID named for KaratOS so it can be removed on its own. Publishing a schedule and approving a timesheet are declared behind the write gate, turned off, and the client has no request to send them. Deputy's own error text is never repeated in an error, only the HTTP status.
+
+**What it reads.** A pass reads locations (`Company`), areas (`OperationalUnit`), team members (`Employee`), shifts (`Roster`), timesheets and leave, one after another, in Id order, 500 to a page. The first import reads every location, area and team member, three years of shifts and timesheets by date, and the leave that ends in that time. Each later sync reads each of those records Deputy says changed (`Modified`) since an hour before the last pass started. Each page is one batch and one checkpoint, which keeps the record type and how many of it the pass has read.
+
+**Events.** A shift has its team member, area, day, start and end, hours, cost, whether it's published or open, the team member's confirmation and the timesheet it matched. A timesheet has its team member, area, shift, day, start and end, hours, cost, whether its time and pay are approved, whether it's in progress, discarded, exported or paid, the leave it's for, and whether Deputy flagged it. Leave has its team member, location, leave rule, first and last day, days, hours and status. A location has its name, code and parent; an area its name, location, parent and payroll code; a team member their location, start and end dates, access level and whether they're active. Each is keyed by a digest of what was kept, so an unchanged record is a duplicate and an approval is a new event. One without an ID or a time that reads is dead-lettered.
+
+**Privacy.** A team member is kept as their Deputy ID, never their name, birthday, address, contact details, photo or pronouns. Comments on shifts, timesheets and leave, and shift warnings, are not kept.
+
+**Rate limits.** The client waits out a 429, 500, 502, 503 or 504 three times, honoring `Retry-After` in seconds up to a minute, before the error goes to the sync runner, which resumes from its checkpoint next time.
+
+**Testing.** The tests run against a mock built from Deputy's docs (`packages/testkit/src/mocks/deputy.ts`). It checks the token, the search, sort and paging, and lists what the first trial run must confirm: how a search compares days and times, that `ge` is inclusive, and that `start` pages a stable order.
 
 ### Docusign
 

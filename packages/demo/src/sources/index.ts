@@ -79,6 +79,7 @@ export const DEMO_NOT_YET: Readonly<Record<string, string>> = {
   judgeme: NOT_READ_YET,
   calendly: NOT_READ_YET,
   custom_forms: NOT_READ_YET,
+  deputy: NOT_READ_YET,
   edi_x12: NOT_READ_YET,
   gia: NOT_READ_YET,
   hrd: NOT_READ_YET,

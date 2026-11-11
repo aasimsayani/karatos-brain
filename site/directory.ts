@@ -279,7 +279,7 @@ export const SYSTEM_DETAILS: Readonly<Record<string, SystemDetail>> = {
   // Store operations
   rfid_counts: { about: "Tray and case scans, checked against what should be there each night." },
   homebase: { about: "Staff schedules and time clock, set against sales." },
-  deputy: { about: "Staff rosters and timesheets, set against sales or bench work." },
+  deputy: { about: "Shifts, timesheets and leave with their hours and cost, by location and area." },
   asana: { about: "Tasks and projects that track repairs, custom orders and buying trips." },
   trello: { about: "Boards and cards that track repairs, custom orders and buying." },
   airtable: { about: "Bases for memo logs, repair intake and custom order tracking." },
@@ -373,5 +373,6 @@ export const CONNECTED_ON: Readonly<Record<string, string>> = {
   rfid_counts: "2026-11-10",
   hrd: "2026-11-10",
   ramp: "2026-11-11",
+  deputy: "2026-11-11",
   gusto: "2026-10-30",
 };
