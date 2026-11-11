@@ -133,8 +133,8 @@ export function netSuiteConnector(options: NetSuiteOptions): Connector {
       let last = false;
       const full = page.more && page.rows.length === NETSUITE_PAGE_SIZE;
       if (full && pass.offset + NETSUITE_PAGE_SIZE < NETSUITE_MAX_ROWS) pass = { ...pass, offset: pass.offset + NETSUITE_PAGE_SIZE };
-      // Only a list with a start has a top.
-      else if (full && pass.top !== null && pass.top > pass.since!) pass = { ...pass, since: pass.top, offset: 0 };
+      // Only a list with a start has a top; no top never restarts.
+      else if (full && (pass.top ?? "") > pass.since!) pass = { ...pass, since: pass.top, offset: 0 };
       else if (full && pass.since !== null) throw new Error(`NetSuite has more than ${NETSUITE_MAX_ROWS} ${pass.list} changed in one second, more than SuiteQL can page through`);
       else {
         if (pass.list !== "stock") marks[pass.list] = pass.top ?? marks[pass.list];
