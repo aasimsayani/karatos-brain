@@ -59,7 +59,8 @@ const defined = (fields: Record<string, unknown>) => Object.fromEntries(Object.e
 export const imapRef = (kind: "message" | "thread" | "label", id: string) => `imap_email:${kind}:${id}`;
 
 function event(key: string, type: string, occurredAt: string | undefined, receivedAt: string, payload: Record<string, unknown>): ImapEmailEvent {
-  return { id: `imap_email_${key.replace(/[^A-Za-z0-9_.:-]/g, "_")}`, type, occurredAt, receivedAt, idempotencyKey: `imap_email:${key}`, payload };
+  // Keys are made of hex, folder labels and ":", so they make ids as they are.
+  return { id: `imap_email_${key}`, type, occurredAt, receivedAt, idempotencyKey: `imap_email:${key}`, payload };
 }
 
 /** Where a message was read: the folder's role, its name and UIDVALIDITY. */

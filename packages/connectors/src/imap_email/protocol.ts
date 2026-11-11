@@ -77,14 +77,12 @@ export class ImapReader {
     const out: ImapRawResponse[] = [];
     for (;;) {
       if (this.literalLeft > 0) {
-        if (this.buffer.length === 0) return out;
         const take = Math.min(this.literalLeft, this.buffer.length);
         if (this.literalParts) this.literalParts.push(this.buffer.subarray(0, take));
         this.buffer = this.buffer.subarray(take);
         this.literalLeft -= take;
         if (this.literalLeft > 0) return out;
         this.literals.push(this.literalParts ? concat(this.literalParts) : new ImapLiteralTooLarge(this.literalSize));
-        this.literalParts = null;
         continue;
       }
       const end = this.buffer.indexOf(0x0a);
@@ -238,7 +236,7 @@ export function parseImapValues(response: ImapResponse): ImapValue[] {
       }
     }
     if (c === "{") {
-      const m = /^\{(\d{1,10})\}\u0000/.exec(text.slice(i, i + 14));
+      const m = /^\{(\d{1,10})\}\u0000/.exec(text.slice(i, i + 13));
       if (!m) fail("a literal that doesn't read");
       i += m![0].length;
       const lit = literals[literal++];
@@ -298,9 +296,9 @@ export function imapInternalDate(value: unknown): string | undefined {
   if (!m) return undefined;
   const month = MONTHS.indexOf(m[2] as (typeof MONTHS)[number]);
   const [day, year, hour, minute, second, zh, zm] = [m[1], m[3], m[4], m[5], m[6], m[8], m[9]].map((v) => Number(v!.trim()));
-  if (month < 0 || hour! > 23 || minute! > 59 || second! > 59 || zh! > 23 || zm! > 59 || day! < 1) return undefined;
+  if (month < 0 || minute! > 59 || second! > 59 || zh! > 23 || zm! > 59) return undefined;
   const local = Date.UTC(year!, month, day!, hour!, minute!, second!);
-  // A day past the month's end rolls over; it must read back as itself.
+  // Day 0, a day past the month's end and an hour past 23 all roll the day over; it must read back as itself.
   if (new Date(local).getUTCDate() !== day) return undefined;
   const offset = (zh! * 60 + zm!) * 60_000 * (m[7] === "-" ? -1 : 1);
   return new Date(local - offset).toISOString();

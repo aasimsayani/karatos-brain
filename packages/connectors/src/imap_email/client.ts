@@ -92,13 +92,13 @@ export class ImapError extends Error {
   }
 }
 
-const HOST = /^(?=.{4,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z][a-z0-9-]{0,61}[a-z0-9]$/;
+const HOST = /^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z][a-z0-9-]{0,61}[a-z0-9]$/;
 const CONTROL = /[\u0000-\u001f\u007f]/;
 
 /** The settings, checked before anything is sent. The messages name the setting, never its value. */
 export function imapSettings(options: Pick<ImapClientOptions, "host" | "port" | "username" | "password">): ImapSettings {
   const host = typeof options.host === "string" ? options.host.trim().toLowerCase() : "";
-  if (!HOST.test(host)) throw new ImapConfigError("set IMAP_HOST to the IMAP server's host name, such as imap.example.com, without imaps:// or a port");
+  if (host.length > 253 || !HOST.test(host)) throw new ImapConfigError("set IMAP_HOST to the IMAP server's host name, such as imap.example.com, without imaps:// or a port");
   const raw = options.port;
   const port = raw === undefined || raw === "" ? IMAP_DEFAULT_PORT : typeof raw === "number" ? raw : /^\d{1,5}$/.test(raw.trim()) ? Number(raw.trim()) : Number.NaN;
   if (!Number.isInteger(port) || port < 1 || port > 65535) throw new ImapConfigError("IMAP_PORT must be a whole number from 1 to 65535; leave it empty for 993, IMAP over TLS");
@@ -221,7 +221,7 @@ const errorCode = (error: unknown) => {
 };
 const codeName = (response: ImapResponse) => (response.code && /^[A-Z-]{1,40}$/.test(response.code.name) ? ` ${response.code.name}` : "");
 
-/** Connects over TLS, checking the server's certificate against the host name as Node does by default. */
+/** Connects over TLS, checking the server's certificate against the host name as Node does by default, and naming the host in SNI, which Node doesn't by default. */
 export const imapTlsConnect: ImapConnect = ({ host, port, timeoutMs }) =>
   new Promise((resolve, reject) => {
     const socket = tlsConnect({ host, port, servername: host, minVersion: "TLSv1.2", ALPNProtocols: ["imap"] });
@@ -315,7 +315,8 @@ class ImapSession {
       const r = await this.next();
       if (r.tag === "*") {
         untagged.push(r);
-        if (r.kind === "BYE" && request.command !== "LOGOUT") throw this.endWith(new ImapError(`the IMAP server at ${this.where} ended the session${codeName(r)}`, true));
+        // Even a LOGOUT's BYE ends the session here: close() wants nothing more from it.
+        if (r.kind === "BYE") throw this.endWith(new ImapError(`the IMAP server at ${this.where} ended the session${codeName(r)}`, true));
         return take();
       }
       if (r.tag === "+") return "go on";

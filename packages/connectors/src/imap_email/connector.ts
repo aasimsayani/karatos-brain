@@ -151,9 +151,8 @@ export function imapEmailConnector(options: ImapEmailOptions): Connector {
   async function* pages(mode: "historical" | "incremental", context: SyncContext): AsyncIterable<SourceBatch> {
     const saved = parseImapCursor(context.cursor);
     const ours = saved?.account === label ? saved : null;
-    // A finished import stays finished.
-    if (mode === "historical" && ours?.pass === "historical" && ours.step === "done") return;
     let c: ImapCursor;
+    // A finished import stays finished: its checkpoint is at "done", so nothing is read and nothing connects.
     if (mode === "historical") {
       c = ours?.pass === "historical" ? ours : { pass: "historical", account: label, step: "folders", since: yearsAgo().toISOString(), folders: { inbox: null, sent: null } };
     } else if (ours?.pass === "incremental" && ours.step !== "done") {
@@ -185,7 +184,8 @@ export function imapEmailConnector(options: ImapEmailOptions): Connector {
         // A new UIDVALIDITY means every UID kept for the folder is void: read it again.
         const restarted = state.uidValidity !== null && state.uidValidity !== status.uidValidity;
         if (restarted) state = { mailbox: state.mailbox, uidValidity: null, lastUid: 0 };
-        const tail = mode === "incremental" && !restarted && state.uidValidity !== null && state.lastUid > 0;
+        // A folder restarted or never read has no last UID (the checkpoint parser holds it at 0 without a UIDVALIDITY), so it is searched.
+        const tail = mode === "incremental" && state.lastUid > 0;
         state = { ...state, uidValidity: status.uidValidity };
         const place = { role, mailbox: state.mailbox, uidValidity: status.uidValidity };
 
@@ -207,7 +207,8 @@ export function imapEmailConnector(options: ImapEmailOptions): Connector {
           const group = groups[i]!;
           const messages = group.messages ?? (await mailbox.fetch(imapSequenceSet(group.uids)));
           const events = messages.flatMap((m) => normalizer.message(place, m, receivedAt));
-          state = { ...state, lastUid: Math.max(state.lastUid, ...group.uids) };
+          // Every UID searched or fetched is past the last one read.
+          state = { ...state, lastUid: Math.max(...group.uids) };
           const last = i === groups.length - 1;
           c = { ...c, step: last ? nextStep : role, folders: { ...c.folders, [role]: last ? finish(state) : state } };
           yield batch(events);

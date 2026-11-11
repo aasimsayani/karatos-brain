@@ -10,7 +10,8 @@ import { gmailAddresses } from "../gmail/normalize.js";
 /** Header fields fetched for each message. No Subject, Date or body is ever asked for. */
 export const IMAP_HEADER_FIELDS = ["FROM", "TO", "CC", "MESSAGE-ID", "IN-REPLY-TO", "REFERENCES"] as const;
 
-const FIELD_NAME = /^[!-9;-~]{1,76}$/;
+/** A field's name, printable ASCII but the colon, and the colon after any white space. */
+const FIELD = /^([!-9;-~]{1,76})[ \t]*:/;
 
 /**
  * A header block's fields, by lower-cased name, each with every value it
@@ -38,31 +39,35 @@ export function parseHeaderBlock(bytes: Uint8Array): Map<string, string[]> {
       continue;
     }
     flush();
-    const colon = line.indexOf(":");
-    const name = colon > 0 ? line.slice(0, colon).trimEnd() : "";
-    if (!FIELD_NAME.test(name)) continue;
-    current = { name: name.toLowerCase(), value: line.slice(colon + 1) };
+    const field = FIELD.exec(line);
+    if (!field) continue;
+    current = { name: field[1]!.toLowerCase(), value: line.slice(field[0].length) };
   }
   flush();
   return fields;
 }
 
-const ENCODED_WORD = /=\?([^?\s*]+)(?:\*[^?\s]*)?\?([BbQq])\?([^?\s]*)\?=/g;
-/** Charsets an encoded word may name, mapped to what TextDecoder calls them. */
+const ENCODED_WORD = /=\?([^?\s*]+)(?:\*[^?\s]*)?\?([BbQq])\?([^?]*)\?=/g;
+/**
+ * Charsets an encoded word may name, mapped to what TextDecoder calls them.
+ * TextDecoder reads every Latin-1 label as windows-1252, a superset, so
+ * they all map there. Its text is checked by the decoders below, which
+ * turn down white space.
+ */
 const CHARSETS = new Map<string, string>([
   ["utf-8", "utf-8"],
   ["utf8", "utf-8"],
   ["us-ascii", "utf-8"],
   ["ascii", "utf-8"],
-  ["iso-8859-1", "iso-8859-1"],
-  ["latin1", "iso-8859-1"],
+  ["iso-8859-1", "windows-1252"],
+  ["latin1", "windows-1252"],
   ["iso-8859-15", "iso-8859-15"],
   ["windows-1252", "windows-1252"],
   ["cp1252", "windows-1252"],
 ]);
 const BASE64 = /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=|[A-Za-z0-9+/]{2,3})?$/;
-// Printable ASCII but "=" and "?", or =XX.
-const Q_TEXT = /^(?:[!-<>@-~]|=[0-9A-Fa-f]{2})*$/;
+// Printable ASCII but "=" (an encoded word's text never holds "?"), or =XX.
+const Q_TEXT = /^(?:[!-<>-~]|=[0-9A-Fa-f]{2})*$/;
 
 /** One encoded word's bytes, or null when it doesn't read. */
 function wordBytes(encoding: string, text: string): Uint8Array | null {
@@ -117,7 +122,7 @@ export function decodeEncodedWords(value: string): string {
 export function imapAddresses(values: readonly string[] | undefined): string[] {
   const raw = (values ?? []).join(", ");
   const found = gmailAddresses(raw);
-  if (found.length || !raw.includes("=?")) return found;
+  if (found.length) return found;
   return gmailAddresses(decodeEncodedWords(raw));
 }
 

@@ -1,4 +1,5 @@
 import { createServer, type Server } from "node:net";
+import tls from "node:tls";
 import { describe, expect, it } from "vitest";
 import { InMemoryWriteAuditLog, READ_ONLY, WriteGate, WritesDisabledError, runSync, type SourceBatch } from "@karatos/core";
 import { RETAIL_DEPARTMENTS, combineDepartments } from "@karatos/retail";
@@ -118,6 +119,13 @@ describe("IMAP reader", () => {
     // Literal bytes are kept as sent, not read as text.
     const [raw] = readAll(new Uint8Array([...latin("* 1 FETCH (X {2}\r\n"), 0xc3, 0xa9, ...latin(")\r\n")]));
     expect([...(raw!.literals[0] as Uint8Array)]).toEqual([0xc3, 0xa9]);
+    // Only a {n} that ends the line announces a literal.
+    expect(readAll("* OK [ALERT] {5} left\r\nK1 OK done\r\n")).toEqual([
+      { text: ["* OK [ALERT] {5} left"], literals: [] },
+      { text: ["K1 OK done"], literals: [] },
+    ]);
+    // Ten digits still announce one, which the reader then waits for.
+    expect(new ImapReader().feed(latin("* 1 FETCH (B {1234567890}\r\n"))).toEqual([]);
   });
 
   it("keeps a literal up to its cap and skips one past it, staying in step", () => {
@@ -156,6 +164,7 @@ describe("IMAP responses", () => {
     // A number before a status kind isn't a code holder.
     expect(response("* 3 OK [X]\r\n").code).toBeUndefined();
     expect(response("* OK [UNCLOSED text\r\n").code).toBeUndefined();
+    expect(response("* OK [] x\r\n")).toMatchObject({ code: { name: "", args: "" }, rest: "x" });
     expect(response("* BYE\r\n")).toMatchObject({ tag: "*", kind: "BYE", rest: "" });
     expect(response("+ Ready\r\n")).toMatchObject({ tag: "+", kind: "", rest: "Ready" });
     expect(response("+\r\n")).toMatchObject({ tag: "+", rest: "" });
@@ -163,7 +172,7 @@ describe("IMAP responses", () => {
   });
 
   it("turns down a response without a tag or a kind", () => {
-    for (const bad of ["(junk) OK\r\n", "\r\n", "K1 \r\n", "K1 (x)\r\n", "* 12\r\n", "Ké1 OK\r\n"]) {
+    for (const bad of ["(junk) OK\r\n", "\r\n", " OK x\r\n", "K1 \r\n", "K1 (x)\r\n", "* 12\r\n", "K1 3 OK done\r\n", "Ké1 OK\r\n"]) {
       expect(() => response(bad), bad).toThrow(ImapProtocolError);
     }
   });
@@ -176,6 +185,12 @@ describe("IMAP responses", () => {
     expect(values("* X (a (b (c)) ())\r\n")).toEqual([["a", ["b", ["c"]], []]]);
     expect(values("* 1 FETCH (BODY[HEADER.FIELDS (FROM TO)] NIL BODY[]<0> x)\r\n")).toEqual([["BODY[HEADER.FIELDS (FROM TO)]", null, "BODY[]<0>", "x"]]);
     expect(values("* X a[b[c]d]e f\r\n")).toEqual(["a[b[c]d]e", "f"]);
+    expect(values("* X a[b[c d] e] f\r\n")).toEqual(["a[b[c d] e]", "f"]);
+    // An atom ends where a quoted string, a list or a literal starts.
+    expect(values('* X a"b" c(d)\r\n')).toEqual(["a", "b", "c", ["d"]]);
+    expect(values("* X a{0}\r\n\r\n")).toEqual(["a", new Uint8Array(0)]);
+    // A literal's size may take all ten digits.
+    expect(parseImapValues(readImapResponse({ text: ["* 1 FETCH (B {1234567890}", ")"], literals: [new ImapLiteralTooLarge(1234567890)] }))).toEqual([["B", new ImapLiteralTooLarge(1234567890)]]);
     const [list] = values("* 1 FETCH (B {3}\r\nabc C {1}\r\nd)\r\n") as [unknown[]];
     expect(list.map((v) => (v instanceof Uint8Array ? `lit:${Buffer.from(v).toString()}` : v))).toEqual(["B", "lit:abc", "C", "lit:d"]);
     const big = parseImapValues(readImapResponse(new ImapReader({ maxLiteral: 1 }).feed(latin("* 1 FETCH (B {3}\r\nabc)\r\n"))[0]!));
@@ -211,6 +226,9 @@ describe("IMAP values the client writes and reads", () => {
   it("writes SEARCH days in UTC and reads INTERNALDATE with its zone", () => {
     expect(imapSearchDate(new Date("2021-02-01T23:30:00Z"))).toBe("1-Feb-2021");
     expect(imapSearchDate(new Date("2021-12-25T00:00:00Z"))).toBe("25-Dec-2021");
+    // The day is the UTC one, whatever the local zone says.
+    const local = Object.assign(new Date("2021-02-01T23:30:00Z"), { getDate: () => 2 });
+    expect(imapSearchDate(local)).toBe("1-Feb-2021");
     expect(imapInternalDate("17-Jul-1996 02:44:25 -0700")).toBe("1996-07-17T09:44:25.000Z");
     expect(imapInternalDate("17-Jul-1996 02:44:25 +0130")).toBe("1996-07-17T01:14:25.000Z");
     expect(imapInternalDate(" 7-Jan-2026 00:00:00 +0000")).toBe("2026-01-07T00:00:00.000Z");
@@ -279,6 +297,7 @@ describe("IMAP header fields", () => {
     expect(parseHeaderBlock(bytes("From: café <a@example.test>\n")).get("from")).toEqual(["café <a@example.test>"]);
     expect(parseHeaderBlock(new Uint8Array([...bytes("From: "), 0xff, ...bytes(" <a@example.test>")])).get("from")).toEqual(["� <a@example.test>"]);
     expect(parseHeaderBlock(new Uint8Array(0)).size).toBe(0);
+    expect([...parseHeaderBlock(bytes("From: a@example.test\nTo: b@example.test\n"))]).toEqual([["from", ["a@example.test"]], ["to", ["b@example.test"]]]);
     expect(parseHeaderBlock(bytes(`${"X".repeat(76)}: kept\r\n${"Y".repeat(77)}: skipped\r\n`)).size).toBe(1);
     expect(IMAP_HEADER_FIELDS).toEqual(["FROM", "TO", "CC", "MESSAGE-ID", "IN-REPLY-TO", "REFERENCES"]);
   });
@@ -310,6 +329,8 @@ describe("IMAP header fields", () => {
     // A decoded display name can't pose as an address.
     expect(imapAddresses(["=?utf-8?Q?evil=40example.test?= <real@example.test>"])).toEqual(["real@example.test"]);
     expect(imapAddresses(["=?utf-8?B?PGVuY29kZWRAZXhhbXBsZS50ZXN0Pg==?="])).toEqual(["encoded@example.test"]);
+    // A field that holds an address isn't decoded, even when part of it is encoded.
+    expect(imapAddresses(["a@example.test, =?utf-8?B?PGVuY29kZWRAZXhhbXBsZS50ZXN0Pg==?="])).toEqual(["a@example.test"]);
     expect(imapAddresses(["Nobody"])).toEqual([]);
     expect(imapAddresses(["=?utf-8?Q?Nobody?="])).toEqual([]);
     expect(imapAddresses(undefined)).toEqual([]);
@@ -320,6 +341,9 @@ describe("IMAP header fields", () => {
     expect(messageIds(["<a@example.test> <b@example.test>", "<c@example.test>"])).toEqual(["a@example.test", "b@example.test", "c@example.test"]);
     expect(messageIds(["no id", "<>", "< spaced@example.test>"])).toEqual([]);
     expect(messageIds(undefined)).toEqual([]);
+    expect(messageIds([`<${"a".repeat(998)}>`, `<${"b".repeat(999)}>`])).toEqual(["a".repeat(998)]);
+    // Each value stands alone: an id can't be pieced together across two.
+    expect(messageIds(["<a@example.test", ">"])).toEqual([]);
     expect(messageIds([`${" ".repeat(16_384)}<late@example.test>`])).toEqual([]);
     expect(messageIds([`${" ".repeat(16_360)}<early@example.test>`])).toEqual(["early@example.test"]);
   });
@@ -366,6 +390,9 @@ describe("IMAP settings", () => {
     expect(imapSettings({ ...base, host: "a.bc" }).host).toBe("a.bc");
     expect(imapSettings({ ...base, host: `${"a".repeat(63)}.example.test` }).host).toHaveLength(76);
     expect(imapSettings({ ...base, host: "mail-1.example.xn--p1ai" }).host).toBe("mail-1.example.xn--p1ai");
+    const long = (n: number) => `${`${"a".repeat(63)}.`.repeat(3)}${"a".repeat(n)}.test`;
+    expect(imapSettings({ ...base, host: long(56) }).host).toHaveLength(253);
+    expect(() => imapSettings({ ...base, host: long(57) })).toThrow(ImapConfigError);
     // A password keeps its spaces; it is the mailbox's own.
     expect(imapSettings({ ...base, password: " spaced pass " }).password).toBe(" spaced pass ");
     expect(imapSettings({ ...base, password: "p".repeat(1024) }).password).toHaveLength(1024);
@@ -374,14 +401,14 @@ describe("IMAP settings", () => {
 
   it("turns down a host that isn't a host name, naming IMAP_HOST and not the value", () => {
     const hostError = "set IMAP_HOST to the IMAP server's host name, such as imap.example.com, without imaps:// or a port";
-    for (const host of ["", "  ", "imaps://imap.example.test", "imap.example.test:993", "imap.example.test/", "localhost", "a.b", "-imap.example.test", "imap-.example.test", "imap..example.test", "192.168.0.1", "imap.example.1", "imap.example.test.", "imap_x.example.test", `${"a".repeat(64)}.example.test`, `${"a.".repeat(126)}test`, 5]) {
+    for (const host of ["", "  ", "imaps://imap.example.test", "imap.example.test:993", "imap.example.test/", "localhost", "a.b", "-imap.example.test", "imap-.example.test", "imap..example.test", "192.168.0.1", "10.0.0.12", "imap.example.1", "imap.example.test.", "imap_x.example.test", `${"a".repeat(64)}.example.test`, `${"a.".repeat(126)}test`, 5]) {
       expect(message({ host }), String(host)).toBe(hostError);
     }
   });
 
   it("turns down a port outside 1 to 65535, or that isn't a whole number", () => {
     const portError = "IMAP_PORT must be a whole number from 1 to 65535; leave it empty for 993, IMAP over TLS";
-    for (const port of [0, "0", 65536, "65536", -1, "-1", 1.5, "1.5", "abc", "993a", "123456", Number.NaN]) expect(message({ port }), String(port)).toBe(portError);
+    for (const port of [0, "0", 65536, "65536", -1, "-1", 1.5, "1.5", "abc", "993a", "123456", "000993", Number.NaN]) expect(message({ port }), String(port)).toBe(portError);
   });
 
   it("turns down a username or password that can't be sent, naming the setting and not the value", () => {
@@ -413,6 +440,7 @@ describe("IMAP commands", () => {
     expect(parts({ command: "UID SEARCH", since: new Date("2021-11-11T15:00:00Z"), afterUid: 4294967294 })).toEqual(["K1 UID SEARCH UID 4294967295:* SINCE 11-Nov-2021\r\n"]);
     expect(parts({ command: "UID FETCH", uids: "1:3,7,9:*" })).toEqual([`${FETCH("K1", "1:3,7,9:*")}\r\n`]);
     expect(parts({ command: "UID FETCH", uids: "4294967295" })).toHaveLength(1);
+    expect(parts({ command: "UID FETCH", uids: `${"1,".repeat(4095)}11` })).toHaveLength(1);
   });
 
   it("can't write anything else: no SELECT, STORE, COPY, MOVE, EXPUNGE, APPEND, CREATE or DELETE", () => {
@@ -423,13 +451,29 @@ describe("IMAP commands", () => {
     // An allowed command can't carry anything it wasn't made to.
     expect(() => parts({ command: "UID FETCH", uids: "1", items: "BODY[]" } as never)).toThrow("UID FETCH doesn't take items");
     expect(() => parts({ command: "LIST", pattern: "%" } as never)).toThrow("LIST doesn't take pattern");
-    expect(() => parts({ command: "LOGOUT", a: 1, b: 2, c: 3, d: 4 } as never)).toThrow("LOGOUT doesn't take a, b, c");
+    expect(() => parts({ command: "LOGOUT", a: 1, b: 2, c: 3, d: 4 } as never)).toThrow(new ImapConfigError("LOGOUT doesn't take a, b, c"));
+    // Nor another command's arguments.
+    const valid: ImapRequest[] = [
+      { command: "CAPABILITY" },
+      { command: "LOGIN", username: USER, password: PASSWORD },
+      { command: "LIST" },
+      { command: "EXAMINE", mailbox: "INBOX" },
+      { command: "UID SEARCH", since: new Date("2021-11-11T15:00:00Z"), afterUid: 0 },
+      { command: "UID FETCH", uids: "1" },
+      { command: "LOGOUT" },
+    ];
+    for (const request of valid) {
+      expect(() => parts(request), request.command).not.toThrow();
+      for (const key of ["username", "password", "mailbox", "since", "afterUid", "uids"].filter((k) => !(k in request))) {
+        expect(() => parts({ ...request, [key]: "x" } as never), `${request.command} ${key}`).toThrow(new ImapConfigError(`${request.command} doesn't take ${key}`));
+      }
+    }
   });
 
   it("checks every argument before writing a byte", () => {
     for (const tag of ["A1", "K", "K1 ", "K1234567890", "k1"]) expect(() => parts({ command: "CAPABILITY" }, tag), tag).toThrow("a command tag is K and a number");
     expect(parts({ command: "CAPABILITY" }, "K123456789")).toEqual(["K123456789 CAPABILITY\r\n"]);
-    for (const uids of ["", "0", "1:0", "*", "1,", ",1", "1 2", "1;STORE", "a", "01", "1:*:2", "12345678901", "1".repeat(8193)]) {
+    for (const uids of ["", "0", "1:0", "*", "1,", ",1", "1 2", "1;STORE", "a", "01", " 1", "1:*:2", "12345678901", "1".repeat(8193), `${"1,".repeat(4096)}1`]) {
       expect(() => parts({ command: "UID FETCH", uids }), uids.slice(0, 20)).toThrow("UID FETCH takes a set of UIDs");
     }
     expect(() => parts({ command: "UID FETCH", uids: 5 } as never)).toThrow(ImapConfigError);
@@ -604,6 +648,14 @@ describe("IMAP client", () => {
     expect(await errorOf(connection.examine("INBOX"))).toBe(error);
     await connection.close();
     expect(hangs.lines.at(-1)).toBe('K3 LIST "" "*"');
+    // A close that comes after the failure doesn't replace it.
+    let socket: ImapFakeTransport | undefined;
+    const late = imapFakeServer(mailbox(), { script: (c) => (c.command === "LIST" ? "hang" : undefined) });
+    const lateConnection = await imapClient(clientOptions({ ...late, connect: async () => (socket = (await late.connect()) as ImapFakeTransport) }, { timeoutMs: 20 })).open();
+    const first = await errorOf(lateConnection.list());
+    socket!.emit("close");
+    await new Promise((r) => setTimeout(r, 10));
+    expect(await errorOf(lateConnection.examine("INBOX"))).toBe(first);
 
     const slowGreeting = imapFakeServer(mailbox(), { greeting: "" });
     expect(((await errorOf(imapClient(clientOptions(slowGreeting, { timeoutMs: 1500 })).open())) as Error).message).toBe(`the IMAP server at ${HOST}:993 didn't answer within 2 s`);
@@ -693,6 +745,7 @@ describe("IMAP client", () => {
       '* LIST (\\HasNoChildren \\Sent) "/" "[Gmail]/Sent Mail"',
       "* LIST () NIL INBOX",
       '* LIST () "." {9}\r\nINBOX.Bin',
+      '* LIST () "." {3}\r\na\nb',
       '* LIST () "/" ""',
       '* LIST \\Bad "/" "x"',
       '* LIST () "/" NIL',
@@ -807,6 +860,45 @@ describe("IMAP client", () => {
   });
 });
 
+/**
+ * The ClientHello imapTlsConnect sends to localhost, read for its TLS
+ * versions, SNI and ALPN, with Node's floor lowered to TLS 1.0 and
+ * OpenSSL's security level to 0, so only the client's own pin holds it at 1.2.
+ */
+async function helloFor(): Promise<{ versions: number[]; sni: string; alpn: string }> {
+  let seen: Buffer | null = null;
+  const server = createServer((socket) => socket.once("data", (d: Buffer) => ((seen = d), socket.destroy())));
+  await new Promise<void>((r) => server.listen(0, "127.0.0.1", r));
+  const [floor, ciphers] = [tls.DEFAULT_MIN_VERSION, tls.DEFAULT_CIPHERS];
+  tls.DEFAULT_MIN_VERSION = "TLSv1";
+  tls.DEFAULT_CIPHERS = "DEFAULT@SECLEVEL=0";
+  try {
+    await imapTlsConnect({ host: "localhost", port: (server.address() as { port: number }).port, timeoutMs: 5000 }).then((s) => s.destroy(), () => undefined);
+  } finally {
+    tls.DEFAULT_MIN_VERSION = floor;
+    tls.DEFAULT_CIPHERS = ciphers;
+    server.close();
+  }
+  const b = seen! as Buffer;
+  // Record (5) and handshake (4) headers, version (2), random (32), then session id, ciphers and compression.
+  let at = 5 + 4 + 2 + 32;
+  at += 1 + b[at]!;
+  at += 2 + b.readUInt16BE(at);
+  at += 1 + b[at]!;
+  const end = at + 2 + b.readUInt16BE(at);
+  at += 2;
+  const out = { versions: [] as number[], sni: "", alpn: "" };
+  while (at < end) {
+    const type = b.readUInt16BE(at);
+    const data = b.subarray(at + 4, at + 4 + b.readUInt16BE(at + 2));
+    if (type === 0x2b) for (let i = 1; i < data.length; i += 2) out.versions.push(data.readUInt16BE(i));
+    if (type === 0x00) out.sni = data.subarray(5).toString("latin1");
+    if (type === 0x10) out.alpn = data.subarray(3).toString("latin1");
+    at += 4 + data.length;
+  }
+  return out;
+}
+
 describe("IMAP over TLS", () => {
   const listen = (handler: (socket: import("node:net").Socket) => void) =>
     new Promise<{ server: Server; port: number }>((resolve) => {
@@ -831,6 +923,11 @@ describe("IMAP over TLS", () => {
     const timedOut = await errorOf(imapTlsConnect({ host: "127.0.0.1", port: silent.port, timeoutMs: 50 }));
     expect([timedOut?.message, (timedOut as { code?: unknown }).code]).toEqual(["timed out", "ETIMEDOUT"]);
     silent.server.close();
+    // What the client offers: TLS 1.2 or later even where Node's default allows less, the host name as SNI, and ALPN "imap".
+    const hello = await helloFor();
+    expect(hello.versions).toEqual([0x0304, 0x0303]);
+    expect(hello.sni).toBe("localhost");
+    expect(hello.alpn).toBe("imap");
     const viaClient = (await errorOf(imapClient({ host: "localhost.test", port: closed.port, username: USER, password: PASSWORD, timeoutMs: 2000 }).open())) as ImapError;
     expect(viaClient.retryable).toBe(true);
     expect(viaClient.message).toMatch(/^couldn't open a TLS connection to the IMAP server at localhost\.test:\d+/);
@@ -880,6 +977,8 @@ describe("IMAP events", () => {
     // The message's reference is keyed: another instance's key gives another.
     expect(imapNormalizer("z".repeat(32)).message(inbox, fetched(), RECEIVED)[0]!.payload.messageId).not.toBe(e.payload.messageId);
     expect(() => imapNormalizer("short")).toThrow("CORRESPONDENT_HASH_KEY");
+    // The key is read as Gmail's is, trimmed.
+    expect(imapNormalizer(` ${KEY} `).message(inbox, fetched(), RECEIVED)).toEqual([e]);
   });
 
   it("reads direction from the folder and labels from the flags, each a version of its own", () => {
@@ -1113,6 +1212,10 @@ describe("IMAP connector", () => {
     expect(server.lines.slice(2, 4)).toEqual(['K3 EXAMINE "INBOX"', "K4 UID SEARCH SINCE 11-Nov-2021"]);
     expect(cursorOf(out[0]).folders.inbox).toEqual({ mailbox: "INBOX", uidValidity: "70", lastUid: 2 });
     expect(eventsOf(out).filter((e) => e.payload.direction === "received")).toHaveLength(3);
+    // An import keeps the start it was given, rather than five years back from now.
+    const later = imapFakeServer(box);
+    await drain(connector(later, { batchSize: 2 }).historicalImport(ctx(JSON.stringify({ ...cursorOf(first[1]), since: "2024-01-01T00:00:00.000Z" }))));
+    expect(later.lines[3]).toBe("K4 UID SEARCH SINCE 1-Jan-2024");
   });
 
   it("starts over for another mailbox, and when a folder is renamed reads it from the start", async () => {
@@ -1151,6 +1254,11 @@ describe("IMAP connector", () => {
     const out = await drain(connector(imapFakeServer(box)).historicalImport(ctx(null)));
     expect(out.map((b) => b.events.length)).toEqual([2, 3, 0]);
     expect(cursorOf(out.at(-1)).folders.sent).toEqual({ mailbox: "Sent", uidValidity: "9", lastUid: 40 });
+    // A folder with mail takes its UIDNEXT too, once its last batch is read.
+    const ahead = mailbox();
+    folder({ mailbox: ahead } as ImapFakeServer, "INBOX").uidNext = 21;
+    const read = await drain(connector(imapFakeServer(ahead), { batchSize: 2 }).historicalImport(ctx(null)));
+    expect(read.slice(1, 3).map((b) => cursorOf(b).folders.inbox!.lastUid)).toEqual([2, 20]);
     // Without UIDNEXT, the last UID read stands.
     const noNext = mailbox();
     folder({ mailbox: noNext } as ImapFakeServer, "INBOX").uidNext = null;
@@ -1339,6 +1447,7 @@ describe("IMAP connector", () => {
       { ...base, extra: 1 },
       { ...base, pass: "full" },
       { ...base, account: "account:xyz" },
+      { ...base, account: `${LABEL}0` },
       { ...base, account: 5 },
       { ...base, step: "trash" },
       { ...base, since: "2021-11-11" },
@@ -1347,6 +1456,7 @@ describe("IMAP connector", () => {
       { ...base, folders: [] },
       { ...base, folders: { inbox: state } },
       { ...base, folders: { inbox: state, sent: null, trash: null } },
+      { ...base, folders: { inbox: state, sent: "Sent" } },
       { ...base, folders: { inbox: null, sent: null } },
       { ...base, step: "done", folders: { inbox: null, sent: null } },
       { ...base, step: "sent", folders: { inbox: state, sent: null } },
