@@ -27,6 +27,7 @@ export * from "./gia/index.js";
 export * from "./gmail/index.js";
 export * from "./google_ads/index.js";
 export * from "./google_analytics/index.js";
+export * from "./google_business_profile/index.js";
 export * from "./google_workspace/index.js";
 export * from "./gorgias/index.js";
 export * from "./gusto/index.js";
