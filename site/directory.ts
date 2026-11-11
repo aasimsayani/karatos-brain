@@ -370,6 +370,7 @@ export const CONNECTED_ON: Readonly<Record<string, string>> = {
   microsoft_onedrive: "2026-11-10",
   microsoft_outlook: "2026-11-11",
   microsoft_teams: "2026-11-11",
+  gorgias: "2026-11-11",
   ringcentral: "2026-11-11",
   ups: "2026-11-10",
   fedex: "2026-11-10",
@@ -380,5 +381,6 @@ export const CONNECTED_ON: Readonly<Record<string, string>> = {
   ramp: "2026-11-11",
   repairshopr: "2026-11-11",
   smile_io: "2026-11-11",
+  zendesk: "2026-11-11",
   gusto: "2026-10-30",
 };
