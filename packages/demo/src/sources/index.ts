@@ -51,6 +51,7 @@ export const DEMO_NOT_YET: Readonly<Record<string, string>> = {
   yext: NEXT,
   birdeye: NEXT,
   etsy: NEXT,
+  gorgias: NEXT,
   openphone: NEXT,
   ringcentral: NEXT,
   tiktok: NEXT,
