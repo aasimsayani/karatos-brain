@@ -41,6 +41,17 @@ describe("integration catalog", () => {
     }
   });
 
+  it("dates a live check only on a built connector, as a real day no later than today", () => {
+    const today = new Date().toISOString().slice(0, 10);
+    for (const integration of INTEGRATIONS) {
+      const day = integration.liveCheckedOn;
+      if (day === undefined) continue;
+      expect(integration.status, integration.id).toBe("built");
+      expect(new Date(`${day}T00:00:00Z`).toISOString().slice(0, 10), integration.id).toBe(day);
+      expect(day <= today, integration.id).toBe(true);
+    }
+  });
+
   it("names at least one kind of business for every integration", () => {
     const missing = INTEGRATIONS.filter((i) => i.segments.length === 0).map((i) => i.id);
     expect(missing).toEqual([]);
