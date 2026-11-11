@@ -78,7 +78,7 @@ export const SYSTEM_DETAILS: Readonly<Record<string, SystemDetail>> = {
   ofac_sanctions: { about: "Large buyers and sellers checked against the US Treasury sanctions lists." },
   jsa_crime_alerts: { about: "Jewelry crime alerts and bulletins for the store's area." },
   bill_com: { about: "Supplier bills, approvals and vendor payments." },
-  ramp: { about: "Company card spending, receipts, reimbursements and bills." },
+  ramp: { about: "Company card purchases with their category, GL account, receipt and approval state." },
   klarna: { about: "Pay-over-time orders, captures, refunds and settlements." },
   afterpay: { about: "Pay-over-time orders, refunds and settlements.", company: "Block" },
   cardone_fintech: { about: "Payments and financing offered to the store's customers." },
@@ -372,5 +372,6 @@ export const CONNECTED_ON: Readonly<Record<string, string>> = {
   lightspeed: "2026-11-10",
   rfid_counts: "2026-11-10",
   hrd: "2026-11-10",
+  ramp: "2026-11-11",
   gusto: "2026-10-30",
 };
