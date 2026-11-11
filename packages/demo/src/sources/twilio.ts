@@ -18,7 +18,8 @@ const rfc2822 = (iso: string) => new Date(iso).toUTCString().replace("GMT", "+00
 /**
  * A week of the store's phone line. Two people rang without getting
  * through and nobody has called them back; a third was called back the
- * same afternoon, so it no longer counts as missed.
+ * same afternoon, so it no longer counts as missed. Around them, the calls
+ * of a busy week that got through.
  */
 export function demoCalls(calendar: DemoCalendar): TwilioCall[] {
   let n = 0;
@@ -47,6 +48,9 @@ export function demoCalls(calendar: DemoCalendar): TwilioCall[] {
     call(4, 16, STORE, caller(13), "completed", "outbound-dial"),
     call(2, 16, caller(14), STORE, "completed"),
     call(5, 13, caller(15), STORE, "completed"),
+    // The rest of a busy week: customers who got through, and calls the store made.
+    ...Array.from({ length: 48 }, (_, k) => call(k % 7, 11 + (k % 8), caller(21 + k), STORE, "completed")),
+    ...Array.from({ length: 12 }, (_, k) => call(k % 6, 12 + (k % 5), STORE, caller(21 + k * 3), "completed", "outbound-dial")),
   ];
 }
 

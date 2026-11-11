@@ -28,8 +28,8 @@ export interface SeedOptions {
   sources?: readonly DemoSource[];
 }
 
-/** Signals the demo brain reasons over: well above everything the demo store makes. */
-export const DEMO_REASONING_WINDOW = 1_000;
+/** Signals the demo brain reasons over: well above the several thousand the demo store makes. */
+export const DEMO_REASONING_WINDOW = 20_000;
 
 const noDocs = { current: () => ({ documentIds: [], stale: false }) };
 

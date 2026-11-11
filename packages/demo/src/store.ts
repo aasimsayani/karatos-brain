@@ -6,6 +6,8 @@
  * is seeded, so the dashboard always reads as this week.
  */
 
+import { bulkStore } from "./bulk.js";
+
 export const DEMO_ORGANIZATION = "demo-example-street";
 export const DEMO_STORE_NAME = "Example Street Jewelers";
 
@@ -56,8 +58,8 @@ export interface DemoItem {
   receivedDaysAgo: number;
 }
 
-/** The case: a few pieces that sell, a few that don't, and one on memo. */
-export const DEMO_ITEMS: DemoItem[] = [
+/** The story pieces: a few that sell out, a few that don't, and one on memo. */
+const STORY_ITEMS: DemoItem[] = [
   { sku: "ES-1001", title: "14K Yellow Gold Diamond Solitaire Ring, 1.00 ct", category: "Engagement Ring", metal: "gold", karat: 14, weightGrams: 3.4, costCents: 240_000, retailCents: 520_000, quantity: 4, vendor: "Sample Bridal Supply", receivedDaysAgo: 150 },
   { sku: "ES-1002", title: "18K White Gold Halo Engagement Ring", category: "Engagement Ring", metal: "gold", karat: 18, weightGrams: 5.1, costCents: 310_000, retailCents: 690_000, quantity: 3, vendor: "Sample Bridal Supply", receivedDaysAgo: 600 },
   { sku: "ES-1003", title: "14K Gold Hoop Earrings, 20 mm", category: "Earrings", metal: "gold", karat: 14, weightGrams: 2.8, costCents: 21_000, retailCents: 54_000, quantity: 6, vendor: "Demo Findings Co", receivedDaysAgo: 90 },
@@ -67,7 +69,15 @@ export const DEMO_ITEMS: DemoItem[] = [
   { sku: "ES-1007", title: "Loose Oval Diamond, 1.52 ct, G VS2", category: "Loose Stone", costCents: 820_000, retailCents: 1_490_000, quantity: 1, vendor: "Demo Diamond Exchange", onMemo: true, receivedDaysAgo: 40 },
   { sku: "ES-1008", title: "Akoya Pearl Strand, 7 mm, 18 in", category: "Necklace", costCents: 64_000, retailCents: 165_000, quantity: 2, vendor: "Demo Pearl House", receivedDaysAgo: 300 },
   { sku: "ES-1009", title: "14K Rose Gold Diamond Pendant, 0.25 ct", category: "Pendant", metal: "gold", karat: 14, weightGrams: 1.9, costCents: 38_000, retailCents: 95_000, quantity: 5, vendor: "Demo Findings Co", receivedDaysAgo: 60 },
+  { sku: "ES-1010", title: "18K Yellow Gold Sapphire and Diamond Cocktail Ring", category: "Fashion Ring", metal: "gold", karat: 18, weightGrams: 8.2, costCents: 460_000, retailCents: 980_000, quantity: 2, vendor: "Demo Gem Imports", receivedDaysAgo: 510 },
+  { sku: "ES-1011", title: "14K White Gold Diamond Stud Earrings, 1.00 ctw", category: "Earrings", metal: "gold", karat: 14, weightGrams: 1.6, costCents: 98_000, retailCents: 225_000, quantity: 9, vendor: "Demo Lab Diamonds", receivedDaysAgo: 200 },
 ];
+
+/** The rest of a busy store: a full case, regular customers, a year of sales and repairs. */
+export const DEMO_BULK = bulkStore();
+
+/** Everything in the case: the story pieces, then the everyday stock. */
+export const DEMO_ITEMS: DemoItem[] = [...STORY_ITEMS, ...DEMO_BULK.items];
 
 export interface DemoCustomer {
   id: string;
@@ -75,8 +85,8 @@ export interface DemoCustomer {
   optIn: boolean;
 }
 
-/** Customers, all invented. */
-export const DEMO_CUSTOMERS: DemoCustomer[] = [
+/** Customers in the story, all invented. */
+const STORY_CUSTOMERS: DemoCustomer[] = [
   { id: "C-1001", name: "Avery Sample", optIn: true },
   { id: "C-1002", name: "Jordan Example", optIn: true },
   { id: "C-1003", name: "Morgan Placeholder", optIn: true },
@@ -85,7 +95,11 @@ export const DEMO_CUSTOMERS: DemoCustomer[] = [
   { id: "C-1006", name: "Quinn Testwell", optIn: true },
   { id: "C-1007", name: "Harper Madeup", optIn: true },
   { id: "C-1008", name: "Rowan Invented", optIn: true },
+  { id: "C-1009", name: "Sawyer Fauxman", optIn: true },
 ];
+
+/** Every customer: the story's, then the store's regulars. */
+export const DEMO_CUSTOMERS: DemoCustomer[] = [...STORY_CUSTOMERS, ...DEMO_BULK.customers];
 
 export type Tender = "Card" | "Cash" | "Financing";
 
@@ -120,7 +134,9 @@ const sale = (n: number, daysAgo: number, sku: string, tender: Tender, customerI
  * - The memo diamond sold for $14,900 cash three days ago: a Form 8300.
  * - One customer paid cash twice in a week, each under $10,000.
  * - A customer who spent over $5,000 hasn't been back in over a year.
- * - The halo ring and platinum band haven't sold in months.
+ * - The halo ring, platinum band and sapphire cocktail ring haven't sold in months.
+ * - The diamond studs are the best seller and down to their last one.
+ * The everyday sales from bulk.ts follow.
  */
 export const DEMO_SALES: DemoSaleLine[] = [
   sale(4001, 560, "ES-1002", "Card", "C-1003"),
@@ -146,6 +162,16 @@ export const DEMO_SALES: DemoSaleLine[] = [
   sale(4019, 24, "ES-1009", "Card", "C-1001"),
   sale(4020, 11, "ES-1001", "Financing", "C-1008"),
   sale(4021, 2, "ES-1009", "Card", "C-1002"),
+  sale(4023, 470, "ES-1010", "Card", "C-1009"),
+  sale(4024, 430, "ES-1011", "Card", "C-1009"),
+  sale(4025, 180, "ES-1011", "Card", "C-1005"),
+  sale(4026, 130, "ES-1011", "Financing", "C-1001"),
+  sale(4027, 95, "ES-1011", "Card"),
+  sale(4028, 52, "ES-1011", "Card", "C-1006"),
+  sale(4029, 33, "ES-1011", "Card"),
+  sale(4030, 14, "ES-1011", "Financing", "C-1002"),
+  sale(4031, 4, "ES-1011", "Card"),
+  ...DEMO_BULK.sales,
 ];
 
 /** Cash the bank shows deposited in the last month. The $14,900 from three days ago hasn't gone in yet. */
@@ -174,7 +200,10 @@ export interface DemoRepair {
  * - A ring sizing is five days past its promised date and still at the bench.
  * - A chain repair has been ready for 52 days and nobody has come for it.
  * - A pearl restring has been ready for 240 days: time for a final notice.
- * - Two more are on time or already collected, so they say nothing.
+ * - An estate brooch came back from the setter late and is two days overdue.
+ * - A watch has waited 34 days for pickup.
+ * - Two more are on time or already collected, so they say nothing, and
+ *   so are the store's everyday tickets from bulk.ts.
  */
 export const DEMO_REPAIRS: DemoRepair[] = [
   { ticketId: "T-501", customerId: "C-1006", item: "14K yellow gold ring", work: "Size up one and a half", receivedDaysAgo: 19, promisedDaysAgo: 5, estimateCents: 6_500, status: "At bench", statusDaysAgo: 12 },
@@ -182,6 +211,9 @@ export const DEMO_REPAIRS: DemoRepair[] = [
   { ticketId: "T-503", customerId: "C-1005", item: "Akoya pearl strand", work: "Restring with knots", receivedDaysAgo: 255, promisedDaysAgo: 241, estimateCents: 12_000, declaredValueCents: 165_000, status: "Ready for pickup", statusDaysAgo: 240 },
   { ticketId: "T-504", customerId: "C-1001", item: "Platinum wedding band", work: "Polish and refinish", receivedDaysAgo: 3, promisedDaysAgo: -4, estimateCents: 8_500, status: "At bench", statusDaysAgo: 2 },
   { ticketId: "T-505", customerId: "C-1008", item: "Lab-grown tennis bracelet", work: "Tighten three prongs", receivedDaysAgo: 30, promisedDaysAgo: 20, estimateCents: 9_000, status: "Picked up", statusDaysAgo: 19 },
+  { ticketId: "T-506", customerId: "C-1003", item: "Estate diamond brooch", work: "Reset two missing stones", receivedDaysAgo: 24, promisedDaysAgo: 2, estimateCents: 28_000, declaredValueCents: 450_000, status: "Sent out", statusDaysAgo: 20 },
+  { ticketId: "T-507", customerId: "C-1007", item: "Steel automatic watch", work: "Service and pressure test", receivedDaysAgo: 70, promisedDaysAgo: 36, estimateCents: 45_000, status: "Ready for pickup", statusDaysAgo: 34 },
+  ...DEMO_BULK.repairs,
 ];
 
 export interface DemoSupplierLine {

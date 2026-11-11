@@ -1,20 +1,31 @@
 # The demo store
 
-`packages/demo` is Example Street Jewelers, a made-up store that runs on the real connectors and the real brain. It powers the public demo dashboard at karatos.app/demo. Nothing in it is a mock of the dashboard. Each system's data goes through that system's connector, into the retail departments and out as recommendations and signals, the same way it does on a client's instance. When a connector or a department changes, the demo changes with it.
+`packages/demo` is Example Street Jewelers, a made-up store doing about $4 million a year that runs on the real connectors and the real brain. It powers the public demo dashboard at karatos.app/demo. Nothing in it is a mock of the dashboard. Each system's data goes through that system's connector, into the retail departments and out as recommendations and signals, the same way it does on a client's instance. When a connector or a department changes, the demo changes with it.
+
+## The size of the store
+
+The store carries about 200 lines in its case (some 740 pieces on hand, about $3 million at cost), sells to nearly 290 customers, and has rung up about 1,300 sales in the last year, plus 70 repair tickets. Two layers make it up:
+
+- **The story** (`packages/demo/src/store.ts`): a few pieces, customers, sales and tickets, each chosen to show one problem on the dashboard.
+- **The everyday store** (`packages/demo/src/bulk.ts`): the rest of the case, the regular customers, a year of card and financing sales and the repairs that go out on time. It is made by a seeded generator, so it is the same on every seed, and it follows rules that keep it from raising anything on its own: every piece sold in the last 120 days and has at least 2 left, returns stay under one in four, regulars bought in the last year by card or financing, and repairs are collected or still ahead of their promised date. A test checks no recommendation names an everyday piece, customer or ticket, so the problems still have to be found among normal business.
+
+Card settlements in the bank are worked out from the week's card and financing sales, less a 2.9% fee, so the bank and the POS agree.
 
 ## What the store runs on
 
 | System | Connector | What it gives the dashboard |
 | --- | --- | --- |
 | Metals-API | `metals_api` | Spot prices close to the real market (gold about $4,040 an ounce in November 2026). Gold is up 6% today, so pieces heavy in gold need repricing |
-| POS exports | `inventory_pos` | The case, customers, two years of sales and the repair envelopes: aged stock, pieces to reorder, a chain that keeps coming back, a $14,900 cash sale that needs a Form 8300, cash payments to review under the AML program, a lapsed customer who spent over $5,000, a ring sizing five days late, a chain repair waiting 52 days for pickup, and a pearl restring unclaimed for 240 days |
+| POS exports | `inventory_pos` | The case, customers, two years of sales and the repair envelopes: aged stock, pieces to reorder, a chain that keeps coming back, a $14,900 cash sale that needs a Form 8300, cash payments to review under the AML program, two lapsed customers who spent over $5,000, diamond studs selling faster than they're restocked, a ring sizing five days late, an estate brooch overdue from the setter, a chain and a watch waiting for pickup, and a pearl restring unclaimed for 240 days |
 | Supplier invoices and memos | `supplier_invoices` | A loose diamond on a 45-day memo that sold three days ago, so the vendor is owed $8,200 before it asks, and the memo carries no System of Warranties statement |
 | Plaid | `plaid` | Bank balances and transactions. The cash deposits don't cover the cash the drawer took in |
-| QuickBooks | `quickbooks` | Invoices to trade accounts. $4,650 is more than 30 days past due |
-| Twilio | `twilio` | The phone line. Two callers didn't get through and nobody called them back |
+| QuickBooks | `quickbooks` | Invoices to trade and corporate accounts. $7,050 across 3 invoices is more than 30 days past due |
+| Twilio | `twilio` | A busy week on the phone line. Two callers didn't get through and nobody called them back |
 | WatchSearch | `watchsearch` | Two WhatsApp dealer groups. Three dealers are looking for the same Rolex |
 
-The brain reasons over the last 1,000 signals (`DEMO_REASONING_WINDOW`), well above all the demo store makes, so the earliest sources still count.
+The brain reasons over the last 20,000 signals (`DEMO_REASONING_WINDOW`), well above all the demo store makes, so the earliest sources still count. Seeding the whole store takes well under a second.
+
+The dashboard shows 23 recommendations.
 
 Every other built connector is listed in `DEMO_NOT_YET` (`packages/demo/src/sources/index.ts`) with the reason it isn't in the demo yet. A test fails when a connector is built but neither runs in the demo nor is listed there. Another test removes each source in turn and checks that something disappears from the dashboard, so no source is there for show.
 
