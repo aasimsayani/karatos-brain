@@ -306,7 +306,7 @@ Used by: R is retail, W is wholesale, M is manufacturing. Test with says how we 
 | Trello | R, W, M | Public API | Free sandbox | No | Built (Read-only: a token authorized with scope=read, which the connector checks before every sync, turning away one that can write. The client sends only its six listed GETs and never asks for card names or descriptions. No webhooks yet; the sync polls) |
 | Airtable | R, W, M | Public API | Free sandbox | No | Built (Read-only: the client sends only its four listed GETs and names every field it reads. It stops if an OAuth token has a write scope; a personal access token's scopes aren't reported, so make it with data.records:read and schema.bases:read only. No webhooks yet; the sync polls) |
 | Notion | R, W, M | Public API | Free sandbox | No | Built (Read-only: the client sends only a search, a data source read and a query, and names every property it reads. Notion's API can't report a connection's capabilities, so make the connection with Read content only. No webhooks yet; the sync polls) |
-| Verkada store traffic | R | Public API | Paid account | Yes | Planned (People counts from store cameras, to compare footfall with sales) |
+| Verkada store traffic | R | Public API | Paid account | Yes | Built (Reads people in and out by hour from each camera's counting line with a read-only API key, traded for a 30-minute token. Occupancy Trends needs Verkada cameras with it turned on: the first client's organization confirms the mock built from Verkada's docs) |
 | ShopperTrak | R | Partner | Partner | No | Planned (Door counts from mall and street store traffic counters, to compare footfall with sales. Data access goes through Sensormatic) |
 | Reshyne | R, W | Partner | Partner | No | Planned (Cloud jewelry and watch repair management: work orders, status and vendor price lists. Partner only. Exhibited at JCK 2026) |
 | Jewelers' Toolbox and Benchtrax | R, M | Unknown | Unknown | No | Planned (Repair and custom quotes, metal buying calculations and RFID bench job tracking. No API found. Exhibited at JCK 2026) |
@@ -449,6 +449,7 @@ A request for a path or method the docs don't list throws `UndocumentedRequestEr
 - Trello's token, member board, list, custom field, card and action endpoints (REST API 1)
 - Trustpilot's public business unit and service reviews (v1)
 - UPS's OAuth client credentials token and Tracking API details call
+- Verkada's API token, occupancy trends cameras and occupancy trends
 - A Wix site's read endpoints (eCommerce orders, Catalog V3 and V1, Contacts V5) with the app token, its permissions and cursor paging
 - A WooCommerce store's REST API v3 read endpoints with its key permissions and page headers
 - Xero's Accounting API endpoints with its token refresh
@@ -2675,6 +2676,27 @@ A package's time is its latest scan, or when it was read when UPS has no scan ye
 **Writes.** None. KaratOS never creates labels, pickups or returns.
 
 **Testing.** The tests run against a mock built from the OpenAPI files UPS publishes (`packages/testkit/src/mocks/ups.ts`), with synthetic packages. UPS's status type letters aren't listed in those files, so the mock's assumptions name them for the first live run to check. The nightly sandbox run signs in at UPS's test environment and reads two of UPS's test tracking numbers once `SANDBOX_UPS_CLIENT_ID` and `SANDBOX_UPS_CLIENT_SECRET` are set.
+
+### Verkada store traffic
+
+Reads how many people came into the store and went out, hour by hour, from each Verkada camera's counting line, so the owner sees footfall against sales.
+
+| Setting | What it is |
+| --- | --- |
+| `VERKADA_API_KEY` | A read-only API key from the organization's admin |
+| `VERKADA_REGION` | `us` (the default) or `eu`, where the organization's data lives |
+
+**Read-only by design.** Verkada API keys are made read-only or read/write, and their permissions can't change later, so the setup asks the admin for a read-only key. The connector trades it for a token that lasts 30 minutes (`POST /token` with the key in `x-api-key`), sends the token in `x-verkada-auth`, and sends only two GETs: the cameras with Occupancy Trends turned on and their counting lines, and the hourly counts across a line. It declares no writes.
+
+**What it reads.** Verkada answers one camera's line at a time, over a time range, by hour. A pass lists the cameras and their lines, then reads each line a week at a time up to the last whole hour. The first import reads two years back. Each later sync reads from two hours before where the last one ended, since Verkada can still be counting the last hours; the first later sync reads the last day. An hour read again unchanged is a duplicate, and a recount is a new event. Each week of a line is one batch, and the checkpoint keeps the pass's range, its lines and where it is, so a resumed sync goes on from there.
+
+**Events.** `store.traffic_counted` for each hour across each counting line: the camera and line, the camera's name and site, the hour's start and end, and how many people came in and went out. It is dated at the end of its hour. An hour that doesn't read, or an answer for another camera, is dead-lettered.
+
+**Privacy.** Counts only: the site's street address, the organization's name and any video or thumbnail are never read into an event.
+
+**Rate limits.** Verkada allows 300 calls a minute for an organization, enforced 25 to each five seconds, so the client spaces calls a quarter second apart. It waits 5, 10 and 20 seconds on a 429, 500, 502, 503 or 504 before the error goes to the sync runner, which resumes from its checkpoint next time. The token is kept until five minutes before it lapses and fetched again once if a call is turned down. A 401 on the token says the key is wrong, expired or in the other region; a 403 says the key can't see the cameras.
+
+**Testing.** Occupancy Trends needs Verkada cameras with the feature on. The tests run against a mock built from Verkada's API docs (`packages/testkit/src/mocks/verkada.ts`). It checks the token, the parameters, the camera and line, and the range. It lists what the first client's organization must confirm: the key the cameras come under, the shape of each hour's entry, that a week at a time is one answer, how lines are picked, and the key's shape.
 
 ### TheWatchSearch (by TheWatchCloud)
 
