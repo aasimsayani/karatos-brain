@@ -110,6 +110,7 @@ describe("HRD XML reader", () => {
       ["<!--><r/>", /comment that doesn't end/],
       ['<r x a="1"/>', /malformed attribute/],
       ["<a.b></aXb>", /ends with another element's name/],
+      ["<a></ a></a>", /ends with another element's name/],
       ["<r>a & b</r>", /an & that starts no entity/],
       ["<r>&amp</r>", /an & that starts no entity/],
       ["<r>&#xD800;</r>", /out of range/],

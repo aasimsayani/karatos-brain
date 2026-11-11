@@ -19,6 +19,8 @@ export interface XmlElement {
 export const XML_MAX_LENGTH = 2_000_000;
 const MAX_DEPTH = 32;
 const NAME = /^[A-Za-z_][\w.:-]*/;
+/** A closing tag, with its name. */
+const CLOSE = /^<\/([A-Za-z_][\w.:-]*)\s*>/;
 /** One attribute, read where the reader stands (sticky). */
 const ATTR = /[A-Za-z_][\w.:-]*\s*=\s*("[^"<]*"|'[^'<]*')/y;
 const NAMED: Record<string, string> = { amp: "&", lt: "<", gt: ">", quot: '"', apos: "'" };
@@ -98,8 +100,8 @@ export function parseXml(source: string): XmlElement {
       text += s.slice(i, lt);
       i = lt;
       if (s.startsWith("</", i)) {
-        const close = new RegExp(`^</${name.replace(/[.:-]/g, "\\$&")}\\s*>`).exec(s.slice(i, i + name.length + 64));
-        if (!close) throw new XmlError(`element ${name} ends with another element's name`);
+        const close = CLOSE.exec(s.slice(i, i + name.length + 64));
+        if (!close || close[1] !== name) throw new XmlError(`element ${name} ends with another element's name`);
         i += close[0].length;
         node.text = entities(text).trim();
         return node;
