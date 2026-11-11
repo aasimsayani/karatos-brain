@@ -70,6 +70,7 @@ export const DEMO_NOT_YET: Readonly<Record<string, string>> = {
   microsoft_onedrive: NOT_READ_YET,
   microsoft_outlook: NEXT,
   microsoft_teams: NEXT,
+  smile_io: NEXT,
   notion: NOT_READ_YET,
   docusign: NOT_READ_YET,
   dropbox: NOT_READ_YET,
