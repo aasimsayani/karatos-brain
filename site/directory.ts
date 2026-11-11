@@ -248,7 +248,7 @@ export const SYSTEM_DETAILS: Readonly<Record<string, SystemDetail>> = {
   katana: { about: "Manufacturing orders, materials, stock and costs." },
   cin7: { about: "Inventory, purchasing and sales across channels." },
   rightclick_wise_choice: { about: "Stock, bills of materials, job bags and costing." },
-  bci_e_jewelry: { about: "Items, memos, production and sales documents on Business Central." },
+  bci_e_jewelry: { about: "Items, vendors, and sales and purchase invoices on Business Central." },
   unbridaled_os: { about: "Inventory and production for diamond and jewelry houses." },
   gem_logic: { about: "Counter sales, workshop jobs, memos, consignment and metal prices." },
 
@@ -385,6 +385,7 @@ export const CONNECTED_ON: Readonly<Record<string, string>> = {
   formlabs: "2026-11-11",
   smile_io: "2026-11-11",
   zendesk: "2026-11-11",
+  bci_e_jewelry: "2026-11-11",
   search_the_watch_market: "2026-11-11",
   verkada: "2026-11-11",
   gusto: "2026-10-30",

@@ -134,6 +134,7 @@ These are built, tested against recorded vendor responses or mocks built from ea
 | Dropbox | Imports the names, kinds, folders, sizes and edit times of the files in the folder you share, then keeps up with every change | Finance, Compliance, Custom orders |
 | Microsoft OneDrive and SharePoint files | Imports the names, kinds, folders, sizes and edit times of the files in the library you share, then keeps up with every change | Finance, Compliance, Custom orders |
 | Verkada store traffic | Imports two years of hourly people counts from every counting line, then the hours since the last sync | Sales, Marketing |
+| e-Jewelry for Business Central | Imports every item and vendor and five years of sales and purchase invoices, then what changed on each sync | Inventory, Sales, Manufacturing, Wholesale, Finance, Metals |
 | Sola Payments (formerly Cardknox) | Imports five years of card and check payments and refunds, then the last two days again on each sync | Finance, Sales |
 | TheWatchSearch (by TheWatchCloud) | Turns the dealer WhatsApp groups the store is in into a feed of offers: brand, reference, buy or sell, price, year, condition and set | Buying, Sales, Inventory |
 | Search The Watch Market Business API | Gives a fair market price for each reference the store follows: listings, low, high, mean and market value | Buying, Appraisals, Sales, Inventory |
@@ -180,7 +181,7 @@ This section updates itself as work lands: it is generated from [docs/milestones
 <!-- progress:start -->
 <!-- Generated from docs/milestones.json and the integration catalog by npm run progress:write. Edit those, not this block. -->
 
-**Overall: 80% complete**, 65 of 81 roadmap items done. 83 of the 253 systems in the integration catalog are connected.
+**Overall: 80% complete**, 65 of 81 roadmap items done. 84 of the 253 systems in the integration catalog are connected.
 
 | Milestone | What it gives a jeweler | Progress | Target |
 | --- | --- | --- | --- |
