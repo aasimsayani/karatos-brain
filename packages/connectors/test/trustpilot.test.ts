@@ -150,8 +150,8 @@ describe("Trustpilot client", () => {
     }
     const { c: missing } = client(scripted(json(404, {})).fetch);
     await expect(missing.businessUnit()).rejects.toThrow(new TrustpilotConfigError("Trustpilot has no business unit with TRUSTPILOT_BUSINESS_UNIT_ID"));
-    for (const status of [400, 418, 501]) {
-      const { c } = client(scripted(json(status, {})).fetch);
+    for (const status of [201, 400, 418, 501]) {
+      const { c } = client(scripted(json(status, trustpilotUnit())).fetch);
       const err = await c.businessUnit().catch((e: unknown) => e);
       expect(err).toBeInstanceOf(TrustpilotApiError);
       expect(err).toMatchObject({ message: `Trustpilot answered HTTP ${status} for the business unit`, status, name: "TrustpilotApiError" });
@@ -304,7 +304,7 @@ describe("Trustpilot events", () => {
     for (const raw of [null, [review()], "x"]) expect(trustpilotReviewEvent(raw, ctx).event.payload.problems).toEqual(["review is not an object", "review has no id that reads", "review has no rating from 1 to 5", "review has no time that reads"]);
     expect(trustpilotReviewEvent(null, ctx).event.idempotencyKey).not.toBe(trustpilotReviewEvent("x", ctx).event.idempotencyKey);
     for (const stars of [0, 1.5, "5", undefined]) expect(trustpilotReviewEvent(review({ stars }), ctx).event.payload.problems).toEqual(["review has no rating from 1 to 5"]);
-    for (const id of [trustpilotId("6a", 1).toUpperCase(), `${trustpilotId("6a", 1)}0`, 5]) expect(trustpilotReviewEvent(review({ id }), ctx).event.payload).toEqual({ system: "Trustpilot", reviewId: null, problems: ["review has no id that reads"] });
+    for (const id of [trustpilotId("6a", 1).toUpperCase(), `${trustpilotId("6a", 1)}0`, 5, [trustpilotId("6a", 1)]]) expect(trustpilotReviewEvent(review({ id }), ctx).event.payload).toEqual({ system: "Trustpilot", reviewId: null, problems: ["review has no id that reads"] });
     expect(trustpilotReviewEvent(review({ createdAt: "2026-02-30T00:00:00Z" }), ctx).event.payload).toMatchObject({ reviewId: trustpilotId("6a", 1), problems: ["review has no time that reads"] });
   });
 

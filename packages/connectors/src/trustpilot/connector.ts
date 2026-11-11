@@ -94,8 +94,9 @@ export function trustpilotConnector(options: TrustpilotOptions): Connector {
       // Kept when posted since the pass's start; one that doesn't read is kept to be dead-lettered.
       const events = [...score, ...reads.filter(({ ok, event }) => !ok || String(event.payload.publishedAt) >= pass.since).map(({ event }) => event)];
       // Newest first, so a page that reaches back past the start is the last; so is a short page, and the last page a pass may ask for.
-      const oldest = quoTime((rows.at(-1) as { createdAt?: unknown } | undefined)?.createdAt);
-      const last = rows.length < TRUSTPILOT_PAGE_SIZE || page === TRUSTPILOT_MAX_PAGE || (oldest !== null && oldest < pass.since);
+      // A last row with no time that reads doesn't end the pass.
+      const oldest = quoTime((rows.at(-1) as { createdAt?: unknown } | undefined)?.createdAt) ?? pass.since;
+      const last = rows.length < TRUSTPILOT_PAGE_SIZE || page === TRUSTPILOT_MAX_PAGE || oldest < pass.since;
       const cursor: TrustpilotCursor = last ? { pass: null, done: doneAtEnd } : { pass: { since: pass.since, page: page + 1 }, done };
       yield { events, cursor: JSON.stringify(cursor) };
       if (last) return;
