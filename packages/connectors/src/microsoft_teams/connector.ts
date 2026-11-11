@@ -101,7 +101,7 @@ export function parseTeamsCursor(raw: string | null): TeamsCursor | null {
     typeof r.done === "boolean" &&
     isTime(r.since);
   if (!ok) throw new Error("Teams checkpoint is not in the expected shape");
-  return { pass: r.pass as TeamsCursor["pass"], team: r.team as string, channels: channels === null ? null : [...(channels as string[])], index: r.index as number, skip: r.skip as string | null, top: r.top as string | null, marks: { ...(marks as Record<string, string>) }, done: r.done as boolean, since: r.since as string };
+  return { pass: r.pass as TeamsCursor["pass"], team: r.team as string, channels: channels as string[] | null, index: r.index as number, skip: r.skip as string | null, top: r.top as string | null, marks: marks as Record<string, string>, done: r.done as boolean, since: r.since as string };
 }
 
 export function teamsConnector(options: TeamsOptions): Connector {
@@ -116,7 +116,7 @@ export function teamsConnector(options: TeamsOptions): Connector {
 
   /** A thread's replies: the ones the listing carried, or all of them when it carried only some. */
   async function repliesOf(channel: string, root: Record<string, unknown>): Promise<Record<string, unknown>[]> {
-    if (root["replies@odata.nextLink"] === undefined) return list(root.replies);
+    if (!root["replies@odata.nextLink"]) return list(root.replies);
     const all: Record<string, unknown>[] = [];
     let skip: string | null = null;
     for (let n = 0; n < MAX_REPLY_PAGES; n++) {
@@ -152,7 +152,8 @@ export function teamsConnector(options: TeamsOptions): Connector {
     }
     while (true) {
       const channel = channels[c.index]!;
-      const mark = c.pass === "incremental" ? c.marks[channel] : undefined;
+      // Only a finished channel has a mark, so the import never stops early at one.
+      const mark = c.marks[channel];
       const floor = mark === undefined ? c.since : new Date(Date.parse(mark) - TEAMS_OVERLAP_MS).toISOString();
       const page = await client.messages(channel, c.skip);
       const events: TeamsEvent[] = [];
@@ -162,7 +163,7 @@ export function teamsConnector(options: TeamsOptions): Connector {
         const replies = await repliesOf(channel, root);
         // A thread's change time is the newest of its message's and its replies'.
         const changed = [root, ...replies].map((m) => outlookTime(m.lastModifiedDateTime) ?? outlookTime(m.createdDateTime)).filter((t) => t !== undefined).sort().at(-1);
-        if (changed !== undefined && changed < floor) {
+        if ((changed ?? floor) < floor) {
           reached = true;
           break;
         }

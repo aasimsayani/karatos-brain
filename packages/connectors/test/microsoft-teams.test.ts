@@ -176,6 +176,7 @@ describe("Teams client", () => {
     await plain(fetch).c.messages(CH1, null);
     expect(sent[1]!.headers).toEqual({ Authorization: `Bearer ${TOKEN}`, Accept: "application/json" });
     expect(sent[0]!.method).toBe("POST");
+    expect(sent[0]!.headers).toEqual({ "Content-Type": "application/x-www-form-urlencoded", Accept: "application/json" });
   });
 
   it("checks a request before sending anything", async () => {
@@ -185,6 +186,7 @@ describe("Teams client", () => {
     await expect(c.messages(CH1, "a b")).rejects.toThrow(new MicrosoftApiError("the saved skip token isn't in the expected shape", 0));
     await expect(c.replies(CH1, "12a", null)).rejects.toThrow(new MicrosoftApiError("the message id isn't in the expected shape", 0));
     await expect(c.replies("x", "12", null)).rejects.toThrow("the channel id isn't in the expected shape");
+    for (const channel of ["19:abc@thread.tacv2x", "19:a/b@thread.tacv2", "x19:abc@thread.tacv2", `19:${"a".repeat(129)}@thread.tacv2`]) await expect(c.messages(channel, null), channel).rejects.toThrow("the channel id isn't in the expected shape");
     expect(sent).toHaveLength(0);
     await c.messages("19:abc@thread.skype", "ok");
     expect(new URL(sent[1]!.url).pathname).toBe(`/v1.0/teams/${TEAM}/channels/${encodeURIComponent("19:abc@thread.skype")}/messages`);
@@ -192,7 +194,7 @@ describe("Teams client", () => {
   });
 
   it("stops before reading when the token can do more than read, naming what it can do", async () => {
-    const write = scripted(jwt({ roles: ["ChannelMessage.Read.All", "ChannelMessage.Send", "Group.ReadWrite.All", "a", "b", "c"] }), okPage());
+    const write = scripted(jwt({ roles: ["ChannelMessage.Read.All", "ChannelMessage.Send", "Group.ReadWrite.All", "a", "b", "c", "d"] }), okPage());
     await expect(plain(write.fetch).c.channels()).rejects.toThrow(new MicrosoftConfigError("the app has ChannelMessage.Send, Group.ReadWrite.All, a, b, c; KaratOS only reads, so install it in the team with ChannelMessage.Read.Group and ChannelSettings.Read.Group and give it nothing else"));
     expect(write.sent).toHaveLength(1);
     for (const roles of [["ChannelMessage.Read.All", "ChannelSettings.Read.All", "Channel.ReadBasic.All"], []]) {
@@ -219,7 +221,9 @@ describe("Teams client", () => {
     expect([e.constructor, e.message, e.status]).toEqual([MicrosoftApiError, "Microsoft answered HTTP 503 to the sign-in", 503]);
     const odd = (async () => new Response(JSON.stringify({ error_codes: "7000215" }), { status: 400 })) as unknown as typeof globalThis.fetch;
     await expect(plain(odd).c.channels()).rejects.toThrow("Microsoft answered HTTP 400 to the sign-in");
-    for (const body of [{}, { access_token: 5 }, { access_token: "a b" }, { access_token: "" }, "x"]) {
+    const created = (async () => new Response(JSON.stringify({ access_token: "t".repeat(20), expires_in: 3600 }), { status: 201 })) as unknown as typeof globalThis.fetch;
+    await expect(plain(created).c.channels()).rejects.toThrow("Microsoft answered HTTP 201 to the sign-in");
+    for (const body of [{}, { access_token: 5 }, { access_token: "a b" }, { access_token: "" }, "x", null]) {
       const f = (async () => new Response(JSON.stringify(body), { status: 200 })) as unknown as typeof globalThis.fetch;
       const err = (await plain(f).c.channels().catch((x: Error) => x)) as MicrosoftApiError;
       expect([err.message, err.status], JSON.stringify(body)).toEqual(["Microsoft's sign-in had no access token in the expected shape", 200]);
@@ -338,6 +342,10 @@ describe("Teams client", () => {
     await expect(plain(scripted(TOKEN, okPage({ "@odata.nextLink": `${BASE}/channels/${CH1}/messages/8/replies?$skiptoken=r1` })).fetch).c.replies(CH1, "9", null)).rejects.toThrow("isn't the team's");
     const endless = plain(scripted(TOKEN, okPage({ "@odata.nextLink": `${BASE}/channels?$skiptoken=again` }, [{ id: CH1 }])).fetch);
     await expect(endless.c.channels()).rejects.toThrow(new MicrosoftApiError("Microsoft Graph listed more pages of channels than a team can have", 200));
+    const counted = scripted(TOKEN, okPage({ "@odata.nextLink": `${BASE}/channels?$skiptoken=again` }, [{ id: CH1 }]));
+    await plain(counted.fetch).c.channels().catch(() => undefined);
+    expect(counted.sent.filter((s) => s.method === "GET")).toHaveLength(20);
+    await expect(plain(scripted(TOKEN, okPage(NEXT)).fetch).c.channels()).rejects.toThrow("isn't the team's");
   });
 });
 
@@ -388,6 +396,8 @@ describe("Teams events", () => {
     expect(key({ reactions: [{}] })).not.toBe(key({}));
     expect(key({}, CH2)).not.toBe(key({}));
     expect(norm.message(CH2, message(), RECEIVED)[0]!.payload.conversationId).not.toBe(e!.payload.conversationId);
+    // Teams ids tell case apart.
+    expect(norm.message(CH1.replace("test", "TEST"), message(), RECEIVED)[0]!.payload.conversationId).not.toBe(e!.payload.conversationId);
     expect(key({ id: "1759395600001" })).not.toBe(key({}));
     expect(teamsNormalizer("j".repeat(40)).person("x")).not.toBe(norm.person("x"));
     expect(norm.person("x")).not.toBe(norm.person("y"));
@@ -444,12 +454,13 @@ describe("Teams events", () => {
   });
 
   it("turns down a short correspondent key", () => {
-    for (const key of ["short", " ".repeat(40), undefined as never]) expect(() => teamsNormalizer(key)).toThrow("set CORRESPONDENT_HASH_KEY to at least 32 characters; npm run secrets:setup generates one");
+    for (const key of ["short", "k".repeat(31), " ".repeat(40), undefined as never]) expect(() => teamsNormalizer(key)).toThrow("set CORRESPONDENT_HASH_KEY to at least 32 characters; npm run secrets:setup generates one");
     expect(() => teamsNormalizer(` ${"k".repeat(32)} `)).not.toThrow();
   });
 
   it("builds fixtures that look synthetic", () => {
     assertSynthetic(account());
+    assertSynthetic({ chat: "19:abc@thread.skype" });
   });
 });
 
@@ -475,9 +486,13 @@ describe("Teams checkpoint", () => {
         { ...good, pass: "full" },
         { ...good, team: "team:abc" },
         { ...good, team: `x${label}` },
+        { ...good, team: `${label}0` },
         { ...good, team: 5 },
         { ...good, channels: "x" },
         { ...good, channels: ["general"] },
+        { ...good, channels: [CH1, "general"] },
+        { ...good, channels: "", index: 0 },
+        { ...good, channels: false, index: 0 },
         { ...good, channels: [...many, "19:x@thread.tacv2"] },
         { ...good, channels: undefined },
         { ...good, index: -1 },
@@ -494,6 +509,8 @@ describe("Teams checkpoint", () => {
         { ...good, marks: null },
         { ...good, marks: undefined },
         { ...good, marks: [] },
+        { ...good, marks: 5 },
+        { ...good, marks: "x" },
         { ...good, marks: { general: SINCE } },
         { ...good, marks: { [CH1]: "soon" } },
         { ...good, marks: Object.fromEntries([...many, "19:x@thread.tacv2"].map((c) => [c, SINCE])) },
@@ -504,9 +521,6 @@ describe("Teams checkpoint", () => {
     for (const raw of bad) expect(() => parseTeamsCursor(raw), raw.slice(0, 120)).toThrow("Teams checkpoint is not in the expected shape");
     expect(label).toMatch(/^team:[0-9a-f]{16}$/);
     expect(teamsTeamLabel(guid("d"))).not.toBe(label);
-    // A checkpoint read back is a copy.
-    const read2 = parseTeamsCursor(JSON.stringify(good))!;
-    expect(read2.channels).not.toBe(good.channels);
   });
 });
 
@@ -681,6 +695,36 @@ describe("Teams connector", () => {
     expect(eventsOf(out)[0]!.payload).toHaveProperty("problems");
     // The second has no change time that reads, so it is dated when it was posted.
     expect(parseTeamsCursor(out.at(-1)!.cursor!)!.marks).toEqual({ [CH1]: "2026-10-03T09:00:00.000Z" });
+  });
+
+  it("stops at the first thread older than the last change, reading no further page", async () => {
+    teamsMessage.reset();
+    const [older, newer, newest] = [teamsMessage.one({ lastModifiedDateTime: "2026-10-01T00:00:00.000Z" }), teamsMessage.one({ lastModifiedDateTime: "2026-10-10T00:00:00.000Z" }), teamsMessage.one({ lastModifiedDateTime: "2026-10-12T00:00:00.000Z" })];
+    const pages: (string | null)[] = [];
+    const client: TeamsClient = {
+      channels: async () => [{ id: CH1 }],
+      messages: async (_c, skip) => {
+        pages.push(skip);
+        // Out of order on purpose: nothing after the first older thread is read.
+        return { items: [{ ...newer, replies: [null, "x", teamsReply(newer, 1)] }, older, newest], next: "p2" };
+      },
+      replies: async () => ({ items: [], next: null }),
+    };
+    const cursor: TeamsCursor = { pass: "incremental", team: teamsTeamLabel(TEAM), channels: null, index: 0, skip: null, top: null, marks: { [CH1]: "2026-10-05T00:00:00.000Z" }, done: true, since: SINCE };
+    const out = await drain(teamsConnector({ ...options(teamsDocMock(account())), client }).incrementalSync({ cursor: JSON.stringify(cursor) } as never));
+    expect(eventsOf(out).map((e) => e.payload.isReply)).toEqual([false, true]);
+    expect(pages).toEqual([null]);
+    // The reply is older than its message's last change, so the thread is dated by the message.
+    expect(parseTeamsCursor(out.at(-1)!.cursor!)!.marks).toEqual({ [CH1]: "2026-10-10T00:00:00.000Z" });
+  });
+
+  it("reads every page of the last channel before it finishes", async () => {
+    const data = account({ pageCap: 1 });
+    teamsMessage.reset();
+    data.threads![CH2] = [...data.threads![CH2]!, teamsMessage.one({ id: "1900000" })];
+    const out = await drain(connector(teamsDocMock(data)).historicalImport({ cursor: null } as never));
+    expect(eventsOf(out)).toHaveLength(6);
+    expect(out.map((b) => parseTeamsCursor(b.cursor!)!.done)).toEqual([false, false, false, true]);
   });
 
   it("stops the sync on an error from Graph", async () => {
