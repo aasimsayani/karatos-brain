@@ -6,7 +6,7 @@
 
 | System | Connector | What it gives the dashboard |
 | --- | --- | --- |
-| Metals-API | `metals_api` | Spot prices. Gold is up 6% today, so pieces heavy in gold need repricing |
+| Metals-API | `metals_api` | Spot prices close to the real market (gold about $4,040 an ounce in November 2026). Gold is up 6% today, so pieces heavy in gold need repricing |
 | POS exports | `inventory_pos` | The case, customers, two years of sales and the repair envelopes: aged stock, pieces to reorder, a chain that keeps coming back, a $14,900 cash sale that needs a Form 8300, cash payments to review under the AML program, a lapsed customer who spent over $5,000, a ring sizing five days late, a chain repair waiting 52 days for pickup, and a pearl restring unclaimed for 240 days |
 | Supplier invoices and memos | `supplier_invoices` | A loose diamond on a 45-day memo that sold three days ago, so the vendor is owed $8,200 before it asks, and the memo carries no System of Warranties statement |
 | Plaid | `plaid` | Bank balances and transactions. The cash deposits don't cover the cash the drawer took in |

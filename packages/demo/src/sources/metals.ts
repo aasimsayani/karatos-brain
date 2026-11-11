@@ -2,8 +2,14 @@ import { METALS_API_BASE, metalsApiConnector } from "@karatos/connectors";
 import type { DemoCalendar } from "../store.js";
 import type { DemoSource } from "./source.js";
 
-/** Made-up spot prices in dollars per troy ounce. Gold jumps 6% today, which the dashboard should flag. */
-export const DEMO_SPOT = { XAU: { before: 4_100, today: 4_350 }, XAG: { before: 48, today: 48.6 }, XPT: { before: 1_550, today: 1_540 }, XPD: { before: 1_200, today: 1_210 } } as const;
+/**
+ * Spot prices in dollars per troy ounce. Today's quotes are close to the real
+ * market on 11 November 2026 (gold about $4,040, silver $52.40, platinum
+ * $1,565, palladium $1,045), so the numbers look right to a jeweler. The
+ * earlier gold price is made up: gold jumps 6% today so the dashboard has a
+ * price move to flag. Update `today` when the market moves a long way.
+ */
+export const DEMO_SPOT = { XAU: { before: 3_810, today: 4_040 }, XAG: { before: 52, today: 52.4 }, XPT: { before: 1_550, today: 1_565 }, XPD: { before: 1_035, today: 1_045 } } as const;
 type Symbol = keyof typeof DEMO_SPOT;
 
 const isSymbol = (s: string): s is Symbol => Object.hasOwn(DEMO_SPOT, s);

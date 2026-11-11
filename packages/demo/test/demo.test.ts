@@ -75,7 +75,7 @@ describe("the demo store", () => {
       ].sort(),
     );
     const text = recommendations.map((r) => r.summary).join("\n");
-    expect(text).toContain("Gold is up 6.1%");
+    expect(text).toContain("Gold is up 6.1% ($3,808.48 to $4,040.00 per ounce)");
     expect(text).toContain("$14,900.00 in cash was received");
     expect(text).toContain("$4,650.00 across 2 invoices");
     // The two branch deposits count; the $14,900 from three days ago hasn't gone in.
