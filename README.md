@@ -236,6 +236,7 @@ The table is generated from the [integration catalog](docs/integrations.md), so 
 | HRD Antwerp report check | Confirms each HRD Antwerp report number the business holds, with shape, carat weight, color, clarity, cut, polish, symmetry and proportions | Appraisals, Inventory, Buying |
 | Supplier invoices and memos | Imports six years of supplier invoice and memo lines: items, quantities, costs, memo terms and due dates | Buying, Inventory, Compliance, Finance |
 | RFID and barcode tray counts | Imports two years of tray and case counts: what was read, when, and by whom | Inventory, Compliance |
+| ShipStation | Imports two years of shipments and labels, then the shipments changed since the last sync and the last 30 days of labels on each sync | Sales, Inventory, Compliance |
 | FedEx | Follows every FedEx package on the business's list, from label created to delivered or returned | Inventory, Repairs, Compliance |
 | UPS | Follows every UPS package on the business's list, from label created to delivered or returned | Inventory, Repairs, Compliance |
 | BILL | Imports six years of supplier bills with their due dates, balances, payment status and approval status | Finance, Buying |
@@ -274,7 +275,7 @@ This section updates itself from [docs/milestones.json](docs/milestones.json) an
 
 **Roadmap:** 20 of 81 items done. An integration counts as done once it has run against a real or sandbox account, not when its tests pass.
 
-**Integrations:** 83 of the 253 systems in the catalog are built and tested against mocks made from each vendor's docs. 0 have been checked live so far.
+**Integrations:** 84 of the 253 systems in the catalog are built and tested against mocks made from each vendor's docs. 0 have been checked live so far.
 
 | Milestone | What it gives a jeweler | Progress | Target |
 | --- | --- | --- | --- |
