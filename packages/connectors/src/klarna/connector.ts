@@ -64,10 +64,11 @@ export function parseKlarnaCursor(raw: string | null): KlarnaCursor | null {
   } catch {
     c = null;
   }
-  const r = typeof c === "object" && c !== null && !Array.isArray(c) ? (c as Record<string, unknown>) : null;
-  const p = r && typeof r.pass === "object" && r.pass !== null ? (r.pass as Record<string, unknown>) : null;
-  const pass = p && isTime(p.start) && isTime(p.end) && p.start <= p.end && Number.isSafeInteger(p.offset) && (p.offset as number) >= 0 ? { start: p.start, end: p.end, offset: p.offset as number } : null;
-  if (r && typeof r.done === "boolean" && isTime(r.nextFrom) && (r.pass === null || pass)) return { pass, done: r.done, nextFrom: r.nextFrom };
+  // Anything but an object reads as a checkpoint without the fields asked for.
+  const r = (c ?? {}) as Record<string, unknown>;
+  const p = (r.pass ?? {}) as Record<string, unknown>;
+  const pass = isTime(p.start) && isTime(p.end) && p.start <= p.end && Number.isSafeInteger(p.offset) && (p.offset as number) >= 0 ? { start: p.start, end: p.end, offset: p.offset as number } : null;
+  if (typeof r.done === "boolean" && isTime(r.nextFrom) && (r.pass === null || pass)) return { pass, done: r.done, nextFrom: r.nextFrom };
   throw new Error("Klarna checkpoint is not in the expected shape");
 }
 

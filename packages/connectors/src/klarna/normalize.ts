@@ -65,8 +65,8 @@ const TOTALS = {
 } as const;
 
 const short = (value: unknown) => createHash("sha256").update(JSON.stringify(value)).digest("hex").slice(0, 12);
-// An array reads as a record without the fields asked for.
-const record = (v: unknown): Record<string, unknown> => (typeof v === "object" && v !== null ? (v as Record<string, unknown>) : {});
+// Anything but an object reads as a record without the fields asked for.
+const record = (v: unknown): Record<string, unknown> => (v ?? {}) as Record<string, unknown>;
 const text = (v: unknown, max = 100): string | null => (typeof v === "string" && v.trim() !== "" ? v.trim().slice(0, max) : null);
 const ref = (v: unknown): string | undefined => (typeof v === "string" && REFERENCE.test(v) ? v : undefined);
 const minor = (v: unknown): number | null => (Number.isSafeInteger(v) ? (v as number) : null);

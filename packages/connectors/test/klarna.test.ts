@@ -95,6 +95,8 @@ describe("Klarna client", () => {
     expect(make({ apiKey: "  " })).toThrow("KLARNA_API_KEY, or KLARNA_USERNAME and KLARNA_PASSWORD, is missing");
     for (const apiKey of ["klarna_live_api_short", "klarna_prod_api_000000000000", "klarna_live_key_000000000000", `x${KEY}`, `${KEY} `.repeat(2), `${KEY}!`, `klarna_live_api_${"0".repeat(201)}`]) expect(make({ apiKey }), apiKey).toThrow("KLARNA_API_KEY is not in the expected shape");
     expect(make({ apiKey: `klarna_live_api_${"0".repeat(200)}` })).not.toThrow();
+    expect(make({ apiKey: `klarna_live_api_${"0".repeat(7)}` })).toThrow("KLARNA_API_KEY is not in the expected shape");
+    expect(make({ apiKey: `klarna_live_api_${"0".repeat(8)}` })).not.toThrow();
     expect(make({ apiKey: "klarna_live_api_Ab9_-xyzw" })).not.toThrow();
     expect(make({ apiKey: KEY, username: USER })).toThrow("Set KLARNA_API_KEY or KLARNA_USERNAME and KLARNA_PASSWORD, not both");
     expect(make({ apiKey: KEY, password: PASS })).toThrow("not both");
@@ -102,7 +104,7 @@ describe("Klarna client", () => {
     expect(make({ apiKey: TEST_KEY })).toThrow("KLARNA_API_KEY is a test key, so it can't be used with the production API");
     expect(make({ apiKey: KEY, environment: "playground" })).toThrow("KLARNA_API_KEY is a live key, so it can't be used with the playground API");
     expect(make({ apiKey: TEST_KEY, environment: "playground" })).not.toThrow();
-    for (const username of ["abc", "has space", "a".repeat(101), "a/b"]) expect(make({ username, password: PASS }), username).toThrow("KLARNA_API_KEY, or KLARNA_USERNAME and KLARNA_PASSWORD, is missing");
+    for (const username of ["abc", "has space", "a".repeat(101), "abc/def"]) expect(make({ username, password: PASS }), username).toThrow("KLARNA_API_KEY, or KLARNA_USERNAME and KLARNA_PASSWORD, is missing");
     expect(make({ username: "a".repeat(100), password: PASS })).not.toThrow();
     expect(make({ username: "abcd", password: PASS })).not.toThrow();
     for (const password of [undefined, "short12", "has a space", "x".repeat(201), "tab\there0"]) expect(make({ username: USER, password }), String(password)).toThrow("KLARNA_PASSWORD is missing or not in the expected shape");
@@ -179,6 +181,7 @@ describe("Klarna client", () => {
       { start: "2021-11-11", end: E },
       { start: S, end: "2026-11-11T15:00:00Z" },
       { start: `x${S}`, end: E },
+      { start: S, end: `x${E}` },
       { start: S, end: `${E}x` },
       { start: E, end: S },
     ]) await expect(c.payouts({ ...q, offset: 0 }), JSON.stringify(q)).rejects.toThrow(new KlarnaApiError("a payout list must run from one ISO UTC time to a later one", 0));
@@ -211,7 +214,7 @@ describe("Klarna client", () => {
   });
 
   it("says when an answer doesn't hold the list asked for", async () => {
-    for (const answer of [text(200, "not json"), json(200, null), json(200, {}), json(200, { payouts: "x" }), json(200, { transactions: [] })]) {
+    for (const answer of [text(200, "not json"), json(200, null), json(200, {}), json(200, { payouts: "x" }), json(200, { payouts: {} }), json(200, { transactions: [] })]) {
       const err = (await client(scripted(answer).fetch).c.payouts(RANGE).catch((e: Error) => e)) as KlarnaApiError;
       expect(err.message).toBe("Klarna answered without its payouts");
       expect(err.status).toBe(200);
@@ -365,6 +368,8 @@ describe("Klarna payout events", () => {
       openingDebtCents: -15,
       closingDebtCents: -16,
     });
+    p.totals = { settlement_amount: 0 };
+    expect(klarnaPayoutEvent(p, { receivedAt: RECEIVED }).payload.amountCents).toBe(0);
     p.totals = { settlement_amount: 10, sale_amount: 1.5, fee_amount: "3", tax_amount: Number.MAX_SAFE_INTEGER + 2 };
     const sparse = klarnaPayoutEvent(p, { receivedAt: RECEIVED }).payload;
     expect(sparse.amountCents).toBe(10);
@@ -482,6 +487,7 @@ describe("Klarna transaction events", () => {
     expect(e.payload).toMatchObject({ orderId: null, shortOrderId: null, captureId: null, refundId: null, merchantReference: null, vatAmountCents: null, vatRateBasisPoints: null, purchaseCountry: null, paymentMethod: null, detailedType: null });
     const kept = klarnaTransactionEvent(line({ merchant_reference1: ` ${"R".repeat(120)} `, vat_amount: 1000, vat_rate: 2000, purchase_country: "GB", initial_payment_method_type: "PAY_LATER_BY_CARD", detailed_type: `D${"X".repeat(59)}` }), ctx).payload;
     expect(kept).toMatchObject({ merchantReference: "R".repeat(100), vatAmountCents: 1000, vatRateBasisPoints: 2000, purchaseCountry: "GB", paymentMethod: "pay_later_by_card", detailedType: `d${"x".repeat(59)}` });
+    for (const detailed_type of ["dX", `D${"X".repeat(60)}`, "PAY LATER", "FEE!", "Fee"]) expect(klarnaTransactionEvent(line({ detailed_type }), ctx).payload.detailedType, detailed_type).toBeNull();
     for (const purchase_country of ["us", "U", 1]) expect(klarnaTransactionEvent(line({ purchase_country }), ctx).payload.purchaseCountry, String(purchase_country)).toBeNull();
   });
 
@@ -505,6 +511,7 @@ describe("Klarna transaction events", () => {
     expect(e.id).toBe(e.idempotencyKey.replace(/:/g, "_"));
     for (const raw of [null, "x", []]) expect(klarnaTransactionEvent(raw, ctx).payload.problems, JSON.stringify(raw)).toHaveLength(4);
     expect(klarnaTransactionEvent(line({ amount: "400" }), ctx).payload.problems).toEqual(["transaction has no amount that reads"]);
+    expect(klarnaTransactionEvent(line({ amount: 0 }), ctx).payload.amountCents).toBe(0);
     expect(klarnaTransactionEvent(line({ currency_code: "US" }), ctx).payload.problems).toEqual(["transaction has no currency that reads"]);
     // An order that doesn't read isn't a problem: the line is kept without it.
     expect(klarnaTransactionEvent(line({ order_id: undefined }), ctx).payload.orderId).toBeNull();
@@ -596,6 +603,11 @@ describe("Klarna connector", () => {
     const later = await drain(connector(klarnaDocMock(data)).incrementalSync({ cursor: mid } as never));
     expect(later).toHaveLength(1);
     expect(parseKlarnaCursor(later[0]!.cursor ?? null)).toEqual({ pass: null, done: true, nextFrom: "2026-11-01T00:00:00.000Z" });
+    const midDone = JSON.stringify({ pass: { start: S, end: E, offset: 100 }, done: true, nextFrom: "2026-11-01T00:00:00.000Z" });
+    const doneLater = await drain(connector(klarnaDocMock(data)).incrementalSync({ cursor: midDone } as never));
+    expect(doneLater.map((b) => parseKlarnaCursor(b.cursor ?? null)!.done)).toEqual([true, true]);
+    // An import that finished doesn't run again, even from a checkpoint left mid-pass.
+    expect(await drain(connector(klarnaDocMock(data)).historicalImport({ cursor: midDone } as never))).toEqual([]);
     const midImport = JSON.stringify({ pass: { start: S, end: E, offset: 100 }, done: false, nextFrom: "2026-11-01T00:00:00.000Z" });
     const ended = await drain(connector(klarnaDocMock(data)).incrementalSync({ cursor: midImport } as never));
     expect(ended.map((b) => parseKlarnaCursor(b.cursor ?? null))).toEqual([
@@ -662,6 +674,13 @@ describe("Klarna connector", () => {
     expect(report.ingested).toBe(11);
     expect(report.deadLettered).toBe(2);
     expect(mock.reads.filter((r) => r.path === KLARNA_TRANSACTIONS_PATH)).toHaveLength(4);
+    // A payout with a reference but no date that reads is dead-lettered, and its lines are still read.
+    const undated = account();
+    const ref = String(undated.payouts[0]!.payment_reference);
+    undated.payouts = [{ ...undated.payouts[0]!, payout_date: "soon" }];
+    const fake: KlarnaClient = { baseUrl: API, payouts: async () => ({ items: undated.payouts, more: false }), transactions: async (r) => ({ items: r === ref ? undated.transactions[ref]! : [], more: false }) };
+    const lines = eventsOf(await drain(klarnaConnector({ client: fake, now: NOW }).historicalImport({ cursor: null } as never)));
+    expect(lines.map((e) => e.occurredAt === undefined)).toEqual([true, false, false]);
   });
 
   it("waits out a rate limit inside a sync", async () => {
@@ -723,7 +742,10 @@ describe("Klarna connector", () => {
   });
 
   it("declares its writes and turns them down while writes are off", async () => {
-    expect(KLARNA_WRITES.map((w) => w.name)).toEqual(["capture_order", "refund_order"]);
+    expect(KLARNA_WRITES).toEqual([
+      { integration: "klarna", name: "capture_order", description: "Capture all or part of an authorized Klarna order, so the merchant is paid", kind: "update", approval: "each", dailyCap: 20 },
+      { integration: "klarna", name: "refund_order", description: "Refund all or part of a captured Klarna order", kind: "update", approval: "each", dailyCap: 10 },
+    ]);
     const c = connector(klarnaDocMock(account()));
     expect(c.writes).toBe(KLARNA_WRITES);
     expect(await assertWritesRefused(c)).toMatchObject([

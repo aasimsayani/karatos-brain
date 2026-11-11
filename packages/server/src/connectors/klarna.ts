@@ -6,10 +6,11 @@ export default {
   needs: (env) => (setting(env, "KLARNA_API_KEY") ? [] : setting(env, "KLARNA_USERNAME") ? missing(env, ["KLARNA_PASSWORD"]) : ["KLARNA_API_KEY"]),
   make: async (env) =>
     klarnaConnector({
-      apiKey: setting(env, "KLARNA_API_KEY"),
-      username: setting(env, "KLARNA_USERNAME"),
-      password: setting(env, "KLARNA_PASSWORD"),
-      region: setting(env, "KLARNA_REGION"),
-      environment: setting(env, "KLARNA_ENVIRONMENT"),
+      // The connector trims each setting and reads a blank one as unset.
+      apiKey: env.KLARNA_API_KEY,
+      username: env.KLARNA_USERNAME,
+      password: env.KLARNA_PASSWORD,
+      region: env.KLARNA_REGION,
+      environment: env.KLARNA_ENVIRONMENT,
     }),
 } satisfies ConnectorFactory;
