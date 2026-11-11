@@ -214,6 +214,7 @@ The table is generated from the [integration catalog](docs/integrations.md), so 
 | Google Analytics 4 | Imports two years of daily website sessions, users and new users by channel and by source and medium, then keeps them current | Marketing, Sales |
 | Google Ads | Imports two years of daily spend, impressions, clicks, conversions and conversion value for every campaign, then keeps them current | Marketing |
 | Meta Ads | Imports two years of daily Facebook and Instagram ad spend, reach, clicks and purchases for every campaign, then keeps them current | Marketing |
+| Google Business Profile | Imports two years of Google reviews for every location, then the new and edited ones on each sync | Marketing, Clienteling |
 | Etsy | Imports five years of Etsy orders, then reads every order changed since the last sync | Sales, Inventory, Marketing |
 | eBay | Imports the two years of eBay orders that eBay keeps, then reads every order changed since the last sync | Sales, Inventory |
 | Microsoft 365 Outlook mail and calendar | Imports five years of the mailbox's Inbox and Sent Items, then keeps up with every new, changed and removed message | Clienteling, Buying, Custom orders, Repairs |
@@ -277,7 +278,7 @@ This section updates itself from [docs/milestones.json](docs/milestones.json) an
 
 **Roadmap:** 20 of 81 items done. An integration counts as done once it has run against a real or sandbox account, not when its tests pass.
 
-**Integrations:** 86 of the 253 systems in the catalog are built and tested against mocks made from each vendor's docs. 0 have been checked live so far.
+**Integrations:** 87 of the 253 systems in the catalog are built and tested against mocks made from each vendor's docs. 0 have been checked live so far.
 
 | Milestone | What it gives a jeweler | Progress | Target |
 | --- | --- | --- | --- |
