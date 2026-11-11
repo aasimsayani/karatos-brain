@@ -26,8 +26,6 @@ export const ACUITY_USER_AGENT = WHATNOT_USER_AGENT;
 const USER_ID = /^[1-9][0-9]{0,11}$/;
 /** Acuity documents nothing about the key's form, so any 16 to 128 visible ASCII characters are accepted. */
 const API_KEY = /^[!-~]{16,128}$/;
-/** Dates for minDate and maxDate, written YYYY-MM-DD. */
-const DAY = /^\d{4}-\d{2}-\d{2}$/;
 const MAX_WAIT_S = 60;
 const RETRIED = new Set([429, 500, 502, 503, 504]);
 const CREDENTIALS = "ACUITY_USER_ID must be the numeric user id and ACUITY_API_KEY the API key shown together under Integrations > API in Acuity, on the Premium or Powerhouse plan";
@@ -81,7 +79,7 @@ export interface AcuityClient {
 
 /** True for a real calendar day written YYYY-MM-DD. */
 export function isAcuityDay(value: unknown): value is string {
-  return typeof value === "string" && DAY.test(value) && !Number.isNaN(Date.parse(`${value}T00:00:00Z`)) && new Date(`${value}T00:00:00Z`).toISOString().slice(0, 10) === value;
+  return typeof value === "string" && !Number.isNaN(Date.parse(`${value}T00:00:00Z`)) && new Date(`${value}T00:00:00Z`).toISOString().slice(0, 10) === value;
 }
 
 /** Acuity's error code and message, cut short. Error bodies describe the request, never the key. */

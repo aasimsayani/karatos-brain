@@ -253,7 +253,7 @@ describe("Acuity events", () => {
     expect(acuityTime("2013-07-02T10:15:00Z")).toBe("2013-07-02T10:15:00.000Z");
     expect(acuityTime("2028-02-29T23:59:59+1400")).toBe("2028-02-29T09:59:59.000Z");
     expect(acuityTime("2026-12-31T00:00:00-1159")).toBe("2026-12-31T11:59:00.000Z");
-    for (const v of ["2026-02-29T10:00:00-0500", "2026-13-01T10:00:00-0500", "2026-10-01T24:00:00-0500", "2026-10-01T10:60:00-0500", "2026-10-01T10:00:60-0500", "2026-10-01T10:00:00+1500", "2026-10-01T10:00:00+0060", "2026-10-01T10:00:00", "2026-10-01T10:00:00.000Z", "2026-10-01 10:00:00-0500", "2026-10-01T10:00-0500", "July 2, 2013", 1_700_000_000, null]) {
+    for (const v of ["2026-02-29T10:00:00-0500", "2026-13-01T10:00:00-0500", "2026-10-01T24:00:00-0500", "2026-10-01T10:60:00-0500", "2026-10-01T10:00:60-0500", "2026-10-01T10:00:00+1500", "2026-10-01T10:00:00+0060", "2026-10-01T10:00:00", "2026-10-01T10:00:00.000Z", "2026-10-01 10:00:00-0500", "2026-10-01T10:00-0500", "2013-07-02T10:15:00-0700x", "x2013-07-02T10:15:00-0700", "0050-01-01T00:00:00Z", "July 2, 2013", 1_700_000_000, null]) {
       expect(acuityTime(v), String(v)).toBeUndefined();
     }
 
@@ -264,7 +264,7 @@ describe("Acuity events", () => {
     for (const v of ["0", 0, "100000", 100000, "1.5", 1.5, "060", "-5", -5, "", null]) expect(acuityMinutes(v), String(v)).toBeUndefined();
 
     expect([acuityDay("June 17, 2013"), acuityDay("june 7, 2013"), acuityDay(" DECEMBER 31, 1999 "), acuityDay("February 29, 2028"), acuityDay("January 1, 2026")]).toEqual(["2013-06-17", "2013-06-07", "1999-12-31", "2028-02-29", "2026-01-01"]);
-    for (const v of ["February 29, 2026", "June 31, 2026", "June 0, 2026", "Juno 17, 2013", "June 17 2013", "17 June, 2013", "June 17, 13", "2013-06-17", "", 5, null]) expect(acuityDay(v), String(v)).toBeUndefined();
+    for (const v of ["February 29, 2026", "June 31, 2026", "June 0, 2026", "Juno 17, 2013", "June 17 2013", "17 June, 2013", "June 17, 13", "June 17, 2013x", "xJune 17, 2013", "June 17, 0050", "2013-06-17", "", 5, null]) expect(acuityDay(v), String(v)).toBeUndefined();
   });
 
   it("reads names by id from appointment types", () => {
@@ -338,6 +338,13 @@ describe("Acuity events", () => {
     expect(payload(appointment({ appointmentTypeID: 9, type: "Customer1 ring sizing" }))).not.toHaveProperty("title");
     expect(payload(appointment({ appointmentTypeID: 9, type: "Fitting for customer1@example.test" }))).not.toHaveProperty("title");
     expect(payload(appointment({ appointmentTypeID: 9, type: "Bridal consultation", lastName: "Bridal" }))).not.toHaveProperty("title");
+    expect(payload(appointment({ appointmentTypeID: 9, type: "Fitting Morgana", firstName: "Morgana" }))).not.toHaveProperty("title");
+    expect(payload(appointment({ appointmentTypeID: 9, type: "Fitting for zed9", email: "zed9@example.test" }))).not.toHaveProperty("title");
+    expect(payload(appointment({ appointmentTypeID: 9, type: "  Watch service  " })).title).toBe("Watch service");
+    // A name is checked over its first 160 characters: "Al" just inside them drops the title, just past them it is cut off first.
+    expect(payload(appointment({ appointmentTypeID: 9, type: `${"t".repeat(157)} Al`, firstName: "Al" }))).not.toHaveProperty("title");
+    expect(payload(appointment({ appointmentTypeID: 9, type: `  ${"t".repeat(157)} Al`, firstName: "Al" }))).not.toHaveProperty("title");
+    expect(payload(appointment({ appointmentTypeID: 9, type: `${"t".repeat(158)} Al`, firstName: "Al" })).title).toBe("t".repeat(80));
   });
 
   it("keeps money and the day it was booked only when they read", () => {
@@ -437,6 +444,10 @@ describe("Acuity windows and checkpoints", () => {
       { done: false, pending: days(33), end: "2026-11-30" },
       { done: true, pending: [["2026-10-01", "2026-10-31"]], end: null },
       { done: true, pending: [], end: "2026-10-31" },
+      { done: true, pending: "", end: null },
+      { done: false, pending: [["2026-10-01", "2026-10-08"]], end: "zzzz" },
+      { done: false, pending: [["2026-10-00", "2026-10-08"]], end: "2026-10-31" },
+      { done: false, pending: [["2026-10-01", "2026-10-3"]], end: "2026-10-31" },
       { done: false, pending: [], end: null },
       // Another connector's checkpoints.
       { done: false, step: "orders", page: null },

@@ -46,8 +46,8 @@ export type AcuityRead = { ok: boolean; event: AcuityEvent };
 export const ACUITY_FULL_DAY_TYPE = "appointment.day_full";
 
 const SYSTEM = "Acuity Scheduling";
-const TITLE_MAX = 80;
-const NAME_MAX = 80;
+/** The most of a name read before safeTitle checks it for the client's name and cuts it to 80, so a name just past that cut is still caught. */
+const READ_MAX = 160;
 const ID = /^[1-9][0-9]{0,15}$/;
 const TIME = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(Z|[+-]\d{2}:?\d{2})$/;
 const AMOUNT = /^(0|[1-9][0-9]{0,8})(\.[0-9]{1,2})?$/;
@@ -56,11 +56,12 @@ const MONTHS = ["january", "february", "march", "april", "may", "june", "july", 
 
 const short = (value: unknown) => createHash("sha256").update(JSON.stringify([value])).digest("hex").slice(0, 12);
 const obj = (v: unknown): Record<string, unknown> | null => (typeof v === "object" && v !== null && !Array.isArray(v) ? (v as Record<string, unknown>) : null);
-const text = (v: unknown, max: number) => (typeof v === "string" && v.trim() !== "" ? v.trim().slice(0, max) : undefined);
+const text = (v: unknown) => (typeof v === "string" ? v.trim().slice(0, READ_MAX) : undefined);
 const defined = (fields: Record<string, unknown>) => Object.fromEntries(Object.entries(fields).filter(([, v]) => v !== undefined));
 const realDay = (y: number, m: number, d: number) => {
   const day = new Date(Date.UTC(y, m - 1, d));
-  return day.getUTCFullYear() === y && day.getUTCMonth() === m - 1 && day.getUTCDate() === d;
+  // A day past the month's end rolls into the next month; a year under 100 is read as 19xx.
+  return day.getUTCFullYear() === y && day.getUTCMonth() === m - 1;
 };
 
 /** An id Acuity gave: a positive whole number, or one written as digits. */
@@ -110,7 +111,7 @@ export function acuityNames(rows: readonly unknown[]): Map<string, string> {
   for (const row of rows) {
     const r = obj(row);
     const id = acuityId(r?.id);
-    const name = text(r?.name, NAME_MAX * 2);
+    const name = text(r?.name);
     if (id && name) names.set(id, name);
   }
   return names;
@@ -154,7 +155,7 @@ export function acuityAppointmentEvent(raw: unknown, canceled: boolean, lookups:
 
   const typeId = acuityId(r.appointmentTypeID);
   const calendarId = acuityId(r.calendarID);
-  const typeName = (typeId && lookups.types.get(typeId)) || text(r.type, TITLE_MAX * 2);
+  const typeName = (typeId && lookups.types.get(typeId)) || text(r.type);
   const status = r.noShow === true ? "no_show" : canceled ? "canceled" : "booked";
   const type = status === "no_show" ? CALENDLY_EVENT_TYPES.noShow : status === "canceled" ? CALENDLY_EVENT_TYPES.canceled : CALENDLY_EVENT_TYPES.booked;
 

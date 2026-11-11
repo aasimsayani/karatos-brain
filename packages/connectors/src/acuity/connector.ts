@@ -98,7 +98,7 @@ export function parseAcuityCursor(raw: string | null): AcuityCursor | null {
   } catch {
     throw new Error(MESSAGE);
   }
-  if (typeof c !== "object" || c === null || Array.isArray(c)) throw new Error(MESSAGE);
+  if (c === null) throw new Error(MESSAGE);
   const r = c as Record<string, unknown>;
   if (Object.keys(r).sort().join(",") !== "done,end,pending" || !Array.isArray(r.pending)) throw new Error(MESSAGE);
   const pending = r.pending as unknown[];
@@ -127,7 +127,8 @@ export function acuityConnector(options: AcuityOptions): Connector {
   const start = (from: string, end: string): AcuityCursor => ({ done: false, pending: [monthWindow(from, end)], end });
 
   async function* pass(state: AcuityCursor): AsyncIterable<SourceBatch> {
-    if (state.done || state.end === null) return;
+    // A finished pass has no last day.
+    if (state.end === null) return;
     const end = state.end;
     const lookups: AcuityLookups = { types: acuityNames(await client.appointmentTypes()) };
     let pending = state.pending;
