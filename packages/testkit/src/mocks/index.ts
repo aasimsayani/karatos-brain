@@ -22,6 +22,7 @@ import gmail from "./gmail.js";
 import google_ads from "./google_ads.js";
 import google_analytics from "./google_analytics.js";
 import google_workspace from "./google_workspace.js";
+import gorgias from "./gorgias.js";
 import gusto from "./gusto.js";
 import hrd from "./hrd.js";
 import hubspot from "./hubspot.js";
@@ -83,6 +84,7 @@ export * from "./gmail.js";
 export * from "./google_ads.js";
 export * from "./google_analytics.js";
 export * from "./google_workspace.js";
+export * from "./gorgias.js";
 export * from "./gusto.js";
 export * from "./hrd.js";
 export * from "./hubspot.js";
@@ -123,7 +125,7 @@ export * from "./yotpo.js";
 export * from "./zoom.js";
 
 /** Every mock module, one per catalog integration. */
-export const DOC_MOCK_MODULES: readonly DocMockModule[] = [affirm, airtable, amazon, asana, authorize_net, avalara, bigcommerce, bill_com, birdeye, calendly, clover, custom_forms, docusign, dropbox, ebay, etsy, fedex, gia, gmail, google_ads, google_analytics, google_workspace, gusto, hrd, hubspot, idex, judgeme, klaviyo, lightspeed, mailchimp, meta_ads, microsoft_onedrive, microsoft_outlook, microsoft_teams, monday, nivoda, notion, openphone, pinterest, plaid, quickbooks, ramp, rapnet, repairshopr, slack, sola_payments, square, squarespace, stuller, taxjar, tiktok, tiktok_ads, trello, ups, wix, woocommerce, xero, yext, yotpo, zoom];
+export const DOC_MOCK_MODULES: readonly DocMockModule[] = [affirm, airtable, amazon, asana, authorize_net, avalara, bigcommerce, bill_com, birdeye, calendly, clover, custom_forms, docusign, dropbox, ebay, etsy, fedex, gia, gmail, google_ads, google_analytics, google_workspace, gorgias, gusto, hrd, hubspot, idex, judgeme, klaviyo, lightspeed, mailchimp, meta_ads, microsoft_onedrive, microsoft_outlook, microsoft_teams, monday, nivoda, notion, openphone, pinterest, plaid, quickbooks, ramp, rapnet, repairshopr, slack, sola_payments, square, squarespace, stuller, taxjar, tiktok, tiktok_ads, trello, ups, wix, woocommerce, xero, yext, yotpo, zoom];
 
 /** Every doc-derived mock, with empty data, for checks and the vendor docs watch. */
 export function allDocMocks(): DocMock[] {
