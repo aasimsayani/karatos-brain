@@ -48,6 +48,7 @@ import rapnet from "./rapnet.js";
 import repairshopr from "./repairshopr.js";
 import ringcentral from "./ringcentral.js";
 import slack from "./slack.js";
+import smile_io from "./smile_io.js";
 import sola_payments from "./sola_payments.js";
 import square from "./square.js";
 import squarespace from "./squarespace.js";
@@ -56,6 +57,7 @@ import taxjar from "./taxjar.js";
 import tiktok from "./tiktok.js";
 import tiktok_ads from "./tiktok_ads.js";
 import trello from "./trello.js";
+import trustpilot from "./trustpilot.js";
 import ups from "./ups.js";
 import wix from "./wix.js";
 import woocommerce from "./woocommerce.js";
@@ -113,6 +115,7 @@ export * from "./rapnet.js";
 export * from "./repairshopr.js";
 export * from "./ringcentral.js";
 export * from "./slack.js";
+export * from "./smile_io.js";
 export * from "./sola_payments.js";
 export * from "./square.js";
 export * from "./squarespace.js";
@@ -121,6 +124,7 @@ export * from "./taxjar.js";
 export * from "./tiktok.js";
 export * from "./tiktok_ads.js";
 export * from "./trello.js";
+export * from "./trustpilot.js";
 export * from "./ups.js";
 export * from "./wix.js";
 export * from "./woocommerce.js";
@@ -131,7 +135,7 @@ export * from "./zendesk.js";
 export * from "./zoom.js";
 
 /** Every mock module, one per catalog integration. */
-export const DOC_MOCK_MODULES: readonly DocMockModule[] = [affirm, airtable, amazon, asana, authorize_net, avalara, bigcommerce, bill_com, birdeye, calendly, clover, custom_forms, docusign, dropbox, ebay, etsy, fedex, gia, gmail, google_ads, google_analytics, google_workspace, gorgias, gusto, hrd, hubspot, idex, judgeme, klarna, klaviyo, lightspeed, mailchimp, meta_ads, microsoft_onedrive, microsoft_outlook, microsoft_teams, monday, nivoda, notion, openphone, pinterest, plaid, quickbooks, ramp, rapnet, repairshopr, ringcentral, slack, sola_payments, square, squarespace, stuller, taxjar, tiktok, tiktok_ads, trello, ups, wix, woocommerce, xero, yext, yotpo, zendesk, zoom];
+export const DOC_MOCK_MODULES: readonly DocMockModule[] = [affirm, airtable, amazon, asana, authorize_net, avalara, bigcommerce, bill_com, birdeye, calendly, clover, custom_forms, docusign, dropbox, ebay, etsy, fedex, gia, gmail, google_ads, google_analytics, google_workspace, gorgias, gusto, hrd, hubspot, idex, judgeme, klarna, klaviyo, lightspeed, mailchimp, meta_ads, microsoft_onedrive, microsoft_outlook, microsoft_teams, monday, nivoda, notion, openphone, pinterest, plaid, quickbooks, ramp, rapnet, repairshopr, ringcentral, slack, smile_io, sola_payments, square, squarespace, stuller, taxjar, tiktok, tiktok_ads, trello, trustpilot, ups, wix, woocommerce, xero, yext, yotpo, zendesk, zoom];
 
 /** Every doc-derived mock, with empty data, for checks and the vendor docs watch. */
 export function allDocMocks(): DocMock[] {

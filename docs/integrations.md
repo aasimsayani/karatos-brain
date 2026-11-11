@@ -193,8 +193,8 @@ Used by: R is retail, W is wholesale, M is manufacturing. Test with says how we 
 | Postscript | R | Partner | Partner | Yes | Planned (Shopify SMS marketing. Custom API access is limited to enterprise plans and integration partners) |
 | Yotpo reviews and loyalty | R | Public API | Paid account | Yes | Built (Reads the store's reviews with its store ID and API secret, and its Loyalty members' points with the Loyalty GUID and API key when given. Neither can be limited to reading, so the client only ever sends a token request and two GETs. Yotpo has no sandbox: the first client's store confirms the mock built from Yotpo's docs) |
 | Judge.me | R | Public API | Paid account | Yes | Built (Reads the shop's reviews with its domain and an API token: an OAuth token with read_reviews only, or the private token, which also writes. The client only ever sends GETs of the review list. Judge.me has no sandbox: the first client's shop confirms the mock built from Judge.me's docs) |
-| Smile.io | R | Public API | Paid account | No | Planned (Loyalty points, VIP tiers and referrals. The API needs the Plus or Enterprise plan) |
-| Trustpilot | R, W | Public API | Paid account | No | Planned (Company reviews and trust score. The API needs Trustpilot's API module add-on) |
+| Smile.io | R | Public API | Paid account | No | Built (Reads customers, points transactions and VIP tiers with a merchant API key made with read scopes only, which needs Smile's Plus or Enterprise plan. Referrals have no list in Smile's API. The first client's key confirms the mock built from Smile's docs) |
+| Trustpilot | R, W | Public API | Paid account | No | Built (Reads the store's public service reviews and trust score with only a Trustpilot application's API key, which reaches only public endpoints and can't reply or invite; the API secret is never used. Product reviews and invitations need a business user's token, so they aren't read. API access needs Trustpilot's API module: the first client's business unit confirms the mock built from Trustpilot's docs) |
 | Pinterest | R, M | Public API | Free sandbox | No | Built (Connects a Pinterest business account through an app the store owns, holding boards:read, pins:read and user_accounts:read only; the connector stops if the token holds anything more. Its only API requests are the Pin list and two analytics reads. Pinterest's analytics reach back 90 days, so the first import reads 90 days of metrics and every Pin) |
 | TikTok | R | Public API | Free sandbox | No | Built (Connects the store's own TikTok account through an app the store owns, holding user.info.basic, user.info.stats and video.list only; the connector stops if the token holds anything more. Its only API requests are the profile read and the video list) |
 | TikTok Ads | R | Public API | Free sandbox | No | Built (Connects with a long-lived advertiser token from a TikTok developer app made with read scopes only (Ad Account Information and Reporting). Its only API request is the report read for the one advertiser in the settings, built from one fixed report. No changelog page outside the browser-only developer portal; the nightly sandbox run catches API changes) |
@@ -437,6 +437,7 @@ A request for a path or method the docs don't list throws `UndocumentedRequestEr
 - RepairShopr's ticket, estimate and invoice lists (API v1)
 - RingCentral's JWT sign-in, an extension's call log and its message store (REST API v1.0)
 - Slack's auth.test, conversations.list, conversations.history and conversations.replies, with both rate-limit regimes (Web API)
+- Smile.io's List VIP tiers, List customers and List points transactions
 - Sola Payments' transaction report (Report:All)
 - Square's read endpoints with its OAuth refresh and token status check (API version 2026-09-16)
 - A Squarespace site's Commerce APIs: products (v2), inventory and orders, enforcing the key, its Read Only permissions, the User-Agent, cursors and the modified window
@@ -445,6 +446,7 @@ A request for a path or method the docs don't list throws `UndocumentedRequestEr
 - TikTok's Display API v2 profile read and video list with its OAuth refresh, enforcing the client credentials, each token's scopes and the scope each field needs, page sizes and time cursors
 - TikTok's API for Business synchronous report (Marketing API v1.3), enforcing the token, the advertiser, campaign level by day, the metrics, the 30-day range and paging
 - Trello's token, member board, list, custom field, card and action endpoints (REST API 1)
+- Trustpilot's public business unit and service reviews (v1)
 - UPS's OAuth client credentials token and Tracking API details call
 - A Wix site's read endpoints (eCommerce orders, Catalog V3 and V1, Contacts V5) with the app token, its permissions and cursor paging
 - A WooCommerce store's REST API v3 read endpoints with its key permissions and page headers
@@ -2259,6 +2261,33 @@ Reads the messages and threads in the channels the KaratOS app's bot has been in
 
 **Testing.** Until a sandbox is set up, the tests run against a mock built from Slack's docs (`packages/testkit/src/mocks/slack.ts`), which pages by cursor, filters channels by membership and scope, answers `not_in_channel`, `missing_scope`, `invalid_auth` and `ratelimited` the way the docs describe, and holds a non-Marketplace app to 15-message pages. What the docs leave out is in its assumptions, checked on the first live run. For the nightly run, join the Slack Developer Program, create a free developer sandbox workspace holding only synthetic messages, create an internal app there with the four read scopes above, install it, invite the bot to a test channel and a test private channel, and add the bot token as the `SANDBOX_SLACK_BOT_TOKEN` GitHub Actions secret.
 
+### Smile.io
+
+Reads the store's Smile.io loyalty program: each customer's points balance and VIP tier, and every points transaction, so staff see a customer's points and tier at the counter and marketing spots lapsed members early.
+
+| Setting | What it is |
+| --- | --- |
+| `SMILE_API_KEY` | A merchant API key made with only `customer:read`, `points_transaction:read` and `vip_tier:read` |
+| `CUSTOMER_REF_KEY` | The instance's key for customer references |
+
+**Read-only by design.** Smile scopes each merchant key, and a key with only read scopes can't add or take away points. Smile has no call that lists a key's scopes, so the setup asks for those three read scopes and nothing else, and the client sends only GET requests to `https://api.smile.io/v1`: List VIP tiers, List customers (with their VIP status) and List points transactions, with parameters it builds itself from checked values and Smile's page cursor, never from a link in an answer. Adjusting a customer's points is declared behind the write gate, needing approval, turned off, and the client has no request to send it. Merchant keys need Smile's Plus or Enterprise plan.
+
+**What it reads.** Smile lists customers and points transactions newest first, 250 a page, and can filter them to those changed since a time. The first import reads everything changed in the last five years, customers first. Each later sync reads what changed since the newest change the last one saw, less five minutes; the first later sync looks back two days. An unchanged record read again is a duplicate. Each sync reads the VIP tiers first, to name each customer's tier. Each page is one batch, and the checkpoint keeps the list, its start, the newest change seen and Smile's cursor, so a resumed sync goes on from that page.
+
+**Events.**
+- `loyalty.customer_updated` for each customer, as Yotpo's are: their program state (candidate, member or disabled), points balance, VIP tier and its id, when the tier ends, their progress in the current period and when it ends, how much more keeps the tier, the next tier and how much more reaches it, and when they joined and last changed.
+- `loyalty.points_changed` for each points transaction: the customer, the points added or taken away, whether they were earned or spent, and when.
+
+Each event is keyed by a digest of what was kept. A customer without an id, a creation time, a state or a points balance, or a transaction without an id, a customer, a points change or a time, is dead-lettered.
+
+**Privacy.** Names, birthdays, referral links, and a transaction's description and internal note are never read into an event. Customers' emails become the same customer references custom forms, Klaviyo, Quo and Yotpo make (an HMAC under `CUSTOMER_REF_KEY`).
+
+**Referrals.** Smile's API has a referral object but no call that lists referrals, so they aren't read.
+
+**Rate limits.** Each key gets 10 requests a second. The client waits as `Retry-After` says (up to a minute), or 1, 2 and 4 seconds, on a 429, 500 or 503, before the error goes to the sync runner, which resumes from its checkpoint next time. A 401 says the key is wrong or the plan lost API access; a 403 names the scope the key is missing.
+
+**Testing.** Merchant keys need a paid plan. The tests run against a mock built from Smile's developer docs (`packages/testkit/src/mocks/smile_io.ts`). It checks the bearer key, each list's scope, the parameters each list takes, the sort and the page size. It lists what the first client's key must confirm: that a read-only key can't write, that `updated_at_min` holds across pages, that points and tier changes move `updated_at`, and the time format.
+
 ### Sola Payments
 
 Reads the card and check payments and refunds that go through a store's Sola Payments gateway (formerly Cardknox), so finance can reconcile them, layaway installments included, against sales and deposits. Payments arrive as the same `payment.charge_updated` and `payment.refund_updated` events the Stripe and Authorize.net connectors give.
@@ -2530,6 +2559,33 @@ Custom fields are kept only for types that hold no free text: number, date, chec
 **Webhooks.** None yet. The scheduled sync polls.
 
 **Testing.** The tests run against a mock built from Trello's API reference (`packages/testkit/src/mocks/trello.ts`). Like Trello, it returns only the fields asked for, except an action's data, which it returns whole, so the tests show card names, descriptions and comment text never reach a stored event. It answers 401 for the wrong key or token, reports a write token's permissions, filters closed cards, pages cards and actions with `before`, and can answer 429. Its assumptions are listed in the mock and checked on the first sandbox run. For the nightly run, make a free Trello workspace for testing only with a board or two of synthetic cards, a Power-Up for its API key, and a read-only token for a member who belongs only to it, and add them as the `SANDBOX_TRELLO_API_KEY` and `SANDBOX_TRELLO_TOKEN` GitHub Actions secrets.
+
+### Trustpilot
+
+Reads the store's Trustpilot page: every service review and the trust score, so marketing sees the store's reputation next to its sales, and every bad review gets an owner. Reviews arrive as the same `review.updated` events the Yext, Birdeye, Yotpo and Judge.me connectors give.
+
+| Setting | What it is |
+| --- | --- |
+| `TRUSTPILOT_API_KEY` | The API key of a Trustpilot application, never its secret |
+| `TRUSTPILOT_BUSINESS_UNIT_ID` | The store's business unit id |
+
+**Read-only by design.** Trustpilot has no read-only scope: an application's key and secret make a business user token that can reply to reviews and send invitations. So KaratOS asks for the key alone. The key reaches only Trustpilot's public endpoints, which show what anyone can see on the store's Trustpilot page, and the client sends only two GETs to `https://api.trustpilot.com/v1`, with the key in the `apikey` header: the business unit, and its reviews, with parameters it builds itself from checked values. Replying to a review and sending an invitation are declared behind the write gate, needing approval, turned off, and the client has no request to send them.
+
+**What it reads.** Trustpilot lists a store's reviews newest first, 100 a page by number, with no filter by date. So each pass reads from the newest and stops at the first page that reaches back past its start. The first import reads five years. Each later sync reads the reviews posted in the last 30 days again, so a reply or an edit in that time is a new event and the rest are duplicates. Each pass reads the trust score with its first page. Each page is one batch, and the checkpoint keeps the pass's start and the next page, so a resumed pass goes on from that page.
+
+**Events.**
+- `review.updated` for each review: the rating, a title and excerpt with email addresses and phone numbers masked, the language, whether Trustpilot verified it and whether it counts toward the trust score, likes, whether and when the store replied, and when the customer had the experience, posted it and edited it. A review of two stars or fewer is marked for follow-up, and one without a reply is marked as waiting on one.
+- `review.score_updated` for the trust score: the score and stars, the number of reviews, how many count toward the score, and how many there are at each rating. A score that hasn't moved is a duplicate.
+
+Each event is keyed by a digest of what was kept. A review without an id, a rating from 1 to 5 or a time, or a business unit without a trust score or a review count, is dead-lettered.
+
+**Privacy.** Only public reviews are read, never the customer emails and order ids private endpoints carry. Reviewers' display names and locations and the store's reply text are never read into an event; a reviewer is Trustpilot's consumer id.
+
+**Not read.** Product reviews and invitations: their lists need a business user's token, which could also write.
+
+**Rate limits.** Trustpilot asks callers to stay under 833 calls in 5 minutes and 10,000 an hour. The client waits as `Retry-After` says (up to a minute), or 1, 2 and 4 seconds, on a 429, 500, 502, 503 or 504, before the error goes to the sync runner, which resumes from its checkpoint next time. A 401 or 403 says the key is wrong or the store lost the API module; a 404 says the business unit id is wrong.
+
+**Testing.** API access needs Trustpilot's API module. The tests run against a mock built from Trustpilot's developer docs (`packages/testkit/src/mocks/trustpilot.ts`). It checks the `apikey` header, the business unit, the parameters the review list takes, the order and the page size. It lists what the first client's key must confirm: that `perPage` goes to 100, that an edit leaves `createdAt` alone, and the key's shape.
 
 ### Twilio
 
