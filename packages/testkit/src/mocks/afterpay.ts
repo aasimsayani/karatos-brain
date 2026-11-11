@@ -150,7 +150,7 @@ export function afterpayDocMock(data: AfterpayMockData): AfterpayMock {
 export default {
   integration: "afterpay",
   covers: "Afterpay's List Payments on its production and sandbox hosts, with Basic auth, created-date windows, ordering, limit and offset",
-  watchPages: [AFTERPAY_DOC_PAGES.listPayments, AFTERPAY_DOC_PAGES.payment, AFTERPAY_DOC_PAGES.money, AFTERPAY_DOC_PAGES.refund, AFTERPAY_DOC_PAGES.authentication, AFTERPAY_DOC_PAGES.errors],
+  watchPages: [AFTERPAY_DOC_PAGES.listPayments],
   docMocks: () => {
     const mock = afterpayDocMock({ merchantId: "", secretKey: "" });
     return [mock.production, mock.sandbox];
