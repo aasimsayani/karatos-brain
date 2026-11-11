@@ -756,6 +756,9 @@ describe("Gorgias doc mock", () => {
     expect(second.meta).toEqual({ prev_cursor: Buffer.from("offset:0").toString("base64url"), next_cursor: null });
     const oldest = (await (await get("/api/tickets?order_by=created_datetime:asc&limit=1")).json()) as { data: { id: number }[] };
     expect(oldest.data.map((t) => t.id)).toEqual([104]);
+    // Tickets changed at the same moment come in id order.
+    const tied = gorgiasDocMock(helpdesk({ tickets: [gorgiasTicket.one({ id: 9, updated_datetime: g(1) }), gorgiasTicket.one({ id: 3, updated_datetime: g(1) })], messages: [] }));
+    expect((await drain(connector(tied).incrementalSync({ cursor: null } as never)))[0]!.events.map((e) => e.payload.ticketId)).toEqual(["gorgias:ticket:3", "gorgias:ticket:9"]);
     const all = (await (await get("/api/messages")).json()) as { data: unknown[] };
     expect(all.data).toHaveLength(8);
     expect(mock.reads.at(-1)).toEqual({ kind: "messages", query: {} });
