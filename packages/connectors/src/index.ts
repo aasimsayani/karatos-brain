@@ -35,6 +35,7 @@ export * from "./gusto/index.js";
 export * from "./hrd/index.js";
 export * from "./hubspot/index.js";
 export * from "./idex/index.js";
+export * from "./imap_email/index.js";
 export * from "./inventory_pos/index.js";
 export * from "./judgeme/index.js";
 export * from "./klaviyo/index.js";
