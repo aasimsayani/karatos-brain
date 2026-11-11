@@ -13,6 +13,7 @@ export * from "./bill_com/index.js";
 export * from "./birdeye/index.js";
 export * from "./calendly/index.js";
 export * from "./chase/index.js";
+export * from "./cin7/index.js";
 export * from "./clover/index.js";
 export * from "./custom_forms/index.js";
 export * from "./docusign/index.js";
