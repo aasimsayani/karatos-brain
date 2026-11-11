@@ -108,7 +108,7 @@ describe("Outlook settings", () => {
     const base = { tenantId: TENANT, clientId: CLIENT, clientSecret: SECRET, mailbox: MAILBOX, fetch };
     expect(() => outlookClient({ ...base, tenantId: "contoso.onmicrosoft.com" })).toThrow(new MicrosoftConfigError("MICROSOFT_TENANT_ID is missing or not a directory (tenant) id"));
     expect(() => outlookClient({ ...base, clientId: "app" })).toThrow(new MicrosoftConfigError("MICROSOFT_OUTLOOK_CLIENT_ID is missing or not an application (client) id"));
-    for (const clientSecret of ["short", "s".repeat(257), `${"s".repeat(10)} ${"s".repeat(10)}`, undefined as never]) expect(() => outlookClient({ ...base, clientSecret }), String(clientSecret)).toThrow(new MicrosoftConfigError("MICROSOFT_OUTLOOK_CLIENT_SECRET is missing or not in the expected shape"));
+    for (const clientSecret of ["short", "s".repeat(15), "s".repeat(257), `${"s".repeat(10)} ${"s".repeat(10)}`, undefined as never]) expect(() => outlookClient({ ...base, clientSecret }), String(clientSecret)).toThrow(new MicrosoftConfigError("MICROSOFT_OUTLOOK_CLIENT_SECRET is missing or not in the expected shape"));
     expect(() => outlookClient({ ...base, clientSecret: ` ${"s".repeat(16)} ` })).not.toThrow();
     expect(() => outlookClient({ ...base, clientSecret: "s".repeat(256) })).not.toThrow();
     expect(() => outlookClient({ ...base, mailbox: "sales" })).toThrow(new MicrosoftConfigError("MICROSOFT_OUTLOOK_MAILBOX is missing or not a mailbox address or object id"));
@@ -137,6 +137,9 @@ describe("Outlook paging links", () => {
       `https://graph.microsoft.com.evil.test/v1.0/users/x/messages/delta?$skiptoken=a`,
       `http://graph.microsoft.com/v1.0/users/x/messages/delta?$skiptoken=a`,
       `https://u:p@graph.microsoft.com/v1.0/users/x/messages/delta?$skiptoken=a`,
+      `https://u@graph.microsoft.com/v1.0/users/x/messages/delta?$skiptoken=a`,
+      `https://:p@graph.microsoft.com/v1.0/users/x/messages/delta?$skiptoken=a`,
+      `${BOX}/${"a/".repeat(5_000)}messages/delta?$skiptoken=a`,
       `${BOX}/messages/delta?$skiptoken=a#x`,
       `${GRAPH}/me/messages/delta?$skiptoken=a`,
       `${GRAPH}/users/x/calendarView/delta?$skiptoken=a`,
@@ -152,6 +155,7 @@ describe("Outlook paging links", () => {
     for (const link of bad) expect(outlookStateOf(link, "/messages/delta"), String(link).slice(0, 80)).toBeUndefined();
     expect(outlookStateOf(`${BOX}/messages/delta?$skiptoken=${"a".repeat(8192)}`, "/messages/delta")?.token).toHaveLength(8192);
     expect(outlookStateOf(`${BOX}/MESSAGES/DELTA?$skiptoken=a`, "/messages/delta")).toEqual({ kind: "skip", token: "a" });
+    expect(outlookStateOf(`${BOX}/${"a/".repeat(4_900)}messages/delta?$skiptoken=a`, "/messages/delta")).toEqual({ kind: "skip", token: "a" });
   });
 });
 
@@ -255,6 +259,11 @@ describe("Outlook client", () => {
     const e = (await plain(twice.fetch).c.messages("inbox", null, SINCE).catch((x: Error) => x)) as MicrosoftApiError;
     expect([e.message, e.status]).toEqual(["Microsoft Graph turned down the app's token twice", 401]);
     expect(twice.sent.map((s) => s.method)).toEqual(["POST", "GET", "POST", "GET"]);
+    // Signing in again doesn't use up a retry.
+    const then = scripted(TOKEN, json(401, {}), json(503, {}), json(503, {}), json(503, {}), okPage(DELTA_LINK));
+    const t = plain(then.fetch);
+    await expect(t.c.messages("inbox", null, SINCE)).resolves.toMatchObject({ next: { kind: "delta", token: "d1" } });
+    expect(t.slept).toEqual([1000, 2000, 4000]);
   });
 
   it("waits out throttling as long as Retry-After says, up to a minute, or longer each time, then gives up", async () => {
@@ -326,6 +335,10 @@ describe("Outlook client", () => {
       [json(200, { value: [], "@odata.deltaLink": `${BOX}/messages/delta?$skiptoken=a` }), "Microsoft Graph sent a paging link that isn't the mailbox's mail"],
       [json(200, { value: [], "@odata.deltaLink": `${BOX}/calendarView/delta?$deltatoken=a` }), "Microsoft Graph sent a paging link that isn't the mailbox's mail"],
     ];
+    const odd = (await plain(scripted(TOKEN, () => new Response(JSON.stringify({ value: [], ...DELTA_LINK }), { status: 206 })).fetch).c.messages("inbox", null, SINCE).catch((x: Error) => x)) as MicrosoftApiError;
+    expect([odd.message, odd.status]).toEqual(["Microsoft Graph answered HTTP 206 for the mailbox's mail", 206]);
+    const mailLink = (await plain(scripted(TOKEN, okPage(DELTA_LINK)).fetch).c.events(null, SINCE, UNTIL).catch((x: Error) => x)) as MicrosoftApiError;
+    expect(mailLink.message).toBe("Microsoft Graph sent a paging link that isn't the mailbox's calendar");
     for (const [answer, message] of bad) {
       const e = (await plain(scripted(TOKEN, answer).fetch).c.messages("inbox", null, SINCE).catch((x: Error) => x)) as MicrosoftApiError;
       expect([e.message, e.status], message).toEqual([message, 200]);
@@ -343,7 +356,7 @@ describe("Outlook reading helpers", () => {
     expect(outlookTime("2026-01-02T03:04:05.1234567Z")).toBe("2026-01-02T03:04:05.123Z");
     expect(outlookTime("2026-01-02T03:04:05.5")).toBe("2026-01-02T03:04:05.500Z");
     expect(outlookTime("2026-01-02T23:59:59.99")).toBe("2026-01-02T23:59:59.990Z");
-    for (const bad of ["2026-02-30T00:00:00Z", "2026-01-02T24:00:00Z", "2026-01-02T12:60:00Z", "2026-01-02T12:00:60Z", "2026-01-02", "2026-01-02 03:04:05Z", "2026-01-02T03:04:05.12345678Z", "2026-01-02T03:04:05+02:00", "x2026-01-02T03:04:05Z", "2026-01-02T03:04:05Zx", "", null, 5]) expect(outlookTime(bad), String(bad)).toBeUndefined();
+    for (const bad of ["2026-02-30T00:00:00Z", "2026-01-02T24:00:00Z", "2026-01-02T24:30:00Z", "2026-01-02T03:04Z", "2026-01-02T99:00:00Z", "2026-01-02T12:60:00Z", "2026-01-02T12:00:60Z", "2026-01-02", "2026-01-02 03:04:05Z", "2026-01-02T03:04:05.12345678Z", "2026-01-02T03:04:05+02:00", "x2026-01-02T03:04:05Z", "2026-01-02T03:04:05Zx", "", null, 5]) expect(outlookTime(bad), String(bad)).toBeUndefined();
   });
 });
 
@@ -393,6 +406,9 @@ describe("Outlook events", () => {
     expect(norm.message("inbox", message({ subject: "other", isRead: true }), RECEIVED)[0]!.idempotencyKey).toBe(norm.message("inbox", message(), RECEIVED)[0]!.idempotencyKey);
     expect(norm.message("inbox", message({ importance: "high" }), RECEIVED)[0]!.idempotencyKey).not.toBe(norm.message("inbox", message(), RECEIVED)[0]!.idempotencyKey);
     expect(norm.message("inbox", message({ id: "AAMkADother=" }), RECEIVED)[0]!.payload.messageId).not.toBe(e!.payload.messageId);
+    // Graph's ids tell case apart.
+    expect(norm.message("inbox", message({ id: "AAMKADX=" }), RECEIVED)[0]!.payload.messageId).not.toBe(norm.message("inbox", message({ id: "AAMkADx=" }), RECEIVED)[0]!.payload.messageId);
+    expect(norm.message("inbox", message({ conversationId: "" }), RECEIVED)[0]!.payload).not.toHaveProperty("threadId");
   });
 
   it("dates a sent message when it was sent, and keeps only what reads", () => {
@@ -529,6 +545,7 @@ describe("Outlook checkpoint", () => {
         { ...good, lane: 1.5 },
         { ...good, lane: "1" },
         { ...good, states: { ...good.states, inbox: { kind: "next", token: "a" } } },
+        { ...good, states: { ...good.states, inbox: { kind: "full", token: "a" } } },
         { ...good, states: { ...good.states, inbox: { kind: "skip", token: "a b" } } },
         { ...good, states: { ...good.states, inbox: { kind: "skip", token: 5 } } },
         { ...good, states: { ...good.states, inbox: { token: "a" } } },
@@ -712,8 +729,12 @@ describe("Outlook connector", () => {
     const make = () => outlookConnector({ tenantId: TENANT, clientId: CLIENT, clientSecret: SECRET, mailbox: MAILBOX, correspondentKey: KEY, client: gone, now: () => NOW });
     await expect(drain(make().historicalImport({ cursor: null } as never))).rejects.toThrow(OutlookResyncError);
     expect(calls).toBe(4);
-    const broken: OutlookClient = { messages: async () => Promise.reject(new MicrosoftApiError("x", 500)), events: gone.events };
-    await expect(drain(outlookConnector({ tenantId: TENANT, clientId: CLIENT, clientSecret: SECRET, mailbox: MAILBOX, correspondentKey: KEY, client: broken }).historicalImport({ cursor: null } as never))).rejects.toThrow("x");
+    let tries = 0;
+    const counted: OutlookClient = { messages: async () => (tries++, Promise.reject(new MicrosoftApiError("x", 500))), events: gone.events };
+    await expect(drain(outlookConnector({ tenantId: TENANT, clientId: CLIENT, clientSecret: SECRET, mailbox: MAILBOX, correspondentKey: KEY, client: counted }).historicalImport({ cursor: null } as never))).rejects.toThrow("x");
+    // Only Graph's 410 is listed again: any other error stops the sync at once.
+    expect(tries).toBe(1);
+    expect(() => outlookConnector({ tenantId: TENANT, clientId: CLIENT, clientSecret: SECRET, mailbox: "sales", correspondentKey: KEY, client: counted })).toThrow(new MicrosoftConfigError("MICROSOFT_OUTLOOK_MAILBOX is missing or not a mailbox address or object id"));
   });
 
   it("dead-letters a record that doesn't read and keeps going", async () => {

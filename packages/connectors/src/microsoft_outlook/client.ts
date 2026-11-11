@@ -178,7 +178,7 @@ export function outlookClient(options: OutlookClientOptions): OutlookClient {
         continue;
       }
       const reply: unknown = await response.json().catch(() => undefined);
-      const raw = isObject(reply) && isObject(reply.error) ? reply.error.code : undefined;
+      const raw = (reply as { error?: { code?: unknown } } | undefined)?.error?.code;
       const code = typeof raw === "string" && /^[A-Za-z]{1,80}$/.test(raw) ? raw : undefined;
       if (status === 410) throw new OutlookResyncError(code);
       if (status === 401) throw new MicrosoftApiError("Microsoft Graph turned down the app's token twice", 401, code);

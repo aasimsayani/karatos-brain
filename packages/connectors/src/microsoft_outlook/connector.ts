@@ -68,7 +68,7 @@ export interface OutlookOptions extends Partial<Pick<OutlookClientOptions, "fetc
 }
 
 const isTime = (t: unknown): t is string => typeof t === "string" && !Number.isNaN(Date.parse(t)) && new Date(Date.parse(t)).toISOString() === t;
-const isState = (s: unknown) => s === null || (typeof s === "object" && (s as OutlookState).kind !== undefined && ["skip", "delta"].includes((s as OutlookState).kind) && typeof (s as OutlookState).token === "string" && OUTLOOK_STATE_TOKEN.test((s as OutlookState).token));
+const isState = (s: unknown) => s === null || (typeof s === "object" && ["skip", "delta"].includes((s as OutlookState).kind) && typeof (s as OutlookState).token === "string" && OUTLOOK_STATE_TOKEN.test((s as OutlookState).token));
 export const outlookMailboxLabel = (mailbox: string) => `mailbox:${createHash("sha256").update(mailbox).digest("hex").slice(0, 16)}`;
 
 export function parseOutlookCursor(raw: string | null): OutlookCursor | null {
@@ -138,7 +138,7 @@ export function outlookConnector(options: OutlookOptions): Connector {
       const events: OutlookEvent[] = page.items.flatMap((item) => (lane === "calendar" ? [normalizer.appointment(item, receivedAt)] : normalizer.message(lane, item, receivedAt)));
       const ended = page.next.kind === "delta";
       const last = ended && c.lane === OUTLOOK_LANES.length - 1;
-      c = { ...c, states: { ...c.states, [lane]: page.next }, lane: ended ? (c.lane + 1) % OUTLOOK_LANES.length : c.lane, done: c.done || last };
+      c = { ...c, states: { ...c.states, [lane]: page.next }, lane: ended ? (c.lane + 1) % OUTLOOK_LANES.length : c.lane, done: last };
       yield { events, cursor: JSON.stringify(c) };
       if (last) return;
     }

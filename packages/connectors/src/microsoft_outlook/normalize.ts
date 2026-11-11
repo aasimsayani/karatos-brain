@@ -48,7 +48,7 @@ export const OUTLOOK_EVENTS = {
 const MAX_PEOPLE = 50;
 const ID = /^[A-Za-z0-9+/=_-]{1,512}$/;
 // Graph's times: UTC, with up to seven fraction digits.
-const TIME = /^(\d{4}-\d{2}-\d{2})T((?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d)(?:\.(\d{1,7}))?Z?$/;
+const TIME = /^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2}:\d{2})(\.\d{1,7})?Z?$/;
 const IMPORTANCE = new Set(["low", "normal", "high"]);
 const SHOW_AS = new Set(["free", "tentative", "busy", "oof", "workingElsewhere", "unknown"]);
 const EVENT_TYPES = new Set(["singleInstance", "occurrence", "exception", "seriesMaster"]);
@@ -58,7 +58,7 @@ const ADDRESS = /^[^\s@<>()",;:[\]\\]{1,64}@[a-z0-9-]{1,63}(\.[a-z0-9-]{1,63})+$
 
 const short = (v: unknown) => createHash("sha256").update(JSON.stringify(v)).digest("hex").slice(0, 12);
 const digest = (id: string) => createHash("sha256").update(id).digest("hex").slice(0, 24);
-const obj = (v: unknown) => (typeof v === "object" && v !== null && !Array.isArray(v) ? (v as Record<string, unknown>) : {});
+const obj = (v: unknown) => (v ?? {}) as Record<string, unknown>;
 const list = (v: unknown): unknown[] => (Array.isArray(v) ? v : []);
 const idOf = (v: unknown): string | undefined => (typeof v === "string" && ID.test(v) ? v : undefined);
 const ref = (kind: string, id: string | undefined) => (id === undefined ? undefined : `outlook:${kind}:${digest(id)}`);
@@ -69,8 +69,9 @@ const defined = (fields: Record<string, unknown>) => Object.fromEntries(Object.e
 export function outlookTime(v: unknown): string | undefined {
   const m = typeof v === "string" ? TIME.exec(v) : null;
   if (!m) return undefined;
-  const t = Date.parse(`${m[1]}T${m[2]}.${(m[3] ?? "").padEnd(3, "0").slice(0, 3)}Z`);
-  // Date.parse rolls a day like 02-30 into the next month, so the day must read back as itself.
+  // Date.parse turns down a minute or second of 60, and reads up to seven fraction digits.
+  const t = Date.parse(`${m[1]}T${m[2]}${m[3] ?? ""}Z`);
+  // It rolls a day like 02-30, or a time of 24:00:00, into the next day, so the day must read back as itself.
   if (Number.isNaN(t) || new Date(t).toISOString().slice(0, 10) !== m[1]) return undefined;
   return new Date(t).toISOString();
 }
@@ -108,7 +109,7 @@ export function outlookNormalizer(correspondentKey: string) {
     message(folder: OutlookFolder, raw: unknown, receivedAt: string): OutlookEvent[] {
       const r = obj(raw);
       const id = idOf(r.id);
-      if (r["@removed"] !== undefined) {
+      if (r["@removed"]) {
         if (!id) return [make("message", OUTLOOK_EVENTS.removed, id, ["removed message has no id that reads"], raw, undefined, {}, receivedAt)];
         return [make("message", OUTLOOK_EVENTS.removed, id, [], raw, receivedAt, { system: "Outlook", channel: "email", messageId: ref("message", id), folder }, receivedAt)];
       }
@@ -143,7 +144,7 @@ export function outlookNormalizer(correspondentKey: string) {
     appointment(raw: unknown, receivedAt: string): OutlookEvent {
       const r = obj(raw);
       const id = idOf(r.id);
-      if (r["@removed"] !== undefined) {
+      if (r["@removed"]) {
         return make("event", OUTLOOK_EVENTS.cancelled, id, id ? [] : ["removed event has no id that reads"], raw, receivedAt, { system: "Outlook", appointmentId: ref("event", id), status: "cancelled", removed: true }, receivedAt);
       }
       const updatedAt = outlookTime(r.lastModifiedDateTime);
