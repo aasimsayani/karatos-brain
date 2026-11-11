@@ -88,12 +88,18 @@ describe("Aurora Payments client", () => {
     const { fetch, sent } = scripted(token());
     const make = (o: Partial<Parameters<typeof auroraClient>[0]>) => () => auroraClient({ clientId: ID, clientSecret: SECRET, fetch, ...o });
     for (const clientId of ["", "   ", "x".repeat(7), "x".repeat(257), "has space", "id:colon", "id/slash", undefined as never]) expect(make({ clientId }), String(clientId)).toThrow(new AuroraConfigError("AURORA_CLIENT_ID is missing or not in the expected shape"));
-    for (const clientSecret of ["", "x".repeat(15), "x".repeat(513), "has a space in it, so no", "tab\tin\tthe\tsecret\there", undefined as never]) expect(make({ clientSecret }), String(clientSecret)).toThrow(new AuroraConfigError("AURORA_CLIENT_SECRET is missing or not in the expected shape"));
+    for (const clientSecret of ["", "x".repeat(15), "x".repeat(513), "has a space in it, so no", "tab\tin\tthe\tsecret\there", `${"x".repeat(15)}\x7f`, undefined as never]) expect(make({ clientSecret }), String(clientSecret)).toThrow(new AuroraConfigError("AURORA_CLIENT_SECRET is missing or not in the expected shape"));
     for (const environment of ["staging", "Sandbox", "", "toString", "__proto__"]) expect(make({ environment: environment as never }), environment).toThrow(new AuroraConfigError("AURORA_ENVIRONMENT must be production or sandbox"));
     expect(make({ clientId: "x".repeat(8), clientSecret: "!".repeat(16) })).not.toThrow();
     expect(make({ clientId: `${"Az09._~-".repeat(32)}`, clientSecret: "~".repeat(512) })).not.toThrow();
     expect(make({ clientId: ` ${ID} `, clientSecret: ` ${SECRET} ` })).not.toThrow();
     expect(sent).toHaveLength(0);
+  });
+
+  it("signs in with the key as trimmed", async () => {
+    const { fetch, sent } = scripted(token(), items([]));
+    await auroraClient({ clientId: ` ${ID}\n`, clientSecret: `\t${SECRET} `, fetch, now: NOW }).batches(RANGE, 0);
+    expect(sent[0]!.headers.authorization).toBe(BASIC);
   });
 
   it("goes to production by default, or Flute's sandbox", () => {
@@ -170,10 +176,11 @@ describe("Aurora Payments client", () => {
     const err = (await client(scripted(json(404, { error: "secret detail" })).fetch).c.batches(RANGE, 0).catch((e: Error) => e)) as AuroraApiError;
     expect(err).toBeInstanceOf(AuroraApiError);
     expect(err.message).toBe("Flute sign-in answered HTTP 404");
+    await expect(client(scripted(json(201, { access_token: ACCESS, expires_in: 900 })).fetch).c.batches(RANGE, 0)).rejects.toThrow("Flute sign-in answered HTTP 201");
     expect(err.status).toBe(404);
     expect(err.name).toBe("AuroraApiError");
     expect(new AuroraConfigError("x").name).toBe("AuroraConfigError");
-    for (const answer of [text(200, "not json"), json(200, null), json(200, {}), token(900, 5), token(900, "short"), token(900, `${"a".repeat(20)} b`), token(900, "a".repeat(8193))]) {
+    for (const answer of [text(200, "not json"), json(200, null), json(200, {}), token(900, 5), token(900, 1.2345678901234568e21), token(900, "short"), token(900, "a".repeat(15)), token(900, `${"a".repeat(20)} b`), token(900, "a".repeat(8193))]) {
       const e = (await client(scripted(answer).fetch).c.batches(RANGE, 0).catch((x: Error) => x)) as AuroraApiError;
       expect(e.message).toBe("Flute sign-in answered without an access token");
       expect(e.status).toBe(200);
@@ -298,6 +305,11 @@ describe("Aurora Payments reading helpers", () => {
     }
   });
 
+  it("turns down a time without its T", () => {
+    expect(auroraTime("2026-01-0212:00:00Z")).toBeUndefined();
+    expect(auroraTime("2026-01-02")).toBeUndefined();
+  });
+
   it("reads dollars as cents", () => {
     expect(auroraCents(1299.75)).toBe(129_975);
     expect(auroraCents(0.005)).toBe(1);
@@ -389,6 +401,9 @@ describe("Aurora Payments events", () => {
     const none = auroraTransactionEvent(one(auroraTransaction, { typeId: "2", paymentMethodTypeId: 3, currencyCode: "USDX", amount: null, source: { type: "T".repeat(50) } }), { ...ctx, batchId: BATCH }).payload;
     expect(none).toMatchObject({ transactionType: null, paymentMethod: "unknown", currency: null, taxCents: null, tipCents: null, source: "T".repeat(40) });
     expect(auroraTransactionEvent(one(auroraTransaction, { currencyCode: 840 }), { ...ctx, batchId: BATCH }).payload.currency).toBeNull();
+    expect(auroraTransactionEvent(one(auroraTransaction, { currencyCode: ["USD"] }), { ...ctx, batchId: BATCH }).payload.currency).toBeNull();
+    // The batch is the one it was listed under, read in either case.
+    expect(auroraTransactionEvent(one(auroraTransaction, { batchId: "other" }), { ...ctx, batchId: "Ab-9" }).payload.payoutId).toBe("aurora:batch:ab-9");
   });
 
   it("keys each version by what was kept, so an unchanged one is a duplicate", () => {
@@ -416,6 +431,8 @@ describe("Aurora Payments events", () => {
     for (const id of ["", 5, "x".repeat(65), null]) expect(auroraBatchEvent({ id, batchDateTime: "2026-01-01T00:00:00Z" }, ctx).payload.problems, String(id)).toEqual(["batch has no ID that reads"]);
     expect(auroraBatchEvent({ id: "x".repeat(64), batchDateTime: "2026-01-01T00:00:00Z" }, ctx).payload.problems).toBeUndefined();
     for (const raw of [null, "x", []]) expect(auroraTransactionEvent(raw, { ...ctx, batchId: BATCH }).payload.problems, JSON.stringify(raw)).toHaveLength(2);
+    // One whose time reads keeps it.
+    expect(auroraBatchEvent({ id: "a/b", batchDateTime: "2026-01-01T00:00:00Z" }, ctx).occurredAt).toBe("2026-01-01T00:00:00.000Z");
   });
 });
 
@@ -515,6 +532,36 @@ describe("Aurora Payments connector", () => {
     const ended = await drain(auroraConnector({ client: fake, now: NOW }).historicalImport({ cursor: resume } as never));
     expect(pages).toEqual([1]);
     expect(ended.map((b) => parseAuroraCursor(b.cursor ?? null))).toEqual([{ pass: null, done: true, nextFrom: "2026-01-25T00:00:00.000Z" }]);
+  });
+
+  it("resumes across pages, skips an empty page that says more follow, and keeps what it knew of the import", async () => {
+    const at = "2026-01-02T00:00:00Z";
+    const page = (from: number, n: number) => Array.from({ length: n }, (_, i) => ({ id: `b${from + i}`, batchDateTime: at }));
+    const asked: number[] = [];
+    const fake = (pages: { items: unknown[]; more: boolean }[]): AuroraClient => ({
+      baseUrl: API,
+      batches: async (_r, p) => (asked.push(p), pages[p] ?? { items: [], more: false }),
+      transactions: async () => ({ items: [], more: false }),
+    });
+    const pass = { start: "2026-01-01T00:00:00.000Z", end: "2026-02-01T00:00:00.000Z" };
+    const cursor = (offset: number, done: boolean) => JSON.stringify({ pass: { ...pass, offset }, done, nextFrom: "2026-01-25T00:00:00.000Z" });
+    const two = await drain(auroraConnector({ client: fake([{ items: page(0, 50), more: true }, { items: page(50, 50), more: false }]), now: NOW }).historicalImport({ cursor: cursor(3, false) } as never));
+    expect(eventsOf(two).map((e) => e.payload.payoutId)).toEqual(Array.from({ length: 97 }, (_, i) => `aurora:batch:b${i + 3}`));
+    expect(parseAuroraCursor(two.at(-1)!.cursor ?? null)).toEqual({ pass: null, done: true, nextFrom: "2026-01-25T00:00:00.000Z" });
+    asked.length = 0;
+    const gap = await drain(auroraConnector({ client: fake([{ items: [], more: true }, { items: page(0, 1), more: false }]), now: NOW }).historicalImport({ cursor: null } as never));
+    expect(asked).toEqual([0, 1]);
+    expect(eventsOf(gap)).toHaveLength(1);
+    // A later sync resumed mid-pass after the import ended says so at every checkpoint.
+    const later = await drain(auroraConnector({ client: fake([{ items: page(0, 2), more: false }]), now: NOW }).incrementalSync({ cursor: cursor(0, true) } as never));
+    expect(later.map((b) => parseAuroraCursor(b.cursor ?? null)!.done)).toEqual([true, true]);
+    // An empty later pass before the import ends doesn't say it ended.
+    const quiet = await drain(auroraConnector({ client: fake([]), now: NOW }).incrementalSync({ cursor: JSON.stringify({ pass: null, done: false, nextFrom: "2026-11-01T00:00:00.000Z" }) } as never));
+    expect(quiet.map((b) => parseAuroraCursor(b.cursor ?? null))).toEqual([{ pass: null, done: false, nextFrom: "2026-11-04T15:00:00.000Z" }]);
+    // The import, once done, reads nothing, even with a later pass under way.
+    asked.length = 0;
+    expect(await drain(auroraConnector({ client: fake([{ items: page(0, 2), more: false }]), now: NOW }).historicalImport({ cursor: cursor(0, true) } as never))).toEqual([]);
+    expect(asked).toEqual([]);
   });
 
   it("lists the batches from a week before the last pass on each later sync, reading a settled one again", async () => {

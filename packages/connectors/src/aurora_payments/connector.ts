@@ -76,7 +76,7 @@ export function parseAuroraCursor(raw: string | null): AuroraCursor | null {
 
 export function auroraConnector(options: AuroraOptions): Connector {
   // The client checks the environment; a blank one is production.
-  const client = options.client ?? auroraClient({ ...options, clientId: options.clientId ?? "", clientSecret: options.clientSecret ?? "", environment: (options.environment?.trim().toLowerCase() || undefined) as AuroraEnvironment | undefined, ...(options.now ? { now: options.now } : {}) });
+  const client = options.client ?? auroraClient({ ...options, clientId: options.clientId ?? "", clientSecret: options.clientSecret ?? "", environment: (options.environment?.trim().toLowerCase() || undefined) as AuroraEnvironment | undefined });
   const now = options.now ?? (() => new Date());
   const historyYears = options.historyYears ?? 5;
   if (!Number.isInteger(historyYears) || historyYears < 1) throw new Error("historyYears must be a positive whole number");
@@ -107,7 +107,7 @@ export function auroraConnector(options: AuroraOptions): Connector {
         const events = [event];
         const id = event.payload.payoutId;
         // A batch dead-lettered for its time still has its transactions read, when its ID reads.
-        if (typeof id === "string") events.push(...(await transactions(id.slice("aurora:batch:".length), receivedAt)));
+        if (id) events.push(...(await transactions(String(id).slice("aurora:batch:".length), receivedAt)));
         offset++;
         const last = !result.more && i === items.length - 1;
         const cursor: AuroraCursor = last ? { pass: null, done: doneAtEnd, nextFrom } : { pass: { ...pass, offset }, done, nextFrom };

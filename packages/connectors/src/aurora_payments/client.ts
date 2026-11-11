@@ -120,7 +120,8 @@ export function auroraClient(options: AuroraClientOptions): AuroraClient {
     const value = body?.access_token;
     if (typeof value !== "string" || !ACCESS_TOKEN.test(value)) throw new AuroraApiError("Flute sign-in answered without an access token", 200);
     // expires_in is seconds; anything else, or more than a day, counts as already run out.
-    const seconds = Number.isSafeInteger(body!.expires_in) && (body!.expires_in as number) > 0 && (body!.expires_in as number) <= 86_400 ? (body!.expires_in as number) : 0;
+    const expires = body!.expires_in;
+    const seconds = typeof expires === "number" && expires <= 86_400 ? expires : 0;
     token = { value, until: now().getTime() + seconds * 1000 - TOKEN_MARGIN_MS };
     return value;
   }

@@ -52,8 +52,8 @@ export const auroraRef = (kind: string, id: string) => `aurora:${kind}:${id}`;
 export function auroraTime(v: unknown): string | undefined {
   const m = typeof v === "string" ? TIME.exec(v) : null;
   if (!m) return undefined;
-  // Seven fraction digits, as .NET writes them, are cut to the millisecond.
-  const t = Date.parse(`${m[1]}T${m[2]}${(m[3] ?? "").slice(0, 4)}${m[4] ?? "Z"}`);
+  // Node cuts seven fraction digits, as .NET writes them, to the millisecond.
+  const t = Date.parse(`${m[1]}T${m[2]}${m[3] ?? ""}${m[4] ?? "Z"}`);
   // Date.parse rolls a day like 02-30 into the next month, so the day must read back as itself.
   if (Number.isNaN(t) || new Date(Date.parse(`${m[1]}T00:00:00Z`)).toISOString().slice(0, 10) !== m[1]) return undefined;
   return new Date(t).toISOString();
@@ -61,10 +61,11 @@ export function auroraTime(v: unknown): string | undefined {
 
 /** Dollars, as Flute writes them (a number), in whole cents, or null. */
 export function auroraCents(v: unknown): number | null {
-  if (typeof v !== "number" || !Number.isFinite(v) || Math.abs(v) >= 1e12) return null;
+  // Number.isFinite is false for anything but a number.
+  if (!Number.isFinite(v) || Math.abs(v as number) >= 1e12) return null;
   // Rounded on the size, then signed, so half a cent rounds away from zero either way.
-  const cents = Math.round(Math.abs(v) * 100);
-  return v < 0 ? -cents : cents;
+  const cents = Math.round(Math.abs(v as number) * 100);
+  return (v as number) < 0 ? -cents : cents;
 }
 
 export interface AuroraContext {
@@ -82,7 +83,7 @@ function event(kind: "batch" | "transaction", raw: unknown, time: unknown, ctx: 
   const idKey = kind === "batch" ? "payoutId" : "transactionId";
   const payload: Record<string, unknown> = ok ? { system: "Aurora Payments", [idKey]: auroraRef(kind, id!), ...payloadOf(r), occurredAt: at } : { system: "Aurora Payments", [idKey]: id === undefined ? null : auroraRef(kind, id), problems };
   const key = ok ? `aurora:${kind}:${id}:${short(payload)}` : `aurora:unreadable_${kind}:${short(raw)}`;
-  return { id: key.replace(/:/g, "_"), type: AURORA_EVENTS[kind], occurredAt: ok ? at : undefined, receivedAt: ctx.receivedAt, idempotencyKey: key, payload };
+  return { id: key.replace(/:/g, "_"), type: AURORA_EVENTS[kind], occurredAt: at, receivedAt: ctx.receivedAt, idempotencyKey: key, payload };
 }
 
 /** The event for one settlement batch. */
