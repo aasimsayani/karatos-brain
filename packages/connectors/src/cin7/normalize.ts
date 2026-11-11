@@ -75,7 +75,7 @@ export function cin7Cents(v: unknown): number | undefined {
 
 /** A Cin7 Core time, which is UTC with or without the Z, as an ISO time; null when it doesn't read. */
 export function cin7Time(v: unknown): string | null {
-  return typeof v === "string" && /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(\.\d{1,7})?Z?$/.test(v) ? quoTime(v.endsWith("Z") ? v : `${v}Z`) : null;
+  return typeof v === "string" ? quoTime(v.endsWith("Z") ? v : `${v}Z`) : null;
 }
 /** The day of a Cin7 Core date, which it may write as a time at midnight. */
 const day = (v: unknown) => {
@@ -205,7 +205,7 @@ export function cin7StockEvent(raw: unknown, ctx: Cin7Context): Cin7Read {
   const sku = reference(r.SKU);
   if (!sku) problems.push("stock's product has no sku that reads");
   const onHand = decimal(r.OnHand);
-  if (onHand === undefined || !Number.isSafeInteger(onHand) || onHand < 0) problems.push("stock on hand isn't a whole count of zero or more");
+  if (!Number.isSafeInteger(onHand) || onHand! < 0) problems.push("stock on hand isn't a whole count of zero or more");
   const bin = text(r.Bin, 100);
   const batch = text(r.Batch, 100);
   const payload = {

@@ -91,15 +91,15 @@ export function parseCin7Cursor(raw: string | null): Cin7Cursor | null {
     // Not JSON: fails the checks below.
   }
   const r = (c ?? {}) as Record<string, unknown>;
-  const m = (r.marks ?? null) as Record<string, unknown> | null;
-  const marks = m !== null && MARKED.every((list) => mark(m[list]));
+  const m = (r.marks ?? {}) as Record<string, unknown>;
+  const marks = MARKED.every((list) => mark(m[list]));
   const p = (r.pass ?? {}) as Record<string, unknown>;
   const list = p.list as Cin7List;
   const pass = r.pass === null || (LISTS.includes(list) && (list === "stock" ? p.since === null : mark(p.since)) && Number.isSafeInteger(p.page) && (p.page as number) >= 1 && (p.page as number) <= CIN7_MAX_PAGE && isTime(p.began));
   if (typeof r.done === "boolean" && marks && pass) {
     return {
       done: r.done,
-      marks: { products: m!.products as string | null, customers: m!.customers as string | null, suppliers: m!.suppliers as string | null, sales: m!.sales as string | null, purchases: m!.purchases as string | null },
+      marks: { products: m.products as string | null, customers: m.customers as string | null, suppliers: m.suppliers as string | null, sales: m.sales as string | null, purchases: m.purchases as string | null },
       pass: r.pass === null ? null : { list, since: p.since as string | null, page: p.page as number, began: p.began as string },
     };
   }

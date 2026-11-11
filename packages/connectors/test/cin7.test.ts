@@ -118,7 +118,7 @@ const ALL_LISTS: Cin7List[] = ["products", "customers", "suppliers", "sales", "p
 describe("Cin7 Core client", () => {
   it("checks the account id and key before sending anything", () => {
     const { fetch, sent } = scripted(json(200, PAGE));
-    for (const accountId of ["", "x", ACCOUNT.slice(1), `${ACCOUNT}0`, ACCOUNT.replace(/-/g, ""), ACCOUNT.replace("f", "g")]) {
+    for (const accountId of ["", "x", ACCOUNT.slice(1), `${ACCOUNT}0`, ACCOUNT.replace(/-/g, ""), ACCOUNT.replace("-", ""), `0${ACCOUNT}`, ACCOUNT.replace("f", "g")]) {
       expect(() => cin7Client({ accountId, applicationKey: KEY, fetch }), accountId).toThrow("CIN7_ACCOUNT_ID is missing or isn't a Cin7 Core account id");
     }
     for (const applicationKey of ["", KEY.slice(1), `${KEY} x`]) {
@@ -176,7 +176,7 @@ describe("Cin7 Core client", () => {
   });
 
   it("says when an answer has no list or no Total", async () => {
-    for (const body of [null, [], "x", {}, { Products: {} }, { Products: [] }, { Products: [], Total: 1.5 }, { Products: [], Total: "1" }, { CustomerList: [], Total: 1 }]) {
+    for (const body of [null, [], "x", {}, { Products: {} }, { Products: {}, Total: 1 }, { Products: "x", Total: 1 }, { Products: [] }, { Products: [], Total: 1.5 }, { Products: [], Total: "1" }, { CustomerList: [], Total: 1 }]) {
       const { c } = client(scripted(json(200, body)).fetch);
       await expect(c.page("products", null, 1), JSON.stringify(body)).rejects.toMatchObject({ message: "Cin7 Core answered the products without the list and its Total", status: 200 });
     }
@@ -189,11 +189,13 @@ describe("Cin7 Core client", () => {
       const { c } = client(scripted(json(status, [{ ErrorCode: status, Exception: "Method authentication failed" }])).fetch);
       await expect(c.page("products", null, 1)).rejects.toThrow(new Cin7ConfigError("Cin7 Core turned down CIN7_ACCOUNT_ID and CIN7_APPLICATION_KEY: check both, and that the API application is still there"));
     }
-    for (const status of [400, 404, 405, 501]) {
-      const { c } = client(scripted(json(status, {})).fetch);
+    for (const status of [206, 302, 400, 404, 405, 501]) {
+      const { fetch, sent } = scripted(json(status, {}));
+      const { c } = client(fetch);
       const error = await c.page("sales", null, 1).catch((e: unknown) => e);
       expect(error).toBeInstanceOf(Cin7ApiError);
       expect(error).toMatchObject({ message: `Cin7 Core answered HTTP ${status} for the sales`, status });
+      expect(sent, String(status)).toHaveLength(1);
     }
   });
 
@@ -278,7 +280,8 @@ describe("Cin7 Core events", () => {
     expect(cin7Time("2026-03-04T05:06:07Z")).toBe("2026-03-04T05:06:07.000Z");
     expect(cin7Time("2026-03-04T05:06:07.1234567")).toBe("2026-03-04T05:06:07.123Z");
     expect(cin7Time("2026-03-04T05:06:07.123Z")).toBe("2026-03-04T05:06:07.123Z");
-    for (const bad of ["2026-02-30T00:00:00", "2026-03-04 05:06:07", "2026-03-04T05:06:07+01:00", "2026-03-04T05:06:07.12345678", "2026-03-04", "x2026-03-04T05:06:07", "2026-03-04T05:06:07ZZ", 1, null]) expect(cin7Time(bad), String(bad)).toBeNull();
+    expect(cin7Time("2026-03-04T05:06:07.12345678")).toBe("2026-03-04T05:06:07.123Z");
+    for (const bad of ["2026-02-30T00:00:00", "2026-03-04 05:06:07", "2026-03-04T05:06:07+01:00", "2026-03-04T05:06:07.1234567890", "2026-03-04", "x2026-03-04T05:06:07", "2026-03-04T05:06:07ZZ", 1, null]) expect(cin7Time(bad), String(bad)).toBeNull();
     expect(cin7Cents(1250.5)).toBe(125_050);
     expect(cin7Cents(0.015)).toBe(2);
     expect(cin7Cents(-3)).toBe(-300);
@@ -322,6 +325,8 @@ describe("Cin7 Core events", () => {
     expect(cin7ProductEvent(product({ Type: "9 Stock" }), ctx).event.payload.kind).toBeUndefined();
     expect(cin7ProductEvent(product({ Type: "Stock!" }), ctx).event.payload.kind).toBeUndefined();
     expect(cin7ProductEvent(product({ Name: "x".repeat(200) }), ctx).event.payload.name).toBe("x".repeat(200));
+    expect(cin7ProductEvent(product({ Category: "x".repeat(100) }), ctx).event.payload.category).toBe("x".repeat(100));
+    expect(cin7ProductEvent(product({ Category: "x".repeat(101) }), ctx).event.payload.category).toBeUndefined();
     expect(cin7ProductEvent(product({ Name: "x".repeat(201) }), ctx).event.payload.name).toBeUndefined();
     expect(cin7ProductEvent(product({ Name: "ring\u0007" }), ctx).event.payload.name).toBeUndefined();
     expect(cin7ProductEvent(product({ Name: "  ring  " }), ctx).event.payload.name).toBe("ring");
@@ -417,6 +422,10 @@ describe("Cin7 Core events", () => {
     expect(new Set([plain, ...splits.map((e) => e.idempotencyKey.split(":")[2])]).size).toBe(5);
     expect(splits[2]!.payload).toMatchObject({ bin: "A1", batch: "B7" });
     cin7Stock.reset();
+    expect(cin7StockEvent(cin7Stock.one({ Location: "x".repeat(256) }), ctx).ok).toBe(true);
+    cin7Stock.reset();
+    expect(cin7StockEvent(cin7Stock.one({ Location: "x".repeat(257) }), ctx).ok).toBe(false);
+    cin7Stock.reset();
     expect(cin7StockEvent(cin7Stock.one({ OnHand: 0, Allocated: "1", Available: -1, OnOrder: 2.5 }), ctx).event.payload).toMatchObject({ onHand: 0, allocated: undefined, available: -1, onOrder: 2.5 });
   });
 
@@ -437,6 +446,9 @@ describe("Cin7 Core events", () => {
       [cin7ProductEvent(null, ctx), "product", ["product is not an object", "product has no id that reads", "product has no change time that reads", "product has no sku that reads"]],
       [cin7ProductEvent([], ctx), "product", ["product is not an object", "product has no id that reads", "product has no change time that reads", "product has no sku that reads"]],
       [cin7ProductEvent(product({ ID: "not-a-guid" }), ctx), "product", ["product has no id that reads"]],
+      [cin7ProductEvent(product({ ID: `x${cin7Guid("a", 1)}` }), ctx), "product", ["product has no id that reads"]],
+      [cin7ProductEvent(product({ ID: `${cin7Guid("a", 1)}0` }), ctx), "product", ["product has no id that reads"]],
+      [cin7ProductEvent(product({ ID: cin7Guid("a", 1).replace("-0000-", "-") }), ctx), "product", ["product has no id that reads"]],
       [cin7ProductEvent(product({ LastModifiedOn: "yesterday" }), ctx), "product", ["product has no change time that reads"]],
       [cin7ProductEvent(product({ SKU: "RING 1" }), ctx), "product", ["product has no sku that reads"]],
       [cin7CustomerEvent({ ID: cin7Guid("b", 9) }, ctx), "customer", ["customer has no change time that reads"]],
@@ -445,6 +457,7 @@ describe("Cin7 Core events", () => {
       [cin7PurchaseEvent({ ID: cin7Guid("e", 9), Updated: cin7Before(1) }, ctx), "purchase", ["purchase has no change time that reads"]],
       [cin7StockEvent("x", ctx), "stock", ["stock is not an object", "stock has no product and location that read", "stock's product has no sku that reads", "stock on hand isn't a whole count of zero or more"]],
       [cin7StockEvent({ ID: cin7Guid("a", 9), SKU: "R-1", OnHand: 1 }, ctx), "stock", ["stock has no product and location that read"]],
+      [cin7StockEvent({ ID: cin7Guid("a", 9), SKU: "R-1", OnHand: undefined, Location: "Main" }, ctx), "stock", ["stock on hand isn't a whole count of zero or more"]],
       [cin7StockEvent({ Location: "Main", SKU: "R-1", OnHand: 1 }, ctx), "stock", ["stock has no product and location that read"]],
       [cin7StockEvent({ ID: cin7Guid("a", 9), Location: "Main", SKU: "R-1", OnHand: 1.5 }, ctx), "stock", ["stock on hand isn't a whole count of zero or more"]],
       [cin7StockEvent({ ID: cin7Guid("a", 9), Location: "Main", SKU: "R-1", OnHand: -1 }, ctx), "stock", ["stock on hand isn't a whole count of zero or more"]],
@@ -459,6 +472,7 @@ describe("Cin7 Core events", () => {
     }
     expect(cin7ProductEvent(product({ ID: "not-a-guid" }), ctx).event.payload.id).toBeNull();
     expect(cin7ProductEvent(product({ SKU: "" }), ctx).event.payload.id).toBe(cin7Guid("a", 1));
+    expect(cin7StockEvent({ ID: cin7Guid("a", 9), SKU: "R-1", OnHand: 1 }, ctx).event.payload.id).toBeNull();
     expect(cin7StockEvent({ ID: cin7Guid("a", 9), Location: "Main", SKU: "R-1", OnHand: 1.5 }, ctx).event.payload.id).toMatch(new RegExp(`^${cin7Guid("a", 9)}_`));
     // Two records that don't read are two dead letters.
     expect(cin7ProductEvent({ ID: 1 }, ctx).event.idempotencyKey).not.toBe(cin7ProductEvent({ ID: 2 }, ctx).event.idempotencyKey);
@@ -537,6 +551,8 @@ describe("Cin7 Core connector", () => {
     expect(memory.events.slice(0, 3).map((e) => e.occurredAt)).toEqual([before(1), before(30), before(60_000)]);
     const began = { products: RECEIVED, customers: RECEIVED, suppliers: RECEIVED, sales: RECEIVED, purchases: RECEIVED };
     expect(parseCin7Cursor(report.cursor)).toEqual({ done: true, marks: began, pass: null });
+    // Stock has no mark, and the checkpoint keeps none for it.
+    expect(JSON.parse(report.cursor!)).toEqual({ done: true, marks: began, pass: null });
     assertSynthetic(memory.events);
     const again = await runSync({ connector: connector(mock), mode: "historical", pipeline, memory, organizationId: TEST_ORG });
     expect(again.ingested).toBe(0);
@@ -725,6 +741,24 @@ describe("Cin7 Core doc mock", () => {
     expect(stock).toMatchObject({ Total: 2 });
     expect((await (await get(cin7DocMock({ accountId: ACCOUNT, applicationKey: KEY }), "/supplier")).json()) as Body).toEqual({ Total: 0, Page: 1, SupplierList: [] });
     expect(mock.reads.at(-1)!.list).toBe("stock");
+  });
+
+  it("pages 100 at a time unless asked, and filters from the time given, read as UTC whatever the zone", async () => {
+    cin7Product.reset();
+    const mock = cin7DocMock(account({ products: Array.from({ length: 150 }, () => cin7Product.one()) }));
+    expect(((await (await get(mock, "/product")).json()) as Body).Products).toHaveLength(100);
+    const zone = process.env.TZ;
+    process.env.TZ = "America/New_York";
+    try {
+      const same = (await (await get(cin7DocMock(account()), `/customer?ModifiedSince=${cin7Before(30)}`)).json()) as Body;
+      expect(same.Total).toBe(2);
+      const z = (await (await get(cin7DocMock(account()), `/customer?ModifiedSince=${encodeURIComponent(before(30))}`)).json()) as Body;
+      expect(z.Total).toBe(2);
+      const later = (await (await get(cin7DocMock(account()), `/customer?ModifiedSince=${cin7Before(29.99)}`)).json()) as Body;
+      expect(later.Total).toBe(1);
+    } finally {
+      process.env.TZ = zone;
+    }
   });
 
   it("leaves out deprecated records unless asked for them", async () => {
