@@ -76,4 +76,5 @@ export * from "./woocommerce/index.js";
 export * from "./xero/index.js";
 export * from "./yext/index.js";
 export * from "./yotpo/index.js";
+export * from "./zendesk/index.js";
 export * from "./zoom/index.js";
