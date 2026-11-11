@@ -67,10 +67,11 @@ export function parseDeputyCursor(raw: string | null): DeputyCursor | null {
   } catch {
     c = null;
   }
-  const r = typeof c === "object" && c !== null && !Array.isArray(c) ? (c as Record<string, unknown>) : null;
-  const p = r && typeof r.pass === "object" && r.pass !== null ? (r.pass as Record<string, unknown>) : null;
-  const pass = p && (DEPUTY_OBJECTS as readonly unknown[]).includes(p.object) && Number.isSafeInteger(p.start) && (p.start as number) >= 0 ? { object: p.object as DeputyObject, start: p.start as number } : null;
-  if (r && typeof r.done === "boolean" && isTime(r.from) && isTime(r.nextFrom) && (r.pass === null || pass)) return { pass, done: r.done, from: r.from, nextFrom: r.nextFrom };
+  // Anything but an object reads as a checkpoint without the fields asked for.
+  const r = (c ?? {}) as Record<string, unknown>;
+  const p = (r.pass ?? {}) as Record<string, unknown>;
+  const pass = (DEPUTY_OBJECTS as readonly unknown[]).includes(p.object) && Number.isSafeInteger(p.start) && (p.start as number) >= 0 ? { object: p.object as DeputyObject, start: p.start as number } : null;
+  if (typeof r.done === "boolean" && isTime(r.from) && isTime(r.nextFrom) && (r.pass === null || pass)) return { pass, done: r.done, from: r.from, nextFrom: r.nextFrom };
   throw new Error("Deputy checkpoint is not in the expected shape");
 }
 

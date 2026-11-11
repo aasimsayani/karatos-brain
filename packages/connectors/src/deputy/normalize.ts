@@ -51,8 +51,8 @@ const CONFIRM = ["not_required", "required", "confirmed", "declined"] as const;
 const LEAVE_STATUS = ["awaiting_approval", "approved", "declined", "cancelled", "date_approved", "pay_approved"] as const;
 
 const short = (value: unknown) => createHash("sha256").update(JSON.stringify(value)).digest("hex").slice(0, 12);
-// An array reads as a record without the fields asked for.
-const record = (v: unknown): Record<string, unknown> => (typeof v === "object" && v !== null ? (v as Record<string, unknown>) : {});
+// Anything but an object reads as a record without the fields asked for.
+const record = (v: unknown) => (v ?? {}) as Record<string, unknown>;
 const text = (v: unknown, max = 100): string | null => (typeof v === "string" && v.trim() !== "" ? v.trim().slice(0, max) : null);
 const flag = (v: unknown): boolean | null => (typeof v === "boolean" ? v : null);
 /** A positive whole-number ID, or undefined. Deputy writes 0 for none. */
@@ -86,7 +86,8 @@ export function deputyUnix(v: unknown): string | null {
 
 /** Dollars, as a number or a decimal string, in whole cents, or null. */
 export function deputyCents(v: unknown): number | null {
-  const s = typeof v === "number" && Number.isFinite(v) ? String(v) : typeof v === "string" ? v.trim() : "";
+  // A number that isn't finite writes as a word, which isn't a decimal.
+  const s = typeof v === "number" ? String(v) : typeof v === "string" ? v.trim() : "";
   if (!DECIMAL.test(s)) return null;
   const n = Number(s);
   // Rounded on the size, then signed, so half a cent rounds away from zero either way.
@@ -97,7 +98,8 @@ export function deputyCents(v: unknown): number | null {
 /** Hours or days as a number at or above 0, or null. */
 function amount(v: unknown): number | null {
   const n = typeof v === "number" ? v : typeof v === "string" && DECIMAL.test(v.trim()) ? Number(v) : Number.NaN;
-  return Number.isFinite(n) && n >= 0 && n < 1e6 ? Math.round(n * 1000) / 1000 : null;
+  // NaN fails both comparisons, and infinity the second.
+  return n >= 0 && n < 1e6 ? Math.round(n * 1000) / 1000 : null;
 }
 
 function payloadOf(object: DeputyObject, r: Record<string, unknown>): Record<string, unknown> {

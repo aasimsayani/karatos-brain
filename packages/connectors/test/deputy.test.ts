@@ -114,7 +114,7 @@ describe("Deputy client", () => {
     expect(make({ accessToken: "x".repeat(16) })).not.toThrow();
     expect(make({ accessToken: `${"Az09._~+/=-".repeat(46)}x` })).not.toThrow();
     expect(make({ accessToken: ` ${TOKEN} ` })).not.toThrow();
-    for (const install of ["", "example.deputy.com", "example.us.deputy.com", "example.na.deputy.com.example", "a.example.na.deputy.com", "-x.na.deputy.com", "ex_ample.na.deputy.com", `${"a".repeat(64)}.na.deputy.com`, "http://example.na.deputy.com", "example.na.deputy.com/path", undefined as never])
+    for (const install of ["", "example.deputy.com", "example.us.deputy.com", "example.na.deputy.com.example", "a.example.na.deputy.com", "-x.na.deputy.com", "ex_ample.na.deputy.com", `${"a".repeat(64)}.na.deputy.com`, "http://example.na.deputy.com", "example.na.deputy.com/path", "example.na.deputyxcom", "examplexna.deputy.com", "example.naxdeputy.com", undefined as never])
       expect(make({ install }), String(install)).toThrow(new DeputyConfigError("DEPUTY_INSTALL must be the install's host, like example.na.deputy.com"));
     expect(make({ install: `${"a".repeat(63)}.uk.deputy.com` })).not.toThrow();
     expect(sent).toHaveLength(0);
@@ -200,7 +200,7 @@ describe("Deputy client", () => {
   });
 
   it("doesn't retry other errors, and retries as many times as told", async () => {
-    for (const status of [400, 404, 501]) {
+    for (const status of [400, 401, 403, 404, 501]) {
       const { fetch, sent } = scripted(json(status, {}), json(200, []));
       await expect(client(fetch).c.query(ALL)).rejects.toThrow(`HTTP ${status}`);
       expect(sent).toHaveLength(1);
@@ -304,7 +304,7 @@ describe("Deputy events", () => {
     expect(e.type).toBe("labor.timesheet_updated");
     expect(e.occurredAt).toBe("2026-01-03T00:00:00.000Z");
     expect(e.receivedAt).toBe(RECEIVED);
-    expect(e.payload).toEqual({
+    expect(e.payload).toStrictEqual({
       system: "Deputy",
       timesheetId: "deputy:timesheet:1",
       employeeId: "deputy:employee:1",
@@ -333,8 +333,10 @@ describe("Deputy events", () => {
   it("reads a timesheet in progress, for leave, flagged, with Deputy's other spelling", () => {
     const p = deputyEvent("Timesheet", one(deputyTimesheet, { IsInProgress: undefined, isInProgress: true, EndTime: null, IsLeave: true, LeaveId: 4, ValidationFlag: 8, Roster: 0, Cost: null, TotalTime: "x" }), ctx).payload;
     expect(p).toMatchObject({ inProgress: true, endedAt: null, leaveId: "deputy:leave:4", flagged: true, shiftId: null, costCents: null, hours: null });
-    const q = deputyEvent("Timesheet", one(deputyTimesheet, { IsInProgress: "no", ValidationFlag: "8", TimeApproved: 1, PayStaged: true, Exported: true, Discarded: true }), ctx).payload;
-    expect(q).toMatchObject({ inProgress: null, flagged: null, timeApproved: null, paid: true, exported: true, discarded: true });
+    expect(deputyEvent("Timesheet", one(deputyTimesheet, { IsInProgress: false, isInProgress: true }), ctx).payload.inProgress).toBe(false);
+    expect(deputyEvent("Timesheet", one(deputyTimesheet, { ValidationFlag: 1 }), ctx).payload.flagged).toBe(true);
+    const q = deputyEvent("Timesheet", one(deputyTimesheet, { IsInProgress: "no", ValidationFlag: "8", TimeApproved: 1, PayStaged: true, Exported: false, Discarded: true }), ctx).payload;
+    expect(q).toMatchObject({ inProgress: null, flagged: null, timeApproved: null, paid: true, exported: false, discarded: true });
   });
 
   it("keeps a shift's plan, and not its comment or warning", () => {
@@ -358,6 +360,7 @@ describe("Deputy events", () => {
     });
     const all = JSON.stringify(e);
     for (const hidden of ["bridal", "sizing"]) expect(all, hidden).not.toContain(hidden);
+    expect(deputyEvent("Roster", one(deputyRoster, { Cost: undefined, Published: undefined }), ctx).payload).toMatchObject({ costCents: null, published: null });
     // An open shift has no team member yet.
     expect(deputyEvent("Roster", one(deputyRoster, { Employee: 0, Open: true }), ctx).payload).toMatchObject({ employeeId: null, open: true });
     for (const [status, word] of [[0, "not_required"], [1, "required"], [2, "confirmed"], [3, "declined"], [9, "unknown"], [-1, "unknown"], [1.5, null], ["2", null]] as const)
@@ -382,7 +385,8 @@ describe("Deputy events", () => {
     const statuses = ["awaiting_approval", "approved", "declined", "cancelled", "date_approved", "pay_approved"];
     for (const [i, word] of statuses.entries()) expect(deputyEvent("Leave", one(deputyLeave, { Status: i }), ctx).payload.status).toBe(word);
     expect(deputyEvent("Leave", one(deputyLeave, { Status: 6 }), ctx).payload.status).toBe("unknown");
-    expect(deputyEvent("Leave", one(deputyLeave, { Status: "1" }), ctx).payload.status).toBeNull();
+    for (const Status of ["1", 1.5]) expect(deputyEvent("Leave", one(deputyLeave, { Status }), ctx).payload.status, String(Status)).toBeNull();
+    expect(deputyEvent("Leave", one(deputyLeave, { Company: 2, EmployeeHistory: 7 }), ctx).payload.locationId).toBe("deputy:location:2");
     expect(deputyEvent("Leave", one(deputyLeave, { Days: "0.5", TotalHours: -1 }), ctx).payload).toMatchObject({ days: 0.5, hours: null });
   });
 
@@ -390,6 +394,7 @@ describe("Deputy events", () => {
     const loc = deputyEvent("Company", one(deputyCompany, { ParentCompany: 3, CompanyName: ` ${"S".repeat(120)} `, Code: "C".repeat(50) }), ctx);
     expect(loc.type).toBe("labor.location_updated");
     expect(loc.payload).toEqual({ system: "Deputy", locationId: "deputy:location:1", name: "S".repeat(100), code: "C".repeat(40), active: true, parentLocationId: "deputy:location:3", isWorkplace: true, modifiedAt: "2026-01-01T01:00:00.000Z" });
+    expect(deputyEvent("Company", one(deputyCompany, { IsWorkplace: false, IsPayrollEntity: true }), ctx).payload.isWorkplace).toBe(false);
     const area = deputyEvent("OperationalUnit", one(deputyArea, { Parent: 2, PayrollExportName: "P".repeat(50) }), ctx);
     expect(area.type).toBe("labor.area_updated");
     expect(area.payload).toEqual({ system: "Deputy", areaId: "deputy:area:1", name: "Sales floor", locationId: "deputy:location:1", parentAreaId: "deputy:area:2", active: true, payrollCode: "P".repeat(40), modifiedAt: "2026-01-01T01:00:00.000Z" });
@@ -426,6 +431,8 @@ describe("Deputy events", () => {
     expect(e.payload).toEqual({ system: "Deputy", timesheetId: null, problems: ["timesheet has no ID that reads", "timesheet has no time that reads"] });
     expect(e.idempotencyKey).toMatch(/^deputy:unreadable_timesheet:[0-9a-f]{12}$/);
     expect(e.id).toBe(e.idempotencyKey.replace(/:/g, "_"));
+    // Two that read the same way are still two records.
+    expect(deputyEvent("Timesheet", { Id: 0, Modified: "later" }, ctx).idempotencyKey).not.toBe(e.idempotencyKey);
     expect(deputyEvent("Leave", { Id: 4 }, ctx).payload).toEqual({ system: "Deputy", leaveId: "deputy:leave:4", problems: ["leave has no time that reads"] });
     for (const Id of [-1, 1.5, "4", Number.MAX_SAFE_INTEGER + 2]) expect(deputyEvent("Company", { Id, Modified: "2026-01-01" }, ctx).payload.problems, String(Id)).toEqual(["location has no ID that reads"]);
     for (const raw of [null, "x", []]) expect(deputyEvent("Employee", raw, ctx).payload.problems, JSON.stringify(raw)).toHaveLength(2);
@@ -486,6 +493,10 @@ describe("Deputy connector", () => {
     expect(parseDeputyCursor(report.cursor)).toEqual({ pass: null, done: true, from: "2023-11-11T00:00:00.000Z", nextFrom: "2026-11-11T14:00:00.000Z" });
     const again = await runSync({ connector: connector(mock), mode: "historical", pipeline, memory, organizationId: TEST_ORG });
     expect(again.ingested + again.duplicates).toBe(0);
+    expect(mock.reads).toHaveLength(6);
+    // Once the import is done, a later sync's pass under way is no reason to import again.
+    const later = JSON.stringify({ pass: { object: "Roster", start: 0 }, done: true, from: "2026-11-11T14:00:00.000Z", nextFrom: "2026-11-11T14:00:00.000Z" });
+    expect(await drain(connector(mock).historicalImport({ cursor: later } as never))).toEqual([]);
     expect(mock.reads).toHaveLength(6);
   });
 
@@ -621,7 +632,10 @@ describe("Deputy connector", () => {
   });
 
   it("declares its writes and turns them down while writes are off", async () => {
-    expect(DEPUTY_WRITES.map((w) => w.name)).toEqual(["publish_roster", "approve_timesheet"]);
+    expect(DEPUTY_WRITES).toEqual([
+      { integration: "deputy", name: "publish_roster", description: "Publish a Deputy schedule, so team members see their shifts", kind: "update", approval: "each", dailyCap: 5 },
+      { integration: "deputy", name: "approve_timesheet", description: "Approve the time on a Deputy timesheet", kind: "update", approval: "each", dailyCap: 50 },
+    ]);
     const c = connector(deputyDocMock(install()));
     expect(c.writes).toBe(DEPUTY_WRITES);
     expect(await assertWritesRefused(c)).toMatchObject([
