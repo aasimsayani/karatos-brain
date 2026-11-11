@@ -1,0 +1,1 @@
+- The README's progress counts an integration as done only once it has run against a real or sandbox account, and shows how many are built and how many are checked live for each milestone. A catalog entry records the day with `liveCheckedOn`. The single overall percentage is gone, and "Connected today" is now "Built so far".
