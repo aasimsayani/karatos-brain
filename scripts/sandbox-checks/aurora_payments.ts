@@ -6,6 +6,6 @@ import { auroraConnector } from "@karatos/connectors";
 export default {
   integration: "aurora_payments",
   name: "Aurora Payments",
-  credentials: ["SANDBOX_AURORA_CLIENT_ID", "SANDBOX_AURORA_CLIENT_SECRET"],
-  connector: (c) => auroraConnector({ clientId: c.SANDBOX_AURORA_CLIENT_ID!, clientSecret: c.SANDBOX_AURORA_CLIENT_SECRET!, environment: "sandbox" }),
+  credentials: ["SANDBOX_AURORA_PAYMENTS_CLIENT_ID", "SANDBOX_AURORA_PAYMENTS_CLIENT_SECRET"],
+  connector: (c) => auroraConnector({ clientId: c.SANDBOX_AURORA_PAYMENTS_CLIENT_ID!, clientSecret: c.SANDBOX_AURORA_PAYMENTS_CLIENT_SECRET!, environment: "sandbox" }),
 } satisfies SandboxCheck;

@@ -645,7 +645,7 @@ Reads a business's card and ACH settlement batches from Aurora Payments, which r
 
 **Rate limits.** Flute documents a 429 but no numbers. The client waits out a 429, 500, 502, 503 or 504 three times, honoring `Retry-After` in seconds up to a minute, before the error goes to the sync runner, which resumes from its checkpoint next time. A token turned down mid-pass is replaced once.
 
-**Testing.** The tests run against a mock built from Flute's docs (`packages/testkit/src/mocks/aurora_payments.ts`), and a nightly run against Flute's sandbox checks the real API once `SANDBOX_AURORA_CLIENT_ID` and `SANDBOX_AURORA_CLIENT_SECRET` are set. The mock lists what the sandbox run must confirm: that `dateFrom` and `dateTo` match `batchDateTime` inclusively, that the lists sort oldest first by those fields, and that `batchId` on the transactions list matches a card batch as well as an ACH one.
+**Testing.** The tests run against a mock built from Flute's docs (`packages/testkit/src/mocks/aurora_payments.ts`), and a nightly run against Flute's sandbox checks the real API once `SANDBOX_AURORA_PAYMENTS_CLIENT_ID` and `SANDBOX_AURORA_PAYMENTS_CLIENT_SECRET` are set. The mock lists what the sandbox run must confirm: that `dateFrom` and `dateTo` match `batchDateTime` inclusively, that the lists sort oldest first by those fields, and that `batchId` on the transactions list matches a card batch as well as an ACH one.
 
 ### Authorize.net
 
