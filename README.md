@@ -272,28 +272,30 @@ This section updates itself from [docs/milestones.json](docs/milestones.json) an
 <!-- progress:start -->
 <!-- Generated from docs/milestones.json and the integration catalog by npm run progress:write. Edit those, not this block. -->
 
-**Overall: 80% complete**, 65 of 81 roadmap items done. 83 of the 253 systems in the integration catalog are connected.
+**Roadmap:** 20 of 81 items done. An integration counts as done once it has run against a real or sandbox account, not when its tests pass.
+
+**Integrations:** 83 of the 253 systems in the catalog are built and tested against mocks made from each vendor's docs. 0 have been checked live so far.
 
 | Milestone | What it gives a jeweler | Progress | Target |
 | --- | --- | --- | --- |
 | Foundation | Every record is validated, stored once and traceable to its source. | ██████████ 100% | Done |
 | Retail departments | Eleven departments that turn store data into daily recommendations. | ████████░░ 80% | Dec 2026 |
-| Core integrations | Connects what most jewelers already run: online store, POS, payments, bank and books. | ██████████ 100% | Done |
+| Core integrations | Connects what most jewelers already run: online store, POS, payments, bank and books. | █░░░░░░░░░ 14% (6 of 6 built, 0 checked live) | Nov 2026 |
 | Client instances | Each business gets its own isolated instance, in accounts it owns. | █████████░ 86% | Dec 2026 |
 | Website and demo | Jewelers can see what KaratOS does for their business before they talk to us. | ██████░░░░ 60% | Nov 2026 |
 | AI reasoning | Claude explains each recommendation in plain language and learns from the owner's decisions. | ░░░░░░░░░░ 0% | Jan 2027 |
 | Self-serve AI dashboards | Owners ask a question and get a dashboard, without a developer. | ███░░░░░░░ 33% | Mar 2027 |
 | Self-hosted and managed plans | Run it yourself for free, or let us host it on the premium plan. | ███░░░░░░░ 33% | Mar 2027 |
-| Integrations, next wave | Jewelry POS, CRM, messaging, marketing and diamond feeds join the catalog. | ██████████ 100% | Done |
-| Marketplaces, ads and office tools | Sales channels, ad spend and the files and tasks a team already keeps, in one place. | ██████████ 100% | Done |
-| Shipping, payables and insurance | Packages, bills and care plans tracked next to the sale they belong to. | █████░░░░░ 50% | Jan 2027 |
+| Integrations, next wave | Jewelry POS, CRM, messaging, marketing and diamond feeds join the catalog. | ░░░░░░░░░░ 0% (19 of 19 built, 0 checked live) | Dec 2026 |
+| Marketplaces, ads and office tools | Sales channels, ad spend and the files and tasks a team already keeps, in one place. | ░░░░░░░░░░ 0% (17 of 17 built, 0 checked live) | Dec 2026 |
+| Shipping, payables and insurance | Packages, bills and care plans tracked next to the sale they belong to. | ░░░░░░░░░░ 0% (3 of 6 built, 0 checked live) | Jan 2027 |
 | Manufacturing departments | Bench, casting and setting work tracked with metal loss and labor cost per piece. | ░░░░░░░░░░ 0% | Jun 2027 |
 
 ### Up next
 
+- **Core integrations** (target Nov 2026): check live: Shopify, Inventory and POS systems, Stripe, Bank and card statements from CSV exports, Chase business bank accounts and credit cards, QuickBooks Online
 - **Website and demo** (target Nov 2026): Demo walkthroughs of the biggest jeweler problems; Homepage video of the live dashboard solving real problems
 - **Retail departments** (target Dec 2026): Tune thresholds against a live store's data
-- **Client instances** (target Dec 2026): First live client instance
 <!-- progress:end -->
 
 The [roadmap](docs/roadmap.md) has the detail behind each milestone, and the [changelog](CHANGELOG.md) lists what shipped.
