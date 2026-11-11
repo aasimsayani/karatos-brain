@@ -53,6 +53,7 @@ export const DEMO_NOT_YET: Readonly<Record<string, string>> = {
   etsy: NEXT,
   openphone: NEXT,
   tiktok: NEXT,
+  tiktok_ads: NEXT,
   pinterest: NEXT,
   ebay: NEXT,
   meta_ads: NEXT,

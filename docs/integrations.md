@@ -197,7 +197,7 @@ Used by: R is retail, W is wholesale, M is manufacturing. Test with says how we 
 | Trustpilot | R, W | Public API | Paid account | No | Planned (Company reviews and trust score. The API needs Trustpilot's API module add-on) |
 | Pinterest | R, M | Public API | Free sandbox | No | Built (Connects a Pinterest business account through an app the store owns, holding boards:read, pins:read and user_accounts:read only; the connector stops if the token holds anything more. Its only API requests are the Pin list and two analytics reads. Pinterest's analytics reach back 90 days, so the first import reads 90 days of metrics and every Pin) |
 | TikTok | R | Public API | Free sandbox | No | Built (Connects the store's own TikTok account through an app the store owns, holding user.info.basic, user.info.stats and video.list only; the connector stops if the token holds anything more. Its only API requests are the profile read and the video list) |
-| TikTok Ads | R | Public API | Free sandbox | No | Planned (Ad spend and results from TikTok's API for Business. No public API changelog found; the nightly sandbox run catches API changes) |
+| TikTok Ads | R | Public API | Free sandbox | No | Built (Connects with a long-lived advertiser token from a TikTok developer app made with read scopes only (Ad Account Information and Reporting). Its only API request is the report read for the one advertiser in the settings, built from one fixed report. No changelog page outside the browser-only developer portal; the nightly sandbox run catches API changes) |
 | Yext | R | Public API | Free sandbox | No | Built (Connects with an API key of a Yext app the store owns, which should hold read access to Entities and Reviews only. Its only API requests are two GETs, the location list and the review list. Listing status and analytics are a follow-up. No public API changelog found; the docs watch follows the three doc pages the mock was built from) |
 | Docusign | R, W, M | Public API | Free sandbox | Yes | Built (Read-only by its client: Docusign has no read-only scope, so it signs in with JWT Grant as a user that can't send envelopes, and sends only the sign-in, the user's accounts and envelope reads. It never downloads a document. Connect deliveries are verified with the configuration's HMAC keys) |
 | Dropbox | R, W, M | Public API | Free sandbox | Yes | Built (Read-only: every token is asked for account_info.read and files.metadata.read only (and files.content.read for file imports), and the client stops if Dropbox reports more. Webhooks only say an account changed, so a verified one prompts the incremental sync. Dropbox publishes no API changelog; changes are announced on its developer blog) |
@@ -437,6 +437,7 @@ A request for a path or method the docs don't list throws `UndocumentedRequestEr
 - Stuller's invoice and metal market rate endpoints (API v2)
 - TaxJar's transaction and nexus reads
 - TikTok's Display API v2 profile read and video list with its OAuth refresh, enforcing the client credentials, each token's scopes and the scope each field needs, page sizes and time cursors
+- TikTok's API for Business synchronous report (Marketing API v1.3), enforcing the token, the advertiser, campaign level by day, the metrics, the 30-day range and paging
 - Trello's token, member board, list, custom field, card and action endpoints (REST API 1)
 - UPS's OAuth client credentials token and Tracking API details call
 - A Wix site's read endpoints (eCommerce orders, Catalog V3 and V1, Contacts V5) with the app token, its permissions and cursor paging
@@ -446,7 +447,7 @@ A request for a path or method the docs don't list throws `UndocumentedRequestEr
 - Yotpo's access token, Retrieve all reviews (Reviews v1) and recently updated Loyalty customers (Loyalty v2)
 - Zoom's Server-to-Server OAuth token, meeting history and meeting participant reports (API v2)
 
-Where a vendor has a free sandbox (Affirm, Airtable, Amazon (Selling Partner API), Asana, Authorize.net, Avalara AvaTax, BigCommerce, BILL, Calendly, Clover, Custom forms, Docusign, Dropbox, eBay, FedEx, GIA Report Results, Gmail, Google Ads, Google Analytics 4, Google Workspace and Drive, Gusto, HubSpot, Klaviyo, Lightspeed Retail, Mailchimp, Meta Ads, Microsoft OneDrive and SharePoint files, Monday.com, Notion, Pinterest, Plaid, QuickBooks Online, Ramp, Slack, Sola Payments (formerly Cardknox), Square, TikTok, Trello, UPS, Wix, WooCommerce, Xero and Yext so far), its mock is a stand-in until a developer account is set up for the nightly run.
+Where a vendor has a free sandbox (Affirm, Airtable, Amazon (Selling Partner API), Asana, Authorize.net, Avalara AvaTax, BigCommerce, BILL, Calendly, Clover, Custom forms, Docusign, Dropbox, eBay, FedEx, GIA Report Results, Gmail, Google Ads, Google Analytics 4, Google Workspace and Drive, Gusto, HubSpot, Klaviyo, Lightspeed Retail, Mailchimp, Meta Ads, Microsoft OneDrive and SharePoint files, Monday.com, Notion, Pinterest, Plaid, QuickBooks Online, Ramp, Slack, Sola Payments (formerly Cardknox), Square, TikTok, TikTok Ads, Trello, UPS, Wix, WooCommerce, Xero and Yext so far), its mock is a stand-in until a developer account is set up for the nightly run.
 
 <!-- registry:mocks:end -->
 
@@ -2328,6 +2329,28 @@ Reads the store's own TikTok account through TikTok's Display API (v2). Read-onl
 **Writes.** Posting a product video is declared so it can be gated and audited, and is turned off. It needs a named person's approval. Turning it on would also need a token with `video.publish`, which the connector stops on today.
 
 **Testing.** The tests run against a mock built from TikTok for Developers' Display API docs (`packages/testkit/src/mocks/tiktok.ts`), which checks the client credentials in the form, the refresh token rotation, each token's scopes and the scope each field needs, page sizes and time cursors. For the nightly run, add a sandbox to the developer app with a test TikTok account, sign it in with the three read scopes, and add `SANDBOX_TIKTOK_CLIENT_KEY`, `SANDBOX_TIKTOK_CLIENT_SECRET` and `SANDBOX_TIKTOK_REFRESH_TOKEN` as GitHub Actions secrets.
+
+### TikTok Ads
+
+Reads one advertiser's TikTok campaign report by day through TikTok's API for Business (Marketing API v1.3). Read-only two ways over: the token comes from a developer app made with read scopes only (Ad Account Information and Reporting), and the client's only request is a GET of the report for the advertiser in the settings, with parameters built from one fixed report.
+
+| Setting | What it is |
+| --- | --- |
+| `TIKTOK_ADS_ACCESS_TOKEN` | A long-lived advertiser token from an app with read scopes only |
+| `TIKTOK_ADS_ADVERTISER_ID` | The advertiser's numeric ID |
+| `TIKTOK_ADS_ENVIRONMENT` | `production` (the default) or `sandbox` |
+
+**What it reads.** One `BASIC` report at campaign level (`AUCTION_CAMPAIGN`), a 30-day window at a time, by day, 1,000 rows a page: for each campaign, its name and objective, and the spend, impressions, reach, clicks, purchases (`complete_payment`) and purchase value (`total_complete_payment_rate`). The historical import reads two years up to today. Each incremental sync reads again from 28 days before the last day the previous pass read, TikTok's longest attribution window.
+
+**Privacy.** Reports are totals by campaign and day, so nothing names a person. Campaign names are cut short, and one holding an @ is dropped.
+
+**Rate limits and errors.** TikTok answers most errors with HTTP 200 and a code. Rate limits (40016, 40100, 40133, or HTTP 429) and passing faults on TikTok's side (50000, 51001, 51002, 51004, 51041, 51043, 60001, or HTTP 5xx) are retried three times, doubling from a second, before the error goes to the sync runner, which resumes from its checkpoint next time. Codes 40001, 40102, 40104 and 40105 mean the token lacks a scope, expired or was revoked: authorize the app again. TikTok's own message is never shown, only its code.
+
+**Writes.** Pausing and resuming a campaign are declared, so they can be gated and audited, and both are turned off. Each needs a named person's approval and is capped at five a day. Turning them on would also need an app with the Ads Management scope, which isn't requested.
+
+**Events.** `ads.campaign_reported`, the same event Google Ads and Meta Ads give, one per campaign and day, with money in cents of the advertiser's currency. Each is keyed by its day, its campaign and a digest of its numbers, so a revised row is stored as a new version and an unchanged one is a duplicate. A row without a campaign ID or a day that reads is dead-lettered.
+
+**Testing.** The tests run against a mock built from TikTok's docs (`packages/testkit/src/mocks/tiktok_ads.ts`), which checks the token, the advertiser, campaign level by day, the metrics, the 30-day range and paging. For the nightly run, make a sandbox advertiser in the TikTok for Business Developers portal and add `SANDBOX_TIKTOK_ADS_ACCESS_TOKEN` and `SANDBOX_TIKTOK_ADS_ADVERTISER_ID` as GitHub Actions secrets.
 
 ### Trello
 
