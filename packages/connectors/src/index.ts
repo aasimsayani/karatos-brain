@@ -56,6 +56,7 @@ export * from "./refiner_statements/index.js";
 export * from "./repairshopr/index.js";
 export * from "./rfid_counts/index.js";
 export * from "./ringcentral/index.js";
+export * from "./search_the_watch_market/index.js";
 export * from "./shipping/index.js";
 export * from "./shipstation/index.js";
 export * from "./shopify/index.js";
