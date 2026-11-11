@@ -384,6 +384,7 @@ export const CONNECTED_ON: Readonly<Record<string, string>> = {
   repairshopr: "2026-11-11",
   smile_io: "2026-11-11",
   zendesk: "2026-11-11",
+  nfusion: "2026-11-11",
   whatnot: "2026-11-11",
   afterpay: "2026-11-11",
   google_business_profile: "2026-11-11",
