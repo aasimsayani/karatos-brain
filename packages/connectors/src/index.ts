@@ -40,6 +40,7 @@ export * from "./meta_ads/index.js";
 export * from "./metals_api/index.js";
 export * from "./microsoft_onedrive/index.js";
 export * from "./microsoft_outlook/index.js";
+export * from "./microsoft_teams/index.js";
 export * from "./monday/index.js";
 export * from "./nivoda/index.js";
 export * from "./notion/index.js";

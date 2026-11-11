@@ -49,7 +49,8 @@ export class RealLookingDataError extends Error {
   }
 }
 
-const SAFE_EMAIL_DOMAINS = /@(example\.(test|com|org|net)|[a-z0-9-]+\.test|[a-z0-9-]+\.example|[a-z0-9-]+\.invalid)$/i;
+// Teams writes its channel and chat ids as 19:{id}@thread.tacv2 or @thread.skype: ids, not addresses.
+const SAFE_EMAIL_DOMAINS = /@(example\.(test|com|org|net)|[a-z0-9-]+\.test|[a-z0-9-]+\.example|[a-z0-9-]+\.invalid|thread\.(tacv|skype))$/i;
 const EMAIL = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi;
 const DIGIT_RUN = /\d[\d -]{11,22}\d/g;
 const US_PHONE = /(?<!\d)(?:\+?1[ .-]?)?\(?(\d{3})\)?[ .-]?(\d{3})[ .-]?(\d{4})(?!\d)/g;

@@ -34,6 +34,7 @@ import mailchimp from "./mailchimp.js";
 import meta_ads from "./meta_ads.js";
 import microsoft_onedrive from "./microsoft_onedrive.js";
 import microsoft_outlook from "./microsoft_outlook.js";
+import microsoft_teams from "./microsoft_teams.js";
 import monday from "./monday.js";
 import nivoda from "./nivoda.js";
 import notion from "./notion.js";
@@ -95,6 +96,7 @@ export * from "./mailchimp.js";
 export * from "./meta_ads.js";
 export * from "./microsoft_onedrive.js";
 export * from "./microsoft_outlook.js";
+export * from "./microsoft_teams.js";
 export * from "./monday.js";
 export * from "./nivoda.js";
 export * from "./notion.js";
@@ -123,7 +125,7 @@ export * from "./yotpo.js";
 export * from "./zoom.js";
 
 /** Every mock module, one per catalog integration. */
-export const DOC_MOCK_MODULES: readonly DocMockModule[] = [affirm, airtable, amazon, asana, aurora_payments, authorize_net, avalara, bigcommerce, bill_com, birdeye, calendly, clover, custom_forms, docusign, dropbox, ebay, etsy, fedex, gia, gmail, google_ads, google_analytics, google_workspace, gusto, hrd, hubspot, idex, judgeme, klaviyo, lightspeed, mailchimp, meta_ads, microsoft_onedrive, microsoft_outlook, monday, nivoda, notion, openphone, pinterest, plaid, quickbooks, ramp, rapnet, repairshopr, slack, sola_payments, square, squarespace, stuller, taxjar, tiktok, tiktok_ads, trello, ups, wix, woocommerce, xero, yext, yotpo, zoom];
+export const DOC_MOCK_MODULES: readonly DocMockModule[] = [affirm, airtable, amazon, asana, aurora_payments, authorize_net, avalara, bigcommerce, bill_com, birdeye, calendly, clover, custom_forms, docusign, dropbox, ebay, etsy, fedex, gia, gmail, google_ads, google_analytics, google_workspace, gusto, hrd, hubspot, idex, judgeme, klaviyo, lightspeed, mailchimp, meta_ads, microsoft_onedrive, microsoft_outlook, microsoft_teams, monday, nivoda, notion, openphone, pinterest, plaid, quickbooks, ramp, rapnet, repairshopr, slack, sola_payments, square, squarespace, stuller, taxjar, tiktok, tiktok_ads, trello, ups, wix, woocommerce, xero, yext, yotpo, zoom];
 
 /** Every doc-derived mock, with empty data, for checks and the vendor docs watch. */
 export function allDocMocks(): DocMock[] {

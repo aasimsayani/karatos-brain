@@ -369,6 +369,7 @@ export const CONNECTED_ON: Readonly<Record<string, string>> = {
   dropbox: "2026-11-09",
   microsoft_onedrive: "2026-11-10",
   microsoft_outlook: "2026-11-11",
+  microsoft_teams: "2026-11-11",
   ups: "2026-11-10",
   fedex: "2026-11-10",
   bill_com: "2026-11-10",
