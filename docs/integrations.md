@@ -194,7 +194,7 @@ Used by: R is retail, W is wholesale, M is manufacturing. Test with says how we 
 | Yotpo reviews and loyalty | R | Public API | Paid account | Yes | Built (Reads the store's reviews with its store ID and API secret, and its Loyalty members' points with the Loyalty GUID and API key when given. Neither can be limited to reading, so the client only ever sends a token request and two GETs. Yotpo has no sandbox: the first client's store confirms the mock built from Yotpo's docs) |
 | Judge.me | R | Public API | Paid account | Yes | Built (Reads the shop's reviews with its domain and an API token: an OAuth token with read_reviews only, or the private token, which also writes. The client only ever sends GETs of the review list. Judge.me has no sandbox: the first client's shop confirms the mock built from Judge.me's docs) |
 | Smile.io | R | Public API | Paid account | No | Planned (Loyalty points, VIP tiers and referrals. The API needs the Plus or Enterprise plan) |
-| Trustpilot | R, W | Public API | Paid account | No | Planned (Company reviews and trust score. The API needs Trustpilot's API module add-on) |
+| Trustpilot | R, W | Public API | Paid account | No | Built (Reads the store's public service reviews and trust score with only a Trustpilot application's API key, which reaches only public endpoints and can't reply or invite; the API secret is never used. Product reviews and invitations need a business user's token, so they aren't read. API access needs Trustpilot's API module: the first client's business unit confirms the mock built from Trustpilot's docs) |
 | Pinterest | R, M | Public API | Free sandbox | No | Built (Connects a Pinterest business account through an app the store owns, holding boards:read, pins:read and user_accounts:read only; the connector stops if the token holds anything more. Its only API requests are the Pin list and two analytics reads. Pinterest's analytics reach back 90 days, so the first import reads 90 days of metrics and every Pin) |
 | TikTok | R | Public API | Free sandbox | No | Built (Connects the store's own TikTok account through an app the store owns, holding user.info.basic, user.info.stats and video.list only; the connector stops if the token holds anything more. Its only API requests are the profile read and the video list) |
 | TikTok Ads | R | Public API | Free sandbox | No | Built (Connects with a long-lived advertiser token from a TikTok developer app made with read scopes only (Ad Account Information and Reporting). Its only API request is the report read for the one advertiser in the settings, built from one fixed report. No changelog page outside the browser-only developer portal; the nightly sandbox run catches API changes) |
@@ -444,6 +444,7 @@ A request for a path or method the docs don't list throws `UndocumentedRequestEr
 - TikTok's Display API v2 profile read and video list with its OAuth refresh, enforcing the client credentials, each token's scopes and the scope each field needs, page sizes and time cursors
 - TikTok's API for Business synchronous report (Marketing API v1.3), enforcing the token, the advertiser, campaign level by day, the metrics, the 30-day range and paging
 - Trello's token, member board, list, custom field, card and action endpoints (REST API 1)
+- Trustpilot's public business unit and service reviews (v1)
 - UPS's OAuth client credentials token and Tracking API details call
 - A Wix site's read endpoints (eCommerce orders, Catalog V3 and V1, Contacts V5) with the app token, its permissions and cursor paging
 - A WooCommerce store's REST API v3 read endpoints with its key permissions and page headers
@@ -2505,6 +2506,33 @@ Custom fields are kept only for types that hold no free text: number, date, chec
 **Webhooks.** None yet. The scheduled sync polls.
 
 **Testing.** The tests run against a mock built from Trello's API reference (`packages/testkit/src/mocks/trello.ts`). Like Trello, it returns only the fields asked for, except an action's data, which it returns whole, so the tests show card names, descriptions and comment text never reach a stored event. It answers 401 for the wrong key or token, reports a write token's permissions, filters closed cards, pages cards and actions with `before`, and can answer 429. Its assumptions are listed in the mock and checked on the first sandbox run. For the nightly run, make a free Trello workspace for testing only with a board or two of synthetic cards, a Power-Up for its API key, and a read-only token for a member who belongs only to it, and add them as the `SANDBOX_TRELLO_API_KEY` and `SANDBOX_TRELLO_TOKEN` GitHub Actions secrets.
+
+### Trustpilot
+
+Reads the store's Trustpilot page: every service review and the trust score, so marketing sees the store's reputation next to its sales, and every bad review gets an owner. Reviews arrive as the same `review.updated` events the Yext, Birdeye, Yotpo and Judge.me connectors give.
+
+| Setting | What it is |
+| --- | --- |
+| `TRUSTPILOT_API_KEY` | The API key of a Trustpilot application, never its secret |
+| `TRUSTPILOT_BUSINESS_UNIT_ID` | The store's business unit id |
+
+**Read-only by design.** Trustpilot has no read-only scope: an application's key and secret make a business user token that can reply to reviews and send invitations. So KaratOS asks for the key alone. The key reaches only Trustpilot's public endpoints, which show what anyone can see on the store's Trustpilot page, and the client sends only two GETs to `https://api.trustpilot.com/v1`, with the key in the `apikey` header: the business unit, and its reviews, with parameters it builds itself from checked values. Replying to a review and sending an invitation are declared behind the write gate, needing approval, turned off, and the client has no request to send them.
+
+**What it reads.** Trustpilot lists a store's reviews newest first, 100 a page by number, with no filter by date. So each pass reads from the newest and stops at the first page that reaches back past its start. The first import reads five years. Each later sync reads the reviews posted in the last 30 days again, so a reply or an edit in that time is a new event and the rest are duplicates. Each pass reads the trust score with its first page. Each page is one batch, and the checkpoint keeps the pass's start and the next page, so a resumed pass goes on from that page.
+
+**Events.**
+- `review.updated` for each review: the rating, a title and excerpt with email addresses and phone numbers masked, the language, whether Trustpilot verified it and whether it counts toward the trust score, likes, whether and when the store replied, and when the customer had the experience, posted it and edited it. A review of two stars or fewer is marked for follow-up, and one without a reply is marked as waiting on one.
+- `review.score_updated` for the trust score: the score and stars, the number of reviews, how many count toward the score, and how many there are at each rating. A score that hasn't moved is a duplicate.
+
+Each event is keyed by a digest of what was kept. A review without an id, a rating from 1 to 5 or a time, or a business unit without a trust score or a review count, is dead-lettered.
+
+**Privacy.** Only public reviews are read, never the customer emails and order ids private endpoints carry. Reviewers' display names and locations and the store's reply text are never read into an event; a reviewer is Trustpilot's consumer id.
+
+**Not read.** Product reviews and invitations: their lists need a business user's token, which could also write.
+
+**Rate limits.** Trustpilot asks callers to stay under 833 calls in 5 minutes and 10,000 an hour. The client waits as `Retry-After` says (up to a minute), or 1, 2 and 4 seconds, on a 429, 500, 502, 503 or 504, before the error goes to the sync runner, which resumes from its checkpoint next time. A 401 or 403 says the key is wrong or the store lost the API module; a 404 says the business unit id is wrong.
+
+**Testing.** API access needs Trustpilot's API module. The tests run against a mock built from Trustpilot's developer docs (`packages/testkit/src/mocks/trustpilot.ts`). It checks the `apikey` header, the business unit, the parameters the review list takes, the order and the page size. It lists what the first client's key must confirm: that `perPage` goes to 100, that an edit leaves `createdAt` alone, and the key's shape.
 
 ### Twilio
 
