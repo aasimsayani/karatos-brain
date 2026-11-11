@@ -49,7 +49,7 @@ const ref = (kind: string, v: unknown) => (idOf(v) ? `zendesk_${kind}:${v}` : un
 export function zendeskTime(value: unknown): string | null {
   const m = typeof value === "string" ? /^(\d{4}-\d{2}-\d{2})T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?Z$/.exec(value) : null;
   if (!m) return null;
-  const t = Date.parse(value as string);
+  const t = Date.parse(m[0]);
   // Date.parse rolls an impossible day (Feb 30) into the next month, so the day must read back as itself.
   return t >= 0 && new Date(t).toISOString().slice(0, 10) === m[1] ? new Date(t).toISOString() : null;
 }

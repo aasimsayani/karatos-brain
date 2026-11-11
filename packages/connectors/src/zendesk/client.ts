@@ -91,8 +91,6 @@ export interface ZendeskClient {
   page(kind: ZendeskExport, from: { start: number } | { cursor: string }): Promise<ZendeskPage>;
 }
 
-const isObject = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null && !Array.isArray(value);
-
 export function zendeskClient(options: ZendeskClientOptions): ZendeskClient {
   const subdomain = options.subdomain?.trim().toLowerCase() ?? "";
   const clientId = options.clientId?.trim() ?? "";
@@ -117,7 +115,7 @@ export function zendeskClient(options: ZendeskClientOptions): ZendeskClient {
     if (response.status === 400 || response.status === 401) throw new ZendeskConfigError("Zendesk turned down the sign-in: check ZENDESK_CLIENT_ID and ZENDESK_CLIENT_SECRET, and authorize the client again if the refresh token expired, was revoked or was already used");
     // Zendesk's docs show 201 for a new token.
     if (response.status !== 200 && response.status !== 201) throw new ZendeskApiError(`Zendesk answered HTTP ${response.status} to the sign-in`, response.status);
-    const r = (isObject(reply) ? reply : {}) as Record<string, unknown>;
+    const r = (reply ?? {}) as Record<string, unknown>;
     if (typeof r.access_token !== "string" || !TOKEN.test(r.access_token)) throw new ZendeskApiError("Zendesk's sign-in had no access token in the expected shape", 200);
     // A token that can do more than read is never used.
     if (r.scope !== undefined) {
@@ -127,7 +125,7 @@ export function zendeskClient(options: ZendeskClientOptions): ZendeskClient {
     }
     // Saved before it is used: Zendesk has already retired the old one.
     if (typeof r.refresh_token === "string" && TOKEN.test(r.refresh_token)) await options.tokens.save(r.refresh_token);
-    const seconds = typeof r.expires_in === "number" && r.expires_in > 0 ? r.expires_in : 0;
+    const seconds = typeof r.expires_in === "number" ? r.expires_in : 0;
     access = { value: r.access_token, until: now().getTime() + seconds * 1000 - TOKEN_MARGIN_MS };
     return access.value;
   }
@@ -173,12 +171,14 @@ export function zendeskClient(options: ZendeskClientOptions): ZendeskClient {
       if (status === 404) throw new ZendeskConfigError("Zendesk has no account at ZENDESK_SUBDOMAIN");
       if (status !== 200) throw new ZendeskApiError(`Zendesk answered HTTP ${status} for the ${kind} export`, status);
       const body: unknown = await response.json().catch(() => undefined);
-      if (!isObject(body) || !Array.isArray(body[kind]) || typeof body.end_of_stream !== "boolean") throw new ZendeskApiError(`Zendesk answered the ${kind} export without a list and end_of_stream`, 200);
-      const next = body.after_cursor;
+      const b = (body ?? {}) as Record<string, unknown>;
+      const rows = b[kind];
+      if (!Array.isArray(rows) || typeof b.end_of_stream !== "boolean") throw new ZendeskApiError(`Zendesk answered the ${kind} export without a list and end_of_stream`, 200);
+      const next = b.after_cursor;
       // Only the last page may have no cursor: one in the middle must say where the rest is.
-      if (next === null && body.end_of_stream) return { rows: body[kind], cursor: null, end: true };
+      if (next === null && b.end_of_stream) return { rows, cursor: null, end: true };
       if (typeof next !== "string" || !ZENDESK_CURSOR.test(next)) throw new ZendeskApiError(`Zendesk's ${kind} export had no after_cursor in the expected shape`, 200);
-      return { rows: body[kind], cursor: next, end: body.end_of_stream };
+      return { rows, cursor: next, end: b.end_of_stream };
     }
   }
 

@@ -127,6 +127,12 @@ describe("Zendesk client", () => {
     expect(() => zendeskClient({ ...nothing, subdomain: "a", clientId: "ab" })).toThrow("ZENDESK_CLIENT_SECRET");
   });
 
+  it("trims its settings before using them", async () => {
+    const padded = scripted(signedIn, json(200, PAGE));
+    await zendeskClient({ subdomain: ZENDESK_TEST_SUBDOMAIN, clientId: ` ${CLIENT_ID} `, clientSecret: ` ${SECRET} `, tokens: memoryTokenStore(REFRESH), fetch: padded.fetch, now: NOW }).page("tickets", start);
+    expect(JSON.parse(padded.sent[0]!.body)).toMatchObject({ client_id: CLIENT_ID, client_secret: SECRET });
+  });
+
   it("refreshes with JSON and the two read scopes, saves the new refresh token, then reads an export", async () => {
     const { fetch, sent } = scripted(signedIn, json(200, { ...PAGE, tickets: [{ id: 1 }], after_cursor: "next=", end_of_stream: false }));
     const { c, tokens } = client(fetch, { subdomain: " TestStore " });
@@ -185,7 +191,7 @@ describe("Zendesk client", () => {
   });
 
   it("stops before reading when the token has a scope that writes", async () => {
-    for (const scope of ["read write", "tickets:write", "tickets:read impersonate", "users:read hc:write", 5, ""]) {
+    for (const scope of ["read write", "tickets:write", "tickets:read impersonate", "users:read hc:write", "webhooks:read", 5, false, 0, ""]) {
       const { fetch, sent } = scripted(json(200, { ...TOKEN, scope }), json(200, PAGE));
       const { c, tokens } = client(fetch);
       if (scope === "") {
@@ -199,7 +205,7 @@ describe("Zendesk client", () => {
       // The refresh token isn't saved from a token that is never used.
       expect(tokens.current).toBe(REFRESH);
     }
-    const { c } = client(scripted(json(200, { ...TOKEN, scope: "read write impersonate a:write b:write c:write" })).fetch);
+    const { c } = client(scripted(json(200, { ...TOKEN, scope: "read write impersonate a:write b:write c:write d:write" })).fetch);
     await expect(c.page("tickets", start)).rejects.toThrow("the token has write, impersonate, a:write, b:write, c:write; KaratOS");
     const { c: odd } = client(scripted(json(200, { ...TOKEN, scope: 5 })).fetch);
     await expect(odd.page("tickets", start)).rejects.toThrow("the token has (unreadable);");
@@ -437,7 +443,7 @@ describe("Zendesk events", () => {
   };
 
   it("logs a ticket with its status, people, tags and times, and no words or names", () => {
-    const r = zendeskTicketEvent(row({ tags: ["Repair", "sizing", "repair"], organization_id: 40, due_at: before(-24), satisfaction_rating: { score: "good", comment: "Lovely" } }), ctx);
+    const r = zendeskTicketEvent(row({ submitter_id: 8, tags: ["Repair", "sizing", "repair"], organization_id: 40, due_at: before(-24), satisfaction_rating: { score: "good", comment: "Lovely" } }), ctx);
     expect(r.ok).toBe(true);
     expect(r.event).toEqual({
       id: r.event.idempotencyKey.replace(/:/g, "_"),
@@ -449,7 +455,7 @@ describe("Zendesk events", () => {
         system: "Zendesk",
         ticketId: "zendesk:ticket:101",
         requester: "zendesk_user:501",
-        submittedBy: "zendesk_user:501",
+        submittedBy: "zendesk_user:8",
         assignedTo: `zendesk_user:${ZENDESK_TEST_AGENT}`,
         organization: "zendesk_organization:40",
         group: "zendesk_group:30",
@@ -479,6 +485,7 @@ describe("Zendesk events", () => {
     expect(r.ok).toBe(true);
     expect(r.event.payload).toEqual({ system: "Zendesk", ticketId: "zendesk:ticket:101", status: "open", tags: [], public: false, createdAt: ms(3), updatedAt: ms(1), requester: undefined, submittedBy: undefined, assignedTo: undefined, organization: undefined, group: undefined, brand: undefined, ticketType: undefined, priority: undefined, channel: undefined, satisfaction: undefined, dueAt: undefined });
     expect(zendeskTicketEvent(row({ via: null, is_public: undefined }), ctx).event.payload).toMatchObject({ channel: undefined, public: true });
+    expect(zendeskTicketEvent(row({ satisfaction_rating: { score: "<b>" }, via: { channel: "Web!" } }), ctx).event.payload).toMatchObject({ satisfaction: undefined, channel: undefined });
     expect(zendeskTicketEvent(row({ status: "a".repeat(40), type: "x-y_9" }), ctx).event.payload).toMatchObject({ status: "a".repeat(40), ticketType: "x-y_9" });
     expect(zendeskTicketEvent(row({ status: "a".repeat(41) }), ctx).ok).toBe(false);
     expect(zendeskTicketEvent(row({ status: "9a" }), ctx).ok).toBe(false);
@@ -615,6 +622,12 @@ describe("Zendesk connector", () => {
   it("checkpoints each page, and a resumed import goes on from the page it reached", async () => {
     zendeskTicket.reset();
     const tickets = Array.from({ length: 2300 }, (_, i) => zendeskTicket.one({ updated_at: before(10 - i / 1000) }));
+    zendeskUser.reset();
+    const customers = Array.from({ length: 1200 }, (_, i) => zendeskUser.one({ id: 10_000 + i, updated_at: before(10 - i / 1000) }));
+    const both = await drain(connector(zendeskDocMock(helpdesk({ tickets, users: customers }))).historicalImport({ cursor: null } as never));
+    expect(both.map((b) => b.events.length)).toEqual([1000, 1000, 300, 1000, 200]);
+    // The import is done only once the last export's last page is read.
+    expect(both.map((b) => parseZendeskCursor(b.cursor as string)!.done)).toEqual([false, false, false, false, true]);
     const mock = zendeskDocMock(helpdesk({ tickets, users: [] }));
     const batches = await drain(connector(mock).historicalImport({ cursor: null } as never));
     expect(batches.map((b) => b.events.length)).toEqual([1000, 1000, 300, 0]);
@@ -713,6 +726,7 @@ describe("Zendesk connector", () => {
     const tokens = memoryTokenStore(REFRESH);
     const batches = await drain(connector(mock, { tokens, sleep: async (ms) => void slept.push(ms) }).historicalImport({ cursor: null } as never));
     expect(eventsOf(batches)).toHaveLength(6);
+    expect(eventsOf(batches).every((e) => e.receivedAt === RECEIVED)).toBe(true);
     expect(slept).toEqual([1000, 1000]);
     mock.revokeTokens();
     const c = connector(mock, { tokens });
