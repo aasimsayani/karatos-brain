@@ -38,10 +38,12 @@ import hubspot from "./hubspot.js";
 import idex from "./idex.js";
 import imap_email from "./imap_email.js";
 import inventory_pos from "./inventory_pos.js";
+import jm_shipping_solution from "./jm_shipping_solution.js";
 import judgeme from "./judgeme.js";
 import klaviyo from "./klaviyo.js";
 import lightspeed from "./lightspeed.js";
 import mailchimp from "./mailchimp.js";
+import meta from "./meta.js";
 import meta_ads from "./meta_ads.js";
 import metals_api from "./metals_api.js";
 import microsoft_onedrive from "./microsoft_onedrive.js";
@@ -95,4 +97,4 @@ import zendesk from "./zendesk.js";
 import zoom from "./zoom.js";
 
 /** Each built connector's own catalog fields, by catalog id. */
-export const CONNECTOR_CATALOG: Readonly<Record<string, ConnectorCatalogEntry>> = { acuity, affirm, afterpay, airtable, amazon, asana, authorize_net, avalara, bank_statements, bci_e_jewelry, bigcommerce, bill_com, birdeye, calendly, chase, cin7, clover, custom_forms, docusign, dropbox, ebay, edi_x12, etsy, fedex, fincen_8300, gia, gmail, google_ads, google_analytics, google_business_profile, google_workspace, gorgias, gusto, hrd, hubspot, idex, imap_email, inventory_pos, judgeme, klaviyo, lightspeed, mailchimp, meta_ads, metals_api, microsoft_onedrive, microsoft_outlook, microsoft_teams, monday, netsuite, nfusion, nivoda, notion, openphone, pinterest, piro, plaid, quickbooks, ramp, rapnet, refiner_statements, repairshopr, rfid_counts, ringcentral, search_the_watch_market, shipstation, shopify, slack, smile_io, sola_payments, square, squarespace, stripe, stuller, supplier_invoices, taxjar, tiktok, tiktok_ads, trello, trustpilot, twilio, ups, verkada, watchbase_datafeed, watchsearch, watchtraderhub, whatnot, wix, woocommerce, xero, yext, yotpo, zendesk, zoom };
+export const CONNECTOR_CATALOG: Readonly<Record<string, ConnectorCatalogEntry>> = { acuity, affirm, afterpay, airtable, amazon, asana, authorize_net, avalara, bank_statements, bci_e_jewelry, bigcommerce, bill_com, birdeye, calendly, chase, cin7, clover, custom_forms, docusign, dropbox, ebay, edi_x12, etsy, fedex, fincen_8300, gia, gmail, google_ads, google_analytics, google_business_profile, google_workspace, gorgias, gusto, hrd, hubspot, idex, imap_email, inventory_pos, jm_shipping_solution, judgeme, klaviyo, lightspeed, mailchimp, meta, meta_ads, metals_api, microsoft_onedrive, microsoft_outlook, microsoft_teams, monday, netsuite, nfusion, nivoda, notion, openphone, pinterest, piro, plaid, quickbooks, ramp, rapnet, refiner_statements, repairshopr, rfid_counts, ringcentral, search_the_watch_market, shipstation, shopify, slack, smile_io, sola_payments, square, squarespace, stripe, stuller, supplier_invoices, taxjar, tiktok, tiktok_ads, trello, trustpilot, twilio, ups, verkada, watchbase_datafeed, watchsearch, watchtraderhub, whatnot, wix, woocommerce, xero, yext, yotpo, zendesk, zoom };
