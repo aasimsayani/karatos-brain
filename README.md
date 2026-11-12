@@ -220,6 +220,7 @@ The table is generated from the [integration catalog](docs/integrations.md), so 
 | Etsy | Imports five years of Etsy orders, then reads every order changed since the last sync | Sales, Inventory, Marketing |
 | eBay | Imports the two years of eBay orders that eBay keeps, then reads every order changed since the last sync | Sales, Inventory |
 | Microsoft 365 Outlook mail and calendar | Imports five years of the mailbox's Inbox and Sent Items, then keeps up with every new, changed and removed message | Clienteling, Buying, Custom orders, Repairs |
+| Any other mailbox (IMAP) | Imports five years of mail metadata from INBOX and Sent on any IMAP mailbox: who wrote to whom, when and which thread | Clienteling, Buying, Custom orders, Repairs |
 | Microsoft Teams | Imports five years of one team's channel messages and replies, then keeps up with every new, edited and deleted one | Sales, Repairs, Custom orders |
 | RingCentral | Imports two years of calls, texts and voicemail on the store's RingCentral line, then rereads the last day on each sync | Clienteling, Repairs, Sales |
 | Quo (formerly OpenPhone) | Imports two years of calls and texts on every Quo line, then rereads the last day on each sync | Clienteling, Repairs, Sales |
@@ -261,6 +262,7 @@ The table is generated from the [integration catalog](docs/integrations.md), so 
 | TheWatchSearch (by TheWatchCloud) | Turns the dealer WhatsApp groups the store is in into a feed of offers: brand, reference, buy or sell, price, year, condition and set | Buying, Sales, Inventory |
 | Search The Watch Market Business API | Gives a fair market price for each reference the store follows: listings, low, high, mean and market value | Buying, Appraisals, Sales, Inventory |
 | WatchBase Data Feed | Reads the reference specs of every watch of the brands the store deals in, from WatchBase | Inventory, Sales, Marketing |
+| WatchTraderHub | Imports every published watch listing, spare part and reported order, then reads only what changed since the last sync | Inventory, Sales |
 | RepairShopr | Imports five years of repair tickets, estimates and invoices, then what changed | Repairs, Clienteling |
 <!-- connected:end -->
 
@@ -282,7 +284,7 @@ This section updates itself from [docs/milestones.json](docs/milestones.json) an
 
 **Roadmap:** 20 of 81 items done. An integration counts as done once it has run against a real or sandbox account, not when its tests pass.
 
-**Integrations:** 91 of the 253 systems in the catalog are built and tested against mocks made from each vendor's docs. 0 have been checked live so far.
+**Integrations:** 93 of the 253 systems in the catalog are built and tested against mocks made from each vendor's docs. 0 have been checked live so far.
 
 | Milestone | What it gives a jeweler | Progress | Target |
 | --- | --- | --- | --- |
@@ -296,7 +298,7 @@ This section updates itself from [docs/milestones.json](docs/milestones.json) an
 | Self-hosted and managed plans | Run it yourself for free, or let us host it on the premium plan. | ███░░░░░░░ 33% | Mar 2027 |
 | Integrations, next wave | Jewelry POS, CRM, messaging, marketing and diamond feeds join the catalog. | ░░░░░░░░░░ 0% (19 of 19 built, 0 checked live) | Dec 2026 |
 | Marketplaces, ads and office tools | Sales channels, ad spend and the files and tasks a team already keeps, in one place. | ░░░░░░░░░░ 0% (17 of 17 built, 0 checked live) | Dec 2026 |
-| Shipping, payables and insurance | Packages, bills and care plans tracked next to the sale they belong to. | ░░░░░░░░░░ 0% (3 of 6 built, 0 checked live) | Jan 2027 |
+| Shipping, payables and insurance | Packages, bills and care plans tracked next to the sale they belong to. | ░░░░░░░░░░ 0% (4 of 6 built, 0 checked live) | Jan 2027 |
 | Manufacturing departments | Bench, casting and setting work tracked with metal loss and labor cost per piece. | ░░░░░░░░░░ 0% | Jun 2027 |
 
 ### Up next
