@@ -20,11 +20,19 @@ const commaList = z
  * client: it has its own organization id, API key and database, and never
  * serves another client's data.
  */
-export const InstanceConfigSchema = z.object({
+const API_KEY = z.string().min(32, "use at least 32 random characters, e.g. from: openssl rand -hex 32");
+
+export const InstanceConfigSchema = z
+  .object({
   INSTANCE_NAME: z.string().min(1),
   ORGANIZATION_ID: z.string().regex(/^[a-z0-9][a-z0-9-]{1,62}$/, "use lowercase letters, digits and dashes, e.g. fuse-jewelry"),
   /** Shared secret callers send as "Authorization: Bearer <key>". */
-  INSTANCE_API_KEY: z.string().min(32, "use at least 32 random characters, e.g. from: openssl rand -hex 32"),
+  INSTANCE_API_KEY: API_KEY,
+  /**
+   * Optional key for support access: it reaches only GET /healthz,
+   * GET /v1/integrations and GET /v1/support/status, never business data.
+   */
+  SUPPORT_API_KEY: API_KEY.optional(),
   SUPABASE_DB_URL: z.string().startsWith("postgres"),
   PORT: z.coerce.number().int().min(1).max(65535).default(8080),
   /** Apply pending database migrations when the instance starts. */
@@ -57,7 +65,12 @@ export const InstanceConfigSchema = z.object({
    * references are kept. See docs/architecture/data-retention.md.
    */
   RAW_RETENTION_DAYS: z.coerce.number().int().min(MIN_RAW_RETENTION_DAYS).max(MAX_RAW_RETENTION_DAYS).default(DEFAULT_RAW_RETENTION_DAYS),
-});
+  })
+  // The same value would hand the support holder every route.
+  .refine((c) => c.SUPPORT_API_KEY === undefined || c.SUPPORT_API_KEY !== c.INSTANCE_API_KEY, {
+    path: ["SUPPORT_API_KEY"],
+    message: "must differ from INSTANCE_API_KEY",
+  });
 
 export type InstanceConfig = z.infer<typeof InstanceConfigSchema>;
 

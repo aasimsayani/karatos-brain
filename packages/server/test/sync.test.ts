@@ -247,3 +247,41 @@ describe("createSyncRunner", () => {
     expect(lines).toEqual(["sync stripe historical: 2 new, 0 duplicates, 0 dead-lettered in 1 batches"]);
   });
 });
+
+describe("createSyncRunner: last run of each connector, for support status", () => {
+  it("keeps each connector's last run with its times, mode, outcome and counts, in schedule order", async () => {
+    const calls: string[] = [];
+    let tick = 0;
+    const memory = new InMemoryStore();
+    const pipeline = new BrainPipeline({ memory, normalizers: [], extractors: [], reasoners: [], documentation: new StaticDocumentationSource([]) });
+    const runner = createSyncRunner({
+      connectors: [scheduled(fakeConnector("stripe", calls, { failHistorical: 3 })), scheduled(fakeConnector("shopify", calls))],
+      pipeline,
+      memory,
+      organizationId: ORG,
+      intervalMs: 60_000,
+      log: () => {},
+      // Every call reads the clock, so each run has its own start and finish.
+      now: () => new Date(Date.UTC(2026, 9, 20) + 1000 * tick++),
+      sync: (options) => runSync({ ...options, sleep: async () => {} }),
+      setTimer: () => 0,
+      clearTimer: () => {},
+    });
+    expect(runner.latest()).toEqual([]);
+    await runner.runOnce();
+    const [stripe, shopify] = runner.latest();
+    expect(stripe).toEqual({ id: "stripe", mode: "historical", outcome: "failed", startedAt: "2026-10-20T00:00:00.000Z", finishedAt: stripe!.finishedAt, error: "Error: vendor timed out" });
+    expect(Date.parse(stripe!.finishedAt)).toBeGreaterThan(Date.parse(stripe!.startedAt));
+    expect(Date.parse(shopify!.finishedAt)).toBeGreaterThan(Date.parse(shopify!.startedAt));
+    expect(Date.parse(shopify!.startedAt)).toBeGreaterThan(Date.parse(stripe!.finishedAt) - 1);
+    expect(shopify).toMatchObject({ id: "shopify", mode: "historical", outcome: "succeeded", report: { ingested: 2, duplicates: 0, deadLettered: 0, batches: 1 } });
+    expect(shopify).not.toHaveProperty("error");
+    expect(stripe).not.toHaveProperty("report");
+    // A later run replaces the earlier one.
+    await runner.runOnce();
+    expect(runner.latest().map((s) => [s.id, s.outcome, s.mode])).toEqual([
+      ["stripe", "succeeded", "historical"],
+      ["shopify", "succeeded", "incremental"],
+    ]);
+  });
+});
