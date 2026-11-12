@@ -1,0 +1,3 @@
+- Added the WatchTraderHub connector (read-only): a watch dealer's published listings and spare parts from the Custom Integration API, with each one's brand or maker, stock number, price and stock, and the orders the dealer's site reports to it, with their status and totals. Later syncs read only what changed. The key has no scopes, so the client only sends GET requests, and no buyer details are kept. Cancelling an order is declared behind the write gate and turned down.
+- Connector test kit: a WatchTraderHub API mock built from WatchTraderHub's docs, with listing, part and order fixture builders.
+- The catalog's WatchTraderHub entry no longer says it is partner only: it has a public API on the dealer's Business plan.
