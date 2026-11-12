@@ -280,6 +280,9 @@ describe("Meta messaging client", () => {
     const d = client(bad.fetch);
     await expect(d.c.message("m_1")).rejects.toMatchObject({ status: 400, code: 100, message: "Meta answered HTTP 400 for a message (code 100, subcode 33)" });
     expect([bad.sent.length, d.slept]).toEqual([1, []]);
+    // Graph answers a read with 200; any other status, even a 2xx, is an error.
+    const other = scripted(json(201, { data: [] }));
+    await expect(client(other.fetch).c.conversations("messenger", null)).rejects.toThrow(new MetaMessagingApiError("Meta answered HTTP 201 for the messenger conversations", 201));
     const plain = scripted(json(404, { nope: true }));
     await expect(client(plain.fetch).c.conversationMessages("t_1")).rejects.toThrow(new MetaMessagingApiError("Meta answered HTTP 404 for a conversation's messages", 404));
   });
@@ -361,6 +364,10 @@ describe("Meta message events", () => {
     expect(node).toMatch(/^meta:messenger:message:[0-9a-f]{32}$/);
     expect(refs.node("messenger", "message", "m_1")).toBe(node);
     expect(new Set([node, refs.node("instagram", "message", "m_1"), refs.node("messenger", "conversation", "m_1"), refs.node("messenger", "message", "m_2"), metaRefs("d".repeat(40)).node("messenger", "message", "m_1")]).size).toBe(5);
+    // The channel and kind are inside the digest, not only in the prefix.
+    const digest = (ref: string) => ref.split(":").at(-1);
+    expect(new Set([node, refs.node("instagram", "message", "m_1"), refs.node("messenger", "conversation", "m_1")].map(digest)).size).toBe(3);
+    expect(digest(refs.person("instagram", "7100000001"))).not.toBe(digest(refs.person("messenger", "7100000001")));
     const person = refs.person("messenger", "7100000001");
     expect(person).toMatch(new RegExp(`^${META_CUSTOMER_PREFIX}[0-9a-f]{32}$`));
     expect(META_CUSTOMER_PREFIX).toBe("meta_customer:");
@@ -754,6 +761,13 @@ describe("Meta connector", () => {
     const later = await drain(connector(old, { channels: ["messenger"] }).incrementalSync({ organizationId: TEST_ORG, cursor: null }));
     expect(eventsOf(later)).toHaveLength(1);
     expect(old.reads.map((r) => r.path)).toEqual([`/${META_TEST_PAGE_ID}/conversations`, "/t_mixed", "/m_test000027"]);
+    // The first later sync looks back exactly 48 hours: a conversation and message from 47.5 hours ago are read, and so is one from exactly 48.
+    for (const hours of [47.5, 48]) {
+      reset();
+      const edge = metaDocMock({ token: TOKEN, conversations: [{ platform: "messenger", id: "t_edge", messages: [metaMessage.one({ created_time: hoursAgo(hours) })] }] });
+      const out = await drain(connector(edge, { channels: ["messenger"] }).incrementalSync({ organizationId: TEST_ORG, cursor: null }));
+      expect(eventsOf(out), String(hours)).toHaveLength(1);
+    }
   });
 
   it("sends at most the request cap in one sync, then goes on from its checkpoint", async () => {
@@ -771,6 +785,11 @@ describe("Meta connector", () => {
     expect(counts).toEqual([3, 4, 3, 0, 0, 0]);
     expect(memory.events).toHaveLength(4);
     expect(counts.every((n) => n <= 22)).toBe(true);
+    // With the Messenger page empty, one request is used: the Instagram page isn't read, as a conversation couldn't follow it.
+    reset();
+    const igOnly = metaDocMock({ token: TOKEN, conversations: [{ platform: "instagram", id: "aWdfY29udjE", messages: [instagramMessage.one()] }] });
+    const short = await drain(connector(igOnly, { maxRequests: 22 }).historicalImport({ organizationId: TEST_ORG, cursor: null }));
+    expect([reads(igOnly), cursorAt(short, -1)!.pass]).toEqual([[`/${META_TEST_PAGE_ID}/conversations messenger`], { channel: "instagram", after: null, skip: 0, since: "2021-01-02T12:00:00.000Z", started: RECEIVED }]);
     const wide = metaDocMock(account());
     await drain(connector(wide, { maxRequests: 45 }).historicalImport({ organizationId: TEST_ORG, cursor: null }));
     expect(wide.reads).toHaveLength(9);
@@ -842,6 +861,11 @@ describe("Meta connector", () => {
     const none = metaDocMock(account());
     const out = await drain(connector(none, { channels: ["messenger"] }).historicalImport({ organizationId: TEST_ORG, cursor: JSON.stringify(pass("instagram")) }));
     expect([none.reads.length, out.length, cursorAt(out, -1)]).toEqual([0, 1, { done: true, pass: null, nextSince: at(RECEIVED, -1) }]);
+    // In a sync, the store's Instagram replies are told by the Instagram account id, not the Page's.
+    reset();
+    const igReply = metaDocMock({ token: TOKEN, conversations: [{ platform: "instagram", id: "aWdfY29udjI", messages: [instagramMessage.one({ from: { id: META_TEST_INSTAGRAM_ID }, to: { data: [{ id: instagramCustomerId(4) }] } })] }] });
+    const sent = eventsOf(await drain(connector(igReply, { channels: ["instagram"] }).historicalImport({ organizationId: TEST_ORG, cursor: null })));
+    expect(sent.map((e) => [e.payload.direction, e.payload.customerRefs])).toEqual([["outbound", [refs.person("instagram", instagramCustomerId(4))]]]);
     // Without Instagram, no account id is needed.
     expect(() => connector(messenger, { channels: ["messenger"], instagramAccountId: "" })).not.toThrow();
   });
@@ -1016,6 +1040,9 @@ describe("Meta doc mock", () => {
     expect(first.data![0]).toEqual({ id: `t_${META_MOCK_PAGE_SIZE - 1}`, updated_time: metaGraphTime(100 + META_MOCK_PAGE_SIZE - 1) });
     const next = await body(await get(mock, `/${META_TEST_PAGE_ID}/conversations?platform=messenger&after=${first.paging!.cursors!.after}`));
     expect([next.data!.map((c) => c.id), next.paging!.next]).toEqual([["t_big"], undefined]);
+    // Exactly a page's worth of conversations has no next page.
+    const full = metaDocMock({ token: TOKEN, conversations: conversations.slice(1) });
+    expect((await body(await get(full, `/${META_TEST_PAGE_ID}/conversations`))).paging!.next).toBeUndefined();
     const list = await body(await get(mock, "/t_big?fields=messages"));
     expect(list.messages!.data.map((m) => m.id).slice(0, 2)).toEqual(["m_test000021", "m_test000020"]);
     const read = await body(await get(mock, "/m_test000002?fields=id,message"));
