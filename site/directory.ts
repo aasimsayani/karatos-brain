@@ -274,7 +274,7 @@ export const SYSTEM_DETAILS: Readonly<Record<string, SystemDetail>> = {
   usps: { about: "Tracking for Registered Mail and other USPS parcels." },
   cabrella: { about: "Insured shipments, declared values and claims." },
   brinks_connect: { about: "Secure shipping bookings, tracking, customs papers and invoices." },
-  jm_shipping_solution: { about: "Insured shipping labels, tracking and claims linked to store orders.", company: "Jewelers Mutual" },
+  jm_shipping_solution: { about: "Insured parcels with their tracking, claims and reconciled carrier charges.", company: "Jewelers Mutual" },
 
   // Store operations
   rfid_counts: { about: "Tray and case scans, checked against what should be there each night." },
@@ -384,6 +384,7 @@ export const CONNECTED_ON: Readonly<Record<string, string>> = {
   repairshopr: "2026-11-11",
   smile_io: "2026-11-11",
   zendesk: "2026-11-11",
+  jm_shipping_solution: "2026-11-11",
   watchbase_datafeed: "2026-11-11",
   imap_email: "2026-11-11",
   watchtraderhub: "2026-11-11",

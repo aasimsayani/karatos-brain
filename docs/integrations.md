@@ -287,7 +287,7 @@ Used by: R is retail, W is wholesale, M is manufacturing. Test with says how we 
 | Brink's Global Services | R, W, M | Partner | Partner | No | Planned (Secure insured shipping of diamonds and jewelry: bookings, tracking, customs papers and invoices. Partner only. Exhibited at JCK 2026) |
 | Gem Logic | R, W, M | Unknown | Unknown | No | Planned (Cloud jewelry ERP: counter sales, workshop jobs, memos, consignment and metal prices. No API found. Found in jewelry industry sources) |
 | Zing by Jewelers Mutual (appraisals, claims and diamonds) | R | Partner | Partner | No | Planned (Appraisals, consumer claim files and diamond searches. Partner only. Found in jewelry industry sources) |
-| JM Shipping Solution | R, W | Partner | Partner | No | Planned (Insured shipping labels, tracking and claims linked to store orders. Partner only. Found in jewelry industry sources) |
+| JM Shipping Solution | R, W | Partner | Partner | No | Built (Reads with the key and password JM issues the store (shipping@jminsure.com), and the client only ever sends GETs. JM documents no scopes, so the same key could buy labels and file claims; the connector never does. The first store's credentials confirm the mock built from JM's public API reference) |
 | BIG Network (Balance to Buy and SalesRep Direct) | R, W | Partner | Partner | No | Planned (POS data gathered from many jewelry POS systems: sales, on-hand and sell-through by vendor. Partner only. Found in jewelry industry sources) |
 | Zillion watch insurance | R | Partner | Partner | No | Planned (Watch insurance enrolled by text at the point of sale. Retail partner program; partner only. Found in luxury watch trade research) |
 | Lavalier | R | Partner | Partner | No | Planned (Personal watch and jewelry cover with online quotes. No API found; partner only. Found in luxury watch trade research) |
@@ -421,6 +421,7 @@ A request for a path or method the docs don't list throws `UndocumentedRequestEr
 - HRD Antwerp's public MyHRD API: report data and report validity
 - HubSpot's CRM search, archived list, batch association and token info endpoints (date version 2026-09)
 - IDEX's Onsite feeds: the natural full feed and the lab-grown full file
+- The JM Shipping Solution API (v1) shipment list and details, latest tracking, a shipment's claim and reconciled shipments, with basic credentials and the API_KEY header
 - Judge.me's review list (REST v1)
 - Klaviyo's mock covers its profile, list, segment, campaign, flow and metric reads and the campaign and flow values reports (revision 2026-10-15). Plaid's accounts, transactions sync, Item and webhook verification key endpoints (API version 2020-09-14), with webhooks signed the way Plaid signs them
 - Lightspeed Retail (X-Series) token refresh and product, inventory, customer and sale reads
@@ -1672,6 +1673,34 @@ Money reads `$1,250.00`, `1250.5` and `(25.00)` without floating point. Metal an
 A value that can't be read is left null, so the department schema dead-letters the row with the raw event kept, and every event carries `sourceRow` (`file.csv:12`) to find it. Only mapped columns are read: email addresses, phone numbers and street addresses in an export are never stored.
 
 **Testing.** The tests use synthetic exports only. The CSV reader in `packages/connectors/src/files` (RFC 4180 quoting, CRLF, byte-order marks) and its money, date and flag parsers are shared with the bank statement connector.
+
+### JM Shipping Solution
+
+Reads one store's JM Shipping Solution account, the insured shipping service from Jewelers Mutual, through the JM Shipping Solution API, v1 ([overview](https://docs.jewelersmutual.com/jm-shipping-solution/overview)): the parcels the store bought labels and insurance for, their latest tracking, each one's insurance claim, and the carrier charges JM reconciled. They arrive as the same `shipment.updated` and `shipment.tracked` events the ShipStation and UPS connectors give, plus `shipment.claim_updated` and `shipment.reconciled`, which no other connector reads yet.
+
+| Setting | What it is |
+| --- | --- |
+| `JM_SHIPPING_API_KEY` | The API key JM issued the store, a GUID |
+| `JM_SHIPPING_PASSWORD` | The password JM issued with the key |
+| `JM_SHIPPING_CLIENT_ID` | The store's JM client id, a whole number |
+| `JM_SHIPPING_API_BASE` | Optional: the https address of the JM host the credentials are for, on transguardian.com; JM's UAT host `https://uat2.transguardian.com` when unset |
+
+**Sign-in.** JM issues each integrator a key and a password ([authentication](https://docs.jewelersmutual.com/jm-shipping-solution/authentication.md)); the store asks JM for them. Every request carries the key in the `API_KEY` header, the key and password as basic credentials in `Authorization`, and a User-Agent naming KaratOS. JM documents no scopes, so the same credentials can buy labels, cancel shipments and file claims; KaratOS never does, and the client sends only GET requests to the five reads below. The key, password, client id and host are checked before anything is sent: the host must be https on transguardian.com, so the credentials never go anywhere else. JM answers a bad request and credentials it doesn't accept alike with 400, so a 400 stops the sync with a message naming the settings to check; a 401 or 403 stops it as a sign-in error naming them. Any text JM sends back is quoted with the key and password masked.
+
+**What it reads.** Each sync walks its range a week at a time, oldest first. For each week it lists the store's shipments with `GET /api/v1/shipment/list/{clientId}/{startDate}/{endDate}` ([list](https://docs.jewelersmutual.com/jm-shipping-solution/api-reference/jm-shipping-solution/shipments/getbyclientidstartdateenddate.md)), reads them 20 at a time with `GET /api/v1/shipment/{ids}` ([details](https://docs.jewelersmutual.com/jm-shipping-solution/api-reference/jm-shipping-solution/shipments/getbyids.md)) and `GET /api/v1/shipment/track/latest/{ids}` ([tracking](https://docs.jewelersmutual.com/jm-shipping-solution/api-reference/jm-shipping-solution/tracking/trackbyidsfullhistory.md)), reads the claim of each one bought and not voided with `GET /api/v1/claim/{id}` ([claim](https://docs.jewelersmutual.com/jm-shipping-solution/api-reference/jm-shipping-solution/claims/getbyid.md)), then lists the shipments JM reconciled that week with `GET /api/v1/shipment/reconciliation/{clientId}/{startDate}/{endDate}` ([reconciliation](https://docs.jewelersmutual.com/jm-shipping-solution/api-reference/jm-shipping-solution/reconciliation/reconciledshipmentsbyclientidstartdateenddate.md)). Days are sent as `YYYY-MM-DD`, from a week's first day to the next week's. The historical import walks the last five years and stops for good; each later sync walks the last 60 days again, since tracking, claims and charges keep changing after a parcel ships, and what didn't change comes back as duplicates. A claim on a parcel older than that isn't seen until the next historical import. Each week is a batch, and the checkpoint keeps the next week's first day, so a sync that stops resumes with the same week. JM documents no rate limit; a 429 (or a 500, 502, 503 or 504) is retried three times, honoring `Retry-After` up to a minute or else waiting 1, 2 and 4 seconds, before the sync stops and resumes from its checkpoint. The end-of-day report isn't read: it repeats the shipment list with full addresses.
+
+**Events.** JM writes money as US dollars, kept as whole cents with `currency: "USD"`.
+
+- `shipment.updated` for each version of a shipment: whether it is saved (`pending`), bought (`label_purchased`) or voided (`cancelled`), its carrier and service when it names one of each, its tracking number and JM's tracking state, the declared (insured) value and the invoice value, with how far the first falls short of the second, the cost, freight and insurance of the rate when JM gives one, its weight, the store's first reference when it reads as an order number, whether it is a return, held for pickup, needs approval or was reconciled, its ship, carrier delivery and purchase times, and the destination's state and country.
+- `shipment.tracked` for its latest tracking event, keyed like the UPS and ShipStation ones: a status every carrier maps to (JM's forwarded and enroute are `in_transit`, out for delivery `out_for_delivery`, delivered `delivered`, returned `returned`, exception, left notice and undeliverable `exception`, unscanned `label_created`, and the rest `unknown`), JM's own code and the carrier's, the event's text and time, and the day it was delivered. A shipment with no tracking events yet gives none.
+- `shipment.claim_updated` for a shipment's insurance claim: its status (such as submitted, investigating, approved, paid or denied), the loss type, the reason, the cargo, the amounts claimed, insured, invoiced, to replace and declared to the carrier, whether a carrier claim was filed, and when it was filed and is due. A shipment without a claim gives none.
+- `shipment.reconciled` once JM reconciles a shipment's carrier charges: the freight first quoted and finally billed, JM's adjustment, its invoice reference, the carrier, service and cargo, and when it was bought and reconciled.
+
+Each is keyed by its record and a digest of what was kept. No names, companies, street addresses, cities, postal codes, phone numbers or email addresses are kept, nor package contents, police report numbers, damage descriptions, comments, labels or the store's free-text references. A shipment, tracking event, claim or reconciled shipment that doesn't read, or a listed GUID that isn't one, is dead-lettered with what was wrong, never guessed.
+
+**Writes.** Buying a label, cancelling a shipment, filing a claim and disputing a reconciliation charge are declared behind the write gate, each needing approval every time and at most five a day, and turned down while writes are off. The client has no way to send them.
+
+**Testing.** JM issues credentials per integrator and has no self-serve sandbox. The mock (`packages/testkit/src/mocks/jm_shipping_solution.ts`) is built from JM's public API reference, and its assumptions list what the first run with a store's credentials must confirm, among them who the basic credentials' user name is, the date format and which date each list filters on, and the production host.
 
 ### Judge.me
 
