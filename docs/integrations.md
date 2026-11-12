@@ -78,7 +78,7 @@ Used by: R is retail, W is wholesale, M is manufacturing. Test with says how we 
 | Keyideas RingBuilder | R | File export | Partner | No | Planned (Shopify ring builder with diamond and gemstone feeds. No public API; partner only, start with its CSV exports. Found in jewelry industry sources) |
 | Chrono24 dealer inventory feed | R, W | File export | Paid account | No | Planned (A dealer-hosted inventory feed that Chrono24 pulls daily, so listings, prices and sold status stay in step. No public API; the feed is set up through a Chrono24 integration manager. Found in luxury watch trade research) |
 | Elefta | R, W | File export | Paid account | No | Planned (Watch and jewelry dealer inventory with serial tracking, memos, repairs and marketplace sync. No public API; start with its CSV exports. Found in luxury watch trade research) |
-| WatchTraderHub | R, W | Partner | Paid account | No | Planned (Dealer catalog that syncs products, prices and orders with Shopify. No public API; partner only. Found in luxury watch trade research) |
+| WatchTraderHub | R, W | Public API | Paid account | Yes | Built (Reads with the API key a dealer on the Business plan generates under Custom Integration, Settings. The key has no scopes and could also report or cancel orders and upsert customers, so the client only ever sends GETs. Test mode shares the live inventory, so the first dealer's account confirms the mock built from WatchTraderHub's docs) |
 | Chronodesk | R | Unknown | Unknown | No | Planned (Watch retail inventory, invoices, margin-scheme tax and customers. No API found; start with scheduled exports. Found in luxury watch trade research) |
 | WatchManager.app | R | Unknown | Unknown | No | Planned (Dealer inventory, customers, sales, invoices and suppliers. No API found; start with scheduled exports. Found in luxury watch trade research) |
 | Loupe for Dealers | R | File export | Unknown | No | Planned (Lists, prices and monitors stock across Chrono24, eBay and the dealer's own site. No API; start with its CSV exports. Found in luxury watch trade research) |
@@ -458,6 +458,7 @@ A request for a path or method the docs don't list throws `UndocumentedRequestEr
 - Trustpilot's public business unit and service reviews (v1)
 - UPS's OAuth client credentials token and Tracking API details call
 - Verkada's API token, occupancy trends cameras and occupancy trends
+- WatchTraderHub's Custom Integration API (v1): the integration, listing, part and order reads, with bearer keys, cursors and updated_after
 - The Whatnot Seller API's order, order item, product and variant lists (REST v2), with bearer tokens, scopes, cursors and direction
 - A Wix site's read endpoints (eCommerce orders, Catalog V3 and V1, Contacts V5) with the app token, its permissions and cursor paging
 - A WooCommerce store's REST API v3 read endpoints with its key permissions and page headers
@@ -2955,6 +2956,30 @@ Everything else in a message, chatter included, is dropped.
 **What the brain does with it.** When three or more dealers have asked for the same reference in the last 14 days, buying recommends offering one to them, with the lowest price other dealers in the groups are asking.
 
 **Testing.** The tests use synthetic exports in both phones' styles, with fictional dealers and 555 numbers. They cover the date and price readers, every runSync scenario, re-exports, the history cutoff and a real folder.
+
+### WatchTraderHub
+
+Reads one watch dealer's WatchTraderHub account through the Custom Integration API, v1, at `https://www.watchtraderhub.com/api/v1` ([quickstart](https://www.watchtraderhub.com/docs/api/quickstart)): the watch listings and spare parts the dealer has published to the custom integration, with their prices and stock, and the orders the dealer's own site reports to it. Listings and parts arrive as the same product and stock events the Etsy and Whatnot connectors give, so a watch reads like any other piece in stock.
+
+| Setting | What it is |
+| --- | --- |
+| `WATCHTRADERHUB_API_KEY` | The custom integration's API key: `wth_` and 32 letters and digits |
+
+**Sign-in.** Requests carry `Authorization: Bearer <key>` and a User-Agent naming KaratOS ([authentication](https://www.watchtraderhub.com/docs/api/authentication)). The custom integration needs the dealer's Business plan ([quickstart](https://www.watchtraderhub.com/docs/api/quickstart), [errors](https://www.watchtraderhub.com/docs/api/errors)). The dealer generates the key under Sales Channels, Custom Integration, Settings, and enables the integration; WatchTraderHub shows the key once and keeps only its hash. Regenerating a key turns the old one off at once, so if the dealer's site already uses the integration, share its key through the secret store instead of making a new one. **The key has no scopes:** whoever holds it can also report orders (`POST /orders`), cancel them (`POST /orders/{id}/cancel`), upsert customers (`POST /customers`, `POST /customers/bulk`) and send a test webhook ([idempotency](https://www.watchtraderhub.com/docs/api/idempotency), [changelog](https://www.watchtraderhub.com/docs/api/changelog)). So read-only is enforced in code: the client sends GET requests to the four endpoints below and has no way to send anything else. The key is checked before anything is sent. Each sync first reads `GET /me`, which confirms the key and stops with a message if the integration is disabled. A 401 or 403 (`invalid_api_key`, `integration_disabled`, `subscription_required` and the rest) stops the sync with a message naming `WATCHTRADERHUB_API_KEY` and WatchTraderHub's error code; any key-shaped text in WatchTraderHub's message is hidden. The one exception is `401 auth_lookup_failed`, which the docs call transient: it is left for the sync to retry.
+
+**What it reads.** `GET /listings`, then `GET /parts`, then `GET /orders`, 250 a page (the most allowed), passing each page's `next_cursor` back as `after` ([pagination](https://www.watchtraderhub.com/docs/api/pagination)). The historical import reads every row and stops for good. Each later sync passes `updated_after`: the time the last pass began, less an hour. The first later sync with no checkpoint reads the last 30 days. Each page is a batch, and the checkpoint keeps the list, the cursor and the window, so a sync that stops resumes at the same page. WatchTraderHub allows 600 requests a minute per integration ([rate limits](https://www.watchtraderhub.com/docs/api/rate-limits)). A 429 (or a 500, 502, 503 or 504) is retried three times, honoring `Retry-After` up to a minute or else waiting 1, 2 and 4 seconds, before the sync stops and resumes from its checkpoint.
+
+**Events.**
+
+- `product.updated` for each listing, with `productType: "watch"`, the watch's brand as `vendor`, its title (or brand, model and reference), and one variant holding its stock number as the SKU (or `watchtraderhub-listing-<id>`) and its price in cents. Each part is one too, with `productType: "part"` and its maker as `vendor`. Each is keyed by a digest of what is kept.
+- `inventory.counted` for each listing's and part's stock: its quantity, or 0 when a listing reads `sold` or a part `sold_out`, at its store location.
+- `order.updated` for each order: its status (pending, matched or dismissed), whether it is fulfilled (matched) or cancelled (dismissed), the dealer site's order number, the shipping, tax, discount and total in cents, the currency and its line count. Orders show no update time, so each is keyed by its id, status and a digest of what is kept.
+
+Orders give no `sale.completed`: they are the dealer site's own orders, reported to WatchTraderHub, so the sale belongs to that site's connector and isn't counted twice. No buyer name, email, phone, address or country is kept, nor descriptions, photos, labels or business addresses. A listing, part, count or order that doesn't read is dead-lettered with what was wrong, never guessed. That includes a status the docs don't name.
+
+**Writes.** Cancelling an order is declared behind the write gate, needing approval each time and at most five a day, and turned down while writes are off. The client has no way to send it.
+
+**Testing.** WatchTraderHub has no sandbox: test mode only tags the rows a key creates and still shows the live inventory ([test mode](https://www.watchtraderhub.com/docs/api/test-mode)). The mock (`packages/testkit/src/mocks/watchtraderhub.ts`) is built from WatchTraderHub's docs and the Postman collection the overview links ([overview](https://www.watchtraderhub.com/docs/api)), and its assumptions list what the first live run on a dealer's account must confirm. Among them: the full list of listing, part and order statuses, and that amounts are in cents. The API reference page and its OpenAPI file couldn't be read.
 
 ### Whatnot
 
