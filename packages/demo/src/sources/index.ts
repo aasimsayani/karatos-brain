@@ -73,6 +73,7 @@ export const DEMO_NOT_YET: Readonly<Record<string, string>> = {
   microsoft_teams: NEXT,
   smile_io: NEXT,
   zendesk: NEXT,
+  extend: NEXT,
   jm_shipping_solution: NEXT,
   meta: NEXT,
   watchbase_datafeed: NEXT,
