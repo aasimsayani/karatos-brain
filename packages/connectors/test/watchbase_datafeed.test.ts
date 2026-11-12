@@ -125,6 +125,8 @@ describe("WatchBase client", () => {
     for (const good of ["a".repeat(16), "A-b_9".repeat(25) + "abc", ` ${KEY} `]) expect(() => watchbaseClient({ apiKey: good, fetch: scripted(LIST).fetch })).not.toThrow();
     expect("A-b_9".repeat(25).length + 3).toBe(128);
     expect(WATCHBASE_USER_AGENT).toBe(WHATNOT_USER_AGENT);
+    expect(new WatchbaseConfigError("x").name).toBe("WatchbaseConfigError");
+    expect(new WatchbaseApiError("x", 0).name).toBe("WatchbaseApiError");
   });
 
   it("sends only GETs, with the key and format in the query, and no authorization header", async () => {
@@ -185,6 +187,10 @@ describe("WatchBase client", () => {
       await client(fetch, slept).watches(1, null);
       expect(slept, after).toEqual([ms]);
     }
+    // Retry-After is whole seconds; "5s" isn't, and on a later attempt the wait it gives still counts.
+    const slept: number[] = [];
+    await client(scripted(json(429, {}, { "retry-after": "5s" }), json(429, {}), json(429, {}, { "retry-after": "1" }), LIST).fetch, slept).watches(1, null);
+    expect(slept).toEqual([1000, 2000, 1000]);
   });
 
   it("gives up after three retries, and doesn't retry other errors", async () => {
@@ -193,8 +199,12 @@ describe("WatchBase client", () => {
     expect(await failure(client(fetch, slept).watches(1, null))).toEqual(new WatchbaseApiError("WatchBase answered HTTP 503 for the watch list: Down for maintenance", 503));
     expect(sent).toHaveLength(4);
     expect(slept).toEqual([1000, 2000, 4000]);
-    const none = watchbaseClient({ apiKey: KEY, fetch: scripted(json(429, {})).fetch, sleep: noSleep, retries: 0 });
-    expect(((await failure(none.brands())) as WatchbaseApiError).status).toBe(429);
+    for (const retries of [0, 1]) {
+      const s = scripted(json(429, {}));
+      const c = watchbaseClient({ apiKey: KEY, fetch: s.fetch, sleep: noSleep, retries });
+      expect(((await failure(c.brands())) as WatchbaseApiError).status).toBe(429);
+      expect(s.sent).toHaveLength(retries + 1);
+    }
     for (const status of [400, 404, 409, 501, 505]) {
       const s = scripted(json(status, {}));
       const error = (await failure(client(s.fetch).watch(1))) as WatchbaseApiError;
@@ -216,6 +226,12 @@ describe("WatchBase client", () => {
     expect(await failure(client(scripted(json(401, { message: "No credits left" })).fetch).brands())).toEqual(new WatchbaseConfigError(`WatchBase turned down the API key (HTTP 401): No credits left; ${KEY_MESSAGE}`));
     expect(await failure(client(scripted(json(401, { response: { error: { message: "Bad key" } } })).fetch).brands())).toEqual(new WatchbaseConfigError(`WatchBase turned down the API key (HTTP 401): Bad key; ${KEY_MESSAGE}`));
     expect(await failure(client(scripted(json(401, { error: "   " })).fetch).brands())).toEqual(new WatchbaseConfigError(`WatchBase turned down the API key (HTTP 401); ${KEY_MESSAGE}`));
+    expect(await failure(client(scripted(json(401, { error: "Bad key", message: "Other" })).fetch).brands())).toEqual(new WatchbaseConfigError(`WatchBase turned down the API key (HTTP 401): Bad key; ${KEY_MESSAGE}`));
+    expect(await failure(client(scripted(json(401, { error: " ", message: "No credits left" })).fetch).brands())).toEqual(new WatchbaseConfigError(`WatchBase turned down the API key (HTTP 401): No credits left; ${KEY_MESSAGE}`));
+    expect(await failure(client(scripted(plain(403, " \n<html>Forbidden</html>")).fetch).brands())).toEqual(new WatchbaseConfigError(`WatchBase turned down the API key (HTTP 403); ${KEY_MESSAGE}`));
+    // Every URL and key pair is masked, whatever its case or scheme.
+    const masked = await failure(client(scripted(json(400, { error: "see http://a.example.test/x and HTTPS://b.example.test/y KEY=abc key=def apikey=ghi" })).fetch).watch(1));
+    expect(masked?.message).toBe("WatchBase answered HTTP 400 for the watch: see [url] and [url] key=[key] key=[key] apikey=[key]");
     const long = (await failure(client(scripted(json(500, { error: "x".repeat(300) })).fetch).watch(1))) as Error;
     expect(long.message).toBe(`WatchBase answered HTTP 500 for the watch: ${"x".repeat(200)}`);
   });
@@ -246,6 +262,20 @@ describe("WatchBase client", () => {
     expect(await failure(client(scripted(json(200, { watch: [] })).fetch).watch(1))).toEqual(new WatchbaseApiError("WatchBase answered the watch without a watch that reads", 200));
     expect(await failure(client(scripted(json(200, { num_results: 1 })).fetch).brands())).toEqual(new WatchbaseApiError("WatchBase answered the brand list without a list that reads", 200));
     expect(await client(scripted(json(200, { response: { watch: { wb: { id: 3 } } } })).fetch).watch(3)).toEqual({ wb: { id: 3 } });
+    // Only a 200 is an answer: another 2xx is an error.
+    expect(await failure(client(scripted(json(201, { watches: [] })).fetch).watches(1, null))).toEqual(new WatchbaseApiError("WatchBase answered HTTP 201 for the watch list", 201));
+    // A body cut off while it is read is an answer without a body.
+    const cut = (status: number) => () => new Response(new ReadableStream({ start: (c) => c.error(new Error("cut off")) }), { status });
+    expect(await failure(client(scripted(cut(200)).fetch).watch(1))).toEqual(new WatchbaseApiError("WatchBase answered the watch without JSON that reads", 200));
+    expect(await failure(client(scripted(cut(500)).fetch).watch(1))).toEqual(new WatchbaseApiError("WatchBase answered HTTP 500 for the watch", 500));
+  });
+
+  it("reads the brand and watch lists in each shape", async () => {
+    expect(await client(scripted(json(200, { num_results: 2, watches: { watch: [{ id: 1 }, { id: 2 }] } })).fetch).watches(1, null)).toEqual([{ id: 1 }, { id: 2 }]);
+    expect(await client(scripted(json(200, { response: { num_results: 1, watches: { watch: { id: 1 } } } })).fetch).watches(1, null)).toEqual([{ id: 1 }]);
+    expect(await client(scripted(json(200, { response: { num_results: "0", watches: "" } })).fetch).watches(1, null)).toEqual([]);
+    expect(await client(scripted(json(200, { num_results: 1, brands: { brand: { id: 1, name: "A" } } })).fetch).brands()).toEqual([{ id: 1, name: "A" }]);
+    expect(await client(scripted(json(200, { num_results: 2, brands: { brand: [{ id: 1 }, { id: 2 }] } })).fetch).brands()).toEqual([{ id: 1 }, { id: 2 }]);
   });
 
   it("reads a list in each shape XML turned into JSON may give it", () => {
@@ -263,6 +293,7 @@ describe("WatchBase client", () => {
       expect(watchbaseList({ watches: none }, "watches", "watch")).toBeUndefined();
     }
     expect(watchbaseList({ num_results: 0, watches: 5 }, "watches", "watch")).toBeUndefined();
+    expect(watchbaseList({ num_results: 0, watches: { other: a } }, "watches", "watch")).toBeUndefined();
     expect(watchbaseRoot({ response: { a: 1 } })).toEqual({ a: 1 });
     expect(watchbaseRoot({ response: [1], a: 2 })).toEqual({ response: [1], a: 2 });
     expect(watchbaseRoot({ a: 1 })).toEqual({ a: 1 });
@@ -273,7 +304,8 @@ describe("WatchBase client", () => {
     for (const v of [1, 9, 999_999_999]) expect(isWatchbaseId(v), String(v)).toBe(true);
     for (const v of [0, -1, 1.5, 1_000_000_000, "1", Number.NaN, Number.POSITIVE_INFINITY, null]) expect(isWatchbaseId(v), String(v)).toBe(false);
     for (const v of ["2026-11-11", "2024-02-29", "1999-12-31"]) expect(isWatchbaseDay(v), v).toBe(true);
-    for (const v of ["2025-02-29", "2026-02-30", "2026-00-10", "2026-1-1", " 2026-11-11", "2026-11-11Z", 20261111, null]) expect(isWatchbaseDay(v), String(v)).toBe(false);
+    // "-000001-01" reads back as itself through Date, so only the pattern turns it down.
+    for (const v of ["2025-02-29", "2026-02-30", "2026-00-10", "2026-1-1", " 2026-11-11", "2026-11-11Z", "-000001-01", "+002026-11", 20261111, null]) expect(isWatchbaseDay(v), String(v)).toBe(false);
   });
 });
 
@@ -351,7 +383,10 @@ describe("WatchBase events", () => {
       expect(read.event.payload).toEqual({ system: "WatchBase", kind: "watch", problems });
       expect(read.event.idempotencyKey).toMatch(/^watchbase:unreadable_watch:[0-9a-f]{12}$/);
       expect(read.event.idempotencyKey).toBe(watchbaseWatchEvent(raw, "2030-01-01T00:00:00.000Z").event.idempotencyKey);
+      expect(read.event.id).toBe(read.event.idempotencyKey.replace(/:/g, "_"));
     }
+    // The id is the one under wb, never one at the top.
+    expect(watchbaseWatchEvent({ ...good, id: 1, wb: { modified: "2026-05-05" } }, RECEIVED).event.payload.problems).toEqual(["no watch id"]);
     expect(watchbaseWatchEvent(good, RECEIVED).ok).toBe(true);
     const listed = watchbaseUnlisted({ refnr: "X" }, 901, RECEIVED);
     expect(listed).toMatchObject({ type: WATCHBASE_WATCH_EVENT, occurredAt: undefined, payload: { system: "WatchBase", kind: "listed_watch", problems: ["a watch listed for BrandID 901 has no id"] } });
@@ -359,12 +394,33 @@ describe("WatchBase events", () => {
     expect(watchbaseUnlisted({ refnr: "X" }, 902, RECEIVED).idempotencyKey).not.toBe(listed.idempotencyKey);
   });
 
+  it("cuts each text field at its own length", () => {
+    const long = (c: string) => c.repeat(130);
+    const raw = {
+      wb: { id: 1, modified: "2026-05-05" },
+      reference_number: long("r"),
+      name: long("n"),
+      gender: long("g"),
+      brand: { id: 1, name: long("b") },
+      caliber: { reference_number: long("c"), brand: long("m"), type: long("t"), display: long("d"), hands: `${long("h")},Minutes` },
+      case: { materials: { material: [long("s")] }, coating: long("o"), glass: long("l"), back: long("k"), shape: long("p") },
+      dial: { color: long("C"), finish: long("F"), indextype: long("I"), handstyle: long("H") },
+    };
+    const p = watchbaseWatchEvent(raw, RECEIVED).event.payload as Record<string, Record<string, unknown>>;
+    const lengths = (o: Record<string, unknown>) => Object.fromEntries(Object.entries(o).map(([k, v]) => [k, Array.isArray(v) ? v.map((x: string) => x.length) : typeof v === "string" ? v.length : v]));
+    expect(lengths({ reference: p.reference, name: p.name, gender: p.gender, brand: p.brand })).toEqual({ reference: 60, name: 120, gender: 20, brand: 80 });
+    expect(lengths(p.caliber!)).toEqual({ reference: 60, maker: 80, type: 40, display: 40, hands: [40, 7] });
+    expect(lengths(p.case!)).toEqual({ materials: [60], coating: 60, glass: 60, back: 60, shape: 60 });
+    expect(lengths(p.dial!)).toEqual({ color: 60, finish: 60, indexType: 60, handStyle: 60 });
+  });
+
   it("reads ids, text, days, counts and years at their edges", () => {
     expect([1, "1", 999_999_999, "999999999"].map(watchbaseId)).toEqual([1, 1, 999_999_999, 999_999_999]);
-    for (const v of [0, "0", "01", 1_000_000_000, "1000000000", 1.5, "1.5", -1, " 1", null, undefined, {}]) expect(watchbaseId(v), String(v)).toBeUndefined();
+    for (const v of [0, "0", "01", 1_000_000_000, "1000000000", 1.5, "1.5", -1, " 1", null, undefined, {}, [1], ["1"]]) expect(watchbaseId(v), String(v)).toBeUndefined();
     expect(watchbaseText("  a \n b  ")).toBe("a b");
     expect(watchbaseText("abcdef", 3)).toBe("abc");
     expect(watchbaseText(5711)).toBe("5711");
+    expect(watchbaseText(123_456, 3)).toBe("123");
     for (const v of ["", "   ", null, Number.NaN, Number.POSITIVE_INFINITY, true, {}]) expect(watchbaseText(v), String(v)).toBeUndefined();
     expect(watchbaseText("x".repeat(121))).toBe("x".repeat(120));
     expect(watchbaseDay("2026-11-11")).toBe("2026-11-11");
@@ -406,6 +462,7 @@ describe("WatchBase events", () => {
     expect(watchbaseMaterials("Ceramic")).toEqual(["Ceramic"]);
     for (const v of [undefined, null, {}, { material: [] }, { other: "Steel" }, [], ""]) expect(watchbaseMaterials(v), JSON.stringify(v)).toBeUndefined();
     expect(watchbaseHands("Hours,Minutes , ,Seconds")).toEqual(["Hours", "Minutes", "Seconds"]);
+    expect(watchbaseHands("Hours; Minutes")).toEqual(["Hours; Minutes"]);
     for (const v of ["", " , ", ["Hours"], null]) expect(watchbaseHands(v), JSON.stringify(v)).toBeUndefined();
     expect(watchbaseRef("brand", 37)).toBe("watchbase:brand:37");
   });
@@ -415,6 +472,7 @@ describe("WatchBase settings and checkpoint", () => {
   it("reads the brands to follow", () => {
     expect(parseWatchbaseBrands(" Testmaker 1, 37\n testmaker 1 ,\n\n37, 999999999, Other ")).toEqual([{ name: "Testmaker 1" }, { id: 37 }, { id: 999_999_999 }, { name: "Other" }]);
     expect(parseWatchbaseBrands("x".repeat(80))).toEqual([{ name: "x".repeat(80) }]);
+    expect(parseWatchbaseBrands("1st Test Brand, Test; Brand")).toEqual([{ name: "1st Test Brand" }, { name: "Test; Brand" }]);
     expect(parseWatchbaseBrands(Array.from({ length: WATCHBASE_MAX_BRANDS }, (_, i) => String(i + 1)).join(","))).toHaveLength(50);
     const bad: [string, string][] = [
       ["", "WATCHBASE_BRANDS lists no brand"],
@@ -425,6 +483,8 @@ describe("WatchBase settings and checkpoint", () => {
       ["x".repeat(81), "WATCHBASE_BRANDS has a brand name that isn't plain text up to 80 characters"],
       ["Test\tBrand", "WATCHBASE_BRANDS has a brand name that isn't plain text up to 80 characters"],
       ["Test\u007fBrand", "WATCHBASE_BRANDS has a brand name that isn't plain text up to 80 characters"],
+      ["Test\u0000Brand", "WATCHBASE_BRANDS has a brand name that isn't plain text up to 80 characters"],
+      ["Test\u001fBrand", "WATCHBASE_BRANDS has a brand name that isn't plain text up to 80 characters"],
       [Array.from({ length: WATCHBASE_MAX_BRANDS + 1 }, (_, i) => String(i + 1)).join(","), "WATCHBASE_BRANDS lists more than 50 brands"],
     ];
     for (const [raw, message] of bad) expect(() => parseWatchbaseBrands(raw), raw).toThrow(new WatchbaseConfigError(message));
@@ -454,6 +514,7 @@ describe("WatchBase settings and checkpoint", () => {
     for (const c of good) expect(parseWatchbaseCursor(JSON.stringify(c))).toEqual(c);
     const pass = { started: "2026-11-11", brand: 1, after: 2 };
     const bad: unknown[] = [
+      "",
       "{",
       "null",
       "[]",
@@ -473,6 +534,9 @@ describe("WatchBase settings and checkpoint", () => {
       { synced: Array.from({ length: WATCHBASE_MAX_BRANDS + 1 }, (_, i) => [i + 1, "2026-11-11"]), pass: null },
       { synced: [], pass: [] },
       { synced: [], pass: "open" },
+      { synced: [], pass: false },
+      { synced: [], pass: 0 },
+      { synced: [], pass: "" },
       { synced: [], pass: { ...pass, extra: 1 } },
       { synced: [], pass: { started: "2026-11-11", brand: 1 } },
       { synced: [], pass: { ...pass, started: "2026-13-01" } },
@@ -593,6 +657,28 @@ describe("WatchBase connector", () => {
     await sync(connector(both, { brands: "TESTMAKER 2, 902" }));
     expect(paths(both).filter((p) => p.startsWith("/v1/watches"))).toEqual(["/v1/watches?brand-id=902&format=json"]);
     for (const brands of ["Broken", "Nobody"]) expect(await failure(sync(connector(both, { brands })))).toEqual(new WatchbaseConfigError(`WATCHBASE_BRANDS names a brand WatchBase doesn't list: ${brands}`));
+    // A brand named and given by id, in either order, is read once and kept once in the checkpoint.
+    for (const brands of ["TESTMAKER 2, 902", "902, Testmaker 2"]) {
+      const once = watchbaseDocMock(store());
+      const batches = await sync(connector(once, { brands }));
+      expect(paths(once).filter((p) => p.startsWith("/v1/watches")), brands).toEqual(["/v1/watches?brand-id=902&format=json"]);
+      expect(parseWatchbaseCursor(batches.at(-1)!.cursor), brands).toEqual({ synced: [[902, TODAY]], pass: null });
+    }
+  });
+
+  it("matches a brand name in full, and skips list entries whose id doesn't read", async () => {
+    const x80 = "x".repeat(80);
+    const brands = [
+      { id: 911, name: "x".repeat(81) },
+      { id: 912, name: x80 },
+      { id: "x", name: "Dup" } as never,
+      { id: 913, name: "Dup" },
+    ];
+    const mock = watchbaseDocMock(store({ brands }));
+    await sync(connector(mock, { brands: `${x80}, Dup` }));
+    expect(paths(mock).filter((p) => p.startsWith("/v1/watches"))).toEqual(["/v1/watches?brand-id=912&format=json", "/v1/watches?brand-id=913&format=json"]);
+    const longer = watchbaseDocMock(store({ brands: [{ id: 911, name: "x".repeat(81) }] }));
+    expect(await failure(sync(connector(longer, { brands: x80 })))).toEqual(new WatchbaseConfigError(`WATCHBASE_BRANDS names a brand WatchBase doesn't list: ${x80}`));
   });
 
   it("reads at most WATCHBASE_MAX_WATCHES a sync, and the next sync goes on from there", async () => {
@@ -617,6 +703,18 @@ describe("WatchBase connector", () => {
     expect((await sync(connector(watchbaseDocMock(store()), { maxWatches: 24 }))).map((b) => b.events.length)).toEqual([24]);
     expect((await sync(connector(watchbaseDocMock(store()))))).toHaveLength(3);
     expect(WATCHBASE_DEFAULT_MAX_WATCHES).toBe(200);
+    // Unset, the cap is 200 watches.
+    watchbaseWatch.reset();
+    const big = await sync(connector(watchbaseDocMock({ apiKey: KEY, watches: watchbaseWatch.many(201) }), { brands: "901" }));
+    expect(eventsOf(big)).toHaveLength(200);
+    expect(parseWatchbaseCursor(big.at(-1)!.cursor)!.pass).toEqual({ started: TODAY, brand: 901, after: 5200 });
+    // 26 watches: the first batch leaves one, so the brand is still open.
+    watchbaseWatch.reset();
+    const odd = await sync(connector(watchbaseDocMock({ apiKey: KEY, watches: watchbaseWatch.many(26) }), { brands: "901" }));
+    expect(odd.map((b) => [b.events.length, parseWatchbaseCursor(b.cursor)!.pass])).toEqual([
+      [25, { started: TODAY, brand: 901, after: 5025 }],
+      [1, null],
+    ]);
   });
 
   it("closes a pass with nothing left to read, and goes on past a brand no longer followed", async () => {
@@ -634,6 +732,36 @@ describe("WatchBase connector", () => {
     const window = watchbaseDocMock(store());
     await sync(connector(window, { brands: "902" }), { synced: [[902, "2026-01-05"]], pass: { started: "2026-11-10", brand: 902, after: 6001 } });
     expect(paths(window)).toEqual(["/v1/watches?brand-id=902&updated-since=2026-01-04&format=json", "/v1/watch?id=6002&format=json", "/v1/watch?id=6003&format=json"]);
+    // A pass that stopped in a brand no longer followed, with every brand left read that day, closes without reading.
+    const done = watchbaseDocMock(store());
+    const closed = await sync(connector(done, { brands: "902" }), { synced: [[902, "2026-11-10"]], pass: { started: "2026-11-10", brand: 905, after: 3 } });
+    expect(closed).toEqual([{ events: [], cursor: JSON.stringify({ synced: [[902, "2026-11-10"]], pass: null }) }]);
+    expect(done.reads).toEqual([]);
+    // A pass that stopped in a later brand reads a brand listed before it from the start; finishing that brand
+    // ends the place it had, so the later brand is read in full again (its repeats are duplicates).
+    const order = watchbaseDocMock(store());
+    await sync(connector(order, { brands: "901, 902" }), { synced: [], pass: { started: TODAY, brand: 902, after: 6002 } });
+    expect(paths(order).filter((p) => p.startsWith("/v1/watch?"))).toEqual([...Array.from({ length: 30 }, (_, i) => `/v1/watch?id=${5001 + i}&format=json`), ...[6001, 6002, 6003].map((id) => `/v1/watch?id=${id}&format=json`)]);
+    // A checkpoint that marks a brand read on the pass's day but stopped inside it goes on inside it, and stays open until it is done.
+    const inside = { synced: [[902, "2026-01-05"]], pass: { started: "2026-01-05", brand: 902, after: 6001 } } satisfies WatchbaseCursor;
+    const one = await sync(connector(watchbaseDocMock(store()), { brands: "902", maxWatches: 1 }), inside);
+    expect(eventsOf(one).map((e) => e.payload.watchId)).toEqual(["watchbase:watch:6002"]);
+    expect(parseWatchbaseCursor(one.at(-1)!.cursor)).toEqual({ synced: [[902, "2026-01-05"]], pass: { started: "2026-01-05", brand: 902, after: 6002 } });
+    const rest = await sync(connector(watchbaseDocMock(store()), { brands: "902" }), inside);
+    expect(eventsOf(rest).map((e) => e.payload.watchId)).toEqual(["watchbase:watch:6002", "watchbase:watch:6003"]);
+    expect(parseWatchbaseCursor(rest.at(-1)!.cursor)).toEqual({ synced: [[902, "2026-01-05"]], pass: null });
+    // A brand read on an earlier day keeps the pass open until it is read again.
+    const twoQuiet = await sync(connector(watchbaseDocMock(store()), { brands: "901, 902" }), { synced: [[901, "2026-11-01"], [902, "2026-11-01"]], pass: null });
+    expect(twoQuiet.map((b) => parseWatchbaseCursor(b.cursor))).toEqual([
+      { synced: [[901, TODAY], [902, "2026-11-01"]], pass: { started: TODAY, brand: null, after: 0 } },
+      { synced: [[901, TODAY], [902, TODAY]], pass: null },
+    ]);
+    // The window starts the day before, across a month and a year.
+    for (const [day, before] of [["2026-03-01", "2026-02-28"], ["2027-01-01", "2026-12-31"]]) {
+      const edge = watchbaseDocMock(store());
+      await sync(connector(edge, { brands: "902" }), { synced: [[902, day!]], pass: null });
+      expect(paths(edge)[0]).toBe(`/v1/watches?brand-id=902&updated-since=${before}&format=json`);
+    }
     // A brand with nothing changed still gets the day it was read.
     const quiet = watchbaseDocMock(store());
     const none = await sync(connector(quiet, { brands: "902" }), { synced: [[902, "2026-11-01"]], pass: null });
@@ -658,6 +786,15 @@ describe("WatchBase connector", () => {
     expect((batches[0]!.events as WatchbaseEvent[]).slice(0, 2).map((e) => e.payload.problems)).toEqual([["a watch listed for BrandID 901 has no id"], ["a watch listed for BrandID 901 has no id"]]);
     const resumed = await sync(c, batches[0]!.cursor);
     expect(eventsOf(resumed).map((e) => e.payload.watchId)).toEqual(["watchbase:watch:5026", "watchbase:watch:5027"]);
+    // Watches are read in id order, as numbers, and each is stamped when it was read.
+    const asked: number[] = [];
+    let tick = 0;
+    const clock = () => new Date(Date.parse("2026-11-11T15:30:00.000Z") + 1000 * tick++);
+    const watchOf = (id: number) => ({ wb: { id, modified: "2026-05-05" }, reference_number: `R${id}`, brand: { id: 901, name: "B" } });
+    const ordered = watchbaseConnector({ apiKey: KEY, brands: "901", now: clock, client: { brands: async () => [], watches: async () => [{ id: 100 }, { id: 9 }, { id: 10 }], watch: async (id) => (asked.push(id), watchOf(id)) } });
+    const read = eventsOf(await sync(ordered));
+    expect(asked).toEqual([9, 10, 100]);
+    expect(new Set(read.map((e) => e.receivedAt)).size).toBe(3);
     // A brand whose list holds only entries without ids gives them, and is read.
     const onlyBad = watchbaseConnector({ apiKey: KEY, brands: "901", now: NOW, client: { ...scriptedClient, watches: async () => [{ refnr: "x" }] } });
     const lone = await sync(onlyBad);

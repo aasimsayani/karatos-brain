@@ -43,7 +43,8 @@ const COUNT = /^(0|[1-9][0-9]{0,2})$/;
 
 const short = (value: unknown) => createHash("sha256").update(JSON.stringify(value)).digest("hex").slice(0, 12);
 const digest = (value: unknown) => createHash("sha256").update(JSON.stringify(value)).digest("hex").slice(0, 16);
-const obj = (v: unknown) => (typeof v === "object" && v !== null && !Array.isArray(v) ? (v as Record<string, unknown>) : {});
+/** An array reads as an object with none of the fields asked for, so it needs no case of its own. */
+const obj = (v: unknown) => (typeof v === "object" && v !== null ? (v as Record<string, unknown>) : {});
 const defined = (fields: Record<string, unknown>) => Object.fromEntries(Object.entries(fields).filter(([, v]) => v !== undefined));
 /** Fields kept, or undefined when none read. */
 const group = (fields: Record<string, unknown>) => {

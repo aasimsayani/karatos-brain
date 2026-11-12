@@ -37,7 +37,6 @@ export const WATCHBASE_DEFAULT_MAX_WATCHES = 200;
 export const WATCHBASE_MAX_WATCHES_LIMIT = 10_000;
 /** Watches read per batch. */
 export const WATCHBASE_BATCH_SIZE = 25;
-const DAY_MS = 86_400_000;
 
 /** A brand the store follows: a BrandID, or a name to look up. */
 export type WatchbaseBrand = { id: number } | { name: string };
@@ -86,7 +85,8 @@ export function parseWatchbaseBrands(raw: string): WatchbaseBrand[] {
       if (t.length > 80 || /[\u0000-\u001f\u007f]/.test(t)) throw new WatchbaseConfigError("WATCHBASE_BRANDS has a brand name that isn't plain text up to 80 characters");
       brand = { name: t };
     }
-    const k = "id" in brand ? `#${brand.id}` : brand.name.toLowerCase();
+    // A name is never all digits (that reads as a BrandID), so an id and a name never share a key.
+    const k = "id" in brand ? String(brand.id) : brand.name.toLowerCase();
     if (seen.has(k)) continue;
     seen.add(k);
     out.push(brand);
@@ -106,7 +106,8 @@ export function parseWatchbaseMaxWatches(raw: string | undefined): number {
 }
 
 const MESSAGE = "WatchBase checkpoint is not in the expected shape";
-const keysAre = (r: Record<string, unknown>, keys: string) => Object.keys(r).sort().join(",") === keys;
+/** Whether a value is an object with exactly these keys. An array or a primitive has none of them. */
+const keysAre = (r: unknown, keys: string): r is Record<string, unknown> => r != null && Object.keys(r).sort().join(",") === keys;
 const isAfter = (v: unknown): v is number => v === 0 || isWatchbaseId(v);
 
 export function parseWatchbaseCursor(raw: string | null): WatchbaseCursor | null {
@@ -117,9 +118,8 @@ export function parseWatchbaseCursor(raw: string | null): WatchbaseCursor | null
   } catch {
     throw new Error(MESSAGE);
   }
-  if (typeof c !== "object" || c === null || Array.isArray(c)) throw new Error(MESSAGE);
-  const r = c as Record<string, unknown>;
-  if (!keysAre(r, "pass,synced")) throw new Error(MESSAGE);
+  if (!keysAre(c, "pass,synced")) throw new Error(MESSAGE);
+  const r = c;
   const synced = r.synced;
   const okSynced =
     Array.isArray(synced) &&
@@ -129,10 +129,8 @@ export function parseWatchbaseCursor(raw: string | null): WatchbaseCursor | null
   if (!okSynced) throw new Error(MESSAGE);
   let pass: WatchbasePass | null = null;
   if (r.pass !== null) {
-    const p = r.pass as Record<string, unknown>;
+    const p = r.pass;
     const ok =
-      typeof p === "object" &&
-      !Array.isArray(p) &&
       keysAre(p, "after,brand,started") &&
       isWatchbaseDay(p.started) &&
       (p.brand === null ? p.after === 0 : isWatchbaseId(p.brand) && isAfter(p.after));
@@ -142,7 +140,10 @@ export function parseWatchbaseCursor(raw: string | null): WatchbaseCursor | null
   return { synced: synced as [number, string][], pass };
 }
 
-const dayBefore = (day: string) => new Date(Date.parse(`${day}T00:00:00Z`) - DAY_MS).toISOString().slice(0, 10);
+const dayBefore = (day: string) => {
+  const [y, m, d] = day.split("-").map(Number);
+  return new Date(Date.UTC(y!, m! - 1, d! - 1)).toISOString().slice(0, 10);
+};
 
 export function watchbaseConnector(options: WatchbaseOptions): Connector {
   const wanted = parseWatchbaseBrands(options.brands);
@@ -159,7 +160,8 @@ export function watchbaseConnector(options: WatchbaseOptions): Connector {
       for (const b of await client.brands()) {
         const row = (b ?? {}) as Record<string, unknown>;
         const id = watchbaseId(row.id);
-        const name = watchbaseText(row.name, 80);
+        // Cut only past 120: a wanted name is at most 80 characters, so a longer one never matches by its first 80.
+        const name = watchbaseText(row.name);
         if (id !== undefined && name !== undefined && !byName.has(name.toLowerCase())) byName.set(name.toLowerCase(), id);
       }
     }

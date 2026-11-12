@@ -8,7 +8,7 @@ import { WHATNOT_USER_AGENT } from "../whatnot/client.js";
  *
  * WatchBase takes its API key as the `key` parameter. So a request URL is
  * never put in an error, a log or a thrown error's cause, and any text
- * WatchBase sends back has the key, any `key=` pair and any URL masked
+ * WatchBase sends back has the key, any `key=` pair (`apikey=` too) and any URL masked
  * before it is quoted.
  *
  * Each watch read (`/v1/watch`) is charged in DataFeed credits, US$0.25 a
@@ -75,7 +75,8 @@ export interface WatchbaseClient {
 }
 
 /** Whether a value is a whole-number id as WatchBase gives them. */
-export const isWatchbaseId = (v: unknown): v is number => typeof v === "number" && Number.isSafeInteger(v) && ID.test(String(v));
+/** ID allows only 1 to 9 digits, so a fraction, NaN, an infinity or an exponent never passes. */
+export const isWatchbaseId = (v: unknown): v is number => typeof v === "number" && ID.test(String(v));
 
 /** Whether a string names a real day as YYYY-MM-DD (so 2026-02-30 is turned down). */
 export const isWatchbaseDay = (v: unknown): v is string => {
@@ -128,7 +129,7 @@ export function watchbaseClient(options: WatchbaseClientOptions): WatchbaseClien
       .split(key)
       .join("[key]")
       .replace(/https?:\/\/\S+/gi, "[url]")
-      .replace(/\bkey\s*=\s*["']?[^&\s"']*["']?/gi, "key=[key]")
+      .replace(/key\s*=\s*["']?[^&\s"']*["']?/gi, "key=[key]")
       .replace(/\s+/g, " ")
       .trim()
       .slice(0, 200);
