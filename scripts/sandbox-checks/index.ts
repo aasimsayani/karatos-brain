@@ -26,6 +26,7 @@ import hubspot from "./hubspot.js";
 import klaviyo from "./klaviyo.js";
 import lightspeed from "./lightspeed.js";
 import mailchimp from "./mailchimp.js";
+import meta from "./meta.js";
 import meta_ads from "./meta_ads.js";
 import metals_api from "./metals_api.js";
 import microsoft_onedrive from "./microsoft_onedrive.js";
@@ -51,4 +52,4 @@ import xero from "./xero.js";
 import yext from "./yext.js";
 
 /** Every connector's nightly sandbox check. */
-export const SANDBOX_CHECKS: SandboxCheck[] = [affirm, airtable, amazon, asana, aurora_payments, authorize_net, avalara, bigcommerce, bill_com, calendly, clover, custom_forms, docusign, dropbox, ebay, fedex, gia, gmail, google_ads, google_analytics, google_workspace, gusto, hubspot, klaviyo, lightspeed, mailchimp, meta_ads, metals_api, microsoft_onedrive, monday, notion, pinterest, plaid, quickbooks, ramp, shopify, slack, sola_payments, square, stripe, tiktok, tiktok_ads, trello, twilio, ups, wix, woocommerce, xero, yext];
+export const SANDBOX_CHECKS: SandboxCheck[] = [affirm, airtable, amazon, asana, aurora_payments, authorize_net, avalara, bigcommerce, bill_com, calendly, clover, custom_forms, docusign, dropbox, ebay, fedex, gia, gmail, google_ads, google_analytics, google_workspace, gusto, hubspot, klaviyo, lightspeed, mailchimp, meta, meta_ads, metals_api, microsoft_onedrive, monday, notion, pinterest, plaid, quickbooks, ramp, shopify, slack, sola_payments, square, stripe, tiktok, tiktok_ads, trello, twilio, ups, wix, woocommerce, xero, yext];
