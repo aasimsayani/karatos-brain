@@ -100,7 +100,8 @@ export function jmShippingBase(raw: string | undefined): string {
   } catch {
     throw problem;
   }
-  const host = url.hostname.toLowerCase();
+  // URL lowercases the host already.
+  const host = url.hostname;
   const onJm = host === "transguardian.com" || host.endsWith(".transguardian.com");
   if (url.protocol !== "https:" || !onJm || url.username || url.password || url.search || url.hash || (url.pathname !== "/" && url.pathname !== "")) throw problem;
   return url.origin;
@@ -132,7 +133,8 @@ export function jmShippingClient(options: JmShippingClientOptions): JmShippingCl
   const key = options.apiKey?.trim() ?? "";
   if (!GUID.test(key)) throw new JmShippingConfigError("set JM_SHIPPING_API_KEY to the key JM issued the store, a GUID such as 00000000-0000-0000-0000-000000000000");
   const password = options.password?.trim() ?? "";
-  if (password.length === 0 || password.length > PASSWORD_MAX || !/^[ -~]+$/.test(password)) {
+  // The pattern needs one character at least, so an empty password fails it.
+  if (password.length > PASSWORD_MAX || !/^[ -~]+$/.test(password)) {
     throw new JmShippingConfigError(`set JM_SHIPPING_PASSWORD to the password JM issued with the key: 1 to ${PASSWORD_MAX} printable ASCII characters`);
   }
   const clientId = options.clientId?.trim() ?? "";

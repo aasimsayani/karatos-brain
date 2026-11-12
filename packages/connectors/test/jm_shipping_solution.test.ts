@@ -403,6 +403,60 @@ describe("JM Shipping Solution client", () => {
     expect(await claimOf(client(scripted(json(200, {})).fetch))).toEqual({});
   });
 
+  it("reads only plain days and GUID strings, and keeps credentials and paths to JM's form", async () => {
+    // An extended year round-trips through Date, so only the pattern turns it down.
+    expect(isJmShippingDay("+012345-01")).toBe(false);
+    expect(isJmShippingDay("2026-11-01")).toBe(true);
+    expect(isJmShippingGid([gid(1)])).toBe(false);
+    expect(isJmShippingGid(gid(1))).toBe(true);
+    const message = new JmShippingConfigError("JM_SHIPPING_API_BASE must be the https address of a JM Shipping Solution host on transguardian.com, such as https://uat2.transguardian.com, with no path");
+    for (const bad of ["https://api.transguardian.com.example.test", "https://:pw@uat2.transguardian.com"]) expect(thrown(() => jmShippingBase(bad)), bad).toEqual(message);
+    expect(jmShippingBase("https://api.transguardian.com")).toBe("https://api.transguardian.com");
+    // Standard base64, which writes + and / where base64url writes - and _.
+    const password = ">>>?";
+    const { fetch, sent } = scripted(LIST);
+    await client(fetch, [], { password }).shipmentGids("2026-11-01", "2026-11-02");
+    const basic = `Basic ${Buffer.from(`${KEY}:${password}`).toString("base64")}`;
+    expect(basic).toContain("+");
+    expect(sent[0]!.headers.authorization).toBe(basic);
+  });
+
+  it("waits a second when Retry-After isn't a whole number of seconds", async () => {
+    for (const after of ["2.5", "10s"]) {
+      const slept: number[] = [];
+      const { fetch } = scripted(json(429, {}, { "retry-after": after }), LIST);
+      await client(fetch, slept).shipmentGids("2026-11-01", "2026-11-02");
+      expect(slept, after).toEqual([1000]);
+    }
+    const slept: number[] = [];
+    const { fetch } = scripted(json(429, {}, { "retry-after": "2" }), LIST);
+    await client(fetch, slept).shipmentGids("2026-11-01", "2026-11-02");
+    expect(slept).toEqual([2000]);
+  });
+
+  it("gives JM's Message before its ErrorMessage, skips a blank one, and masks the credentials before cutting the text", async () => {
+    const said = async (body: unknown) => (await failure(client(scripted(json(409, body)).fetch).shipments([gid(1)])))?.message;
+    expect(await said({ Message: "first", ErrorMessage: "second" })).toBe("JM Shipping Solution answered HTTP 409 for the shipments: first");
+    expect(await said({ Message: "  ", ErrorMessage: "second" })).toBe("JM Shipping Solution answered HTTP 409 for the shipments: second");
+    expect(await said({ Message: "", Error: [{ ErrorMessage: "third" }] })).toBe("JM Shipping Solution answered HTTP 409 for the shipments: third");
+    const cut = await said({ Message: `${"z".repeat(190)} ${KEY}` });
+    expect(cut).toBe(`JM Shipping Solution answered HTTP 409 for the shipments: ${"z".repeat(190)} ***`);
+    expect(cut).not.toContain(KEY.slice(0, 8));
+  });
+
+  it("gives null only for a claim JM answers 404, takes only a 200, and turns down a shipment list with a single error", async () => {
+    const claimOf = (answer: () => Response) => failure(client(scripted(answer).fetch, [], { retries: 0 }).claim(gid(1)));
+    expect(await claimOf(json(410, {}))).toEqual(new JmShippingApiError("JM Shipping Solution answered HTTP 410 for the claim", 410));
+    expect(await claimOf(json(500, {}))).toEqual(new JmShippingApiError("JM Shipping Solution answered HTTP 500 for the claim", 500));
+    expect(await claimOf(json(404, {}))).toBeNull();
+    for (const status of [201, 204]) {
+      const error = await failure(client(scripted(() => new Response(status === 204 ? null : "[]", { status })).fetch).shipments([gid(1)]));
+      expect(error, String(status)).toEqual(new JmShippingApiError(`JM Shipping Solution answered HTTP ${status} for the shipments`, status));
+    }
+    const one = await failure(client(scripted(json(200, { Error: [{ ErrorMessage: "Bad range" }], ShipmentGids: [] })).fetch).shipmentGids("2026-11-01", "2026-11-02"));
+    expect(one).toEqual(new JmShippingApiError("JM Shipping Solution answered the shipment list with an error: Bad range", 200));
+  });
+
   it("reads JM's error lists", () => {
     expect(jmShippingErrors(null)).toEqual([]);
     expect(jmShippingErrors({ ErrorCode: "1" })).toEqual([]);
@@ -577,6 +631,23 @@ describe("JM Shipping Solution shipment events", () => {
     expect(of({ ToAddress: { State: "N" } })).not.toHaveProperty("destinationState");
   });
 
+  it("prefers the shipment's own GUID, the purchase's tracking number and the purchase time, and reads a void by either field", () => {
+    const of = (fields: Record<string, unknown>, outer: Record<string, unknown> = {}) => jmShipmentEvent(shipment(1, fields, outer), RECEIVED);
+    expect(of({}, { Purchase: { Gid: gid(2), TrackingNumber: "JMTEST222222" } }).event.payload).toMatchObject({ shipmentId: ref(1), trackingNumber: "JMTEST222222" });
+    expect(of({ Gid: null }, { Purchase: { Gid: gid(2) } }).event.payload).toMatchObject({ shipmentId: ref(2), trackingNumber: "JMTEST000001" });
+    expect(of({ VoidedOn: "2026-10-02T12:00:00Z", VoidId: 0 }).event.payload).toMatchObject({ voided: true, status: "cancelled" });
+    for (const v of [-1, "5", 1.5]) expect(of({ VoidId: v }).event.payload, String(v)).toMatchObject({ voided: false, status: "label_purchased" });
+    expect(of({ TransactionTime: "2026-10-01T15:00:00Z", ShipDate: "2026-10-03T00:00:00Z" }).event.occurredAt).toBe("2026-10-01T15:00:00.000Z");
+    expect(of({ DeclaredValue: 1, InvoiceValue: null }, { Rates: [] }).event.payload).toMatchObject({ insuredCents: 100, currency: "USD" });
+    const country = of({ ToAddress: { State: "NY", CountryCode: "C" } }).event.payload;
+    expect(country).toMatchObject({ destinationState: "NY" });
+    expect(country).not.toHaveProperty("destinationCountry");
+    expect(of({ ToAddress: { CountryCode: "USA" } }).event.payload).not.toHaveProperty("destinationCountry");
+    expect(of({ ToAddress: { CountryCode: "us" } }).event.payload).toMatchObject({ destinationCountry: "US" });
+    const unset = of({ IsReturnShipment: undefined, IsHoldForPickup: undefined, ApprovalRequired: undefined, IsReconciled: undefined }).event.payload;
+    expect(unset).toMatchObject({ isReturn: false, holdForPickup: false, approvalRequired: false, reconciled: false });
+  });
+
   it("reads ids, times, money, tracking numbers and references at their edges", () => {
     expect(jmShippingGid(gid(1).toUpperCase())).toBe(gid(1));
     expect(jmShippingGid("x")).toBeUndefined();
@@ -586,10 +657,16 @@ describe("JM Shipping Solution shipment events", () => {
     expect(jmShippingTime("2026-10-01T15:00Z")).toBe("2026-10-01T15:00:00.000Z");
     expect(jmShippingTime("2026-10-01T15:00:00.1234567+05:30")).toBe("2026-10-01T09:30:00.123Z");
     expect(jmShippingTime("2000-01-01T00:00:00Z")).toBe("2000-01-01T00:00:00.000Z");
+    expect(jmShippingTime("2026-10-01T15:00:00-05:00")).toBe("2026-10-01T20:00:00.000Z");
+    expect(jmShippingTime("2026-10-01T15:00:00+0530")).toBeUndefined();
     for (const v of ["1999-12-31T23:59:59Z", "0001-01-01T00:00:00Z", "2026-10-01T15:00:00", "2026-10-01", "2026-13-01T00:00:00Z", "", null, 1_700_000_000]) expect(jmShippingTime(v), String(v)).toBeUndefined();
     expect(jmShippingCents(0)).toBe(0);
     expect(jmShippingCents(42.5)).toBe(4250);
     expect(jmShippingCents(0.1 + 0.2)).toBe(30);
+    // 0.29 * 100 is just under 29, so it is rounded, not cut.
+    expect(jmShippingCents(0.29)).toBe(29);
+    expect(jmShippingSignedCents(0.29)).toBe(29);
+    expect(jmShippingSignedCents(-0.29)).toBe(-29);
     expect(jmShippingCents(1e9)).toBe(1e11);
     for (const v of [-0.01, 1e9 + 1, Number.NaN, Number.POSITIVE_INFINITY, "5", null]) expect(jmShippingCents(v), String(v)).toBeUndefined();
     expect(jmShippingSignedCents(-3)).toBe(-300);
@@ -748,6 +825,7 @@ describe("JM Shipping Solution claim events", () => {
     const of = (fields: Record<string, unknown>) => jmClaimEvent({ Claim: claim(2, fields) }, factsOf(2), RECEIVED)!;
     expect([...JM_CLAIM_STATUSES.keys()]).toEqual([2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]);
     for (const [n, name] of JM_CLAIM_STATUSES) expect(of({ Status: n }).event.payload.status, String(n)).toBe(name);
+    expect([...JM_CLAIM_STATUSES.values()]).toEqual(["no_claim", "not_submitted", "submitted", "acknowledged", "need_shipper_info", "need_recipient_info", "need_carrier_info", "with_underwriter", "investigating", "approved", "paid", "withdrawn", "denied", "npol_pending", "archived"]);
     expect(JM_CLAIM_STATUSES.get(12)).toBe("paid");
     expect(JM_CLAIM_STATUSES.get(14)).toBe("denied");
     for (const s of [0, 1, 17, "4", null]) {
@@ -779,6 +857,11 @@ describe("JM Shipping Solution claim events", () => {
     expect(of({ CarrierClaimNumber: "  " }).payload.carrierClaimFiled).toBe(false);
     expect(of({ CarrierClaimNumber: null }).payload.carrierClaimFiled).toBe(false);
     expect(of({ PostagePurchased: false }).payload.postagePurchased).toBe(false);
+    expect(of({ PostagePurchased: null }).payload.postagePurchased).toBe(false);
+    expect(of({ CarrierLiability: -5 }).payload).not.toHaveProperty("carrierLiabilityCents");
+    expect(of({ CarrierLiability: 5 }).payload.carrierLiabilityCents).toBe(500);
+    // The claim's own tracking number comes before the shipment's.
+    expect(of({ TrackingNumber: "jmtest555555" }).payload.trackingNumber).toBe("JMTEST555555");
     for (const v of [0, -1, 1.5, "1"]) expect(of({ PackageCount: v }).payload, String(v)).not.toHaveProperty("packages");
     expect(of({ PackageCount: 3 }).payload.packages).toBe(3);
     expect(of({ TrackingNumber: null }).payload.trackingNumber).toBe("JMTEST000002");
@@ -1076,6 +1159,35 @@ describe("JM Shipping Solution connector", () => {
     expect(slept).toEqual([1000, 2000]);
   });
 
+  it("counts 60 days back from midnight exactly, stamps each event with when it was read, and dead-letters tracking that doesn't read", async () => {
+    const midnight = jmShippingDocMock(store());
+    await sync(connector(midnight, { now: () => new Date("2026-11-12T00:00:00.000Z") }));
+    expect(midnight.reads[0]).toBe(`${API}/shipment/list/4321/2026-09-13/2026-09-20`);
+    const batches = await sync(connector(jmShippingDocMock(store())));
+    expect(eventsOf(batches).length).toBeGreaterThan(0);
+    for (const e of eventsOf(batches)) expect(e.receivedAt).toBe(RECEIVED);
+    const bad = jmShippingDocMock(store({ shipments: [shipment(1)], tracking: [tracking(1, { Activities: [{ tgActivityCode: 999, activityDateTime: "2026-10-02T00:00:00Z" }] })], claims: [], reconciled: [] }));
+    const { memory, pipeline } = testPipeline();
+    expect(await runSync({ connector: connector(bad), mode: "incremental", pipeline, memory, organizationId: TEST_ORG })).toMatchObject({ ingested: 1, deadLettered: 1 });
+  });
+
+  it("walks the same UTC weeks whatever the machine's time zone", async () => {
+    const tz = process.env.TZ;
+    process.env.TZ = "Pacific/Kiritimati";
+    try {
+      const mock = jmShippingDocMock(store());
+      const batches = await sync(connector(mock), { done: false, next: "2026-11-05", end: "2026-11-13" });
+      expect(batches.map((b) => parseJmShippingCursor(b.cursor))).toEqual([
+        { done: false, next: "2026-11-12", end: "2026-11-13" },
+        { done: true, next: null, end: null },
+      ]);
+      expect(mock.reads[0]).toBe(`${API}/shipment/list/4321/2026-11-05/2026-11-12`);
+    } finally {
+      if (tz === undefined) delete process.env.TZ;
+      else process.env.TZ = tz;
+    }
+  });
+
   it("declares buying labels, cancelling, claims and disputes behind the write gate, and turns each down", async () => {
     const c = connector(jmShippingDocMock(store()));
     expect(c.source).toBe("jm_shipping_solution");
@@ -1193,6 +1305,9 @@ describe("JM Shipping Solution doc mock", () => {
     const missing = await get(mock, `/claim/${gid(99)}`);
     expect(missing.status).toBe(404);
     expect(await missing.json()).toEqual({ Message: "Claim not found" });
+    // Only reads answered 200 are recorded.
+    expect(mock.reads).not.toContain(`${API}/claim/${gid(99)}`);
+    expect(mock.reads).toHaveLength(3);
   });
 
   it("turns down requests the docs don't document", async () => {

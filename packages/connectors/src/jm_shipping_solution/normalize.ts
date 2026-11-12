@@ -217,14 +217,14 @@ export function jmShippingTime(value: unknown): string | undefined {
   return Number.isNaN(ms) || ms < EARLIEST ? undefined : new Date(ms).toISOString();
 }
 
-/** A dollar amount from 0 to a billion as whole cents, or undefined. */
+/** A dollar amount from 0 to a billion as whole cents, or undefined. NaN and infinities fail the range check. */
 export function jmShippingCents(value: unknown): number | undefined {
-  return typeof value === "number" && Number.isFinite(value) && value >= 0 && value <= MAX_DOLLARS ? Math.round(value * 100) : undefined;
+  return typeof value === "number" && value >= 0 && value <= MAX_DOLLARS ? Math.round(value * 100) : undefined;
 }
 
 /** A dollar amount that may be below zero, such as an adjustment, as whole cents, or undefined. */
 export function jmShippingSignedCents(value: unknown): number | undefined {
-  return typeof value === "number" && Number.isFinite(value) && Math.abs(value) <= MAX_DOLLARS ? Math.round(value * 100) : undefined;
+  return typeof value === "number" && Math.abs(value) <= MAX_DOLLARS ? Math.round(value * 100) : undefined;
 }
 
 /** A carrier tracking number: 8 to 40 letters and digits, uppercased. */
@@ -247,7 +247,7 @@ export function jmShippingOne(map: Map<number, string>, value: unknown): string 
 
 /** A positive weight in ounces, to two places. */
 function ounces(value: unknown): number | undefined {
-  return typeof value === "number" && Number.isFinite(value) && value > 0 && value <= 1e6 ? Math.round(value * 100) / 100 : undefined;
+  return typeof value === "number" && value > 0 && value <= 1e6 ? Math.round(value * 100) / 100 : undefined;
 }
 
 function read(kind: string, type: string, raw: unknown, problems: string[], key: string, payload: Record<string, unknown>, occurredAt: string | undefined, receivedAt: string): JmShippingRead {

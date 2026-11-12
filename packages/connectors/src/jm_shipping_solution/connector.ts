@@ -70,8 +70,8 @@ export function parseJmShippingCursor(raw: string | null): JmShippingCursor | nu
   } catch {
     throw new Error(MESSAGE);
   }
-  if (typeof c !== "object" || c === null || Array.isArray(c)) throw new Error(MESSAGE);
-  const r = c as Record<string, unknown>;
+  // Anything but an object with exactly these keys fails the key check: null reads as {}, and a list, string or number has none of them.
+  const r = Object(c) as Record<string, unknown>;
   if (Object.keys(r).sort().join(",") !== "done,end,next") throw new Error(MESSAGE);
   const doneOk = r.done === true && r.next === null && r.end === null;
   const openOk = r.done === false && isJmShippingDay(r.next) && isJmShippingDay(r.end) && r.next < r.end;
@@ -114,7 +114,8 @@ export function jmShippingConnector(options: JmShippingOptions): Connector {
     while (!state.done) {
       const from = state.next!;
       const end = state.end!;
-      const to = plus(from, JM_SHIPPING_WINDOW_DAYS) < end ? plus(from, JM_SHIPPING_WINDOW_DAYS) : end;
+      const week = plus(from, JM_SHIPPING_WINDOW_DAYS);
+      const to = week < end ? week : end;
       const receivedAt = now().toISOString();
       const events: JmShippingEvent[] = [];
       const gids: string[] = [];
