@@ -64,7 +64,8 @@ export function parseWatchTraderHubCursor(raw: string | null): WatchTraderHubCur
   } catch {
     throw new Error(MESSAGE);
   }
-  if (typeof c !== "object" || c === null) throw new Error(MESSAGE);
+  // Only null has no keys to read: any other JSON value that isn't the checkpoint fails the key check below.
+  if (c === null) throw new Error(MESSAGE);
   const r = c as Record<string, unknown>;
   if (Object.keys(r).sort().join(",") !== "done,page,since,started,step") throw new Error(MESSAGE);
   const doneOk = r.done === true && r.step === null && r.page === null && isWatchTraderHubSince(r.since) && r.started === null;

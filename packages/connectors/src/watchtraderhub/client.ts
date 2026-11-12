@@ -28,8 +28,8 @@ const KEY = /^wth_[A-Za-z0-9]{32}$/;
 const KEY_RUN = /wth_[A-Za-z0-9]{32}/g;
 /** The docs call cursors opaque and give no length; a cursor is taken as 1 to 2048 visible ASCII characters. */
 const CURSOR = /^[!-~]{1,2048}$/;
-/** An updated_after the connector made: an ISO time in UTC with milliseconds. */
-const SINCE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/;
+/** An updated_after the connector made starts with a four-digit year, not a signed six-digit one; the round trip through Date pins the rest of the shape. */
+const SINCE = /^\d{4}/;
 const CODE = /^[a-z_]{1,64}$/;
 const MAX_WAIT_S = 60;
 const RETRIED = new Set([429, 500, 502, 503, 504]);
@@ -85,14 +85,15 @@ export interface WatchTraderHubClient {
 }
 
 export const isWatchTraderHubCursor = (v: unknown): v is string => typeof v === "string" && CURSOR.test(v);
-export const isWatchTraderHubSince = (v: unknown): v is string => typeof v === "string" && SINCE.test(v) && new Date(v).toISOString() === v;
+/** An ISO time in UTC with milliseconds, as toISOString writes it; a date that doesn't exist, such as month 13, is false rather than a RangeError. */
+export const isWatchTraderHubSince = (v: unknown): v is string => typeof v === "string" && SINCE.test(v) && Number.isFinite(Date.parse(v)) && new Date(v).toISOString() === v;
 
 /** The error's code and message, cut short, with anything shaped like a key hidden. */
 function detail(body: unknown): { code: string | undefined; text: string } {
-  const b = (typeof body === "object" && body !== null ? body : {}) as { error?: unknown };
-  const e = (typeof b.error === "object" && b.error !== null ? b.error : {}) as { code?: unknown; message?: unknown };
-  const code = typeof e.code === "string" && CODE.test(e.code) ? e.code : undefined;
-  const message = typeof e.message === "string" ? e.message.replace(KEY_RUN, "wth_...").slice(0, 200) : "";
+  // The body is parsed JSON or null, and reading a property of any JSON value but null gives undefined.
+  const e = (body as { error?: { code?: unknown; message?: unknown } | null } | null)?.error;
+  const code = typeof e?.code === "string" && CODE.test(e.code) ? e.code : undefined;
+  const message = typeof e?.message === "string" ? e.message.replace(KEY_RUN, "wth_...").slice(0, 200) : "";
   return { code, text: `${code ? ` (${code})` : ""}${message ? `: ${message}` : ""}` };
 }
 
@@ -140,9 +141,8 @@ export function watchTraderHubClient(options: WatchTraderHubClientOptions): Watc
     const reads =
       body?.object === "list" &&
       Array.isArray(data) &&
-      typeof body.has_more === "boolean" &&
       (next === null || isWatchTraderHubCursor(next)) &&
-      // has_more and next_cursor say the same thing, as the pagination page says.
+      // has_more is a boolean that says what next_cursor says, as the pagination page says.
       body.has_more === (next !== null);
     if (!reads) throw new WatchTraderHubApiError(`WatchTraderHub answered the ${what} without a page that reads`, 200);
     if (next !== null && next === after) throw new WatchTraderHubApiError(`WatchTraderHub answered the ${what} with the same cursor again`, 200);
@@ -152,7 +152,7 @@ export function watchTraderHubClient(options: WatchTraderHubClientOptions): Watc
   return {
     me: async () => {
       const body = (await get("/me", "integration", null)) as Record<string, unknown> | null;
-      if (body === null || typeof body !== "object" || Array.isArray(body) || body.object !== "integration") throw new WatchTraderHubApiError("WatchTraderHub answered the integration without one that reads", 200);
+      if (body?.object !== "integration") throw new WatchTraderHubApiError("WatchTraderHub answered the integration without one that reads", 200);
       return body;
     },
     listings: (request) => list("/listings", "listings", request),

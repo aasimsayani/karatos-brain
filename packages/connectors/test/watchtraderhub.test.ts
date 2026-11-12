@@ -50,6 +50,7 @@ import {
 // Key-shaped test values, assembled at runtime so no scanner mistakes the source for a leak.
 const KEY = ["wth", "a".repeat(32)].join("_");
 const OTHER_KEY = ["wth", "b".repeat(32)].join("_");
+const MIXED_KEY = ["wth", `${"Ab3".repeat(10)}Zz`].join("_");
 const BEARER = `Bearer ${KEY}`;
 const NOW = () => new Date("2026-11-11T15:00:00.000Z");
 const RECEIVED = "2026-11-11T15:00:00.000Z";
@@ -154,7 +155,7 @@ describe("WatchTraderHub client", () => {
     for (const after of ["", "c".repeat(2049), "a b", "é", 5 as unknown as string]) {
       await expect(c.listings({ after, updatedAfter: null }), String(after).slice(0, 5)).rejects.toThrow(new WatchTraderHubApiError("a cursor for the listings must be 1 to 2048 visible characters", 0));
     }
-    for (const updatedAfter of ["2026-11-01T00:00:00Z", "2026-11-01T00:00:00.000+00:00", "2026-02-30T00:00:00.000Z", "2026-11-01", "x", 5 as unknown as string]) {
+    for (const updatedAfter of ["", "2026-11-01T00:00:00Z", "2026-11-01T00:00:00.000+00:00", "2026-02-30T00:00:00.000Z", "2026-13-01T00:00:00.000Z", "+010000-01-01T00:00:00.000Z", "2026-11-01", "x", 5 as unknown as string, Symbol("t") as unknown as string]) {
       await expect(c.orders({ after: null, updatedAfter }), String(updatedAfter)).rejects.toThrow(new WatchTraderHubApiError("updated_after for the orders must be an ISO time in UTC", 0));
     }
     await expect(c.parts({ after: "", updatedAfter: null })).rejects.toThrow("a cursor for the parts must be");
@@ -163,6 +164,8 @@ describe("WatchTraderHub client", () => {
     await c.listings({ after: "!~", updatedAfter: "2026-02-28T23:59:59.999Z" });
     expect(sent).toHaveLength(2);
     expect([isWatchTraderHubCursor("x"), isWatchTraderHubCursor(null), isWatchTraderHubSince("2026-11-01T00:00:00.000Z"), isWatchTraderHubSince(null)]).toEqual([true, false, true, false]);
+    // A month that doesn't exist reads as false, never a RangeError.
+    expect([isWatchTraderHubSince("2026-13-01T00:00:00.000Z"), isWatchTraderHubSince("9999-12-31T23:59:59.999Z"), isWatchTraderHubSince("0000-01-01T00:00:00.000Z")]).toEqual([false, true, true]);
   });
 
   it("explains a key WatchTraderHub turns down, hiding anything shaped like a key", async () => {
@@ -178,6 +181,11 @@ describe("WatchTraderHub client", () => {
     const echoed = await at(json(401, error("malformed_authorization", `Bad header ${KEY} and ${OTHER_KEY}`))).then(() => null, (e: unknown) => e as Error);
     expect(echoed!.message).toBe(`WatchTraderHub turned down the API key (HTTP 401) (malformed_authorization): Bad header wth_... and wth_...; ${must}`);
     expect(echoed!.message).not.toContain(KEY);
+    const mixed = await at(json(401, error("malformed_authorization", `Bad header ${MIXED_KEY}`))).then(() => null, (e: unknown) => e as Error);
+    expect(mixed!.message).toBe(`WatchTraderHub turned down the API key (HTTP 401) (malformed_authorization): Bad header wth_...; ${must}`);
+    // A key that runs past the 200-character cut is hidden before the cut, so no part of it shows.
+    const late = await at(json(401, error("malformed_authorization", `${"d".repeat(180)}${KEY}`))).then(() => null, (e: unknown) => e as Error);
+    expect(late!.message).toBe(`WatchTraderHub turned down the API key (HTTP 401) (malformed_authorization): ${"d".repeat(180)}wth_...; ${must}`);
     // auth_lookup_failed is transient, so it is no config error and the sync retries it.
     await expect(at(json(401, error("auth_lookup_failed", "Try again.")))).rejects.toThrow(new WatchTraderHubApiError("WatchTraderHub answered HTTP 401 for the listings (auth_lookup_failed): Try again.", 401, "auth_lookup_failed"));
     await expect(at(json(401, error("auth_lookup_failed")))).rejects.not.toBeInstanceOf(WatchTraderHubConfigError);
@@ -189,6 +197,9 @@ describe("WatchTraderHub client", () => {
     await expect(at(json(400, error("invalid_cursor", "d".repeat(250))))).rejects.toThrow(new WatchTraderHubApiError(`WatchTraderHub answered HTTP 400 for the orders (invalid_cursor): ${"d".repeat(200)}`, 400, "invalid_cursor"));
     await expect(at(json(404, { error: { code: "Not Found", message: "No." } }))).rejects.toMatchObject({ message: "WatchTraderHub answered HTTP 404 for the orders: No.", code: undefined });
     await expect(at(json(404, { error: { code: "c".repeat(65) } }))).rejects.toMatchObject({ code: undefined });
+    await expect(at(json(400, { error: { code: ["invalid_cursor"], message: "No." } }))).rejects.toMatchObject({ message: "WatchTraderHub answered HTTP 400 for the orders: No.", code: undefined });
+    await expect(at(json(400, { error: "invalid_cursor" }))).rejects.toThrow(/^WatchTraderHub answered HTTP 400 for the orders$/);
+    await expect(at(json(400, { code: "invalid_cursor", message: "Not in error." }))).rejects.toMatchObject({ message: "WatchTraderHub answered HTTP 400 for the orders", code: undefined });
     await expect(at(json(400, { error: { code: "c".repeat(64), message: 5 } }))).rejects.toMatchObject({ message: `WatchTraderHub answered HTTP 400 for the orders (${"c".repeat(64)})`, code: "c".repeat(64) });
     await expect(at(json(500, null))).rejects.toThrow(/^WatchTraderHub answered HTTP 500 for the orders$/);
     await expect(at(json(500, { error: null }))).rejects.toThrow(/^WatchTraderHub answered HTTP 500 for the orders$/);
@@ -220,6 +231,13 @@ describe("WatchTraderHub client", () => {
     expect(await waits({ "retry-after": "60" })).toEqual([60_000]);
     expect(await waits({ "retry-after": "61" })).toEqual([60_000]);
     for (const value of ["0", "-1", "1.5", "soon"]) expect(await waits({ "retry-after": value }), value).toEqual([1000]);
+    // A Retry-After that isn't a whole number is no number of seconds at all: the second wait backs off to 2 seconds.
+    for (const value of ["3.5", "3s"]) {
+      const twice = scripted([json(429, {}), json(429, {}, { "retry-after": value }), empty]);
+      const { c, slept } = client(twice.fetch);
+      await c.listings(first);
+      expect(slept, value).toEqual([1000, 2000]);
+    }
     expect(await waits({})).toEqual([1000]);
     for (const status of [500, 502, 503, 504]) expect(await waits({ "retry-after": "3" }, status), String(status)).toEqual([3000]);
     const { fetch, sent } = scripted([json(503, error("query_failed"))]);
@@ -264,7 +282,7 @@ describe("WatchTraderHub events", () => {
     for (const v of [0, 1, 1200000, 1e15]) expect(watchTraderHubCents(v)).toBe(v);
     for (const v of [-1, 1.5, "100", 1e15 + 1, Number.NaN, Number.POSITIVE_INFINITY, null]) expect(watchTraderHubCents(v), String(v)).toBeUndefined();
     expect(watchTraderHubCurrency("USD")).toBe("USD");
-    for (const v of ["usd", "US", "USDT", 5]) expect(watchTraderHubCurrency(v), String(v)).toBeUndefined();
+    for (const v of ["usd", "US", "USDT", 5, ["USD"]]) expect(watchTraderHubCurrency(v), String(v)).toBeUndefined();
     expect(watchTraderHubPrice({ amount: 1200000, currency: "USD", amount_formatted: "$12,000.00" })).toEqual({ cents: 1200000, currency: "USD" });
     expect(watchTraderHubPrice({ amount: 0, currency: "CHF" })).toEqual({ cents: 0, currency: "CHF" });
     for (const p of [null, [], 5, { amount: "12000.00", currency: "USD" }, { amount: 1, currency: "usd" }, { amount: -1, currency: "USD" }, { amount: 1 }, { currency: "USD" }]) expect(watchTraderHubPrice(p), JSON.stringify(p)).toBeUndefined();
@@ -273,7 +291,8 @@ describe("WatchTraderHub events", () => {
     expect(watchTraderHubTime("2026-05-08T08:41:16.770507+00:00")).toBe("2026-05-08T08:41:16.770Z");
     expect(watchTraderHubTime("2026-05-08T08:41Z")).toBe("2026-05-08T08:41:00.000Z");
     expect(watchTraderHubTime("2026-05-08T10:41:16+02:00")).toBe("2026-05-08T08:41:16.000Z");
-    for (const t of ["2026-05-08", "2026-05-08T08:41:16", "x2026-05-08T08:41:16Z", "2026-13-01T00:00:00Z", null, 5]) expect(watchTraderHubTime(t), String(t)).toBeUndefined();
+    expect(watchTraderHubTime("2026-05-08T04:41:16-04:00")).toBe("2026-05-08T08:41:16.000Z");
+    for (const t of ["2026-05-08", "2026-05-08T08:41:16", "x2026-05-08T08:41:16Z", "+002026-05-08T08:41:16Z", "2026-13-01T00:00:00Z", null, 5]) expect(watchTraderHubTime(t), String(t)).toBeUndefined();
     expect(watchTraderHubSku("  STOCK-1 ", "listing", "id-1")).toBe("STOCK-1");
     expect(watchTraderHubSku("s".repeat(150), "part", "id-1")).toBe("s".repeat(100));
     expect(watchTraderHubSku(" ", "listing", "id-1")).toBe("watchtraderhub-listing-id-1");
@@ -359,7 +378,7 @@ describe("WatchTraderHub events", () => {
     expect(problems(null)).toEqual(["listing is not an object", "listing has no id that reads", "listing has no status that reads"]);
     expect(problems([])).toEqual(["listing is not an object", "listing has no id that reads", "listing has no status that reads"]);
     expect(problems(listing({ id: 5 }))).toEqual(["listing has no id that reads"]);
-    for (const status of ["reserved", "sold_out", "ACTIVE", null, "constructor"]) expect(problems(listing({ status })), String(status)).toEqual(["listing has no status that reads"]);
+    for (const status of ["reserved", "sold_out", "ACTIVE", null, "constructor", ["active"]]) expect(problems(listing({ status })), String(status)).toEqual(["listing has no status that reads"]);
     expect(problems(listing({ status: "sold" }))).toEqual([]);
     const dead = watchTraderHubListingEvents(listing({ status: "x" }), RECEIVED)[0]!.event;
     expect(dead.payload).toEqual({ system: "WatchTraderHub", kind: "listing", problems: ["listing has no status that reads"] });
@@ -388,6 +407,7 @@ describe("WatchTraderHub events", () => {
     expect(JSON.stringify(events)).not.toMatch(/description|Crown"|compatible|ext-part/);
     expect(watchTraderHubPartEvents(part({ status: "sold_out", quantity: 4 }), RECEIVED)[1]!.event.payload.onHand).toBe(0);
     expect(watchTraderHubPartEvents(part({ quantity: 7 }), RECEIVED)[1]!.event.payload.onHand).toBe(7);
+    expect(watchTraderHubPartEvents(part({ part: { name: "n".repeat(250), manufacturer: "m".repeat(150) } }), RECEIVED)[0]!.event.payload).toMatchObject({ title: "n".repeat(200), vendor: "m".repeat(100) });
     expect(watchTraderHubPartEvents(part({ part: null }), RECEIVED)[0]!.event.payload).toMatchObject({ title: `WatchTraderHub part ${PART_1}`, vendor: null, variants: [{ sku: `watchtraderhub-part-${PART_1}` }] });
     const dead = watchTraderHubPartEvents(part({ quantity: null }), RECEIVED)[1]!;
     expect([dead.ok, dead.event.payload.problems]).toEqual([false, ["part has no quantity that reads"]]);
@@ -458,11 +478,11 @@ describe("WatchTraderHub events", () => {
     expect(problems(null)).toEqual(["order is not an object", "order has no id that reads", "order has no status that reads", "order has no currency that reads", "order has no total that reads", "order has no time that reads", "order has no line items that read"]);
     expect(problems([])).toContain("order is not an object");
     expect(problems(order({ id: "" }))).toEqual(["order has no id that reads"]);
-    for (const status of ["fulfilled", "cancelled", "MATCHED", null, "constructor"]) expect(problems(order({ status })), String(status)).toEqual(["order has no status that reads"]);
+    for (const status of ["fulfilled", "cancelled", "MATCHED", null, "constructor", ["matched"]]) expect(problems(order({ status })), String(status)).toEqual(["order has no status that reads"]);
     expect(problems(order({ currency: "usd" }))).toEqual(["order has no currency that reads"]);
     for (const total_amount of [null, -1, 1.5, "1000"]) expect(problems(order({ total_amount })), String(total_amount)).toEqual(["order has no total that reads"]);
     expect(problems(order({ ordered_at: "soon", created_at: null }))).toEqual(["order has no time that reads"]);
-    expect(problems(order({ line_items: null }))).toEqual(["order has no line items that read"]);
+    for (const line_items of [null, {}, "x"]) expect(problems(order({ line_items })), JSON.stringify(line_items)).toEqual(["order has no line items that read"]);
     const dead = watchTraderHubOrderEvents(order({ status: 5 }), RECEIVED)[0]!.event;
     expect(dead).toMatchObject({ type: "order.updated", idempotencyKey: expect.stringMatching(/^watchtraderhub:unreadable_order:[0-9a-f]{12}$/), payload: { system: "WatchTraderHub", kind: "order", problems: ["order has no status that reads"] } });
   });
@@ -488,6 +508,11 @@ describe("WatchTraderHub connector", () => {
     // Newest change first, as the docs say.
     const products = memory.events.filter((e) => e.type === "product.updated").map((e) => e.payload.title);
     expect(products.slice(0, 2)).toEqual([`Test watch ${WATCHTRADERHUB_PAGE_SIZE + 1}`, `Test watch ${WATCHTRADERHUB_PAGE_SIZE}`]);
+    // Each list goes to its own reader: the part reads as a part and the order as an order.
+    const types = memory.events.filter((e) => e.type === "product.updated").map((e) => e.payload.productType);
+    expect([types.filter((t) => t === "watch").length, types.filter((t) => t === "part").length]).toEqual([WATCHTRADERHUB_PAGE_SIZE + 1, 1]);
+    expect(memory.events.find((e) => e.payload.productType === "part")!.payload).toMatchObject({ title: "Test crown 1", vendor: "Testmaker" });
+    expect(memory.events.filter((e) => e.type === "order.updated")).toHaveLength(1);
     assertSynthetic(memory.events.map((e) => e.payload));
     expect(JSON.stringify(memory.events.map((e) => e.payload))).not.toMatch(/buyer|Test Customer|example\.test|description/);
     expect(parseWatchTraderHubCursor(report.cursor)).toEqual({ done: true, step: null, page: null, since: RECEIVED, started: null });
@@ -635,9 +660,12 @@ describe("WatchTraderHub connector", () => {
     ];
     expect(parseWatchTraderHubCursor(null)).toBeNull();
     for (const c of good) expect(parseWatchTraderHubCursor(JSON.stringify(c))).toEqual(c);
+    // The keys may come in any order.
+    expect(parseWatchTraderHubCursor(JSON.stringify({ started: null, since: RECEIVED, page: null, step: null, done: true }))).toEqual(good[3]);
     const open = { done: false, step: "listings", page: null, since: null, started: RECEIVED };
     const done = { done: true, step: null, page: null, since: RECEIVED, started: null };
     const bad: unknown[] = [
+      "",
       "{",
       "null",
       "[]",
@@ -659,6 +687,10 @@ describe("WatchTraderHub connector", () => {
       { ...done, page: "abc" },
       { ...done, since: null },
       { ...done, started: RECEIVED },
+      { ...done, done: false },
+      { ...done, done: "true" },
+      { ...done, since: "2026-13-01T00:00:00.000Z" },
+      { ...open, started: "2026-13-01T00:00:00.000Z" },
       // Another connector's checkpoints.
       { done: true, step: null, page: null },
       { done: false, step: "orders", page: null },
@@ -731,6 +763,9 @@ describe("WatchTraderHub doc mock", () => {
     const one = await body(await get(tied, "/listings", "?limit=1"));
     expect([one.data.map((l) => l.id), one.has_more]).toEqual([["c"], true]);
     expect((await body(await get(tied, "/listings", `?limit=1&after=${one.next_cursor}`))).data.map((l) => l.id)).toEqual(["b"]);
+    // A page that holds exactly the rows left is the last.
+    const whole = await body(await get(tied, "/listings", "?limit=2"));
+    expect([whole.data.length, whole.has_more, whole.next_cursor]).toEqual([2, false, null]);
     expect((await body(await get(mock, "/listings", `?updated_after=${minutes(59 * 60)}`))).data.map((l) => l.title)).toEqual(["Test watch 60"]);
     expect((await body(await get(mock, "/listings", `?updated_after=${minutes(60 * 60)}`))).data).toEqual([]);
     expect((await body(await get(mock, "/parts"))).data).toEqual([]);

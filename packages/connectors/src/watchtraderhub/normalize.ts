@@ -176,7 +176,7 @@ function common(raw: unknown, kind: "listing" | "part", statuses: Set<string>) {
   if (r !== raw) problems.push(`${kind} is not an object`);
   const id = watchTraderHubId(r.id);
   if (!id) problems.push(`${kind} has no id that reads`);
-  const status = typeof r.status === "string" && statuses.has(r.status) ? r.status : undefined;
+  const status = statuses.has(r.status as string) ? (r.status as string) : undefined;
   if (!status) problems.push(`${kind} has no status that reads`);
   const location = watchTraderHubId(obj(r.store_location).id);
   return {
@@ -262,7 +262,7 @@ export function watchTraderHubOrderEvents(raw: unknown, receivedAt: string): Wat
   if (o !== raw) problems.push("order is not an object");
   const id = watchTraderHubId(o.id);
   if (!id) problems.push("order has no id that reads");
-  const rawStatus = typeof o.status === "string" && ORDER_STATUSES.has(o.status) ? o.status : undefined;
+  const rawStatus = ORDER_STATUSES.has(o.status as string) ? (o.status as string) : undefined;
   if (!rawStatus) problems.push("order has no status that reads");
   const currency = watchTraderHubCurrency(o.currency);
   if (!currency) problems.push("order has no currency that reads");
