@@ -385,6 +385,7 @@ export const CONNECTED_ON: Readonly<Record<string, string>> = {
   smile_io: "2026-11-11",
   zendesk: "2026-11-11",
   extend: "2026-11-11",
+  imap_email: "2026-11-11",
   watchtraderhub: "2026-11-11",
   acuity: "2026-11-11",
   nfusion: "2026-11-11",
