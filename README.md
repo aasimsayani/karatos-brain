@@ -259,6 +259,7 @@ The table is generated from the [integration catalog](docs/integrations.md), so 
 | Verkada store traffic | Imports two years of hourly people counts from every counting line, then the hours since the last sync | Sales, Marketing |
 | e-Jewelry for Business Central | Imports every item and vendor and five years of sales and purchase invoices, then what changed on each sync | Inventory, Sales, Manufacturing, Wholesale, Finance, Metals |
 | Sola Payments (formerly Cardknox) | Imports five years of card and check payments and refunds, then the last two days again on each sync | Finance, Sales |
+| JM Shipping Solution | Imports five years of JM Shipping Solution shipments, then keeps the last 60 days current | Sales, Finance |
 | Whatnot | Imports every Whatnot order and product, then keeps the last 60 days of orders and every product current | Sales, Inventory, Marketing |
 | TheWatchSearch (by TheWatchCloud) | Turns the dealer WhatsApp groups the store is in into a feed of offers: brand, reference, buy or sell, price, year, condition and set | Buying, Sales, Inventory |
 | Search The Watch Market Business API | Gives a fair market price for each reference the store follows: listings, low, high, mean and market value | Buying, Appraisals, Sales, Inventory |
@@ -285,7 +286,7 @@ This section updates itself from [docs/milestones.json](docs/milestones.json) an
 
 **Roadmap:** 20 of 81 items done. An integration counts as done once it has run against a real or sandbox account, not when its tests pass.
 
-**Integrations:** 94 of the 253 systems in the catalog are built and tested against mocks made from each vendor's docs. 0 have been checked live so far.
+**Integrations:** 95 of the 253 systems in the catalog are built and tested against mocks made from each vendor's docs. 0 have been checked live so far.
 
 | Milestone | What it gives a jeweler | Progress | Target |
 | --- | --- | --- | --- |
