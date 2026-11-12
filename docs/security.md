@@ -31,9 +31,30 @@ An instance holds a slim copy of a client's data. Raw vendor records (event payl
 ### Someone reaches an instance's API
 
 - Every route except `/healthz` needs `Authorization: Bearer <INSTANCE_API_KEY>`. The key is compared with `timingSafeEqual` over fixed-width zero-padded buffers, then by length, so neither its contents nor its length leak through timing.
+- An optional `SUPPORT_API_KEY` reaches only the diagnostic routes; every other route answers 403 to it. When it is set, both keys are compared the same way on every request, whichever was sent. See [support access without seeing data](#support-access-without-seeing-data).
 - Every request is pinned to the instance's one organization. An event naming another organization is refused, so one client's instance can't write into another's data.
 - Request bodies are capped (1 MB by default) and must be JSON.
 - Responses carry `Cache-Control: no-store`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: no-referrer`, a `default-src 'none'` content policy that also forbids framing, and HSTS, so business data isn't cached by a proxy or browser, sniffed as another type, or framed.
+
+### Support access without seeing data
+
+A client may want help running their instance without showing the person helping everything their business has going on. `SUPPORT_API_KEY` is for that: a second key, different from `INSTANCE_API_KEY`, that the client can give whoever supports the instance.
+
+| The support key reaches | The support key never reaches |
+| --- | --- |
+| `GET /healthz` | Events, entities, signals or recommendations, or anything else that reads business data |
+| `GET /v1/integrations`: which integrations have their settings, by setting name, never value | Writing anything: ingesting events, running reasoning, recording feedback or results |
+| `GET /v1/support/status`: instance name and organization id, version, uptime, applied migrations, retention days, enabled departments and integrations, each integration's missing setting names and last sync (when, mode, outcome, counts and the last error message), dead-letter counts by source and reason, and event counts by day, source and type | Payloads, entity ids, customer references, amounts, names, recommendation text or signal values |
+
+Every other route answers 403 with a message naming the routes the support key can reach, before the route reads the body or touches the database. A test walks the route table, so a new route is turned down for the support key unless it is marked diagnostic on purpose.
+
+Some of what the status shows is still about the business, and the client should know before handing the key out:
+
+- Event counts by day and type show how busy the business is (for example, orders a day), though never what was in them.
+- A sync's last error message is vendor text. Before it is shown, email addresses, bearer and basic credentials, URL paths and query strings, the values of anything named like a key, token, secret or password, other key-shaped runs and numbers of six or more digits are replaced, and the message is capped at 200 characters. Vendor text can still name something that doesn't look sensitive.
+- Source names that aren't plain lowercase ids, which a caller or a malformed input could set, are grouped as `other` rather than shown.
+
+The key only limits what the API shows. Anyone with access to the database (the Supabase project) or the host (its secret store, shell or logs) can still read everything, and could read `INSTANCE_API_KEY` from the host's secret store. So for a client who wants their data kept from whoever supports them, the client owns the Supabase project and the host account, keeps both keys in their own secret store, and shares only the support key. Leave `SUPPORT_API_KEY` unset to turn support access off, and remove it from the secret store to take it back.
 
 ### A connector or vendor misbehaves
 

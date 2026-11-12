@@ -61,6 +61,20 @@ export interface SyncRunOutcome {
   error?: string;
 }
 
+/**
+ * The last run of one connector, kept in memory for the support status
+ * route: when it ran, how and how it went, as counts. Never records.
+ */
+export interface SyncStatus {
+  id: string;
+  mode: SyncRunOutcome["mode"];
+  outcome: "succeeded" | "failed";
+  startedAt: string;
+  finishedAt: string;
+  report?: SyncReport;
+  error?: string;
+}
+
 export interface SyncRunnerOptions {
   connectors: readonly ScheduledConnector[];
   pipeline: BrainPipeline;
@@ -90,8 +104,24 @@ export function createSyncRunner(options: SyncRunnerOptions) {
   let timer: unknown;
   let running: Promise<SyncRunOutcome[]> | null = null;
   let stopped = true;
+  const latest = new Map<string, SyncStatus>();
 
   async function runOne(scheduled: ScheduledConnector): Promise<SyncRunOutcome> {
+    const startedAt = now().toISOString();
+    const outcome = await attempt(scheduled);
+    latest.set(scheduled.id, {
+      id: outcome.id,
+      mode: outcome.mode,
+      outcome: outcome.error === undefined ? "succeeded" : "failed",
+      startedAt,
+      finishedAt: now().toISOString(),
+      ...(outcome.report ? { report: outcome.report } : {}),
+      ...(outcome.error !== undefined ? { error: outcome.error } : {}),
+    });
+    return outcome;
+  }
+
+  async function attempt(scheduled: ScheduledConnector): Promise<SyncRunOutcome> {
     const { memory, organizationId } = options;
     let mode: SyncRunOutcome["mode"] = "historical";
     try {
@@ -130,6 +160,13 @@ export function createSyncRunner(options: SyncRunnerOptions) {
 
   return {
     runOnce,
+    /** The last finished run of each connector that has run since the instance started, in schedule order. */
+    latest(): SyncStatus[] {
+      return options.connectors.flatMap(({ id }) => {
+        const status = latest.get(id);
+        return status ? [status] : [];
+      });
+    },
     /** Starts the first round right away, then one every interval after the previous round ends. */
     start(): void {
       if (!stopped || options.connectors.length === 0) return;
