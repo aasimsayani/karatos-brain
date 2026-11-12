@@ -64,6 +64,50 @@ describe("scrubSupportText", () => {
     expect(scrubSupportText("  line one\n\tline\u0000two  ")).toBe("line one line two");
   });
 
+  it("drops the whole control range, DEL included, and collapses runs of plain spaces", () => {
+    expect(scrubSupportText("a\u001fb\u007fc\u001b[31md")).toBe("a b c [31md");
+    expect(scrubSupportText("one   two")).toBe("one two");
+  });
+
+  it("replaces every address, whatever its case, and keeps the delimiters around it", () => {
+    expect(scrubSupportText("to <pat@example.test>, mailto:lee@example.test and Kim.Lee@Example.test")).toBe("to <[email]>, mailto:[email] and [email]");
+    // Without a dot after the @ it isn't an address.
+    expect(scrubSupportText("icon@2x missing")).toBe("icon@2x missing");
+  });
+
+  it("replaces credentials however many spaces follow the scheme", () => {
+    expect(scrubSupportText("sent Bearer   abc.def")).toBe("sent Bearer [redacted]");
+  });
+
+  it("keeps only the host of a URL with a query or fragment straight after the host, in any case", () => {
+    expect(scrubSupportText("GET https://vendor.test?customer=pat-lee failed")).toBe("GET https://vendor.test/[redacted] failed");
+    expect(scrubSupportText("see https://vendor.test#pat-lee")).toBe("see https://vendor.test/[redacted]");
+    expect(scrubSupportText("GET HTTPS://Vendor.test/customers/pat-lee")).toBe("GET HTTPS://Vendor.test/[redacted]");
+  });
+
+  it("replaces a secret-named value however it is spaced, quoted or ended", () => {
+    expect(scrubSupportText("bad passwd=abc&next")).toBe("bad passwd=[redacted]&next");
+    expect(scrubSupportText("bad api_key = abc next")).toBe("bad api_key = [redacted] next");
+    expect(scrubSupportText("bad token: 'two words' next")).toBe("bad token: [redacted] next");
+    expect(scrubSupportText("bad token=abc,next and key=abc;next")).toBe("bad token=[redacted],next and key=[redacted];next");
+    expect(scrubSupportText('bad token=ab"cd next')).toBe("bad token=[redacted] next");
+  });
+
+  it("treats +, /, = and . as part of a key-shaped run", () => {
+    // Built at runtime: pieces too short to be redacted alone.
+    const pieces = ["Ab3", "Xy9", "Qr5", "Mn7", "Lp2", "Kd8", "Zw4"];
+    expect(scrubSupportText(`rejected ${pieces.join("+")}`)).toBe("rejected [redacted]");
+    expect(scrubSupportText(`rejected ${pieces.join("/")}==`)).toBe("rejected [redacted]");
+    expect(scrubSupportText(`rejected ${pieces.join(".")}`)).toBe("rejected [redacted]");
+  });
+
+  it("counts digits, not characters, and treats a date followed by more digits as a number", () => {
+    expect(scrubSupportText("call 555-010-4477")).toBe("call [number]");
+    expect(scrubSupportText("lot 12 345 ok")).toBe("lot 12 345 ok");
+    expect(scrubSupportText("lot 12 3456 ok")).toBe("lot [number] ok");
+    expect(scrubSupportText("on 2026-11-12 503121 failed")).toBe("on [number] failed");
+  });
+
   it("caps the result at 200 characters by default, keeping exactly 200", () => {
     expect(MAX_SUPPORT_ERROR_CHARS).toBe(200);
     const at = `${"abcd ".repeat(40).trim()}z`;
@@ -85,6 +129,12 @@ describe("supportLabel", () => {
     expect(supportLabel("Pat Lee")).toBe("other");
     expect(supportLabel("-shopify")).toBe("other");
     expect(supportLabel("")).toBe("other");
+    // Lowercase only, from a letter or digit, with no spaces or address characters.
+    expect(supportLabel("3pl")).toBe("3pl");
+    expect(supportLabel("Shopify")).toBe("other");
+    expect(supportLabel("pat lee")).toBe("other");
+    expect(supportLabel("pat@example.test")).toBe("other");
+    expect(supportLabel("vendor:pat")).toBe("other");
     expect(supportLabel(null)).toBe("unknown");
     expect(supportLabel(undefined)).toBe("unknown");
   });
@@ -161,6 +211,8 @@ describe("postgresDiagnostics", () => {
     const migrations = await loadMigrations(MIGRATIONS_DIR);
     await migrate(client, migrations);
     for (const id of [ORG, "other-jeweler"]) await client.query("insert into organizations (id, name) values ($1, $2)", [id, id]);
+    // Days are UTC whatever the session's time zone.
+    await client.query("set time zone 'America/New_York'");
     const store = new PostgresMemoryStore(client);
     await store.appendEvent(event(9, "2026-11-12T10:00:00.000Z", "other-jeweler"));
     await store.appendDeadLetter(deadLetter(9, "shopify", "other-jeweler"));
@@ -226,6 +278,31 @@ describe("supportStatus", () => {
     // The sync cursor is a vendor position, not shown.
     expect(JSON.stringify(status)).not.toContain("opaque-cursor");
     expect(status.events.since).toBe("2026-11-12T00:00:00.000Z");
+  });
+
+  it("groups free-text types too, and orders rows by day, then source, then type", async () => {
+    const status = await supportStatus(
+      ORG,
+      {
+        ...base,
+        diagnostics: {
+          ...diagnostics,
+          eventCountsByDay: async () => [
+            { day: "2026-11-12", source: "stripe", type: "payment.succeeded", count: 1 },
+            { day: "2026-11-12", source: "shopify", type: "Pat Lee ordered", count: 1 },
+            { day: "2026-11-12", source: "shopify", type: "order.created", count: 2 },
+            { day: "2026-11-11", source: "stripe", type: "charge.failed", count: 4 },
+          ],
+        },
+      },
+      [],
+    );
+    expect(status.events.byDay).toEqual([
+      { day: "2026-11-11", source: "stripe", type: "charge.failed", count: 4 },
+      { day: "2026-11-12", source: "shopify", type: "order.created", count: 2 },
+      { day: "2026-11-12", source: "shopify", type: "other", count: 1 },
+      { day: "2026-11-12", source: "stripe", type: "payment.succeeded", count: 1 },
+    ]);
   });
 
   it("scrubs and caps a failed run's error", async () => {

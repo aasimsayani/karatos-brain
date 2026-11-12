@@ -29,10 +29,10 @@ beforeEach(() => {
   compared.calls = [];
 });
 
-async function start(withSupport: boolean) {
+async function start(withSupport: boolean | string) {
   const memory = new InMemoryStore();
   const pipeline = new BrainPipeline({ memory, normalizers: [], extractors: [], reasoners: [], documentation: new StaticDocumentationSource([]) });
-  server = createServer(createBrainApp({ pipeline, memory, organizationId: "example-jewelers", apiKey: INSTANCE_KEY, ...(withSupport ? { supportApiKey: SUPPORT_KEY } : {}) }));
+  server = createServer(createBrainApp({ pipeline, memory, organizationId: "example-jewelers", apiKey: INSTANCE_KEY, ...(withSupport === false ? {} : { supportApiKey: withSupport === true ? SUPPORT_KEY : withSupport }) }));
   await new Promise<void>((resolve) => server!.listen(0, resolve));
   const base = `http://127.0.0.1:${(server!.address() as AddressInfo).port}`;
   return (path: string, key: string) => fetch(base + path, { headers: { authorization: `Bearer ${key}` } });
@@ -63,6 +63,17 @@ describe("support key comparison", () => {
     const call = await start(false);
     expect((await call("/v1/integrations", SUPPORT_KEY)).status).toBe(401);
     expect(compared.calls).toEqual([[512, 512]]);
+  });
+
+  it("treats an empty support key as none", async () => {
+    const call = await start("");
+    expect((await call("/v1/integrations", SUPPORT_KEY)).status).toBe(401);
+    expect((await call("/v1/integrations", INSTANCE_KEY)).status).toBe(200);
+    // Two requests, one comparison each: only the instance key is compared.
+    expect(compared.calls).toEqual([
+      [512, 512],
+      [512, 512],
+    ]);
   });
 
   it("never compares a token longer than 512 bytes", async () => {

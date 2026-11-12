@@ -5,8 +5,9 @@
 set -euo pipefail
 
 KEY=$(openssl rand -hex 32)
+SUPPORT_KEY=$(openssl rand -hex 32)
 NAME=brain-smoke
-export INSTANCE_NAME="Smoke Test Jewelers" ORGANIZATION_ID=smoke-test INSTANCE_API_KEY="$KEY" SUPABASE_DB_URL="$DB_URL" PORT=8080
+export INSTANCE_NAME="Smoke Test Jewelers" ORGANIZATION_ID=smoke-test INSTANCE_API_KEY="$KEY" SUPPORT_API_KEY="$SUPPORT_KEY" SUPABASE_DB_URL="$DB_URL" PORT=8080
 
 if [ "$IMAGE" = "local" ]; then
   LOG=$(mktemp)
@@ -16,7 +17,7 @@ if [ "$IMAGE" = "local" ]; then
 else
   docker rm -f "$NAME" >/dev/null 2>&1 || true
   docker run -d --name "$NAME" --network host \
-    -e INSTANCE_NAME -e ORGANIZATION_ID -e INSTANCE_API_KEY -e SUPABASE_DB_URL -e PORT "$IMAGE" >/dev/null
+    -e INSTANCE_NAME -e ORGANIZATION_ID -e INSTANCE_API_KEY -e SUPPORT_API_KEY -e SUPABASE_DB_URL -e PORT "$IMAGE" >/dev/null
   trap 'docker logs "$NAME"; docker rm -f "$NAME" >/dev/null' EXIT
 fi
 
@@ -52,3 +53,13 @@ expect 2 "$ROWS" "events stored in Postgres"
 expect 2 "$(psql "$DB_URL" -tAc "select count(*) from dead_letter_events where organization_id = 'smoke-test'")" "dead letters stored"
 expect t "$(psql "$DB_URL" -tAc "select count(*) > 0 from signals where organization_id = 'smoke-test' and kind like 'sale.%'")" "retail signals stored"
 expect 1 "$(psql "$DB_URL" -tAc "select count(*) from reasoning_runs where organization_id = 'smoke-test'")" "reasoning run stored"
+
+# Support access: the support key reaches the status (wired to Postgres) and nothing else.
+get() { curl -s -o /dev/null -w '%{http_code}' -H "authorization: Bearer $2" "http://127.0.0.1:8080$1"; }
+expect 200 "$(get /v1/support/status "$SUPPORT_KEY")" "support status with the support key"
+expect 403 "$(get /v1/recommendations "$SUPPORT_KEY")" "recommendations with the support key"
+expect 403 "$(post /v1/events "$EVENT" -H "authorization: Bearer $SUPPORT_KEY")" "event with the support key"
+STATUS=$(curl -s -H "authorization: Bearer $SUPPORT_KEY" http://127.0.0.1:8080/v1/support/status)
+expect smoke-test "$(jq -r .instance.organizationId <<<"$STATUS")" "support status organization"
+expect 2 "$(jq -r .deadLetters.total <<<"$STATUS")" "support status dead letters"
+expect true "$(jq -r '.migrations.count > 0' <<<"$STATUS")" "support status migrations"

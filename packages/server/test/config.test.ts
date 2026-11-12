@@ -99,6 +99,10 @@ describe("loadInstanceConfig: SUPPORT_API_KEY", () => {
     }
     expect(message).toMatch(/Invalid instance configuration: SUPPORT_API_KEY: must differ from INSTANCE_API_KEY/);
     expect(message).not.toContain(shared);
+    // Compared exactly, case included.
+    const mixed = `A${shared.slice(1)}`;
+    expect(() => loadInstanceConfig({ ...valid, INSTANCE_API_KEY: mixed, SUPPORT_API_KEY: mixed })).toThrow(/SUPPORT_API_KEY: must differ from INSTANCE_API_KEY/);
+    expect(loadInstanceConfig({ ...valid, INSTANCE_API_KEY: mixed, SUPPORT_API_KEY: mixed.toLowerCase() }).SUPPORT_API_KEY).toBe(mixed.toLowerCase());
     // One character apart is a different key.
     const other = `${shared.slice(0, -1)}${shared.endsWith("a") ? "b" : "a"}`;
     expect(loadInstanceConfig({ ...valid, INSTANCE_API_KEY: shared, SUPPORT_API_KEY: other }).SUPPORT_API_KEY).toBe(other);

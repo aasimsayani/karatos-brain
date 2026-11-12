@@ -1,5 +1,5 @@
 import { randomBytes } from "node:crypto";
-import { createServer, type Server } from "node:http";
+import { createServer, request, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { afterEach, describe, expect, it } from "vitest";
 import { BrainPipeline, InMemoryStore, type IntegrationStatus, type Reasoner } from "@karatos/core";
@@ -73,7 +73,7 @@ async function start(overrides: Partial<BrainAppOptions> = {}, syncStatus: SyncS
     if (init.auth !== false) headers.authorization = `Bearer ${init.auth ?? INSTANCE_KEY}`;
     return fetch(base + path, { ...init, headers });
   };
-  return { memory, call };
+  return { memory, call, base };
 }
 
 /** A concrete path for a route's pattern: each captured segment becomes "abc". */
@@ -123,6 +123,22 @@ describe("support access: which routes the support key reaches", () => {
     expect(memory.reasoningRuns).toEqual([]);
     expect(memory.feedback).toEqual([]);
     expect(memory.valueResults).toEqual([]);
+  });
+
+  it("turns the support key down without waiting for the request body", async () => {
+    const { base, memory } = await start();
+    // The body is announced but never finished: an answer can only come if nothing reads it.
+    const status = await new Promise<number>((resolve, reject) => {
+      const req = request(`${base}/v1/events`, { method: "POST", headers: { authorization: `Bearer ${SUPPORT_KEY}`, "content-type": "application/json", "content-length": "1000" } }, (res) => {
+        res.resume();
+        resolve(res.statusCode!);
+        req.destroy();
+      });
+      req.on("error", reject);
+      req.write("{");
+    });
+    expect(status).toBe(403);
+    expect(memory.events).toEqual([]);
   });
 
   it("names what the support key can reach when it turns a request down", async () => {

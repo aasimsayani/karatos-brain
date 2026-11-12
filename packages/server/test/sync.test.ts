@@ -275,6 +275,8 @@ describe("createSyncRunner: last run of each connector, for support status", () 
     expect(Date.parse(shopify!.finishedAt)).toBeGreaterThan(Date.parse(shopify!.startedAt));
     expect(Date.parse(shopify!.startedAt)).toBeGreaterThan(Date.parse(stripe!.finishedAt) - 1);
     expect(shopify).toMatchObject({ id: "shopify", mode: "historical", outcome: "succeeded", report: { ingested: 2, duplicates: 0, deadLettered: 0, batches: 1 } });
+    // Started before the run read the clock for its checkpoint, finished after.
+    expect([shopify!.startedAt, shopify!.finishedAt]).toEqual(["2026-10-20T00:00:02.000Z", "2026-10-20T00:00:04.000Z"]);
     expect(shopify).not.toHaveProperty("error");
     expect(stripe).not.toHaveProperty("report");
     // A later run replaces the earlier one.
