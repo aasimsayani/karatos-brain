@@ -1,0 +1,2 @@
+- README: says a private instance can be supported with `SUPPORT_API_KEY`, which sees health and sync status but never the instance's records, and links to the support access section of the security docs.
+- Meta catalog: the first capability now says only the latest 20 messages of each Messenger and Instagram conversation are imported, as Meta allows.
