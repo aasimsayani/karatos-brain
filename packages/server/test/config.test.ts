@@ -1,3 +1,4 @@
+import { randomBytes } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import { loadInstanceConfig } from "../src/index.js";
 
@@ -67,5 +68,43 @@ describe("loadInstanceConfig", () => {
     expect(loadInstanceConfig({ ...valid, RAW_RETENTION_DAYS: "90" }).RAW_RETENTION_DAYS).toBe(90);
     expect(loadInstanceConfig({ ...valid, RAW_RETENTION_DAYS: "365" }).RAW_RETENTION_DAYS).toBe(365);
     for (const bad of ["0", "-1", "366", "1.5", "forever"]) expect(() => loadInstanceConfig({ ...valid, RAW_RETENTION_DAYS: bad })).toThrow(/RAW_RETENTION_DAYS/);
+  });
+});
+
+describe("loadInstanceConfig: SUPPORT_API_KEY", () => {
+  // Built at runtime so no key-shaped literal sits in the repository.
+  const key = (length: number) => randomBytes(length).toString("hex").slice(0, length);
+
+  it("is optional: unset or empty leaves support access off", () => {
+    expect(loadInstanceConfig(valid).SUPPORT_API_KEY).toBeUndefined();
+    expect(loadInstanceConfig({ ...valid, SUPPORT_API_KEY: "" }).SUPPORT_API_KEY).toBeUndefined();
+  });
+
+  it("takes a key of 32 characters or more, and turns down 31", () => {
+    const support = key(32);
+    expect(loadInstanceConfig({ ...valid, SUPPORT_API_KEY: support }).SUPPORT_API_KEY).toBe(support);
+    const long = key(64);
+    expect(loadInstanceConfig({ ...valid, SUPPORT_API_KEY: long }).SUPPORT_API_KEY).toBe(long);
+    const short = key(31);
+    expect(() => loadInstanceConfig({ ...valid, SUPPORT_API_KEY: short })).toThrow(/SUPPORT_API_KEY: use at least 32 random characters/);
+  });
+
+  it("must differ from the instance key, without echoing either", () => {
+    const shared = key(64);
+    let message = "";
+    try {
+      loadInstanceConfig({ ...valid, INSTANCE_API_KEY: shared, SUPPORT_API_KEY: shared });
+    } catch (error) {
+      message = String(error);
+    }
+    expect(message).toMatch(/Invalid instance configuration: SUPPORT_API_KEY: must differ from INSTANCE_API_KEY/);
+    expect(message).not.toContain(shared);
+    // Compared exactly, case included.
+    const mixed = `A${shared.slice(1)}`;
+    expect(() => loadInstanceConfig({ ...valid, INSTANCE_API_KEY: mixed, SUPPORT_API_KEY: mixed })).toThrow(/SUPPORT_API_KEY: must differ from INSTANCE_API_KEY/);
+    expect(loadInstanceConfig({ ...valid, INSTANCE_API_KEY: mixed, SUPPORT_API_KEY: mixed.toLowerCase() }).SUPPORT_API_KEY).toBe(mixed.toLowerCase());
+    // One character apart is a different key.
+    const other = `${shared.slice(0, -1)}${shared.endsWith("a") ? "b" : "a"}`;
+    expect(loadInstanceConfig({ ...valid, INSTANCE_API_KEY: shared, SUPPORT_API_KEY: other }).SUPPORT_API_KEY).toBe(other);
   });
 });
