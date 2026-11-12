@@ -7,6 +7,7 @@ import { loadMigrations, migrate, PostgresMemoryStore, type SqlClient } from "@k
 import {
   inMemoryDiagnostics,
   MAX_SUPPORT_ERROR_CHARS,
+  MAX_SUPPORT_SCRUB_INPUT,
   postgresDiagnostics,
   scrubSupportText,
   supportLabel,
@@ -22,6 +23,30 @@ describe("scrubSupportText", () => {
   it("replaces email addresses", () => {
     expect(scrubSupportText("no customer for pat.lee+vip@example.test here")).toBe("no customer for [email] here");
     expect(scrubSupportText("pat at example.test")).toBe("pat at example.test");
+  });
+
+  it("reads an address as text before the last @ and a dot with text on both sides after it", () => {
+    expect(scrubSupportText("to a@b.co now")).toBe("to [email] now");
+    expect(scrubSupportText("to a@b@c.co now")).toBe("to [email] now");
+    expect(scrubSupportText("to @b.co now")).toBe("to @b.co now");
+    expect(scrubSupportText("to a@.co now")).toBe("to a@.co now");
+    expect(scrubSupportText("to a@b. now")).toBe("to a@b. now");
+    expect(scrubSupportText("to a@bco now")).toBe("to a@bco now");
+    expect(scrubSupportText("to a.b@co now")).toBe("to a.b@co now");
+    expect(scrubSupportText("(a@b.co); 'c@d.co'")).toBe("([email]); '[email]'");
+    expect(scrubSupportText("to @a@b.co now")).toBe("to [email] now");
+    expect(scrubSupportText("a@b.co;x. a@b.co,x. a@b.co:x.")).toBe("[email];x. [email],x. [email]:x.");
+  });
+
+  it("cuts vendor text before scrubbing it, and stays fast on long repeated input", () => {
+    expect(MAX_SUPPORT_SCRUB_INPUT).toBe(4096);
+    const at = (n: number) => `${"ab ".repeat(n).slice(0, n - 6)} a@b.c`;
+    expect(scrubSupportText(at(MAX_SUPPORT_SCRUB_INPUT), 10_000).endsWith("[email]")).toBe(true);
+    expect(scrubSupportText(at(MAX_SUPPORT_SCRUB_INPUT + 1), 10_000).endsWith("[email]")).toBe(false);
+    expect(scrubSupportText(at(MAX_SUPPORT_SCRUB_INPUT + 1), 10_000)).toHaveLength(MAX_SUPPORT_SCRUB_INPUT);
+    const started = performance.now();
+    for (const filler of ["!", "a", "1 ", "a@", "key", "https://a"]) scrubSupportText(filler.repeat(200_000));
+    expect(performance.now() - started).toBeLessThan(2000);
   });
 
   it("replaces bearer and basic credentials", () => {

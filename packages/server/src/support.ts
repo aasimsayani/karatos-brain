@@ -111,6 +111,17 @@ export function supportLabel(value: string | null | undefined): string {
   return LABEL.test(value) ? value : "other";
 }
 
+/** Text before the last `@` and a dot with text on both sides after it, checked without a regular expression. */
+function looksLikeEmail(word: string): boolean {
+  const at = word.lastIndexOf("@");
+  if (at <= 0) return false;
+  const dot = word.lastIndexOf(".");
+  return dot > at + 1 && dot < word.length - 1;
+}
+
+/** Vendor text longer than this is cut before it is scrubbed, so no pattern runs over unbounded input. */
+export const MAX_SUPPORT_SCRUB_INPUT = 4096;
+
 /**
  * Makes an error message fit to show someone who may not see the client's
  * data: email addresses, bearer tokens, URL paths and query strings,
@@ -121,9 +132,10 @@ export function supportLabel(value: string | null | undefined): string {
  */
 export function scrubSupportText(text: string, max: number = MAX_SUPPORT_ERROR_CHARS): string {
   const scrubbed = text
+    .slice(0, MAX_SUPPORT_SCRUB_INPUT)
     // eslint-disable-next-line no-control-regex
     .replace(/[\u0000-\u001f\u007f]+/g, " ")
-    .replace(/[^\s@<>()"',;:]+@[^\s@<>()"',;:]+\.[^\s@<>()"',;:]+/g, "[email]")
+    .replace(/[^\s<>()"',;:]+/g, (word) => (looksLikeEmail(word) ? "[email]" : word))
     .replace(/\b(bearer|basic)\s+\S+/gi, "$1 [redacted]")
     // A URL keeps only its host: paths and query strings can carry ids, names and keys.
     .replace(/\b(https?:\/\/[^\s/?#]+)\S*/gi, "$1/[redacted]")
