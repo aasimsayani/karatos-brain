@@ -74,6 +74,8 @@ export const DEMO_NOT_YET: Readonly<Record<string, string>> = {
   microsoft_teams: NEXT,
   smile_io: NEXT,
   zendesk: NEXT,
+  imap_email: NEXT,
+  watchtraderhub: NEXT,
   acuity: NEXT,
   nfusion: NEXT,
   whatnot: NEXT,
