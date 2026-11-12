@@ -5,7 +5,7 @@ export default {
   status: "built",
   note: "Reads Messenger and Instagram DMs with a Page access token over the Graph API, and WhatsApp only from signed webhooks, since WhatsApp has no history to read. Meta has no read-only messaging permission, so the client only ever sends GETs. Only the 20 latest messages of each conversation can be read",
   capabilities: [
-    "Imports every Messenger and Instagram conversation from the last five years, then keeps them current on each sync",
+    "Imports the latest 20 messages of every Messenger and Instagram conversation from the last five years, then keeps them current",
     "Takes each WhatsApp message and delivery status as Meta sends it, checking the signature on every delivery",
     "Shows who wrote, on which app, and whether each message came from the customer or the store",
     "Links each WhatsApp customer to the same customer as Quo, forms and Klaviyo, without keeping the number",
