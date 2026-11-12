@@ -1,14 +1,20 @@
+import { readFileSync } from "node:fs";
 import { createServer } from "node:http";
 import { fileURLToPath } from "node:url";
 import pg from "pg";
 import { integrationStatuses } from "@karatos/core";
+import { selectDepartments } from "@karatos/retail";
 import { loadMigrations, migrate, PostgresMemoryStore } from "@karatos/store-postgres";
 import { createBrainApp } from "./app.js";
 import { createInstancePipeline } from "./brain.js";
 import { loadInstanceConfig } from "./config.js";
 import { StaticDocumentationSource } from "./documentation.js";
 import { createRetentionRunner } from "./retention.js";
+import { postgresDiagnostics } from "./support.js";
 import { createSyncRunner, scheduledConnectors } from "./sync.js";
+
+const startedAt = new Date();
+const { version } = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")) as { version: string };
 
 const config = loadInstanceConfig(process.env);
 const migrationsDir = process.env.MIGRATIONS_DIR ?? fileURLToPath(new URL("../../../supabase/migrations", import.meta.url));
@@ -37,19 +43,6 @@ const pipeline = createInstancePipeline({
   departments: config.ENABLED_DEPARTMENTS,
 });
 
-const server = createServer(
-  createBrainApp({
-    pipeline,
-    memory,
-    organizationId: config.ORGANIZATION_ID,
-    apiKey: config.INSTANCE_API_KEY,
-    integrations: integrationStatuses(process.env),
-  }),
-);
-server.listen(config.PORT, () => {
-  console.log(`${config.INSTANCE_NAME} (${config.ORGANIZATION_ID}) listening on :${config.PORT}`);
-});
-
 // Each turned-on connector that has its settings syncs on a schedule. Skipped ones are named with what they're missing, never with values.
 const { connectors, skipped } = scheduledConnectors(config.ENABLED_INTEGRATIONS, process.env, { memory, organizationId: config.ORGANIZATION_ID });
 for (const { id, reason } of skipped) console.log(`sync ${id} skipped: ${reason}`);
@@ -59,6 +52,32 @@ const sync = createSyncRunner({
   memory,
   organizationId: config.ORGANIZATION_ID,
   intervalMs: config.SYNC_INTERVAL_MINUTES * 60_000,
+});
+
+const server = createServer(
+  createBrainApp({
+    pipeline,
+    memory,
+    organizationId: config.ORGANIZATION_ID,
+    apiKey: config.INSTANCE_API_KEY,
+    // Support access: diagnostic routes only, never business data. See docs/security.md.
+    ...(config.SUPPORT_API_KEY ? { supportApiKey: config.SUPPORT_API_KEY } : {}),
+    integrations: integrationStatuses(process.env),
+    support: {
+      instanceName: config.INSTANCE_NAME,
+      version,
+      startedAt,
+      retentionDays: config.RAW_RETENTION_DAYS,
+      departments: selectDepartments(config.ENABLED_DEPARTMENTS).map((d) => d.id),
+      enabledIntegrations: config.ENABLED_INTEGRATIONS,
+      skipped,
+      syncStatus: () => sync.latest(),
+      diagnostics: postgresDiagnostics(pool),
+    },
+  }),
+);
+server.listen(config.PORT, () => {
+  console.log(`${config.INSTANCE_NAME} (${config.ORGANIZATION_ID}) listening on :${config.PORT}${config.SUPPORT_API_KEY ? ", support access on" : ""}`);
 });
 sync.start();
 
