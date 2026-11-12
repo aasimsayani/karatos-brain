@@ -129,7 +129,7 @@ describe("Extend client", () => {
     const badCredential = ["", "1234567", "has space-in", "x".repeat(513), "tést-1234", undefined as unknown as string];
     for (const clientId of badCredential) expect(() => extendClient({ ...base, clientId }), String(clientId)).toThrow(new ExtendConfigError(id));
     for (const clientSecret of badCredential) expect(() => extendClient({ ...base, clientSecret }), String(clientSecret)).toThrow(new ExtendConfigError(secret));
-    for (const storeId of ["", "not-a-uuid", STORE.slice(1), `${STORE}0`, STORE.replace(/-/g, ""), STORE.replace("a", "g"), undefined as unknown as string]) {
+    for (const storeId of ["", "not-a-uuid", STORE.slice(1), STORE.slice(0, -1), `${STORE}0`, `0${STORE}`, STORE.replace(/-/g, ""), STORE.replace("-", ""), STORE.replace("a", "g"), `g${STORE.slice(1)}`, STORE.replace(/^(\w{8}-\w{4}-)\w/, "$1"), STORE.replace(/-\w(\w{3}-\w{12})$/, "-$1"), undefined as unknown as string]) {
       expect(() => extendClient({ ...base, storeId }), String(storeId)).toThrow(new ExtendConfigError(store));
     }
     for (const environment of ["sandbox", "toString", "Production"]) expect(() => extendClient({ ...base, environment: environment as "demo" })).toThrow(new ExtendConfigError("EXTEND_ENVIRONMENT must be production or demo"));
@@ -176,7 +176,7 @@ describe("Extend client", () => {
     await c.orders(null);
     expect(sent.map((s) => s.method)).toEqual(["POST", "GET", "GET", "POST", "GET"]);
     // No lifetime, or one that isn't a whole number above zero: a token is asked for every time.
-    for (const expires of ["none", null, 0, -5, 1.5, "3600"]) {
+    for (const expires of ["none", null, 0, -5, 1.5, 3600.5, 60, "3600"]) {
       const s = scripted([tokenOk(expires), noOrders, tokenOk(expires), noOrders]);
       const { c: each } = client(s.fetch);
       await each.orders(null);
@@ -205,11 +205,18 @@ describe("Extend client", () => {
     expect(demo!.message).toContain("from the demo Merchant Portal");
     await expect(tokenWith(json(404, { code: "not_found" }))).rejects.toThrow(new ExtendApiError("Extend answered HTTP 404 for a token", 404, "not_found"));
     await expect(tokenWith(json(500, null))).rejects.toMatchObject({ status: 500, code: undefined });
-    for (const body of [{}, { access_token: 5 }, { access_token: "short" }, { access_token: "has space here" }, { access_token: "x".repeat(8193) }, null]) {
+    for (const body of [{}, { access_token: 5 }, { access_token: "short" }, { access_token: "abcdefg" }, { access_token: "has space here" }, { access_token: "x".repeat(8193) }, null]) {
       await expect(tokenWith(json(200, body)), JSON.stringify(body)).rejects.toThrow(new ExtendApiError("Extend answered without a token", 200));
     }
     await expect(tokenWith(() => new Response("{", { status: 200 }))).rejects.toThrow("Extend answered without a token");
     expect(await client(scripted([json(200, { access_token: "a".repeat(8192) }), noOrders]).fetch).c.orders(null)).toEqual({ orders: [], nextCursor: null });
+    // Eight characters is the shortest token taken, and each of its punctuation marks is.
+    for (const value of ["abcdefgh", "a._~+/=-b"]) {
+      const s = scripted([json(200, { access_token: value }), noOrders]);
+      await client(s.fetch).c.orders(null);
+      expect(s.sent[1]!.headers["x-extend-access-token"], value).toBe(value);
+    }
+    await expect(tokenWith(json(202, { access_token: TOKEN }))).rejects.toThrow(new ExtendApiError("Extend answered HTTP 202 for a token", 202));
 
     const searchWith = async (response: () => Response) => client(scripted([tokenOk(), response]).fetch, { retries: 0 }).c.orders(null);
     const store = "EXTEND_STORE_ID must be the store the API Integration in EXTEND_CLIENT_ID was made for";
@@ -219,13 +226,15 @@ describe("Extend client", () => {
     await expect(searchWith(json(400, { code: "invalid_parameter", message: "customer@example.test is not valid" }))).rejects.toThrow(new ExtendApiError("Extend answered HTTP 400 for the orders (invalid_parameter)", 400, "invalid_parameter"));
     await expect(searchWith(json(404, { code: "c".repeat(65) }))).rejects.toThrow(new ExtendApiError("Extend answered HTTP 404 for the orders", 404));
     expect(await searchWith(json(404, { code: "c".repeat(64) })).catch((e: ExtendApiError) => e.code)).toBe("c".repeat(64));
+    for (const code of ["c", "Not_Found.2-x"]) expect(await searchWith(json(404, { code })).catch((e: ExtendApiError) => e.code), code).toBe(code);
+    for (const code of ["", 404, ["x"]]) expect(await searchWith(json(404, { code })).catch((e: ExtendApiError) => [e.code, e.message]), JSON.stringify(code)).toEqual([undefined, "Extend answered HTTP 404 for the orders"]);
     await expect(searchWith(json(202, {}))).rejects.toMatchObject({ status: 202 });
     await expect(searchWith(json(501, {}))).rejects.toMatchObject({ status: 501 });
   });
 
   it("reads only pages and lists that read, and turns down a cursor it wasn't made for", async () => {
     const at = async (body: unknown, cursor: string | null = null) => client(scripted([tokenOk(), json(200, body)]).fetch).c.orders(cursor);
-    for (const body of [null, [], 5, {}, { orders: 5 }, { orders: {} }, { orders: [], nextPageCursor: 5 }, { orders: [], nextPageCursor: "c".repeat(4097) }, { orders: [], nextPageCursor: "a b" }]) {
+    for (const body of [null, [], 5, {}, { orders: 5 }, { orders: {} }, { orders: [], nextPageCursor: 5 }, { orders: [], nextPageCursor: 0 }, { orders: [], nextPageCursor: false }, { orders: [], nextPageCursor: "c".repeat(4097) }, { orders: [], nextPageCursor: "a b" }]) {
       await expect(at(body), JSON.stringify(body).slice(0, 40)).rejects.toThrow(new ExtendApiError("Extend answered the orders without a page that reads", 200));
     }
     expect(await at({ orders: [{ id: "1" }] })).toEqual({ orders: [{ id: "1" }], nextCursor: null });
@@ -256,7 +265,7 @@ describe("Extend client", () => {
     expect(await waits({ "retry-after": "1" })).toEqual([1000]);
     expect(await waits({ "retry-after": "60" })).toEqual([60_000]);
     expect(await waits({ "retry-after": "61" })).toEqual([60_000]);
-    for (const value of ["0", "-1", "1.5", "soon"]) expect(await waits({ "retry-after": value }), value).toEqual([1000]);
+    for (const value of ["0", "-1", "1.5", "2.5", "3s", "soon"]) expect(await waits({ "retry-after": value }), value).toEqual([1000]);
     expect(await waits({})).toEqual([1000]);
     for (const status of [500, 502, 503, 504]) expect(await waits({ "retry-after": "3" }, status), String(status)).toEqual([3000]);
     const { fetch, sent } = scripted([tokenOk(), json(503, { code: "unavailable" })]);
@@ -310,6 +319,7 @@ describe("Extend events", () => {
     expect(extendId(STORE)).toBe(STORE);
     expect(extendId("a".repeat(64))).toBe("a".repeat(64));
     expect(extendId("A_b-9")).toBe("A_b-9");
+    expect(extendId("a")).toBe("a");
     for (const id of ["", "a".repeat(65), "a b", "a/b", "customer@example.test", 5, null]) expect(extendId(id), String(id)).toBeUndefined();
   });
 
@@ -521,6 +531,43 @@ describe("Extend events", () => {
     expect((extendOrderEvent(order({ status: 5 }), RECEIVED).event.payload.problems as string[])).toEqual(["order has a status that doesn't read"]);
     expect((extendOrderEvent(order({ lineItems: undefined }), RECEIVED).event.payload.problems as string[])).toEqual(["order has no line items that read"]);
   });
+
+  it("takes each documented coverage status, cancellation reason, plan category and service type, and only those", () => {
+    const payload = (over: ExtendMockRecord) => extendContractEvent(contract(over), RECEIVED).event.payload;
+    const coverage = ["covered_by_manufacturers_warranty", "covered_for_adh_only_by_extend", "covered_for_base_protection_only_by_extend", "covered_by_adh_and_base_protection_by_extend", "expired", "fulfilled", "cancelled"];
+    for (const status of coverage) expect(payload({ coverage: { status } }).coverageStatus, status).toBe(status);
+    const reasons = ["fraud_identified", "merchant_refund", "sp_claim", "correction_needed", "customer_requested", "merchant_requested", "created_in_error", "goodwill_escalation"];
+    for (const reason of reasons) expect(payload({ cancellationReason: reason }).cancellationReason, reason).toBe(reason);
+    for (const category of ["service_contract", "shipping_contract"]) expect(payload({ plan: { category } }).planCategory, category).toBe(category);
+    for (const type of ["repair", "replace", "repair_depot", "repair_onsite", "repair_irobot"]) expect(payload({ planDetails: { service_type: type } }).serviceType, type).toBe(type);
+    for (const odd of ["COVERED", "live", 5, ["expired"]]) expect(payload({ coverage: { status: odd } }), String(odd)).not.toHaveProperty("coverageStatus");
+    for (const odd of ["Fraud_Identified", ["sp_claim"]]) expect(payload({ cancellationReason: odd }), String(odd)).not.toHaveProperty("cancellationReason");
+    expect(extendContractEvent(contract({ status: ["live"] }), RECEIVED).event.payload.problems).toEqual(["contract has no status that reads"]);
+  });
+
+  it("keeps each field from its own source, cut to its length, and marks a test only when Extend says true", () => {
+    const c = extendContractEvent(
+      contract({ purchaseDate: 1767225600, createdAt: 1767229200000, cancelledAt: 1767232800000, refundedAt: 1767236400, isTest: "yes", plan: { id: "p".repeat(101) }, transactionId: "t".repeat(101), product: { name: "  Test ring  ", referenceId: "  SKU-1 " }, planDetails: { term_length: 1.5 } }),
+      RECEIVED,
+    ).event.payload;
+    expect(c).toMatchObject({ purchasedAt: "2026-01-01T00:00:00.000Z", createdAt: "2026-01-01T01:00:00.000Z", cancelledAt: "2026-01-01T02:00:00.000Z", refundedAt: "2026-01-01T03:00:00.000Z", test: false, planId: "p".repeat(100), transactionId: "t".repeat(100) });
+    expect(c.product).toEqual({ name: "Test ring", referenceId: "SKU-1" });
+    expect(c).not.toHaveProperty("termMonths");
+    const whole = extendContractEvent(contract({ plan: { id: "p".repeat(100) }, transactionId: "t".repeat(100) }), RECEIVED).event.payload;
+    expect([whole.planId, whole.transactionId]).toEqual(["p".repeat(100), "t".repeat(100)]);
+    const o = extendOrderEvent(order({ isTest: "yes", transactionId: `  ${"t".repeat(101)}`, shippingCostTotal: 150, shippingTaxCostTotal: 12, discountAmountTotal: 7 }), RECEIVED).event.payload;
+    expect(o).toMatchObject({ test: false, transactionId: "t".repeat(100), shippingCents: 150, shippingTaxCents: 12, discountCents: 7 });
+    expect(extendOrderEvent(order({ transactionId: "t".repeat(100) }), RECEIVED).event.payload.transactionId).toBe("t".repeat(100));
+    expect(JSON.stringify(o)).not.toMatch(/gift|example\.test|Recipient/);
+  });
+
+  it("dead-letters a currency that isn't three capital letters, and an order status that isn't Extend's spelling", () => {
+    for (const currency of ["USDX", "XUSD", ["USD"], "US"]) {
+      expect(extendContractEvent(contract({ purchaseCurrency: currency }), RECEIVED).event.payload.problems, JSON.stringify(currency)).toEqual(["contract has no currency that reads"]);
+      expect(extendOrderEvent(order({ currency }), RECEIVED).event.payload.problems, JSON.stringify(currency)).toEqual(["order has no currency that reads"]);
+    }
+    for (const status of ["OPEN", "Open", "cancelled", ["open"], ""]) expect(extendOrderEvent(order({ status }), RECEIVED).event.payload.problems, JSON.stringify(status)).toEqual(["order has a status that doesn't read"]);
+  });
 });
 
 describe("Extend connector", () => {
@@ -561,6 +608,7 @@ describe("Extend connector", () => {
       [null, true, null, NOW_MS],
     ]);
     expect(all.map((b) => b.events.length)).toEqual([3, 1, 1, 1]);
+    expect(eventsOf(all).map((e) => e.receivedAt)).toEqual(Array(6).fill(RECEIVED));
     const mock = extendDocMock(data);
     const resumed = await drain(connector(mock, { now: () => new Date(NOW_MS + DAY) }).historicalImport({ organizationId: TEST_ORG, cursor: all[1]!.cursor }));
     expect(reads(mock)).toEqual(["/orders/search next", "/orders/search next"]);
@@ -595,7 +643,8 @@ describe("Extend connector", () => {
       orders: [order({ id: "o-in", createdAt: since / 1000, updatedAt: since / 1000 }), order({ id: "o-out", createdAt: since / 1000 + 1, updatedAt: since / 1000 - 1 })],
     });
     const mock = extendDocMock(data);
-    const batches = await drain(connector(mock).incrementalSync({ organizationId: TEST_ORG, cursor: JSON.stringify({ step: null, page: null, since: null, started }) }));
+    // The window comes from when the last pass started, whatever window that pass had.
+    const batches = await drain(connector(mock).incrementalSync({ organizationId: TEST_ORG, cursor: JSON.stringify({ step: null, page: null, since: 0, started }) }));
     expect(eventsOf(batches).map((e) => e.payload.contractId ?? e.payload.orderId)).toEqual(["extend:contract:c-in", "extend:order:o-in"]);
     expect(reads(mock)).toEqual(["/contracts/search first", "/orders/search first", "/orders/search next"]);
     expect(batches.map((b) => parseExtendCursor(b.cursor))).toEqual([
@@ -697,6 +746,8 @@ describe("Extend connector", () => {
       { step: "claims", page: null, since: null, started: 0 },
       { step: "contracts", page: "abc", since: null, started: 0 },
       { step: null, page: "abc", since: null, started: 0 },
+      { step: null, page: "", since: null, started: 0 },
+      { step: null, page: 0, since: null, started: 0 },
       { step: "orders", page: "", since: null, started: 0 },
       { step: "orders", page: "a b", since: null, started: 0 },
       { step: "orders", page: "c".repeat(4097), since: null, started: 0 },

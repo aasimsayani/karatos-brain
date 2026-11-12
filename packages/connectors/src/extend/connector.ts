@@ -59,9 +59,10 @@ export function parseExtendCursor(raw: string | null): ExtendCursor | null {
   } catch {
     throw new Error(MESSAGE);
   }
-  if (typeof c !== "object" || c === null) throw new Error(MESSAGE);
+  if (c === null) throw new Error(MESSAGE);
   const r = c as Record<string, unknown>;
-  if (Object.keys(r).sort().join(",") !== "page,since,started,step") throw new Error(MESSAGE);
+  // The four fields, each checked below, and nothing else.
+  if (Object.keys(r).length > 4) throw new Error(MESSAGE);
   const timesOk = isTime(r.started) && (r.since === null || isTime(r.since));
   const stepOk = (r.step === null && r.page === null) || (r.step === "contracts" && r.page === null) || (r.step === "orders" && (r.page === null || isExtendCursor(r.page)));
   if (!timesOk || !stepOk) throw new Error(MESSAGE);
@@ -81,7 +82,7 @@ export function extendConnector(options: ExtendOptions): Connector {
     if (state.step === "contracts") {
       const contracts = await client.contracts();
       const receivedAt = now().toISOString();
-      state = { ...state, step: "orders", page: null };
+      state = { ...state, step: "orders" };
       yield { events: kept(contracts.map((c) => extendContractEvent(c, receivedAt)), state.since), cursor: JSON.stringify(state) };
     }
     while (state.step === "orders") {
@@ -95,10 +96,8 @@ export function extendConnector(options: ExtendOptions): Connector {
   const fresh = (since: number | null): ExtendCursor => ({ step: "contracts", page: null, since, started: now().getTime() });
 
   async function* historicalImport(context: SyncContext): AsyncIterable<SourceBatch> {
-    const saved = parseExtendCursor(context.cursor);
-    // A finished import has nothing left to read, so it yields nothing.
-    if (saved?.step === null) return;
-    yield* pass(saved ?? fresh(null));
+    // A finished import has nothing left to read, so its pass yields nothing.
+    yield* pass(parseExtendCursor(context.cursor) ?? fresh(null));
   }
 
   async function* incrementalSync(context: SyncContext): AsyncIterable<SourceBatch> {

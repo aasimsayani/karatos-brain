@@ -56,7 +56,7 @@ const CANCELLATION_REASONS = new Set(["fraud_identified", "merchant_refund", "sp
 const PLAN_CATEGORIES = new Set(["service_contract", "shipping_contract"]);
 const SERVICE_TYPES = new Set(["repair", "replace", "repair_depot", "repair_onsite", "repair_irobot"]);
 /** Order statuses, as order.updated names them. */
-const ORDER_STATUSES = new Map<string, string>([
+const ORDER_STATUSES: ReadonlyMap<unknown, string> = new Map([
   ["pending", "PENDING"],
   ["open", "OPEN"],
   ["closed", "CLOSED"],
@@ -71,7 +71,7 @@ const digest = (value: unknown) => createHash("sha256").update(JSON.stringify(va
 const obj = (v: unknown) => (typeof v === "object" && v !== null && !Array.isArray(v) ? (v as Record<string, unknown>) : {});
 const text = (value: unknown, max = 200) => (typeof value === "string" && value.trim() ? value.trim().slice(0, max) : undefined);
 const defined = (fields: Record<string, unknown>) => Object.fromEntries(Object.entries(fields).filter(([, v]) => v !== undefined));
-const known = (set: Set<string>, value: unknown) => (typeof value === "string" && set.has(value) ? value : undefined);
+const known = (set: ReadonlySet<unknown>, value: unknown) => (set.has(value) ? (value as string) : undefined);
 
 export const extendRef = (kind: string, id: string) => `extend:${kind}:${id}`;
 
@@ -188,7 +188,7 @@ export function extendOrderEvent(raw: unknown, receivedAt: string): ExtendRead {
   const currency = typeof o.currency === "string" && CURRENCY.test(o.currency) ? o.currency : undefined;
   if (!currency) problems.push("order has no currency that reads");
   // Extend's docs don't mark the status as always there: one that is missing is left out, one that isn't Extend's is a problem.
-  const status = o.status === undefined || o.status === null ? undefined : typeof o.status === "string" ? ORDER_STATUSES.get(o.status) : undefined;
+  const status = ORDER_STATUSES.get(o.status);
   if (o.status !== undefined && o.status !== null && !status) problems.push("order has a status that doesn't read");
   const createdAt = extendTime(o.createdAt);
   const updatedAt = extendTime(o.updatedAt) ?? createdAt;

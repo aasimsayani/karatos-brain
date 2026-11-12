@@ -42,8 +42,8 @@ export const EXTEND_CLIENT_ASSERTION = "urn:ietf:params:oauth:client-assertion-t
 
 /** Extend doesn't say what client IDs and secrets look like, so any 8 to 512 visible ASCII characters are taken. */
 const CREDENTIAL = /^[!-~]{8,512}$/;
-/** A store ID is a UUID, as the docs' examples are. */
-const STORE_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+/** A store ID is a UUID, as the docs' examples are; it is lowercased before it is checked. */
+const STORE_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 const TOKEN = /^[A-Za-z0-9._~+/=-]{8,8192}$/;
 /** Extend's cursors are opaque; the docs' example is base64. */
 const CURSOR_MAX = 4096;
@@ -103,7 +103,7 @@ export interface ExtendClient {
   orders(cursor: string | null): Promise<ExtendOrderPage>;
 }
 
-export const isExtendCursor = (v: unknown): v is string => typeof v === "string" && v.length > 0 && v.length <= CURSOR_MAX && /^[!-~]+$/.test(v);
+export const isExtendCursor = (v: unknown): v is string => typeof v === "string" && v.length <= CURSOR_MAX && /^[!-~]+$/.test(v);
 
 /** Extend's error code, when it gives one that reads. The message is never kept. */
 function codeOf(body: unknown): string | undefined {
@@ -151,8 +151,9 @@ export function extendClient(options: ExtendClientOptions): ExtendClient {
     if (status !== 200) throw new ExtendApiError(`Extend answered HTTP ${status} for a token`, status, codeOf(body));
     const value = body?.access_token;
     if (typeof value !== "string" || !TOKEN.test(value)) throw new ExtendApiError("Extend answered without a token", status);
-    // A lifetime that is missing or not a whole number of seconds means the token is asked for again next time.
-    const seconds = Number.isSafeInteger(body!.expires_in) && (body!.expires_in as number) > 0 ? (body!.expires_in as number) : 0;
+    // A lifetime that is missing or not a whole number of seconds means the token is asked for again next time;
+    // so does one of a minute or less, zero or below included, as it ends inside the margin.
+    const seconds = Number.isSafeInteger(body!.expires_in) ? (body!.expires_in as number) : 0;
     token = { value, until: now().getTime() + seconds * 1000 - TOKEN_MARGIN_MS };
     return value;
   }
@@ -190,7 +191,7 @@ export function extendClient(options: ExtendClientOptions): ExtendClient {
       const query = new URLSearchParams({ storeId });
       if (cursor !== null) query.set("cursor", cursor);
       const body = (await get(EXTEND_ORDERS_PATH, query, "orders")) as { orders?: unknown; nextPageCursor?: unknown } | null;
-      const next = body?.nextPageCursor === undefined || body.nextPageCursor === null || body.nextPageCursor === "" ? null : body.nextPageCursor;
+      const next = body?.nextPageCursor === undefined || body.nextPageCursor === "" ? null : body.nextPageCursor;
       if (!Array.isArray(body?.orders) || (next !== null && !isExtendCursor(next))) throw new ExtendApiError("Extend answered the orders without a page that reads", 200);
       // A cursor that comes back unchanged would read the same page forever.
       if (next !== null && next === cursor) throw new ExtendApiError("Extend answered the orders with the same cursor again", 200);
