@@ -41,7 +41,7 @@ A jewelry store is a showroom, a repair bench, a custom studio, a gold buyer, an
 What you get in return:
 
 - **Read-only by default.** KaratOS reads your systems and never changes them unless you turn on a specific action.
-- **Your data stays yours.** Each business runs its own isolated instance. Self-host it for free, or let us host it.
+- **Your data stays yours.** Each business runs its own isolated instance. Self-host it for free, or let us host it. A private instance can be supported with a support key that sees its health and sync status, never its records.
 - **Gets sharper with every system you add.** POS alone shows what sells. Add the bank and the books, and it shows true margin and cash that never reached the bank.
 - **Learns from you.** Every accept, reject and adjustment is kept, so the advice gets better.
 
@@ -182,7 +182,7 @@ The table is generated from the [integration catalog](docs/integrations.md), so 
 | Gmail | Imports five years of mail metadata from one mailbox: who wrote to whom, when, which thread and which labels | Clienteling, Buying, Custom orders |
 | Google Workspace and Drive | Imports the names, types, folders, sizes and edit times of the files in the folder the business shares, then keeps up with every change | Finance, Compliance |
 | Slack | Imports five years of messages and threads from the channels the KaratOS app is invited to, and nothing else | Sales, Repairs, Custom orders |
-| Instagram DMs, Facebook Messenger and WhatsApp Business | Imports every Messenger and Instagram conversation from the last five years, then keeps them current on each sync | Clienteling, Marketing, Sales |
+| Instagram DMs, Facebook Messenger and WhatsApp Business | Imports the latest 20 messages of every Messenger and Instagram conversation from the last five years, then keeps them current | Clienteling, Marketing, Sales |
 | Lightspeed Retail | Imports five years of sales and returns from every outlet, with every product, stock level and customer, then keeps them current | Sales, Inventory, Clienteling, Repairs |
 | Square | Imports five years of orders, payments and refunds from every location, then keeps them current | Sales, Inventory, Clienteling, Repairs |
 | Clover | Imports five years of Clover orders, payments and refunds, then keeps them current as they change | Sales, Inventory, Clienteling, Repairs |
@@ -451,6 +451,7 @@ This repository is public. Never commit a secret, customer data, a bank statemen
 - Use test-only sandbox accounts for connector tests, never a client's.
 - CI runs `npm run secrets:scan` on every push.
 - Raw vendor payloads are cleared after 30 days; the facts drawn from them, and the links back to their source, stay.
+- `SUPPORT_API_KEY` lets someone debug an instance without reaching its data: it opens only the health, integrations and support status routes. See [support access](docs/security.md#support-access-without-seeing-data).
 - How the code, the instance API, the website and CI are protected is in [docs/security.md](docs/security.md).
 
 </details>
