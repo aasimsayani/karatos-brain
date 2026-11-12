@@ -42,6 +42,7 @@ export * from "./judgeme/index.js";
 export * from "./klaviyo/index.js";
 export * from "./lightspeed/index.js";
 export * from "./mailchimp/index.js";
+export * from "./meta/index.js";
 export * from "./meta_ads/index.js";
 export * from "./metals_api/index.js";
 export * from "./microsoft_onedrive/index.js";

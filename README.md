@@ -182,6 +182,7 @@ The table is generated from the [integration catalog](docs/integrations.md), so 
 | Gmail | Imports five years of mail metadata from one mailbox: who wrote to whom, when, which thread and which labels | Clienteling, Buying, Custom orders |
 | Google Workspace and Drive | Imports the names, types, folders, sizes and edit times of the files in the folder the business shares, then keeps up with every change | Finance, Compliance |
 | Slack | Imports five years of messages and threads from the channels the KaratOS app is invited to, and nothing else | Sales, Repairs, Custom orders |
+| Instagram DMs, Facebook Messenger and WhatsApp Business | Imports every Messenger and Instagram conversation from the last five years, then keeps them current on each sync | Clienteling, Marketing, Sales |
 | Lightspeed Retail | Imports five years of sales and returns from every outlet, with every product, stock level and customer, then keeps them current | Sales, Inventory, Clienteling, Repairs |
 | Square | Imports five years of orders, payments and refunds from every location, then keeps them current | Sales, Inventory, Clienteling, Repairs |
 | Clover | Imports five years of Clover orders, payments and refunds, then keeps them current as they change | Sales, Inventory, Clienteling, Repairs |
@@ -284,7 +285,7 @@ This section updates itself from [docs/milestones.json](docs/milestones.json) an
 
 **Roadmap:** 20 of 81 items done. An integration counts as done once it has run against a real or sandbox account, not when its tests pass.
 
-**Integrations:** 93 of the 253 systems in the catalog are built and tested against mocks made from each vendor's docs. 0 have been checked live so far.
+**Integrations:** 94 of the 253 systems in the catalog are built and tested against mocks made from each vendor's docs. 0 have been checked live so far.
 
 | Milestone | What it gives a jeweler | Progress | Target |
 | --- | --- | --- | --- |

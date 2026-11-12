@@ -384,6 +384,7 @@ export const CONNECTED_ON: Readonly<Record<string, string>> = {
   repairshopr: "2026-11-11",
   smile_io: "2026-11-11",
   zendesk: "2026-11-11",
+  meta: "2026-11-12",
   watchbase_datafeed: "2026-11-11",
   imap_email: "2026-11-11",
   watchtraderhub: "2026-11-11",
