@@ -737,11 +737,11 @@ describe("WatchBase connector", () => {
     const closed = await sync(connector(done, { brands: "902" }), { synced: [[902, "2026-11-10"]], pass: { started: "2026-11-10", brand: 905, after: 3 } });
     expect(closed).toEqual([{ events: [], cursor: JSON.stringify({ synced: [[902, "2026-11-10"]], pass: null }) }]);
     expect(done.reads).toEqual([]);
-    // A pass that stopped in a later brand reads a brand listed before it from the start; finishing that brand
-    // ends the place it had, so the later brand is read in full again (its repeats are duplicates).
+    // A pass that stopped in a later brand finishes that brand first, from where it stopped, then reads the brand listed before it,
+    // so no watch is read (and paid for) twice.
     const order = watchbaseDocMock(store());
     await sync(connector(order, { brands: "901, 902" }), { synced: [], pass: { started: TODAY, brand: 902, after: 6002 } });
-    expect(paths(order).filter((p) => p.startsWith("/v1/watch?"))).toEqual([...Array.from({ length: 30 }, (_, i) => `/v1/watch?id=${5001 + i}&format=json`), ...[6001, 6002, 6003].map((id) => `/v1/watch?id=${id}&format=json`)]);
+    expect(paths(order).filter((p) => p.startsWith("/v1/watch?"))).toEqual([`/v1/watch?id=6003&format=json`, ...Array.from({ length: 30 }, (_, i) => `/v1/watch?id=${5001 + i}&format=json`)]);
     // A checkpoint that marks a brand read on the pass's day but stopped inside it goes on inside it, and stays open until it is done.
     const inside = { synced: [[902, "2026-01-05"]], pass: { started: "2026-01-05", brand: 902, after: 6001 } } satisfies WatchbaseCursor;
     const one = await sync(connector(watchbaseDocMock(store()), { brands: "902", maxWatches: 1 }), inside);

@@ -192,7 +192,9 @@ export function watchbaseConnector(options: WatchbaseOptions): Connector {
       return JSON.stringify({ synced: kept, pass: finished ? null : current } satisfies WatchbaseCursor);
     };
 
-    for (const brand of brands) {
+    // A pass that stopped inside a brand finishes that brand first, so reordering the setting never reads (and pays for) it again.
+    const order = current.brand === null ? brands : [current.brand, ...brands.filter((b) => b !== current.brand)];
+    for (const brand of order) {
       // A brand read on the day this pass began, and not the one it stopped in, is done.
       if (synced.get(brand) === current.started && current.brand !== brand) continue;
       if (budget === 0) return;
