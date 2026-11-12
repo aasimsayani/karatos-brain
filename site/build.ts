@@ -635,7 +635,7 @@ section{padding:var(--section) 0;border-top:1px solid var(--line);scroll-margin-
 .ladder p{margin:0;color:var(--ink-2);font-size:15px}
 #partners .rules{margin-bottom:var(--space-4)}
 @media (max-width:760px){.filters{grid-template-columns:1fr}.ladder{grid-template-columns:1fr}}
-.pillars{display:grid;grid-template-columns:repeat(3,1fr);gap:var(--space-3)}
+.pillars{display:grid;grid-template-columns:repeat(2,1fr);gap:var(--space-3)}
 .pillars div{padding-top:var(--space-3);border-top:2px solid var(--gold)}
 .pillars h3{margin:0 0 8px;font-size:18px}
 .pillars p{margin:0;color:var(--ink-2)}
@@ -898,6 +898,7 @@ ${writeRules}
   <div class="pillars">
     <div><h3>No one else sees it</h3><p>On Core, once setup is done we have no access. On Managed, we reach your instance only to keep it running. Either way, your sales, customers, statements and margins stay in your instance.</p></div>
     <div><h3>Nothing shared by default</h3><p>Your data is never used to price, benchmark or advise another business unless you both opt in.</p></div>
+    <div><h3>Help without handing over your records</h3><p>If you want help running it, give your helper a support key instead of your main one. It shows whether each connection is set up and syncing, its last error with anything sensitive blanked out, and how many records came in each day, but never your sales, customers, amounts or recommendations, and it can't change anything. Remove the key to take it back.</p></div>
     <div><h3>You choose who runs it</h3><p>Have the bandwidth? Keep it in your own accounts on Core. Rather not? Managed means we host it, keep it current and fix connections when a vendor changes something.</p></div>
   </div>
 </div></section>

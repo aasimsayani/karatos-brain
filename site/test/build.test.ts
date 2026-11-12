@@ -13,6 +13,14 @@ const sectionOf = (id: string) => {
 };
 
 describe("KaratOS website", () => {
+  it("explains the support key without promising more than it does", () => {
+    const section = html.slice(html.indexOf('<section id="your-data">'), html.indexOf('<section id="departments">'));
+    expect(section).toContain("support key");
+    expect(section).toMatch(/never your sales, customers, amounts or recommendations/);
+    expect(section).toMatch(/how many records came in each day/);
+    expect(section).toMatch(/can't change anything/);
+  });
+
   it("lists every data integration from the catalog", () => {
     const missing = INTEGRATIONS.filter((i) => i.departments.length > 0 && !html.includes(`<h3>${escapeHtml(i.name)}</h3>`)).map((i) => i.id);
     expect(missing).toEqual([]);
