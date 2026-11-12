@@ -259,7 +259,7 @@ export const SYSTEM_DETAILS: Readonly<Record<string, SystemDetail>> = {
   // Insurance
   jewelers_mutual: { about: "Care plans sold and the claims made on them.", company: "Jewelers Mutual" },
   briteco: { about: "Appraisals and insurance offered at the point of sale." },
-  extend: { about: "Protection plans sold online and the claims made on them." },
+  extend: { about: "Protection plans sold with each product, and the orders they were sold on." },
   jm_zing_appraisal: { about: "Appraisals, consumer claim files and diamond searches.", company: "Jewelers Mutual" },
   zillion: { about: "Watch insurance enrolled at the point of sale." },
   lavalier: { about: "Watch and jewelry cover customers bought through the store." },
@@ -385,6 +385,7 @@ export const CONNECTED_ON: Readonly<Record<string, string>> = {
   gem_logic: "2026-11-11",
   smile_io: "2026-11-11",
   zendesk: "2026-11-11",
+  extend: "2026-11-11",
   jm_shipping_solution: "2026-11-11",
   meta: "2026-11-12",
   watchbase_datafeed: "2026-11-11",

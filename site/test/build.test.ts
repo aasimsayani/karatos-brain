@@ -366,7 +366,9 @@ describe("KaratOS website", () => {
     // Every card for a kind with a built system comes before any card without one.
     const cards = value.split('<li class="value">').slice(1);
     const live = cards.map((c) => c.includes("Connected today:"));
-    expect(live.indexOf(false)).toBe(live.filter(Boolean).length);
+    // Once every kind has a built system, no card is without one.
+    const firstBare = live.indexOf(false);
+    expect(firstBare === -1 ? live.length : firstBare).toBe(live.filter(Boolean).length);
     expect(live.filter(Boolean).length).toBe(new Set(built.map((i) => i.domain)).size);
     const bare = cards.find((c) => !c.includes("Connected today:") && !c.includes("Building now:"));
     if (bare) expect(bare).toMatch(/On the roadmap:<\/strong> \d+ system/);
