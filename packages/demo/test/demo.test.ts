@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { INTEGRATIONS } from "@karatos/core";
 import { assertSynthetic } from "@karatos/connector-testkit";
 import {
+  DEMO_BULK,
   DEMO_CASH_DEPOSITS,
   DEMO_CUSTOMERS,
   DEMO_INVOICES,
@@ -14,6 +15,7 @@ import {
   DEMO_SALES,
   DEMO_SOURCES,
   DEMO_SPOT,
+  bulkStore,
   createDemoApp,
   demoCalendar,
   demoCalls,
@@ -42,7 +44,7 @@ const seeded = async () => (brain ??= await seedDemo({ now: NOW }));
 describe("the demo store", () => {
   it("runs every demo source through its real connector without losing a record", async () => {
     const { sources } = await seeded();
-    expect(sources.map((s) => s.integration)).toEqual(["metals_api", "inventory_pos", "plaid", "quickbooks", "twilio", "watchsearch"]);
+    expect(sources.map((s) => s.integration)).toEqual(["metals_api", "inventory_pos", "supplier_invoices", "plaid", "quickbooks", "twilio", "watchsearch"]);
     for (const source of sources) {
       expect(source.ingested, source.integration).toBeGreaterThan(0);
       expect(source.deadLettered, source.integration).toBe(0);
@@ -50,33 +52,66 @@ describe("the demo store", () => {
     }
   });
 
+  it("is the size of a busy store, and its everyday business raises nothing on its own", async () => {
+    expect(DEMO_ITEMS.length).toBeGreaterThanOrEqual(200);
+    expect(DEMO_CUSTOMERS.length).toBeGreaterThanOrEqual(250);
+    expect(DEMO_SALES.filter((s) => !s.returnOf).length).toBeGreaterThanOrEqual(1_200);
+    const lastYear = DEMO_SALES.filter((s) => s.daysAgo <= 365).reduce((sum, s) => sum + (s.returnOf ? -1 : 1) * s.unitCents * s.quantity, 0);
+    expect(lastYear).toBeGreaterThan(300_000_000);
+    // The same store on every seed.
+    expect(bulkStore()).toEqual(DEMO_BULK);
+    const { recommendations } = await seeded();
+    const everyday = /ES-2\d{3}|C-2\d{3}|T-6\d{2}/;
+    expect(recommendations.filter((r) => everyday.test(r.id) || everyday.test(r.summary)).map((r) => r.id)).toEqual([]);
+  });
+
   it("gives the dashboard a recommendation in each department the store's systems feed", async () => {
     const { recommendations } = await seeded();
     expect(recommendations.map((r) => keyOf(r.id)).sort()).toEqual(
       [
+        "rec_buying_memo_demo_diamond_exchange/M-7731/1",
         "rec_buying_watch_wanted_Rolex_126500LN",
         "rec_clienteling_lapsed_pos:generic:customer:C-1003",
+        "rec_clienteling_lapsed_pos:generic:customer:C-1009",
         "rec_clienteling_missed_calls",
         "rec_compliance_8300_sig_payment.cash_received_order_pos:generic:sale:S-4015#0_pos_generic:sale:S-4015",
         "rec_compliance_structuring_pos:generic:customer:C-1004",
+        "rec_compliance_warranty_demo_diamond_exchange_memo_M-7731",
         "rec_finance_cash_gap",
         "rec_finance_overdue_receivables",
         "rec_inventory_aged_ES-1002",
         "rec_inventory_aged_ES-1005",
+        "rec_inventory_aged_ES-1010",
         "rec_inventory_reorder_ES-1001",
         "rec_inventory_reorder_ES-1003",
+        "rec_inventory_reorder_ES-1011",
         "rec_metals_move_gold",
+        "rec_repairs_late_T-501",
+        "rec_repairs_pickup_T-502",
+        "rec_repairs_unclaimed_T-503",
+        "rec_repairs_late_T-506",
+        "rec_repairs_pickup_T-507",
         "rec_sales_returns_ES-1004",
       ].sort(),
     );
     const text = recommendations.map((r) => r.summary).join("\n");
-    expect(text).toContain("Gold is up 6.1%");
+    expect(text).toContain("Gold is up 6.1% ($3,808.48 to $4,040.00 per ounce)");
     expect(text).toContain("$14,900.00 in cash was received");
-    expect(text).toContain("$4,650.00 across 2 invoices");
+    expect(text).toContain("$7,050.00 across 3 invoices");
     // The two branch deposits count; the $14,900 from three days ago hasn't gone in.
     expect(text).toContain("$25,590.00 in cash sales over the last 30 days but only $10,690.00 in cash deposits");
     expect(text).toContain("2 callers rang the store 3 times");
     expect(text).toContain("3 dealers in your WhatsApp groups have asked for the Rolex 126500LN");
+    // Repairs from the POS's repair export, and the memo from the supplier's paperwork.
+    expect(text).toContain("Repair T-501 (14K yellow gold ring) is 5 days past its promised date");
+    expect(text).toContain("Repair T-502 (Sterling silver chain) has been ready for 52 days");
+    expect(text).toContain("Repair T-503 has been ready for 240 days");
+    expect(text).toContain("Repair T-506 (Estate diamond brooch) is 2 days past its promised date and still sent out");
+    expect(text).toContain("Repair T-507 (Steel automatic watch) has been ready for 34 days");
+    expect(text).toContain("Sawyer Fauxman has spent $12,050.00 with you but hasn't bought in 430 days");
+    expect(text).toContain("Reorder 14K White Gold Diamond Stud Earrings, 1.00 ctw (ES-1011): 4 sold in the last 60 days and 1 left.");
+    expect(text).toContain("is due back in 5 days. It has sold, so settle the memo and pay $8,200.00.");
+    expect(text).toContain("Memo M-7731 from demo_diamond_exchange");
     for (const r of recommendations) {
       expect(r.organizationId).toBe(DEMO_ORGANIZATION);
       expect(r.degraded).toBe(false);
@@ -172,7 +207,7 @@ describe("the demo API", () => {
     expect((await call("GET", "/v1/recommendations", undefined, ["wrong", "x".repeat(40)].join("-"))).status).toBe(401);
     const recs = await call("GET", "/v1/recommendations?limit=200");
     expect(recs.status).toBe(200);
-    expect(recs.body.recommendations).toHaveLength(13);
+    expect(recs.body.recommendations).toHaveLength(23);
     const signals = await call("GET", "/v1/signals?kind=bank.balance");
     expect(signals.body.signals.length).toBeGreaterThan(0);
     expect((await call("GET", "/healthz", undefined, null)).status).toBe(200);
@@ -197,7 +232,7 @@ describe("the demo API", () => {
     const event = { id: "evt_1", type: "sale.completed", occurredAt: NOW.toISOString(), receivedAt: NOW.toISOString(), idempotencyKey: "x", payload: {} };
     expect(await call("POST", "/v1/events", event)).toEqual({ status: 403, body: { error: "the demo store is read-only" } });
     expect(await call("POST", "/v1/reason", {})).toEqual({ status: 403, body: { error: "the demo store is read-only" } });
-    expect((await call("GET", "/v1/recommendations")).body.recommendations).toHaveLength(13);
+    expect((await call("GET", "/v1/recommendations")).body.recommendations).toHaveLength(23);
   });
 
   it("takes Accept and Dismiss as feedback, up to its limit", async () => {

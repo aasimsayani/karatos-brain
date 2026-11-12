@@ -28,6 +28,9 @@ export interface SeedOptions {
   sources?: readonly DemoSource[];
 }
 
+/** Signals the demo brain reasons over: well above the several thousand the demo store makes. */
+export const DEMO_REASONING_WINDOW = 20_000;
+
 const noDocs = { current: () => ({ documentIds: [], stale: false }) };
 
 /**
@@ -39,7 +42,8 @@ export async function seedDemo(options: SeedOptions = {}): Promise<DemoBrain> {
   const calendar = demoCalendar(options.now ?? new Date());
   const memory = new InMemoryStore();
   // The brain runs on the demo calendar, so what it says matches the dates in the data.
-  const pipeline = new BrainPipeline({ memory, documentation: noDocs, now: () => calendar.now, ...combineDepartments(RETAIL_DEPARTMENTS) });
+  // The window holds every signal the demo store makes, so the earliest sources (metal prices) still count.
+  const pipeline = new BrainPipeline({ memory, documentation: noDocs, now: () => calendar.now, reasoningWindow: DEMO_REASONING_WINDOW, ...combineDepartments(RETAIL_DEPARTMENTS) });
   const sources: DemoSourceReport[] = [];
   for (const source of options.sources ?? DEMO_SOURCES) {
     const reports: SyncReport[] = [];
