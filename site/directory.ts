@@ -178,7 +178,7 @@ export const SYSTEM_DETAILS: Readonly<Record<string, SystemDetail>> = {
   master_casting_cad: { about: "Casting and 3D print orders, cost estimates and status." },
   bransom_bsmart: { about: "Supplier price, image and product line feeds." },
   hoover_strong_myauction: { about: "Refining lots and settlements, metal orders and goods sold through myAuction." },
-  watchbase_datafeed: { about: "Watch reference specs, calibers and images for listings." },
+  watchbase_datafeed: { about: "Watch reference specs and calibers for listings, by brand." },
   wholesalr: { about: "Dealer-to-dealer watch wholesale listings and alerts." },
   worldwatch_market: { about: "Inventory shared across a network of watch dealers." },
 
@@ -385,6 +385,7 @@ export const CONNECTED_ON: Readonly<Record<string, string>> = {
   smile_io: "2026-11-11",
   zendesk: "2026-11-11",
   extend: "2026-11-11",
+  watchbase_datafeed: "2026-11-11",
   imap_email: "2026-11-11",
   watchtraderhub: "2026-11-11",
   acuity: "2026-11-11",
