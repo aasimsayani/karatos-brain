@@ -17,6 +17,7 @@ import calendly from "./calendly.js";
 import cin7 from "./cin7.js";
 import clover from "./clover.js";
 import custom_forms from "./custom_forms.js";
+import deputy from "./deputy.js";
 import docusign from "./docusign.js";
 import dropbox from "./dropbox.js";
 import ebay from "./ebay.js";
@@ -36,6 +37,8 @@ import hubspot from "./hubspot.js";
 import idex from "./idex.js";
 import jm_shipping_solution from "./jm_shipping_solution.js";
 import judgeme from "./judgeme.js";
+import katana from "./katana.js";
+import klarna from "./klarna.js";
 import klaviyo from "./klaviyo.js";
 import lightspeed from "./lightspeed.js";
 import mailchimp from "./mailchimp.js";
@@ -100,6 +103,7 @@ export * from "./calendly.js";
 export * from "./cin7.js";
 export * from "./clover.js";
 export * from "./custom_forms.js";
+export * from "./deputy.js";
 export * from "./docusign.js";
 export * from "./dropbox.js";
 export * from "./ebay.js";
@@ -119,6 +123,8 @@ export * from "./hubspot.js";
 export * from "./idex.js";
 export * from "./jm_shipping_solution.js";
 export * from "./judgeme.js";
+export * from "./katana.js";
+export * from "./klarna.js";
 export * from "./klaviyo.js";
 export * from "./lightspeed.js";
 export * from "./mailchimp.js";
@@ -167,7 +173,7 @@ export * from "./zendesk.js";
 export * from "./zoom.js";
 
 /** Every mock module, one per catalog integration. */
-export const DOC_MOCK_MODULES: readonly DocMockModule[] = [acuity, affirm, afterpay, airtable, amazon, asana, aurora_payments, authorize_net, avalara, bci_e_jewelry, bigcommerce, bill_com, birdeye, calendly, cin7, clover, custom_forms, docusign, dropbox, ebay, etsy, extend, fedex, gia, gmail, google_ads, google_analytics, google_business_profile, google_workspace, gorgias, gusto, hrd, hubspot, idex, jm_shipping_solution, judgeme, klaviyo, lightspeed, mailchimp, meta, meta_ads, microsoft_onedrive, microsoft_outlook, microsoft_teams, monday, netsuite, nfusion, nivoda, notion, openphone, pinterest, plaid, quickbooks, ramp, rapnet, repairshopr, ringcentral, search_the_watch_market, shipstation, slack, smile_io, sola_payments, square, squarespace, stuller, taxjar, tiktok, tiktok_ads, trello, trustpilot, ups, verkada, watchbase_datafeed, watchtraderhub, whatnot, wix, woocommerce, xero, yext, yotpo, zendesk, zoom];
+export const DOC_MOCK_MODULES: readonly DocMockModule[] = [acuity, affirm, afterpay, airtable, amazon, asana, aurora_payments, authorize_net, avalara, bci_e_jewelry, bigcommerce, bill_com, birdeye, calendly, cin7, clover, custom_forms, deputy, docusign, dropbox, ebay, etsy, extend, fedex, gia, gmail, google_ads, google_analytics, google_business_profile, google_workspace, gorgias, gusto, hrd, hubspot, idex, jm_shipping_solution, judgeme, katana, klarna, klaviyo, lightspeed, mailchimp, meta, meta_ads, microsoft_onedrive, microsoft_outlook, microsoft_teams, monday, netsuite, nfusion, nivoda, notion, openphone, pinterest, plaid, quickbooks, ramp, rapnet, repairshopr, ringcentral, search_the_watch_market, shipstation, slack, smile_io, sola_payments, square, squarespace, stuller, taxjar, tiktok, tiktok_ads, trello, trustpilot, ups, verkada, watchbase_datafeed, watchtraderhub, whatnot, wix, woocommerce, xero, yext, yotpo, zendesk, zoom];
 
 /** Every doc-derived mock, with empty data, for checks and the vendor docs watch. */
 export function allDocMocks(): DocMock[] {
