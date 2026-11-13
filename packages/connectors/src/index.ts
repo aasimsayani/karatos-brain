@@ -42,6 +42,8 @@ export * from "./imap_email/index.js";
 export * from "./inventory_pos/index.js";
 export * from "./jm_shipping_solution/index.js";
 export * from "./judgeme/index.js";
+export * from "./katana/index.js";
+export * from "./klarna/index.js";
 export * from "./klaviyo/index.js";
 export * from "./lightspeed/index.js";
 export * from "./mailchimp/index.js";
