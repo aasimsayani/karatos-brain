@@ -1,11 +1,12 @@
 <h1 align="center">KaratOS</h1>
 
-<p align="center"><strong>The open-source brain for jewelry businesses.</strong><br>
-It reads the systems you already run, sees what none of them can see alone, and hands each department a short list of what to do today.</p>
+<p align="center"><strong>The operating brain for jewelry businesses, built on an open core.</strong><br>
+It reads the systems you already run, sees what none of them can see alone, and hands each department a short list of what to do today, with the evidence behind each item.</p>
 
 <p align="center">
   <a href="https://karatos.app/demo/">Live demo</a> ·
   <a href="https://karatos.app/">Website</a> ·
+  <a href="#holiday-pilot-november-2122-2026">Holiday pilot</a> ·
   <a href="docs/integrations.md">Integrations</a> ·
   <a href="docs/roadmap.md">Roadmap</a> ·
   <a href="CHANGELOG.md">Changelog</a> ·
@@ -26,7 +27,7 @@ It reads the systems you already run, sees what none of them can see alone, and 
 
 Most of these need two systems read together. The gold move comes from a metals price feed and the 140 pieces from the POS. The cash gap needs the POS and the bank side by side. The Form 8300 needs the sale, the payment type and the date. KaratOS reads them as one, and every item links to the exact records behind it, so you can check before you act. *(The numbers are made up. See them live in the [demo store](docs/demo.md).)*
 
-**Who it's for:** independent jewelers with one to five stores, online and hybrid jewelry brands, and studios where repairs and custom work carry the business. Anyone who already runs good systems and still decides by feel, because no one system sees the whole store.
+**Who it's for:** independent jewelers with one to five stores, online and hybrid jewelry brands, studios where repairs and custom work carry the business, and the watch dealers, wholesalers and manufacturers who work alongside them. It suits anyone who already runs good systems and still decides by feel, because no one system sees the whole business.
 
 ## Why KaratOS
 
@@ -41,7 +42,7 @@ A jewelry store is a showroom, a repair bench, a custom studio, a gold buyer, an
 What you get in return:
 
 - **Read-only by default.** KaratOS reads your systems and never changes them unless you turn on a specific action.
-- **Your data stays yours.** Each business runs its own isolated instance. Self-host it for free, or let us host it. A private instance can be supported with a support key that sees its health and sync status, never its records.
+- **Your data stays yours.** Each business runs its own isolated instance. On Core it lives in accounts the business owns; on Managed we host it, still walled off from every other client. Someone helping to run an instance can be given a support key that sees its health and sync status, never its records.
 - **Gets sharper with every system you add.** POS alone shows what sells. Add the bank and the books, and it shows true margin and cash that never reached the bank.
 - **Learns from you.** Every accept, reject and adjustment is kept, so the advice gets better.
 
@@ -80,7 +81,7 @@ These cross-department plays are built today:
 - **A gold spike becomes a cash plan.** Heavy buying from the public plus a falling price becomes a finance alert. *(Next.)*
 - **The owner's judgment teaches the system.** Every accept, reject or override is already stored with what happened next. That history will then tune which advice the system trusts. *(Next.)*
 
-| Connected | What becomes visible |
+| Systems read | What becomes visible |
 | --- | --- |
 | POS only | What sold and what sits |
 | + online store | Total demand across channels, and which pieces only sell in person |
@@ -249,8 +250,11 @@ The table is generated from the [integration catalog](docs/integrations.md), so 
 | BILL | Imports six years of supplier bills with their due dates, balances, payment status and approval status | Finance, Buying |
 | Ramp | Imports five years of company card transactions, then each one Ramp says changed since the last sync | Finance, Buying |
 | NetSuite | Imports every item and vendor and six years of orders, invoices and journal entries, then what changed on each sync | Finance, Inventory, Manufacturing, Wholesale, Buying |
+| Katana | Imports five years of manufacturing orders, then each one changed since the last sync, deleted ones as cancelled | Manufacturing, Inventory, Buying |
 | Cin7 Core | Imports every product, customer and supplier and five years of sales and purchases, then what changed on each sync | Inventory, Sales, Wholesale, Buying |
+| Klarna | Imports five years of Klarna payouts, then each new one, with every sale, return, fee and commission behind it | Sales, Finance |
 | Afterpay | Imports five years of Afterpay orders and refunds, then keeps the last 60 days current as orders are captured, refunded or voided | Sales, Finance |
+| Deputy | Imports every location, area and team member, and three years of shifts, timesheets and leave, then what changed | Sales, Finance, Manufacturing |
 | Asana | Imports five years of tasks from every project you can see, such as repairs, custom orders and production jobs, then keeps them current | Repairs, Custom orders, Buying |
 | Trello | Imports five years of cards from every board you can see, such as repairs, custom orders and buying, then keeps them current | Repairs, Custom orders, Buying |
 | Airtable | Imports five years of records from every base you share, such as memo logs, repair intake and custom orders, then keeps them current | Repairs, Custom orders, Buying, Inventory |
@@ -260,7 +264,9 @@ The table is generated from the [integration catalog](docs/integrations.md), so 
 | Microsoft OneDrive and SharePoint files | Imports the names, kinds, folders, sizes and edit times of the files in the library you share, then keeps up with every change | Finance, Compliance, Custom orders |
 | Verkada store traffic | Imports two years of hourly people counts from every counting line, then the hours since the last sync | Sales, Marketing |
 | e-Jewelry for Business Central | Imports every item and vendor and five years of sales and purchase invoices, then what changed on each sync | Inventory, Sales, Manufacturing, Wholesale, Finance, Metals |
+| Aurora Payments | Imports five years of card and ACH settlement batches, each with its transactions, then each new or settled batch | Finance, Sales |
 | Sola Payments (formerly Cardknox) | Imports five years of card and check payments and refunds, then the last two days again on each sync | Finance, Sales |
+| Gem Logic | Imports every product on each sales channel, then reads them again on each sync so a new status shows | Inventory, Sales, Repairs, Appraisals, Metals, Wholesale |
 | JM Shipping Solution | Imports five years of JM Shipping Solution shipments, then keeps the last 60 days current | Sales, Finance |
 | Whatnot | Imports every Whatnot order and product, then keeps the last 60 days of orders and every product current | Sales, Inventory, Marketing |
 | TheWatchSearch (by TheWatchCloud) | Turns the dealer WhatsApp groups the store is in into a feed of offers: brand, reference, buy or sell, price, year, condition and set | Buying, Sales, Inventory |
@@ -288,7 +294,7 @@ This section updates itself from [docs/milestones.json](docs/milestones.json) an
 
 **Roadmap:** 20 of 81 items done. An integration counts as done once it has run against a real or sandbox account, not when its tests pass.
 
-**Integrations:** 97 of the 253 systems in the catalog are built and tested against mocks made from each vendor's docs. 0 have been checked live so far.
+**Integrations:** 102 of the 253 systems in the catalog are built and tested against mocks made from each vendor's docs. 0 have been checked live so far.
 
 | Milestone | What it gives a jeweler | Progress | Target |
 | --- | --- | --- | --- |
@@ -299,7 +305,7 @@ This section updates itself from [docs/milestones.json](docs/milestones.json) an
 | Website and demo | Jewelers can see what KaratOS does for their business before they talk to us. | ██████░░░░ 60% | Nov 2026 |
 | AI reasoning | Claude explains each recommendation in plain language and learns from the owner's decisions. | ░░░░░░░░░░ 0% | Jan 2027 |
 | Self-serve AI dashboards | Owners ask a question and get a dashboard, without a developer. | ███░░░░░░░ 33% | Mar 2027 |
-| Self-hosted and managed plans | Run it yourself for free, or let us host it on the premium plan. | ███░░░░░░░ 33% | Mar 2027 |
+| Self-hosted and managed plans | Run it in your own accounts on Core, or let us host it on Managed. | ███░░░░░░░ 33% | Mar 2027 |
 | Integrations, next wave | Jewelry POS, CRM, messaging, marketing and diamond feeds join the catalog. | ░░░░░░░░░░ 0% (19 of 19 built, 0 checked live) | Dec 2026 |
 | Marketplaces, ads and office tools | Sales channels, ad spend and the files and tasks a team already keeps, in one place. | ░░░░░░░░░░ 0% (17 of 17 built, 0 checked live) | Dec 2026 |
 | Shipping, payables and insurance | Packages, bills and care plans tracked next to the sale they belong to. | ░░░░░░░░░░ 0% (4 of 6 built, 0 checked live) | Jan 2027 |
@@ -372,9 +378,12 @@ On the Core plan, the database, the container and every credential sit in accoun
 | `POST /v1/reason` | Run the reasoners and return recommendations |
 | `GET /v1/recommendations` | Latest recommendations, with provenance |
 | `POST /v1/recommendations/:id/feedback` | Record an accept, reject or override |
+| `POST /v1/recommendations/:id/result` | Record what an acted-on recommendation returned, for the value ledger |
+| `GET /v1/value` | The value ledger: what acted-on recommendations returned, month by month |
 | `GET /v1/entities/:kind/:id` | One canonical entity |
 | `GET /v1/signals` | The latest signals, filtered by kind, such as each bank balance or open invoice |
 | `GET /v1/integrations` | Each catalog integration and whether this instance has its settings, by name only |
+| `GET /v1/support/status` | Health, sync status and record counts for whoever supports the instance, with no business records |
 
 </details>
 
@@ -460,4 +469,12 @@ Report a vulnerability privately as [SECURITY.md](SECURITY.md) describes.
 
 ## Open core and license
 
-The core is [MIT](LICENSE)-licensed and stays open. The Brain Console and some vertical modules ship under a commercial license. See [docs/open-core.md](docs/open-core.md).
+The core is [MIT](LICENSE)-licensed and stays open: anyone can run the public image and build on its API. The Brain Console, the owner's daily dashboard, and some vertical modules ship under a commercial license, priced per store:
+
+| Plan | Price | What it is |
+| --- | --- | --- |
+| Core | $299 a store a month | The Brain Console and every standard connection, running in accounts the business owns |
+| Managed | $599 a store a month | Everything in Core, hosted, watched and kept current by us |
+| Multi-store and custom | By quote | Several locations, wholesale, partner systems and history moved from old systems |
+
+Each plan has a one-time setup fee. See [docs/open-core.md](docs/open-core.md) and the [website](https://karatos.app/#services).

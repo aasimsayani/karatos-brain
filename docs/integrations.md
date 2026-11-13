@@ -248,11 +248,11 @@ Used by: R is retail, W is wholesale, M is manufacturing. Test with says how we 
 | LeadsOnline secondhand reporting | R | Partner | Partner | No | Planned (Gold and secondhand buys many US police departments require; LeadsOnline issues API credentials to point-of-sale partners) |
 | BILL | R, W, M | Public API | Free sandbox | No | Built (Reads supplier bills, approvals, vendors and payments from BILL's v3 API with a developer app made for accounting data only. BILL has no read-only option, so the connector only ever reads. BILL's sandbox checks the sign-in and calls, and the docs watch follows the pages the mock is built from) |
 | Ramp | R, W, M | Public API | Free sandbox | Yes | Built (Reads company card transactions with an app's client credentials and the transactions:read scope only, turning down a token granted anything more. The vendor docs watch follows Ramp's API changelog; until a Ramp sandbox is set up, the mock built from Ramp's docs stands in) |
-| Klarna | R | Public API | Unknown | No | Planned (Pay-over-time orders, captures, refunds and settlement reports) |
+| Klarna | R | Public API | Free sandbox | No | Built (Reads settlements only, with an API key or username and password. Klarna keys can't be limited to settlements, so the client sends only GET requests to the payouts and settlement transactions lists. Klarna keeps no changelog for the Settlements API, so the vendor docs watch follows its reference; until a playground account is set up, the mock built from Klarna's docs stands in) |
 | Afterpay | R | Public API | Partner | No | Built (Read-only, though an Afterpay Merchant ID and Secret Key can't be limited to reading: the connector only sends GET requests to List Payments. Sandbox credentials come from an Afterpay account manager) |
 | cardONE Fintech | R | Unknown | Unknown | No | Planned (Payments and financing for jewelers; product still being confirmed. No API found. Exhibited at JCK 2026) |
 | American First Finance | R | Partner | Partner | No | Planned (Consumer financing and lease-to-own: applications, funded contracts and settlements. Merchant partner only. Exhibited at JCK 2026) |
-| Aurora Payments | R | Unknown | Unknown | No | Planned (Merchant card processing: transactions, batches, deposits and fees. No API confirmed; start with statements. Exhibited at JCK 2026) |
+| Aurora Payments | R | Public API | Free sandbox | Yes | Built (Reads with a Flute API key (Aurora Payments renamed itself Flute). A merchant's own key can reach every endpoint, so the client only ever asks for a token and lists settlement batches and their transactions. The vendor docs watch follows Flute's changelog, and a nightly run against Flute's sandbox checks the connector) |
 | Sola Payments (formerly Cardknox) | R, W | Public API | Free sandbox | No | Built (Reads the gateway's transaction report with one API key. Sola's keys can't be limited to reports, so the client only ever posts Report:All to the reporting address, never the gateway. Sola publishes no API changelog, so the vendor docs watch follows its reporting page and the nightly sandbox run catches changes; until a sandbox is set up, the mock built from Sola's docs stands in) |
 | Wells Fargo Jewelry Advantage | R | File export | Paid account | No | Planned (Consumer financing program for jewelers. No API; start with merchant summary report exports. Exhibited at Centurion) |
 | OWL Financial Group | R, W, M | Unknown | Unknown | No | Planned (Collateral loans for jewelers and the pledged pieces behind them. No API found. Exhibited at Centurion) |
@@ -278,14 +278,14 @@ Used by: R is retail, W is wholesale, M is manufacturing. Test with says how we 
 | UPS | R, W, M | Public API | Free sandbox | No | Built (Reads UPS tracking for each number on the business's list until the package is delivered or returned, with UPS's free Tracking API. UPS's test environment checks the sign-in and calls; the docs watch follows UPS's published API files, and the nightly sandbox run catches API changes) |
 | USPS | R, W, M | Public API | Free sandbox | Yes | Planned (Tracking for Registered Mail and other USPS parcels, with tracking event subscriptions. USPS publishes no changelog for its new APIs) |
 | NetSuite | W, M | Public API | Paid account | No | Built (Reads items, vendors, sales and purchase orders, invoices, journal entries and stock by location with SuiteQL, signed in by OAuth 2.0 machine-to-machine with a certificate mapped to a role that can only view. The token asks only for the rest_webservices scope, and every query is a fixed SELECT. The first client's account confirms the mock built from NetSuite's docs) |
-| Katana | M | Public API | Unknown | Yes | Planned (Manufacturing orders, materials, stock and costs for small makers) |
+| Katana | M | Public API | Paid account | Yes | Built (Reads manufacturing orders and stock with one API key. Katana's keys can't be limited to reading, so the client only ever sends GET requests to the manufacturing orders and inventory lists. The vendor docs watch follows Katana's API changelog; until a trial account is set up, the mock built from Katana's docs stands in) |
 | Cin7 Core | R, W, M | Public API | Paid account | Yes | Built (Reads products, customers, suppliers, sales, purchases and stock by location with an API application's account id and key. Cin7 Core's docs describe no way to limit what an application can do, so the client only ever sends GETs of the six lists. The first client's account confirms the mock built from Cin7 Core's docs) |
 | RightClick | W, M | Unknown | Partner | No | Planned (Cloud ERP for jewelry manufacturers and wholesalers: stock, bills of materials, job bags and costing. No public API; partner only. Exhibited at JCK 2026) |
 | e-Jewelry for Business Central | R, W, M | Public API | Paid account | No | Built (Reads items, vendors, sales invoices and purchase invoices through Business Central's standard API v2.0, signed in service to service by a Microsoft Entra app given read-only permission sets in Business Central. Every call is a GET marked read-only. Memos, jobs and diamond records are e-Jewelry's own pages without a published API, so they wait for the first client's tenant) |
 | Unbridaled OS | W, M | Unknown | Partner | No | Planned (Cloud ERP for diamond and jewelry houses: inventory and production. No public API; partner only. Exhibited at JCK 2023) |
 | Cabrella Shipping Insurance | R, W, M | Partner | Partner | No | Planned (High-value shipping insurance: insured shipments, declared values and claims. Partner only. Exhibited at JCK 2026) |
 | Brink's Global Services | R, W, M | Partner | Partner | No | Planned (Secure insured shipping of diamonds and jewelry: bookings, tracking, customs papers and invoices. Partner only. Exhibited at JCK 2026) |
-| Gem Logic | R, W, M | Unknown | Unknown | No | Planned (Cloud jewelry ERP: counter sales, workshop jobs, memos, consignment and metal prices. No API found. Found in jewelry industry sources) |
+| Gem Logic | R, W, M | Public API | Paid account | No | Built (Reads with an API key from Settings > API. Gem Logic keys can't be limited to reading, so the client sends only GET requests to the sales channels and their products. Gem Logic keeps no public API changelog, so the vendor docs watch follows its API docs instead; until a trial instance is set up, the mock built from those docs stands in) |
 | Zing by Jewelers Mutual (appraisals, claims and diamonds) | R | Partner | Partner | No | Planned (Appraisals, consumer claim files and diamond searches. Partner only. Found in jewelry industry sources) |
 | JM Shipping Solution | R, W | Partner | Partner | No | Built (Reads with the key and password JM issues the store (shipping@jminsure.com), and the client only ever sends GETs. JM documents no scopes, so the same key could buy labels and file claims; the connector never does. The first store's credentials confirm the mock built from JM's public API reference) |
 | BIG Network (Balance to Buy and SalesRep Direct) | R, W | Partner | Partner | No | Planned (POS data gathered from many jewelry POS systems: sales, on-hand and sell-through by vendor. Partner only. Found in jewelry industry sources) |
@@ -301,7 +301,7 @@ Used by: R is retail, W is wholesale, M is manufacturing. Test with says how we 
 | JSA crime alerts | R, W, M | File export | Sample files | No | Planned (Crime alerts and bulletins the Jewelers' Security Alliance emails its members. No API; read from the alert emails in the connected mailbox) |
 | RFID and barcode tray counts | R, W, M | File export | Sample files | No | Built (Count exports from RFID readers and barcode scanners, saved as CSV, one row per tag) |
 | Homebase | R | Partner | Partner | No | Planned (Staff schedules and time clock, so labor can be set against sales. API keys need the Enterprise plan and a request to Homebase support) |
-| Deputy | R, W, M | Public API | Unknown | Yes | Planned (Staff rosters and timesheets, so labor can be set against sales or bench work) |
+| Deputy | R, W, M | Public API | Paid account | Yes | Built (Reads with a permanent token. Deputy has no read-only token or access level, so the client only ever sends the Resource API search for the six records it uses. The vendor docs watch follows Deputy's API changelog; until a trial install is set up, the mock built from Deputy's docs stands in) |
 | Asana | R, W, M | Public API | Free sandbox | No | Built (Read-only: the client sends only its five listed GETs and names every field it reads. A personal access token can do whatever its user can, so make it as a user with access to only the projects to sync, or use an OAuth app limited to read scopes. No webhooks yet; the sync polls) |
 | Trello | R, W, M | Public API | Free sandbox | No | Built (Read-only: a token authorized with scope=read, which the connector checks before every sync, turning away one that can write. The client sends only its six listed GETs and never asks for card names or descriptions. No webhooks yet; the sync polls) |
 | Airtable | R, W, M | Public API | Free sandbox | No | Built (Read-only: the client sends only its four listed GETs and names every field it reads. It stops if an OAuth token has a write scope; a personal access token's scopes aren't reported, so make it with data.records:read and schema.bases:read only. No webhooks yet; the sync polls) |
@@ -395,6 +395,7 @@ A request for a path or method the docs don't list throws `UndocumentedRequestEr
 - Airtable's whoami, list bases, base schema and list records endpoints (Web API v0)
 - Amazon's Selling Partner API orders search (v2026-01-01), finance transactions (v2024-06-19) and FBA inventory summaries, with the Login with Amazon token refresh, enforcing the access token header, the app's roles, date ranges, page sizes and page tokens tied to their query
 - Asana's current user, project, section, task and story endpoints (REST API 1.0)
+- Flute's (Aurora Payments') token, settlement batches and transactions (API v1)
 - Authorize.net's Transaction Reporting requests on its JSON API
 - AvaTax's connection check, company and transaction endpoints (REST API v2)
 - Microsoft's client credentials sign-in and Business Central's API v2.0 lists of items, vendors, sales invoices and purchase invoices, with filters and next links
@@ -405,6 +406,7 @@ A request for a path or method the docs don't list throws `UndocumentedRequestEr
 - Cin7 Core's API v2 product, customer, supplier, sale, purchase and stock lists
 - Clover's REST API v3 read endpoints with its v2 OAuth token refresh, including its 90-day cap on orders, payments and refunds
 - Typeform's Create API (a form's definition) and Responses API
+- Deputy's Resource API search for locations, areas, team members, shifts, timesheets and leave (API v1)
 - Docusign's JWT Grant sign-in, user info and envelope status changes (eSignature REST API v2.1)
 - Dropbox's token refresh, current account, folder listing and change feed, and download endpoints (API v2)
 - eBay's Fulfillment API getOrders and createShippingFulfillment (Sell APIs, v1) with its OAuth refresh, enforcing the client credentials, the scopes the seller agreed to, the order filter, limit and offset
@@ -412,6 +414,7 @@ A request for a path or method the docs don't list throws `UndocumentedRequestEr
 - Extend's token, contract search and order search endpoints (API version 2022-02-01), with the X-Extend-Access-Token header
 - FedEx's OAuth client credentials token and Track API tracking-number call
 - Formlabs' token endpoint and print runs list (Web API 0.8.1)
+- Gem Logic's sales channel and product lists
 - GIA's Report Results API: getReport and getChangedReports
 - Gmail's message, label and history reads with Google's token refresh (API v1)
 - The Google Ads API's `googleAds:search` and `googleAds:mutate` (REST, v26) with Google's token refresh, enforcing the developer token, the adwords scope, the account and manager headers, GAQL fields and page tokens tied to their query
@@ -425,6 +428,8 @@ A request for a path or method the docs don't list throws `UndocumentedRequestEr
 - IDEX's Onsite feeds: the natural full feed and the lab-grown full file
 - The JM Shipping Solution API (v1) shipment list and details, latest tracking, a shipment's claim and reconciled shipments, with basic credentials and the API_KEY header
 - Judge.me's review list (REST v1)
+- Katana's manufacturing orders and inventory lists (API v1)
+- Klarna's payouts and settlement transactions endpoints (Settlements API v1)
 - Klaviyo's mock covers its profile, list, segment, campaign, flow and metric reads and the campaign and flow values reports (revision 2026-10-15). Plaid's accounts, transactions sync, Item and webhook verification key endpoints (API version 2020-09-14), with webhooks signed the way Plaid signs them
 - Lightspeed Retail (X-Series) token refresh and product, inventory, customer and sale reads
 - Mailchimp's ping, audience, member, campaign and campaign report reads (Marketing API 3.0)
@@ -472,7 +477,7 @@ A request for a path or method the docs don't list throws `UndocumentedRequestEr
 - Zendesk's OAuth token refresh and its cursor-based ticket and user exports
 - Zoom's Server-to-Server OAuth token, meeting history and meeting participant reports (API v2)
 
-Where a vendor has a free sandbox (Affirm, Airtable, Amazon (Selling Partner API), Asana, Authorize.net, Avalara AvaTax, BigCommerce, BILL, Calendly, Clover, Custom forms, Docusign, Dropbox, eBay, FedEx, GIA Report Results, Gmail, Google Ads, Google Analytics 4, Google Workspace and Drive, Gusto, HubSpot, Klaviyo, Lightspeed Retail, Mailchimp, Instagram DMs, Facebook Messenger and WhatsApp Business, Meta Ads, Microsoft OneDrive and SharePoint files, Monday.com, Notion, Pinterest, Plaid, QuickBooks Online, Ramp, Slack, Sola Payments (formerly Cardknox), Square, TikTok, TikTok Ads, Trello, UPS, Wix, WooCommerce, Xero and Yext so far), its mock is a stand-in until a developer account is set up for the nightly run.
+Where a vendor has a free sandbox (Affirm, Airtable, Amazon (Selling Partner API), Asana, Aurora Payments, Authorize.net, Avalara AvaTax, BigCommerce, BILL, Calendly, Clover, Custom forms, Docusign, Dropbox, eBay, FedEx, GIA Report Results, Gmail, Google Ads, Google Analytics 4, Google Workspace and Drive, Gusto, HubSpot, Klarna, Klaviyo, Lightspeed Retail, Mailchimp, Instagram DMs, Facebook Messenger and WhatsApp Business, Meta Ads, Microsoft OneDrive and SharePoint files, Monday.com, Notion, Pinterest, Plaid, QuickBooks Online, Ramp, Slack, Sola Payments (formerly Cardknox), Square, TikTok, TikTok Ads, Trello, UPS, Wix, WooCommerce, Xero and Yext so far), its mock is a stand-in until a developer account is set up for the nightly run.
 
 <!-- registry:mocks:end -->
 
@@ -702,6 +707,28 @@ Custom fields are kept only for types that hold no free text: number, single sel
 **Webhooks.** None yet. The scheduled sync polls.
 
 **Testing.** The tests run against a mock built from Asana's API reference (`packages/testkit/src/mocks/asana.ts`). Like Asana, it returns only the fields `opt_fields` names, so the tests show a task's name and notes never come back. It answers 401 for the wrong token, filters tasks by project and `modified_since`, pages with `offset`, and can answer 429 with `Retry-After` and 400 for an expired offset. Its assumptions are listed in the mock and checked on the first sandbox run. For the nightly run, make a free Asana workspace for testing only, add a project or two of synthetic tasks, make a personal access token as a user who belongs only to that workspace, and add it as the `SANDBOX_ASANA_ACCESS_TOKEN` GitHub Actions secret.
+
+### Aurora Payments
+
+Reads a business's card and ACH settlement batches from Aurora Payments, which renamed itself Flute in 2026, with each transaction in them, so a deposit on the bank statement can be matched to the sales, refunds and fees behind it. Batches arrive as `payout.updated` and their transactions as `balance.transaction_recorded`.
+
+| Setting | What it is |
+| --- | --- |
+| `AURORA_CLIENT_ID` | The client ID of a Flute API key made for KaratOS |
+| `AURORA_CLIENT_SECRET` | That key's client secret |
+| `AURORA_ENVIRONMENT` | Optional: `production` (the default) or `sandbox` |
+
+**Read-only by design.** Flute signs a request in with a token that lasts about 15 minutes, made from the API key with the client credentials grant. A merchant's own key can reach every endpoint, writes included; only a key made under a partner whose permissions allow just the reads is limited. Where the business is under a partner, ask for a key allowed only List Transactions, Get Transaction Details and Get Settlement Batches. Either way, the client keeps to the reads: it sends one POST, for a token, to Flute's OAuth server (`oauth.api.flute.com`, or `sandbox.oauth.api.flute.com`), and otherwise only GET requests to the settlement batches and transactions lists. Refunding and voiding a transaction are declared behind the write gate, turned off, and the client has no request to send them. Flute's own error text is never repeated in an error, only the HTTP status.
+
+**What it reads.** The first import lists five years of settlement batches by when they were batched (`dateFrom`, `dateTo`), oldest first, 50 to a page, and reads each batch's transactions (`batchId`) before the next batch. Each later sync lists the batches from a week before the last pass started, so a batch that was open then is read again once it settles. Each settlement batch, with its transactions, is one batch and one checkpoint, which keeps the pass's dates and how many batches it has read. A list's `total` says when it ends; without one, a short page does.
+
+**Events.** A batch has the processor's batch number, the processor, whether it is open or settled, its transaction count, and its sales, refunds and net in cents. A transaction has its batch, type (sale, refund, void and the rest), status, payment method (card or ACH), where it came from (a terminal, an invoice, the API), its currency, and its base, total, surcharge, tax, tip and discount amounts in cents. Each is keyed by a digest of what was kept, so an unchanged record is a duplicate and a batch that settles is a new event. One without an ID or a time that reads is dead-lettered; a batch dead-lettered for its time still has its transactions read.
+
+**Privacy.** No customer name, company, email, phone or masked card number is kept, nor the merchant's own name for a payment method or terminal.
+
+**Rate limits.** Flute documents a 429 but no numbers. The client waits out a 429, 500, 502, 503 or 504 three times, honoring `Retry-After` in seconds up to a minute, before the error goes to the sync runner, which resumes from its checkpoint next time. A token turned down mid-pass is replaced once.
+
+**Testing.** The tests run against a mock built from Flute's docs (`packages/testkit/src/mocks/aurora_payments.ts`), and a nightly run against Flute's sandbox checks the real API once `SANDBOX_AURORA_PAYMENTS_CLIENT_ID` and `SANDBOX_AURORA_PAYMENTS_CLIENT_SECRET` are set. The mock lists what the sandbox run must confirm: that `dateFrom` and `dateTo` match `batchDateTime` inclusively, that the lists sort oldest first by those fields, and that `batchId` on the transactions list matches a card batch as well as an ACH one.
 
 ### Authorize.net
 
@@ -1090,6 +1117,27 @@ await fetch(instanceFormsUrl, {
 
 **Testing.** Until a Typeform test account is set up, the tests run against a mock built from Typeform's docs (`packages/testkit/src/mocks/typeform.ts`), which answers a form's definition and its responses only, pages with `before` newest first, filters by `since` and `until`, refuses a page size over 1000, answers 401 without the token, and names the responses host in the form's links. Its assumptions are listed in the mock and checked on the first sandbox run. Fixtures are synthetic and carry the personal data a real submission would, so the tests can check none of it is kept. For the nightly run, create a free Typeform account, build a test form and fill it in with made-up answers, create a personal token with `forms:read` and `responses:read`, and add `SANDBOX_CUSTOM_FORMS_TYPEFORM_TOKEN` and `SANDBOX_CUSTOM_FORMS_TYPEFORM_FORM_ID` as GitHub Actions secrets.
 
+### Deputy
+
+Reads a business's Deputy schedules and worked hours, with their cost, by location and area, so labor can be set against sales and bench output by day. Locations, areas, team members, shifts, timesheets and leave each arrive as a `labor.*` event.
+
+| Setting | What it is |
+| --- | --- |
+| `DEPUTY_ACCESS_TOKEN` | A Deputy permanent token made for KaratOS |
+| `DEPUTY_INSTALL` | The install's host, like `example.na.deputy.com` |
+
+**Read-only by design.** A Deputy token acts as the person who made it, with their access level, and Deputy has no read-only level or token scope. The client keeps to the reads: it sends only the Resource API search (`POST /api/v1/resource/<Object>/QUERY`, which Deputy uses for reads too) for the six records the connector uses, to the one install the settings name. Make the token as someone who can see costs (a Location Manager or System Administrator), on a Client ID named for KaratOS so it can be removed on its own. Publishing a schedule and approving a timesheet are declared behind the write gate, turned off, and the client has no request to send them. Deputy's own error text is never repeated in an error, only the HTTP status.
+
+**What it reads.** A pass reads locations (`Company`), areas (`OperationalUnit`), team members (`Employee`), shifts (`Roster`), timesheets and leave, one after another, in Id order, 500 to a page. The first import reads every location, area and team member, three years of shifts and timesheets by date, and the leave that ends in that time. Each later sync reads each of those records Deputy says changed (`Modified`) since an hour before the last pass started. Each page is one batch and one checkpoint, which keeps the record type and how many of it the pass has read.
+
+**Events.** A shift has its team member, area, day, start and end, hours, cost, whether it's published or open, the team member's confirmation and the timesheet it matched. A timesheet has its team member, area, shift, day, start and end, hours, cost, whether its time and pay are approved, whether it's in progress, discarded, exported or paid, the leave it's for, and whether Deputy flagged it. Leave has its team member, location, leave rule, first and last day, days, hours and status. A location has its name, code and parent; an area its name, location, parent and payroll code; a team member their location, start and end dates, access level and whether they're active. Each is keyed by a digest of what was kept, so an unchanged record is a duplicate and an approval is a new event. One without an ID or a time that reads is dead-lettered.
+
+**Privacy.** A team member is kept as their Deputy ID, never their name, birthday, address, contact details, photo or pronouns. Comments on shifts, timesheets and leave, and shift warnings, are not kept.
+
+**Rate limits.** The client waits out a 429, 500, 502, 503 or 504 three times, honoring `Retry-After` in seconds up to a minute, before the error goes to the sync runner, which resumes from its checkpoint next time.
+
+**Testing.** The tests run against a mock built from Deputy's docs (`packages/testkit/src/mocks/deputy.ts`). It checks the token, the search, sort and paging, and lists what the first trial run must confirm: how a search compares days and times, that `ge` is inclusive, and that `start` pages a stable order.
+
 ### Docusign
 
 Reads Docusign's eSignature REST API (`/restapi/v2.1`) for one account: its envelopes, each with its recipients, so a store can see that every consignment and memo agreement is signed and chase the ones that aren't. It signs in with JWT Grant, as a server does, so nobody has to sign in again.
@@ -1366,6 +1414,27 @@ Reads the print runs a workshop's Formlabs printers made, so castable wax and re
 **Rate limits.** Formlabs allows 100 requests a second per IP and 1,500 an hour per user, and answers 429 with `Retry-After` past that. The client waits out a 429, 500, 502, 503 or 504 three times, honoring `Retry-After` up to a minute, before the error goes to the sync runner, which resumes from its checkpoint next time. A token turned down mid-pass is replaced once.
 
 **Testing.** The tests run against a mock built from the published reference (`packages/testkit/src/mocks/formlabs.ts`). The mock lists what a live run must confirm: that `date__gt` and `date__lt` match `created_at`, and that runs list in a stable order.
+
+### Gem Logic
+
+Reads the products a jewelry business lists on each of its Gem Logic sales channels, so stock can be followed across the counter and the web. Each arrives as a `product.updated` event.
+
+| Setting | What it is |
+| --- | --- |
+| `GEM_LOGIC_API_KEY` | A Gem Logic API key made for KaratOS under Settings > API |
+| `GEM_LOGIC_INSTANCE` | The business's instance: `example` in `example.gem-logic.com`, as a name, host or URL |
+
+**Read-only by design.** Gem Logic signs a request in with an API key in the `x-api-key` header. A key can't be limited: the same key can make sales and repairs and upload images. So the client keeps to the reads itself. It sends only GET requests, to `/api/marketplaces/` and `/api/products/{marketplace_id}`, on the one instance the settings name. No writes are declared. Gem Logic's own error text is never repeated in an error, only the HTTP status. To cut KaratOS off, deactivate the key.
+
+**What it reads.** Gem Logic lists products by sales channel and has no filter for when they changed, so each pass reads every channel's products: the historical import once, and every later sync again. A product read again unchanged is a duplicate, so only a new or changed one is ingested. Each page is one batch and one checkpoint, which keeps the channel and the next page; a channel that has moved in the list since starts the pass over.
+
+**Events.** A product has its SKU, status, the channel it is listed on, when it was made, how many images it has, and its weight, height, length and width. Each is keyed by its channel, its ID and a digest of what was kept. One without an ID or a time that reads is dead-lettered.
+
+**Not read.** Sales (the API lists only their order IDs, with no date), repairs (the API can only create them), contacts (names, emails and phones) and image links.
+
+**Rate limits.** Gem Logic documents none. The client waits out a 429, 500, 502, 503 or 504 three times, honoring `Retry-After` in seconds up to a minute, before the error goes to the sync runner, which resumes from its checkpoint next time.
+
+**Testing.** The tests run against a mock built from Gem Logic's API page (`packages/testkit/src/mocks/gem_logic.ts`). The mock lists what a trial run must confirm: whether lists come whole or in pages under `results`, and that products list in a stable order.
 
 ### GIA Report Results
 
@@ -1782,6 +1851,50 @@ Reads a shop's Judge.me reviews, each on the product and customer it is about, w
 **Rate limits.** Judge.me doesn't document one. The client waits out a 429, 500, 502, 503 or 504 three times, honoring `Retry-After` in seconds up to a minute, before the error goes to the sync runner, which resumes from its checkpoint next time.
 
 **Testing.** Judge.me has no sandbox, so the tests run against a mock built from Judge.me's docs (`packages/testkit/src/mocks/judgeme.ts`). It checks the shop domain, the token and paging, and lists what the first client's shop must confirm: the order reviews come back in, whether hidden and unpublished reviews are listed, and the time zone of Judge.me's times.
+
+### Katana
+
+Reads a small maker's Katana manufacturing orders and stock, so production sees job costs and material shortages before they hold up an order. Orders arrive as the same `manufacturing.job_updated` events PIRO gives, and stock as `inventory.counted`.
+
+| Setting | What it is |
+| --- | --- |
+| `KATANA_API_KEY` | An API key from Katana's Settings > API |
+
+**Read-only by design.** Katana's API keys can create and delete records as well as read them, and Katana documents no way to limit one. The client is what keeps KaratOS to reading. It sends only GET requests, only to the manufacturing orders and inventory lists, with query values built from checked ones. Creating a manufacturing order is declared behind the write gate, turned off, and the client has no request to send it. Katana's own error text is never repeated in an error, only the HTTP status.
+
+**What it reads.** A pass reads manufacturing orders 250 to a page, then all of the stock. The first import reads the orders created in the last five years. Each later sync reads the orders changed since an hour before the last pass started, deleted ones included, then the stock again: Katana's stock list has no change filter. Each page is one batch and one checkpoint.
+
+**Events.** `manufacturing.job_updated` for each order, with its status (open, on hold, in progress, completed, or cancelled once deleted), order number, the item, location and sales order it is for, planned and produced quantities, whether its materials are in stock, expected or missing, when it was created, is due, is due for delivery and was done, its total, material, subassembly and operations costs in cents, and planned and actual time. `inventory.counted` for each item at each location, with its SKU, name, whether it is a product or a material, and the quantities in stock, committed, expected and missing or in excess, the reorder point, and the average cost and value in cents. Orders are keyed by a digest of what was kept, so an unchanged order is a duplicate. Counts are keyed by the day and what was counted. One without an ID that reads is dead-lettered.
+
+**Privacy.** An order's notes, serial numbers, batches and custom fields aren't kept: they are free text a maker may fill with a customer's name.
+
+**Rate limits.** Katana allows 60 requests a minute. The client waits out a 429, 500, 502, 503 or 504 three times, honoring `Retry-After` in seconds up to a minute, before the error goes to the sync runner, which resumes from its checkpoint next time.
+
+**Testing.** The tests run against a mock built from Katana's docs (`packages/testkit/src/mocks/katana.ts`). It checks the key, the filters and the paging, and lists what the first run against a real account must confirm: whether the date filters are inclusive, and how a deleted order is listed. Katana has a free trial: an account opened for testing, with synthetic orders and materials, is enough.
+
+### Klarna
+
+Reads what Klarna paid a business for its pay-over-time sales, payout by payout, with each sale, return, fee and commission behind it, so finance can match the deposit on the bank statement to the orders. Payouts arrive as `payout.updated` events and their lines as `balance.transaction_recorded` events.
+
+| Setting | What it is |
+| --- | --- |
+| `KLARNA_API_KEY` | A Klarna API key made for KaratOS: `klarna_live_api_…`, or `klarna_test_api_…` for the playground |
+| `KLARNA_USERNAME` | Optional, in place of a key: the API username the Klarna portal shows |
+| `KLARNA_PASSWORD` | With `KLARNA_USERNAME`: that credential's key or password |
+| `KLARNA_REGION` | Optional: `na` (North America, the default), `eu` or `oc` |
+| `KLARNA_ENVIRONMENT` | Optional: `production` (the default) or `playground` |
+
+**Read-only by design.** Klarna doesn't offer a key limited to settlements, so a Klarna key could also capture, refund or cancel orders. The client keeps to the settlement reads: it sends only GET requests, to the payouts list and the settlement transactions list, on the one host the region and environment name. A live key is turned down for the playground and a test key for production. Pages are walked by offset worked out by the client, never by following a link Klarna sends. Capturing and refunding an order are declared behind the write gate, turned off, and the client has no request to send them. Klarna's own error text is never repeated in an error, only the HTTP status. Make a key just for KaratOS, so it can be disabled on its own.
+
+**What it reads.** The first import lists five years of payouts by payout date, 100 to a page, and reads each payout's lines, 500 to a page, before the next payout. Each later sync lists the payouts made since three days before the last pass started, so one Klarna publishes late is still read. Each payout with its lines is one batch and one checkpoint, which keeps the pass's dates and how many payouts it has read.
+
+**Events.** A payout has its payment reference, the amount settled in cents, the currency, the payout date, whether Klarna settles gross or net, and its totals: sales, returns, fees, fee refunds, commission, reversals, holdbacks and releases, charges and credits, repayments, tax, deposits, and the debt balance before and after. A line has its type and Klarna's detailed type, the amount in cents as Klarna signs it, the currency, the Klarna order with its short ID, the capture or refund, the store's own order reference, the VAT, the purchase country, the payment method, and when it was sold and captured. A line has no ID of its own, so each is keyed by its payout, its place in the payout and a digest of what was kept: reading one again unchanged is a duplicate. One without what it needs is dead-lettered.
+
+**Privacy.** Klarna's comment text, the shipping country and the store's second reference are not kept. Klarna's settlement records hold no customer names or contact details.
+
+**Rate limits.** The client waits out a 429, 500, 502, 503 or 504 three times, honoring `Retry-After` in seconds up to a minute, before the error goes to the sync runner, which resumes from its checkpoint next time.
+
+**Testing.** The tests run against a mock built from Klarna's docs (`packages/testkit/src/mocks/klarna.ts`). It checks the credential, the date filters and offset paging, and lists what the first playground run must confirm: how the date filters match, the order payouts are listed in, and how an API key is sent. For the nightly run, sign up for a Klarna playground account in North America, make an API key there, and add it as the `SANDBOX_KLARNA_API_KEY` GitHub Actions secret.
 
 ### Klaviyo
 
