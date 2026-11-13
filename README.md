@@ -248,6 +248,7 @@ The table is generated from the [integration catalog](docs/integrations.md), so 
 | BILL | Imports six years of supplier bills with their due dates, balances, payment status and approval status | Finance, Buying |
 | Ramp | Imports five years of company card transactions, then each one Ramp says changed since the last sync | Finance, Buying |
 | NetSuite | Imports every item and vendor and six years of orders, invoices and journal entries, then what changed on each sync | Finance, Inventory, Manufacturing, Wholesale, Buying |
+| Katana | Imports five years of manufacturing orders, then each one changed since the last sync, deleted ones as cancelled | Manufacturing, Inventory, Buying |
 | Cin7 Core | Imports every product, customer and supplier and five years of sales and purchases, then what changed on each sync | Inventory, Sales, Wholesale, Buying |
 | Klarna | Imports five years of Klarna payouts, then each new one, with every sale, return, fee and commission behind it | Sales, Finance |
 | Afterpay | Imports five years of Afterpay orders and refunds, then keeps the last 60 days current as orders are captured, refunded or voided | Sales, Finance |
@@ -288,7 +289,7 @@ This section updates itself from [docs/milestones.json](docs/milestones.json) an
 
 **Roadmap:** 20 of 81 items done. An integration counts as done once it has run against a real or sandbox account, not when its tests pass.
 
-**Integrations:** 97 of the 253 systems in the catalog are built and tested against mocks made from each vendor's docs. 0 have been checked live so far.
+**Integrations:** 98 of the 253 systems in the catalog are built and tested against mocks made from each vendor's docs. 0 have been checked live so far.
 
 | Milestone | What it gives a jeweler | Progress | Target |
 | --- | --- | --- | --- |
