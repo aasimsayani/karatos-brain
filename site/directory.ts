@@ -250,7 +250,7 @@ export const SYSTEM_DETAILS: Readonly<Record<string, SystemDetail>> = {
   rightclick_wise_choice: { about: "Stock, bills of materials, job bags and costing." },
   bci_e_jewelry: { about: "Items, vendors, and sales and purchase invoices on Business Central." },
   unbridaled_os: { about: "Inventory and production for diamond and jewelry houses." },
-  gem_logic: { about: "Counter sales, workshop jobs, memos, consignment and metal prices." },
+  gem_logic: { about: "Products on each sales channel, with SKU, status and size." },
 
   // EDI
   edi_x12: { about: "Purchase orders, acknowledgments, ship notices, invoices, inventory and sell-through from retail partners." },
@@ -386,6 +386,7 @@ export const CONNECTED_ON: Readonly<Record<string, string>> = {
   klarna: "2026-11-11",
   katana: "2026-11-11",
   repairshopr: "2026-11-11",
+  gem_logic: "2026-11-11",
   smile_io: "2026-11-11",
   zendesk: "2026-11-11",
   extend: "2026-11-11",

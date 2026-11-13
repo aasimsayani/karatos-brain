@@ -285,7 +285,7 @@ Used by: R is retail, W is wholesale, M is manufacturing. Test with says how we 
 | Unbridaled OS | W, M | Unknown | Partner | No | Planned (Cloud ERP for diamond and jewelry houses: inventory and production. No public API; partner only. Exhibited at JCK 2023) |
 | Cabrella Shipping Insurance | R, W, M | Partner | Partner | No | Planned (High-value shipping insurance: insured shipments, declared values and claims. Partner only. Exhibited at JCK 2026) |
 | Brink's Global Services | R, W, M | Partner | Partner | No | Planned (Secure insured shipping of diamonds and jewelry: bookings, tracking, customs papers and invoices. Partner only. Exhibited at JCK 2026) |
-| Gem Logic | R, W, M | Unknown | Unknown | No | Planned (Cloud jewelry ERP: counter sales, workshop jobs, memos, consignment and metal prices. No API found. Found in jewelry industry sources) |
+| Gem Logic | R, W, M | Public API | Paid account | No | Built (Reads with an API key from Settings > API. Gem Logic keys can't be limited to reading, so the client sends only GET requests to the sales channels and their products. Gem Logic keeps no public API changelog, so the vendor docs watch follows its API docs instead; until a trial instance is set up, the mock built from those docs stands in) |
 | Zing by Jewelers Mutual (appraisals, claims and diamonds) | R | Partner | Partner | No | Planned (Appraisals, consumer claim files and diamond searches. Partner only. Found in jewelry industry sources) |
 | JM Shipping Solution | R, W | Partner | Partner | No | Built (Reads with the key and password JM issues the store (shipping@jminsure.com), and the client only ever sends GETs. JM documents no scopes, so the same key could buy labels and file claims; the connector never does. The first store's credentials confirm the mock built from JM's public API reference) |
 | BIG Network (Balance to Buy and SalesRep Direct) | R, W | Partner | Partner | No | Planned (POS data gathered from many jewelry POS systems: sales, on-hand and sell-through by vendor. Partner only. Found in jewelry industry sources) |
@@ -413,6 +413,7 @@ A request for a path or method the docs don't list throws `UndocumentedRequestEr
 - Etsy Open API v3 token refresh, token scopes, and the shop's receipt and listing reads
 - Extend's token, contract search and order search endpoints (API version 2022-02-01), with the X-Extend-Access-Token header
 - FedEx's OAuth client credentials token and Track API tracking-number call
+- Gem Logic's sales channel and product lists
 - GIA's Report Results API: getReport and getChangedReports
 - Gmail's message, label and history reads with Google's token refresh (API v1)
 - The Google Ads API's `googleAds:search` and `googleAds:mutate` (REST, v26) with Google's token refresh, enforcing the developer token, the adwords scope, the account and manager headers, GAQL fields and page tokens tied to their query
@@ -1391,6 +1392,27 @@ These are reminders for the owner, not legal advice.
 **Testing.** Synthetic logs only: every status, a filing named by its BSA ID, its tracking ID and neither, a voluntary filing, unreadable rows, a blank line, day-first dates, and the same log saved again after FinCEN accepts a filing. The department tests cover a covered sale, a receipt number matched to the POS id, a rejection and the new filing after it, and the statement reminder across the year.
 
 Rules come from the IRS [Instructions for Form 8300](https://www.irs.gov/instructions/i8300), which the docs watch follows.
+
+### Gem Logic
+
+Reads the products a jewelry business lists on each of its Gem Logic sales channels, so stock can be followed across the counter and the web. Each arrives as a `product.updated` event.
+
+| Setting | What it is |
+| --- | --- |
+| `GEM_LOGIC_API_KEY` | A Gem Logic API key made for KaratOS under Settings > API |
+| `GEM_LOGIC_INSTANCE` | The business's instance: `example` in `example.gem-logic.com`, as a name, host or URL |
+
+**Read-only by design.** Gem Logic signs a request in with an API key in the `x-api-key` header. A key can't be limited: the same key can make sales and repairs and upload images. So the client keeps to the reads itself. It sends only GET requests, to `/api/marketplaces/` and `/api/products/{marketplace_id}`, on the one instance the settings name. No writes are declared. Gem Logic's own error text is never repeated in an error, only the HTTP status. To cut KaratOS off, deactivate the key.
+
+**What it reads.** Gem Logic lists products by sales channel and has no filter for when they changed, so each pass reads every channel's products: the historical import once, and every later sync again. A product read again unchanged is a duplicate, so only a new or changed one is ingested. Each page is one batch and one checkpoint, which keeps the channel and the next page; a channel that has moved in the list since starts the pass over.
+
+**Events.** A product has its SKU, status, the channel it is listed on, when it was made, how many images it has, and its weight, height, length and width. Each is keyed by its channel, its ID and a digest of what was kept. One without an ID or a time that reads is dead-lettered.
+
+**Not read.** Sales (the API lists only their order IDs, with no date), repairs (the API can only create them), contacts (names, emails and phones) and image links.
+
+**Rate limits.** Gem Logic documents none. The client waits out a 429, 500, 502, 503 or 504 three times, honoring `Retry-After` in seconds up to a minute, before the error goes to the sync runner, which resumes from its checkpoint next time.
+
+**Testing.** The tests run against a mock built from Gem Logic's API page (`packages/testkit/src/mocks/gem_logic.ts`). The mock lists what a trial run must confirm: whether lists come whole or in pages under `results`, and that products list in a stable order.
 
 ### GIA Report Results
 
