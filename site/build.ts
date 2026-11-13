@@ -409,7 +409,7 @@ export function renderDirectory(dataSources: readonly IntegrationSpec[], selfSer
       const systems = dataSources.filter((i) => i.domain === domain);
       const built = systems.filter((i) => i.status === "built").length;
       const counts = `${systems.length} ${systems.length === 1 ? "system" : "systems"}${built ? ` · ${built} built` : ""}`;
-      return `<details class="group" data-group="${domain}" id="cat-${domain}"${n === 0 ? " open" : ""}>
+      return `<details class="group" data-group="${domain}" id="cat-${domain}">
   <summary class="group-head"><h3>${escapeHtml(domainLabel(domain))}</h3><span class="count">${counts}</span></summary>
   <ul class="cards">
 ${systems.map((i) => renderCard(i, selfServe, deptName, researched)).join("\n")}
@@ -527,7 +527,9 @@ header.nav{position:sticky;top:0;z-index:10;background:color-mix(in srgb,var(--b
 .btn.primary{background:var(--ink);color:var(--bg)}
 .btn.ghost{background:transparent;color:var(--ink)}
 .btn.small{padding:8px 16px;font-size:14px}
-.hero{padding-top:var(--section);padding-bottom:var(--section)}
+.hero{padding-top:var(--section);padding-bottom:var(--section);display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,.9fr);gap:var(--space-5);align-items:center}
+.hero-brief{align-self:center}
+@media (max-width:980px){.hero{grid-template-columns:1fr}}
 .eyebrow{display:block;width:fit-content;font-family:var(--mono);font-size:13px;font-weight:500;letter-spacing:.06em;text-transform:uppercase;color:var(--gold-text);margin-bottom:var(--space-2);line-height:1.4}
 h1,h2{font-weight:600;letter-spacing:-.015em;line-height:1.1;margin:0;text-wrap:balance}
 h1{font-size:clamp(40px,7vw,76px);max-width:14ch}
@@ -716,6 +718,7 @@ footer .wrap{display:flex;flex-wrap:wrap;justify-content:space-between;gap:var(-
 
 <main id="top">
 <div class="wrap hero">
+  <div class="hero-copy">
   <span class="eyebrow">For jewelers, watch dealers, wholesalers, manufacturers and the businesses that serve them</span>
   <h1>The operating brain for jewelry businesses.</h1>
   <p class="lede">KaratOS connects the many systems you already run, from the POS and the books to diamond feeds and the repair bench, and every morning hands you a short list of what to do, with the evidence behind each one.</p>
@@ -727,6 +730,15 @@ footer .wrap{display:flex;flex-wrap:wrap;justify-content:space-between;gap:var(-
     <li><strong>${CORE_PRICE}</strong><span>a store a month</span></li>
   </ul>
   <p class="note">${escapeHtml(earlyAccessNote())}</p>
+  </div>
+  <div class="console-preview hero-brief" aria-label="Example of a morning list in the Brain Console">
+    <div class="cp-head"><span>This morning</span><span class="pill gold">4 need you today</span></div>
+    <div class="cp-row act"><span class="cp-dept">Clienteling</span><p>Call the Hendersons. Their anniversary is in 9 days and the matching earrings are back in stock.</p></div>
+    <div class="cp-row"><span class="cp-dept">Pricing</span><p>Gold is up this week. Fourteen pieces are now priced below what they cost to replace.</p></div>
+    <div class="cp-row"><span class="cp-dept">Buying</span><p>Send back two memo stones before Friday. Their list price dropped.</p></div>
+    <div class="cp-row"><span class="cp-dept">Compliance</span><p>Yesterday's $12,400 cash sale needs a Form 8300 within 15 days.</p></div>
+    <p class="cp-note">Illustrative. Each item opens to the sales, tickets and statements behind it.</p>
+  </div>
 </div>
 
 <section id="together"><div class="wrap">
@@ -739,6 +751,7 @@ ${playCards}
 </div></section>
 
 <section id="how"><div class="wrap">
+  <span class="eyebrow">How it works</span>
   <h2>From scattered systems to a clear next step.</h2>
   <p class="section-intro">Connect what you run, from ${dataSources.length} systems on our map. Three steps:</p>
   <ol class="steps">

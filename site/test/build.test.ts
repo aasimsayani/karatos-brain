@@ -93,7 +93,7 @@ describe("KaratOS website", () => {
   it("spaces the page on one 8px scale, with every section and the hero padded the same", () => {
     const css = html.slice(html.indexOf("<style>"), html.indexOf("</style>"));
     expect(css).toContain("--space-1:8px;--space-2:16px;--space-3:24px;--space-4:32px;--space-5:48px;--section:clamp(64px,9vw,96px);");
-    expect(css).toContain(".hero{padding-top:var(--section);padding-bottom:var(--section)}");
+    expect(css).toContain(".hero{padding-top:var(--section);padding-bottom:var(--section);");
     expect(css).toContain("section{padding:var(--section) 0;");
     expect(css).toContain("footer{padding:var(--space-5) 0;");
     // Heading, intro and content keep the same rhythm in every section.
@@ -121,7 +121,9 @@ describe("KaratOS website", () => {
   it("folds the directory by category, so the growing catalog doesn't block the first paint and links land where they point", () => {
     // Skipped sections were sized by guess, which sent nav links to the wrong place on long pages.
     expect(html).not.toContain("content-visibility");
-    expect(html.match(/<details class="group"[^>]*>/g)!.filter((t) => t.includes(" open"))).toHaveLength(1);
+    // Every category starts folded so the page stays short; a #cat- link or a filter opens its group.
+    expect(html.match(/<details class="group"[^>]*>/g)!.filter((t) => t.includes(" open"))).toHaveLength(0);
+    expect(html).toContain("function openFromHash()");
     // The hero is not a section, so the first screen always renders straight away.
     expect(html).not.toMatch(/<section[^>]*class="[^"]*hero/);
   });
