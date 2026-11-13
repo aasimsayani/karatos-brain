@@ -4,7 +4,7 @@ import { contentSecurityPolicy } from "../server.js";
 import { INTEGRATIONS, selfServeIntegrations } from "../../packages/core/src/index.js";
 import { RETAIL_DEPARTMENTS } from "../../packages/retail/src/index.js";
 import { PAYBACK_INPUTS, PAYBACK_LINES, VALUE_LABELS, corePriceDollars, dollars, paybackDefaults, paybackLine } from "../build.js";
-import { CONTACT_ANCHOR, CORE_PRICE, DOMAIN_LABELS, DOMAIN_VALUE, FONTS, HOLIDAY_PILOT, MANAGED_PRICE, PLAYS, REPORT_URL, WRITE_RULES, buildingNow, domainLabel, renderValueCards, earlyAccessNote, escapeHtml, renderSite } from "../build.js";
+import { CONTACT_ANCHOR, CORE_PRICE, HERO_SYSTEMS, DOMAIN_LABELS, DOMAIN_VALUE, FONTS, HOLIDAY_PILOT, MANAGED_PRICE, PLAYS, REPORT_URL, WRITE_RULES, buildingNow, domainLabel, renderValueCards, earlyAccessNote, escapeHtml, renderSite } from "../build.js";
 
 const html = renderSite();
 const sectionOf = (id: string) => {
@@ -13,6 +13,14 @@ const sectionOf = (id: string) => {
 };
 
 describe("KaratOS website", () => {
+  it("explains the support key without promising more than it does", () => {
+    const section = html.slice(html.indexOf('<section id="your-data">'), html.indexOf('<section id="departments">'));
+    expect(section).toContain("support key");
+    expect(section).toMatch(/never your sales, customers, amounts or recommendations/);
+    expect(section).toMatch(/how many records came in each day/);
+    expect(section).toMatch(/can't change anything/);
+  });
+
   it("lists every data integration from the catalog", () => {
     const missing = INTEGRATIONS.filter((i) => i.departments.length > 0 && !html.includes(`<h3>${escapeHtml(i.name)}</h3>`)).map((i) => i.id);
     expect(missing).toEqual([]);
@@ -30,14 +38,20 @@ describe("KaratOS website", () => {
     expect(html).toContain(`<strong>${building.length}</strong><span>building now</span>`);
   });
 
-  it("explains what each built connector gives the business, and names them in the hero", () => {
+  it("explains what each built connector gives the business, and names the best-known ones in the hero", () => {
     const built = INTEGRATIONS.filter((i) => i.status === "built");
     for (const integration of built) {
       const list = `<ul class="caps" aria-label="What you get with ${escapeHtml(integration.name)}">`;
       expect(html).toContain(list);
       for (const capability of integration.capabilities ?? []) expect(html).toContain(`<li>${escapeHtml(capability)}</li>`);
-      expect(earlyAccessNote()).toContain(integration.name);
     }
+    // The hero names systems a jeweler recognises and counts the rest, so it reads in one glance.
+    const featured = HERO_SYSTEMS.filter((id) => built.some((i) => i.id === id));
+    for (const id of featured) expect(earlyAccessNote()).toContain(built.find((i) => i.id === id)!.name);
+    expect(earlyAccessNote()).toContain(`and ${built.length - featured.length} more`);
+    expect(earlyAccessNote().length).toBeLessThan(240);
+    // Built is not the same as running on a live account, so the hero never says "connected" or "works today".
+    expect(earlyAccessNote()).not.toMatch(/connected|works today/i);
     expect(html.match(/<ul class="caps"/g)?.length).toBe(built.length);
     expect(html).toContain(`<p class="note">${escapeHtml(earlyAccessNote())}</p>`);
   });
@@ -79,7 +93,7 @@ describe("KaratOS website", () => {
   it("spaces the page on one 8px scale, with every section and the hero padded the same", () => {
     const css = html.slice(html.indexOf("<style>"), html.indexOf("</style>"));
     expect(css).toContain("--space-1:8px;--space-2:16px;--space-3:24px;--space-4:32px;--space-5:48px;--section:clamp(64px,9vw,96px);");
-    expect(css).toContain(".hero{padding-top:var(--section);padding-bottom:var(--section)}");
+    expect(css).toContain(".hero{padding-top:var(--section);padding-bottom:var(--section);");
     expect(css).toContain("section{padding:var(--section) 0;");
     expect(css).toContain("footer{padding:var(--space-5) 0;");
     // Heading, intro and content keep the same rhythm in every section.
@@ -107,7 +121,9 @@ describe("KaratOS website", () => {
   it("folds the directory by category, so the growing catalog doesn't block the first paint and links land where they point", () => {
     // Skipped sections were sized by guess, which sent nav links to the wrong place on long pages.
     expect(html).not.toContain("content-visibility");
-    expect(html.match(/<details class="group"[^>]*>/g)!.filter((t) => t.includes(" open"))).toHaveLength(1);
+    // Every category starts folded so the page stays short; a #cat- link or a filter opens its group.
+    expect(html.match(/<details class="group"[^>]*>/g)!.filter((t) => t.includes(" open"))).toHaveLength(0);
+    expect(html).toContain("function openFromHash()");
     // The hero is not a section, so the first screen always renders straight away.
     expect(html).not.toMatch(/<section[^>]*class="[^"]*hero/);
   });
@@ -146,7 +162,7 @@ describe("KaratOS website", () => {
 
   it("shows systems working together: 4 to 6 illustrative plays, each combining 3 or 4 catalog systems into one result", () => {
     const together = sectionOf("together");
-    expect(together).toContain('<span class="eyebrow">Systems that work together</span>');
+    expect(together).toContain('<span class="eyebrow">What it solves</span>');
     expect(together).toContain("<h2>One system knows a little. Together they know what to do.</h2>");
     expect(PLAYS.length).toBeGreaterThanOrEqual(4);
     expect(PLAYS.length).toBeLessThanOrEqual(6);
@@ -176,7 +192,8 @@ describe("KaratOS website", () => {
     expect(payback).toContain("<h2>You pay us. We show you, in dollars, what we put back.</h2>");
     expect(payback).toContain(`Core costs ${CORE_PRICE} a store a month.`);
     expect(payback).toContain("the result is an estimate, not a promise");
-    expect(payback).toContain("That report is being built now.");
+    expect(payback).toContain("KaratOS keeps a ledger of what it actually returned");
+    expect(payback).not.toContain("being built now");
     expect(html).toContain('<a href="#payback">Payback</a>');
     // Every input is labeled, starts at its guess and can't go below zero.
     for (const i of PAYBACK_INPUTS) {
@@ -274,17 +291,30 @@ describe("KaratOS website", () => {
     const hero = html.slice(html.indexOf('<div class="wrap hero">'), html.indexOf("</div>", html.indexOf('<div class="wrap hero">')));
     expect(hero).toContain("For jewelers, watch dealers, wholesalers, manufacturers and the businesses that serve them");
     expect(hero).toContain("connects the many systems");
-    expect(hero).toContain("writes back carefully");
+    // Write-back is explained in the steps and its own section; the hero stays one sentence.
+    expect(hero.match(/<p class="lede">[^<]*<\/p>/)![0].length).toBeLessThan(260);
     const how = sectionOf("how");
     const mapped = INTEGRATIONS.filter((i) => i.departments.length > 0).length;
     expect(how).toContain(`from ${mapped} systems on our map`);
     expect(how).toContain("<h3>Connect everything, read-only</h3>");
     expect(how).toContain("<h3>Act, and write back carefully</h3>");
     const nav = html.slice(html.indexOf("<nav>"), html.indexOf("</nav>"));
-    expect(nav).toContain('<a href="#together">Systems together</a>');
-    expect(nav).toContain('<a href="#write-back">Write-back</a>');
+    expect(nav).toContain('<a href="#together">What it solves</a>');
+    expect(nav).toContain('<a href="#services">Pricing</a>');
+    // Few enough links to read at a glance.
+    expect(nav.match(/<a /g)!.length).toBeLessThanOrEqual(7);
     // Every nav link lands on a section that exists.
     for (const [, id] of nav.matchAll(/href="#([^"]+)"/g)) expect(html).toContain(`id="${id}"`);
+  });
+
+  it("puts what a first-time visitor needs first, and the detail after", () => {
+    // A visitor gives the page about a minute: problems, how, payback, pilot and price come before the reference sections.
+    const at = (id: string) => html.indexOf(`<section id="${id}"`);
+    const path = ["together", "how", "payback", "pilot", "services"].map(at);
+    const detail = ["write-back", "departments", "value", "integrations", "partners"].map(at);
+    for (const i of [...path, ...detail]) expect(i).toBeGreaterThan(0);
+    expect(path).toEqual([...path].sort((a, b) => a - b));
+    expect(Math.max(...path)).toBeLessThan(Math.min(...detail));
   });
 
   it("labels every catalog domain in plain language", () => {
@@ -365,12 +395,12 @@ describe("KaratOS website", () => {
     for (const i of built) expect(value).toContain(escapeHtml(i.name));
     // Every card for a kind with a built system comes before any card without one.
     const cards = value.split('<li class="value">').slice(1);
-    const live = cards.map((c) => c.includes("Connected today:"));
+    const live = cards.map((c) => c.includes("Built:"));
     // Once every kind has a built system, no card is without one.
     const firstBare = live.indexOf(false);
     expect(firstBare === -1 ? live.length : firstBare).toBe(live.filter(Boolean).length);
     expect(live.filter(Boolean).length).toBe(new Set(built.map((i) => i.domain)).size);
-    const bare = cards.find((c) => !c.includes("Connected today:") && !c.includes("Building now:"));
+    const bare = cards.find((c) => !c.includes("Built:") && !c.includes("Building now:"));
     if (bare) expect(bare).toMatch(/On the roadmap:<\/strong> \d+ system/);
   });
 
@@ -387,7 +417,7 @@ describe("KaratOS website", () => {
       );
       const cards = out.split('<li class="value">').slice(1);
       expect(cards.map((c) => c.match(/<h3>(.*)<\/h3>/)![1])).toEqual(["Connected?", "Planned &amp; only?", "Being built?"]);
-      expect(cards[0]).toContain("<strong>Connected today:</strong> c1 &lt;name&gt;</p>");
+      expect(cards[0]).toContain("<strong>Built:</strong> c1 &lt;name&gt;</p>");
       expect(cards[1]).toContain("<p>&lt;why a&gt;</p>");
       expect(cards[1]).toContain("<strong>On the roadmap:</strong> 2 systems</p>");
       expect(cards[2]).toContain("<strong>Building now:</strong> b1 &lt;name&gt;</p>");
