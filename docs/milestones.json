@@ -94,7 +94,7 @@
     {
       "id": "hosting",
       "name": "Self-hosted and managed plans",
-      "value": "Run it yourself for free, or let us host it on the premium plan.",
+      "value": "Run it in your own accounts on Core, or let us host it on Managed.",
       "target": "2027-03",
       "items": [
         { "name": "Self-hosting guide for one instance per business", "done": true },
