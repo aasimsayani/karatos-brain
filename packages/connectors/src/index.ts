@@ -28,6 +28,7 @@ export * from "./extend/index.js";
 export * from "./fedex/index.js";
 export * from "./files/index.js";
 export * from "./fincen_8300/index.js";
+export * from "./formlabs/index.js";
 export * from "./gem_logic/index.js";
 export * from "./gia/index.js";
 export * from "./gmail/index.js";

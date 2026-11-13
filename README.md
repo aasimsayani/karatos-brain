@@ -221,6 +221,7 @@ The table is generated from the [integration catalog](docs/integrations.md), so 
 | Google Business Profile | Imports two years of Google reviews for every location, then the new and edited ones on each sync | Marketing, Clienteling |
 | Etsy | Imports five years of Etsy orders, then reads every order changed since the last sync | Sales, Inventory, Marketing |
 | eBay | Imports the two years of eBay orders that eBay keeps, then reads every order changed since the last sync | Sales, Inventory |
+| Formlabs 3D printing | Imports a year of print runs, then the runs made in the last few days on each sync | Custom orders, Manufacturing |
 | Microsoft 365 Outlook mail and calendar | Imports five years of the mailbox's Inbox and Sent Items, then keeps up with every new, changed and removed message | Clienteling, Buying, Custom orders, Repairs |
 | Any other mailbox (IMAP) | Imports five years of mail metadata from INBOX and Sent on any IMAP mailbox: who wrote to whom, when and which thread | Clienteling, Buying, Custom orders, Repairs |
 | Microsoft Teams | Imports five years of one team's channel messages and replies, then keeps up with every new, edited and deleted one | Sales, Repairs, Custom orders |
@@ -293,7 +294,7 @@ This section updates itself from [docs/milestones.json](docs/milestones.json) an
 
 **Roadmap:** 20 of 81 items done. An integration counts as done once it has run against a real or sandbox account, not when its tests pass.
 
-**Integrations:** 101 of the 253 systems in the catalog are built and tested against mocks made from each vendor's docs. 0 have been checked live so far.
+**Integrations:** 102 of the 253 systems in the catalog are built and tested against mocks made from each vendor's docs. 0 have been checked live so far.
 
 | Milestone | What it gives a jeweler | Progress | Target |
 | --- | --- | --- | --- |
