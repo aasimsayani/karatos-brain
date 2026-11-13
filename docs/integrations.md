@@ -263,7 +263,7 @@ Used by: R is retail, W is wholesale, M is manufacturing. Test with says how we 
 | --- | --- | --- | --- | --- | --- |
 | PIRO | W, M | File export | Sample files | No | Built (Job and casting tree reports exported as CSV. PIRO's EDI documents go through the EDI X12 connector, and its REST API is for custom integrations PIRO sets up) |
 | Adaptive Jewelry ERP | R, W, M | Unknown | Unknown | No | Planned (Built on Microsoft Dynamics NAV) |
-| Acumatica JewelShop | W, M | Public API | Unknown | Yes | Planned |
+| Acumatica JewelShop | W, M | Public API | Paid account | Yes | Built (Reads an Acumatica instance's Default REST endpoint with a connected application and a KaratOS user whose role can only view stock items and sales orders. Acumatica can't limit a token to reading, so the client sends only GET requests for those two, besides signing in and out. JewelShop's memo and consignment screens aren't on the Default endpoint yet. Until a licensed instance is set up, the mock built from Acumatica's guide stands in) |
 | DiamTrade | W, M | Unknown | Unknown | No | Planned |
 | EDI with retail partners (X12 850, 855, 856, 810, 846, 852) | W, M | EDI | Sample files | No | Built (X12 files from the business's VAN or SFTP mailbox: purchase orders, acknowledgments, ship notices, invoices, inventory and sell-through) |
 | Jewelers Mutual care plans | R | Public API | Partner | No | Planned |
@@ -390,6 +390,7 @@ A request for a path or method the docs don't list throws `UndocumentedRequestEr
 <!-- Generated from the mock modules in packages/testkit/src/mocks/ by npm run registry:write. Edit those, not this block. -->
 
 - The Acuity Scheduling API's appointment and appointment type lists (v1), with Basic auth, date windows, max and the canceled list
+- An Acumatica instance's token endpoint, stock items, sales orders and sign-out on the contract-based REST API (Default 24.200.001)
 - Affirm's transaction, transaction event, daily settlement and dispute reads
 - Afterpay's List Payments on its production and sandbox hosts, with Basic auth, created-date windows, ordering, limit and offset
 - Airtable's whoami, list bases, base schema and list records endpoints (Web API v0)
@@ -578,6 +579,32 @@ Each one carries the appointment's id, its type's id and name, its kind (bridal,
 **Webhooks.** None yet; the scheduled sync polls.
 
 **Testing.** Acuity has no sandbox, and API access needs a paid plan. The mock (`packages/testkit/src/mocks/acuity.ts`) is built from Acuity's API reference, and its assumptions list what the first live run on an account must confirm, among them the `minDate`/`maxDate` format (the docs type them only as dates) and that `max=100` is safe.
+
+### Acumatica JewelShop
+
+Reads a JewelShop business's Acumatica instance through its contract-based REST API (the Default endpoint, version 24.200.001 unless set). Read-only by the user's role and by the client: KaratOS signs in as a user whose role can only view stock items and sales orders, and the client sends only GET requests for those two, besides one POST for a token and one to sign out when a pass ends.
+
+| Setting | What it is |
+| --- | --- |
+| `ACUMATICA_URL` | The instance's https address, with its path if it isn't at the site root |
+| `ACUMATICA_CLIENT_ID` | The connected application's ID, a GUID, an @ and the tenant |
+| `ACUMATICA_CLIENT_SECRET` | Its shared secret |
+| `ACUMATICA_USERNAME` | The KaratOS user, whose role has View Only on Stock Items and Sales Orders |
+| `ACUMATICA_PASSWORD` | That user's password |
+| `ACUMATICA_ENDPOINT_VERSION` | Optional: 23.200.001, 24.200.001 (the default), 25.100.001 or 25.200.001 |
+| `CUSTOMER_REF_KEY` | Shared: the key customer references are made with |
+
+**What it reads.** Every pass reads all stock items, 500 a page, with their warehouse lines, since what a warehouse has on hand can change without an item's LastModified moving. Then it reads the sales orders modified in its window. The historical import's window reaches back five years. Each later sync's starts a day before the last one ended. A pass reads records modified up to a time fixed when it starts.
+
+**Events.** A stock item becomes `product.updated` (SKU, description, class, status, type, unit, default price in cents). Each warehouse line becomes `inventory.counted` (SKU, on hand, warehouse), dated when it was read. A sales order becomes `order.updated` (type, number, status, date, currency, total in cents, quantity, customer). Each is keyed by its record and a digest of what was kept, so one read again unchanged is a duplicate. A record without an ID or a time that reads is dead-lettered.
+
+**Privacy.** A customer's account code can name the business, so only a reference keyed with `CUSTOMER_REF_KEY` is kept. Order notes, contacts and addresses aren't read.
+
+**Rate limits.** Acumatica limits requests per minute by license and answers 429 once its queue is full. The client waits out a 429, and a 500, 502, 503 or 504, three times, honoring Retry-After up to a minute. A token turned down early gets one fresh sign-in. Signing out at the end of each pass frees the API session the license counts.
+
+**Not yet.** JewelShop's memo in and out and consignment screens aren't on the Default endpoint. Reading them needs an endpoint extension from JewelShop's vendor or the business's Acumatica partner.
+
+**Testing.** The tests run against a mock built from Acumatica's Integration Development Guide (`packages/testkit/src/mocks/acumatica_jewelshop.ts`). It checks the sign-in, the fields, the filter and paging, the role and sign-out. Its assumptions are listed so the first run against a real instance can confirm them.
 
 ### Affirm
 
