@@ -5,6 +5,7 @@ export * from "./afterpay/index.js";
 export * from "./airtable/index.js";
 export * from "./amazon/index.js";
 export * from "./asana/index.js";
+export * from "./aurora_payments/index.js";
 export * from "./authorize_net/index.js";
 export * from "./avalara/index.js";
 export * from "./bank_statements/index.js";
