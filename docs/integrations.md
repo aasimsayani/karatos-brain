@@ -248,7 +248,7 @@ Used by: R is retail, W is wholesale, M is manufacturing. Test with says how we 
 | LeadsOnline secondhand reporting | R | Partner | Partner | No | Planned (Gold and secondhand buys many US police departments require; LeadsOnline issues API credentials to point-of-sale partners) |
 | BILL | R, W, M | Public API | Free sandbox | No | Built (Reads supplier bills, approvals, vendors and payments from BILL's v3 API with a developer app made for accounting data only. BILL has no read-only option, so the connector only ever reads. BILL's sandbox checks the sign-in and calls, and the docs watch follows the pages the mock is built from) |
 | Ramp | R, W, M | Public API | Free sandbox | Yes | Built (Reads company card transactions with an app's client credentials and the transactions:read scope only, turning down a token granted anything more. The vendor docs watch follows Ramp's API changelog; until a Ramp sandbox is set up, the mock built from Ramp's docs stands in) |
-| Klarna | R | Public API | Unknown | No | Planned (Pay-over-time orders, captures, refunds and settlement reports) |
+| Klarna | R | Public API | Free sandbox | No | Built (Reads settlements only, with an API key or username and password. Klarna keys can't be limited to settlements, so the client sends only GET requests to the payouts and settlement transactions lists. Klarna keeps no changelog for the Settlements API, so the vendor docs watch follows its reference; until a playground account is set up, the mock built from Klarna's docs stands in) |
 | Afterpay | R | Public API | Partner | No | Built (Read-only, though an Afterpay Merchant ID and Secret Key can't be limited to reading: the connector only sends GET requests to List Payments. Sandbox credentials come from an Afterpay account manager) |
 | cardONE Fintech | R | Unknown | Unknown | No | Planned (Payments and financing for jewelers; product still being confirmed. No API found. Exhibited at JCK 2026) |
 | American First Finance | R | Partner | Partner | No | Planned (Consumer financing and lease-to-own: applications, funded contracts and settlements. Merchant partner only. Exhibited at JCK 2026) |
@@ -425,6 +425,7 @@ A request for a path or method the docs don't list throws `UndocumentedRequestEr
 - The JM Shipping Solution API (v1) shipment list and details, latest tracking, a shipment's claim and reconciled shipments, with basic credentials and the API_KEY header
 - Judge.me's review list (REST v1)
 - Katana's manufacturing orders and inventory lists (API v1)
+- Klarna's payouts and settlement transactions endpoints (Settlements API v1)
 - Klaviyo's mock covers its profile, list, segment, campaign, flow and metric reads and the campaign and flow values reports (revision 2026-10-15). Plaid's accounts, transactions sync, Item and webhook verification key endpoints (API version 2020-09-14), with webhooks signed the way Plaid signs them
 - Lightspeed Retail (X-Series) token refresh and product, inventory, customer and sale reads
 - Mailchimp's ping, audience, member, campaign and campaign report reads (Marketing API 3.0)
@@ -472,7 +473,7 @@ A request for a path or method the docs don't list throws `UndocumentedRequestEr
 - Zendesk's OAuth token refresh and its cursor-based ticket and user exports
 - Zoom's Server-to-Server OAuth token, meeting history and meeting participant reports (API v2)
 
-Where a vendor has a free sandbox (Affirm, Airtable, Amazon (Selling Partner API), Asana, Authorize.net, Avalara AvaTax, BigCommerce, BILL, Calendly, Clover, Custom forms, Docusign, Dropbox, eBay, FedEx, GIA Report Results, Gmail, Google Ads, Google Analytics 4, Google Workspace and Drive, Gusto, HubSpot, Klaviyo, Lightspeed Retail, Mailchimp, Instagram DMs, Facebook Messenger and WhatsApp Business, Meta Ads, Microsoft OneDrive and SharePoint files, Monday.com, Notion, Pinterest, Plaid, QuickBooks Online, Ramp, Slack, Sola Payments (formerly Cardknox), Square, TikTok, TikTok Ads, Trello, UPS, Wix, WooCommerce, Xero and Yext so far), its mock is a stand-in until a developer account is set up for the nightly run.
+Where a vendor has a free sandbox (Affirm, Airtable, Amazon (Selling Partner API), Asana, Authorize.net, Avalara AvaTax, BigCommerce, BILL, Calendly, Clover, Custom forms, Docusign, Dropbox, eBay, FedEx, GIA Report Results, Gmail, Google Ads, Google Analytics 4, Google Workspace and Drive, Gusto, HubSpot, Klarna, Klaviyo, Lightspeed Retail, Mailchimp, Instagram DMs, Facebook Messenger and WhatsApp Business, Meta Ads, Microsoft OneDrive and SharePoint files, Monday.com, Notion, Pinterest, Plaid, QuickBooks Online, Ramp, Slack, Sola Payments (formerly Cardknox), Square, TikTok, TikTok Ads, Trello, UPS, Wix, WooCommerce, Xero and Yext so far), its mock is a stand-in until a developer account is set up for the nightly run.
 
 <!-- registry:mocks:end -->
 
@@ -1781,6 +1782,30 @@ Reads a small maker's Katana manufacturing orders and stock, so production sees 
 **Rate limits.** Katana allows 60 requests a minute. The client waits out a 429, 500, 502, 503 or 504 three times, honoring `Retry-After` in seconds up to a minute, before the error goes to the sync runner, which resumes from its checkpoint next time.
 
 **Testing.** The tests run against a mock built from Katana's docs (`packages/testkit/src/mocks/katana.ts`). It checks the key, the filters and the paging, and lists what the first run against a real account must confirm: whether the date filters are inclusive, and how a deleted order is listed. Katana has a free trial: an account opened for testing, with synthetic orders and materials, is enough.
+
+### Klarna
+
+Reads what Klarna paid a business for its pay-over-time sales, payout by payout, with each sale, return, fee and commission behind it, so finance can match the deposit on the bank statement to the orders. Payouts arrive as `payout.updated` events and their lines as `balance.transaction_recorded` events.
+
+| Setting | What it is |
+| --- | --- |
+| `KLARNA_API_KEY` | A Klarna API key made for KaratOS: `klarna_live_api_…`, or `klarna_test_api_…` for the playground |
+| `KLARNA_USERNAME` | Optional, in place of a key: the API username the Klarna portal shows |
+| `KLARNA_PASSWORD` | With `KLARNA_USERNAME`: that credential's key or password |
+| `KLARNA_REGION` | Optional: `na` (North America, the default), `eu` or `oc` |
+| `KLARNA_ENVIRONMENT` | Optional: `production` (the default) or `playground` |
+
+**Read-only by design.** Klarna doesn't offer a key limited to settlements, so a Klarna key could also capture, refund or cancel orders. The client keeps to the settlement reads: it sends only GET requests, to the payouts list and the settlement transactions list, on the one host the region and environment name. A live key is turned down for the playground and a test key for production. Pages are walked by offset worked out by the client, never by following a link Klarna sends. Capturing and refunding an order are declared behind the write gate, turned off, and the client has no request to send them. Klarna's own error text is never repeated in an error, only the HTTP status. Make a key just for KaratOS, so it can be disabled on its own.
+
+**What it reads.** The first import lists five years of payouts by payout date, 100 to a page, and reads each payout's lines, 500 to a page, before the next payout. Each later sync lists the payouts made since three days before the last pass started, so one Klarna publishes late is still read. Each payout with its lines is one batch and one checkpoint, which keeps the pass's dates and how many payouts it has read.
+
+**Events.** A payout has its payment reference, the amount settled in cents, the currency, the payout date, whether Klarna settles gross or net, and its totals: sales, returns, fees, fee refunds, commission, reversals, holdbacks and releases, charges and credits, repayments, tax, deposits, and the debt balance before and after. A line has its type and Klarna's detailed type, the amount in cents as Klarna signs it, the currency, the Klarna order with its short ID, the capture or refund, the store's own order reference, the VAT, the purchase country, the payment method, and when it was sold and captured. A line has no ID of its own, so each is keyed by its payout, its place in the payout and a digest of what was kept: reading one again unchanged is a duplicate. One without what it needs is dead-lettered.
+
+**Privacy.** Klarna's comment text, the shipping country and the store's second reference are not kept. Klarna's settlement records hold no customer names or contact details.
+
+**Rate limits.** The client waits out a 429, 500, 502, 503 or 504 three times, honoring `Retry-After` in seconds up to a minute, before the error goes to the sync runner, which resumes from its checkpoint next time.
+
+**Testing.** The tests run against a mock built from Klarna's docs (`packages/testkit/src/mocks/klarna.ts`). It checks the credential, the date filters and offset paging, and lists what the first playground run must confirm: how the date filters match, the order payouts are listed in, and how an API key is sent. For the nightly run, sign up for a Klarna playground account in North America, make an API key there, and add it as the `SANDBOX_KLARNA_API_KEY` GitHub Actions secret.
 
 ### Klaviyo
 

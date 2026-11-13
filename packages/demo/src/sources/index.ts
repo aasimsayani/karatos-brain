@@ -111,6 +111,7 @@ export const DEMO_NOT_YET: Readonly<Record<string, string>> = {
   hrd: NOT_READ_YET,
   katana: NOT_READ_YET,
   google_workspace: NOT_READ_YET,
+  klarna: NOT_READ_YET,
   idex: NOT_READ_YET,
   monday: NOT_READ_YET,
   nivoda: NOT_READ_YET,
