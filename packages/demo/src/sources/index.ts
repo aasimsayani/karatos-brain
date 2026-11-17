@@ -1,21 +1,29 @@
+import { gustoSource } from "./gusto.js";
 import { inventoryPosSource } from "./inventory-pos.js";
 import { metalsSource } from "./metals.js";
 import { plaidSource } from "./plaid.js";
 import { quickBooksSource } from "./quickbooks.js";
+import { refinerSource } from "./refiner.js";
 import type { DemoSource } from "./source.js";
+import { supplierInvoicesSource } from "./supplier-invoices.js";
+import { trayCountsSource } from "./tray-counts.js";
 import { twilioSource } from "./twilio.js";
 import { watchSearchSource } from "./watchsearch.js";
 
+export * from "./gusto.js";
 export * from "./inventory-pos.js";
 export * from "./metals.js";
 export * from "./plaid.js";
 export * from "./quickbooks.js";
+export * from "./refiner.js";
 export * from "./source.js";
+export * from "./supplier-invoices.js";
+export * from "./tray-counts.js";
 export * from "./twilio.js";
 export * from "./watchsearch.js";
 
 /** Every system the demo store runs on, in the order they sync. */
-export const DEMO_SOURCES: readonly DemoSource[] = [metalsSource, inventoryPosSource, plaidSource, quickBooksSource, twilioSource, watchSearchSource];
+export const DEMO_SOURCES: readonly DemoSource[] = [metalsSource, inventoryPosSource, trayCountsSource, supplierInvoicesSource, refinerSource, plaidSource, gustoSource, quickBooksSource, twilioSource, watchSearchSource];
 
 const sameJobAs = (what: string) => `Does the same job as ${what}, which the demo store already runs on`;
 const NOT_READ_YET = "Its records don't reach a department yet, so they wouldn't show on the dashboard";
@@ -44,9 +52,7 @@ export const DEMO_NOT_YET: Readonly<Record<string, string>> = {
   slack: NEXT,
   hubspot: NEXT,
   stripe: NEXT,
-  refiner_statements: NEXT,
   piro: NEXT,
-  supplier_invoices: NEXT,
   amazon: NEXT,
   yext: NEXT,
   birdeye: NEXT,
@@ -63,8 +69,6 @@ export const DEMO_NOT_YET: Readonly<Record<string, string>> = {
   google_analytics: NEXT,
   mailchimp: NEXT,
   fincen_8300: NEXT,
-  rfid_counts: NEXT,
-  gusto: NEXT,
   acumatica_jewelshop: NEXT,
   affirm: NOT_READ_YET,
   airtable: NOT_READ_YET,

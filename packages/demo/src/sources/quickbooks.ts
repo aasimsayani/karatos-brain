@@ -18,12 +18,16 @@ interface DemoInvoice {
   line: string;
 }
 
-/** Trade and special-order invoices. Two are over 30 days past due. */
+/** Trade, corporate and special-order invoices. Three are over 30 days past due. */
 export const DEMO_INVOICES: DemoInvoice[] = [
   { number: "INV-2101", customer: ["1", "Demo Interiors Trade Account"], issuedDaysAgo: 82, dueDaysAgo: 52, total: 3_450, balance: 3_450, line: "Six sterling silver cuff links, engraved" },
   { number: "INV-2102", customer: ["2", "Sample Events Group"], issuedDaysAgo: 68, dueDaysAgo: 38, total: 2_800, balance: 1_200, line: "Bridal party pendants, 8 pieces" },
   { number: "INV-2103", customer: ["3", "Example Corporate Gifts"], issuedDaysAgo: 45, dueDaysAgo: 15, total: 1_960, balance: 0, line: "Service award lapel pins, 14K" },
   { number: "INV-2104", customer: ["1", "Demo Interiors Trade Account"], issuedDaysAgo: 20, dueDaysAgo: -10, total: 2_150, balance: 2_150, line: "Custom 14K signet ring, deposit invoiced" },
+  { number: "INV-2105", customer: ["4", "Example Law Partners"], issuedDaysAgo: 75, dueDaysAgo: 45, total: 6_400, balance: 2_400, line: "Partner retirement watches, 4 pieces, balance after deposit" },
+  { number: "INV-2106", customer: ["3", "Example Corporate Gifts"], issuedDaysAgo: 40, dueDaysAgo: 10, total: 8_250, balance: 0, line: "Client gift pendants, 30 pieces" },
+  { number: "INV-2107", customer: ["5", "Sample Hotel Group"], issuedDaysAgo: 28, dueDaysAgo: -2, total: 11_800, balance: 11_800, line: "Lobby boutique consignment restock" },
+  { number: "INV-2108", customer: ["2", "Sample Events Group"], issuedDaysAgo: 12, dueDaysAgo: -18, total: 3_600, balance: 3_600, line: "Groomsmen cuff links, 12 pairs" },
 ];
 
 function records(calendar: DemoCalendar): Record<string, QuickBooksMockRecord[]> {

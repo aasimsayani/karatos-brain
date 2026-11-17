@@ -49,7 +49,22 @@ const StockColumns = z.object({ sku: Column, onHand: Column, date: optional });
 
 const CustomerColumns = z.object({ customerId: Column, name: Column, marketingConsent: optional, updatedDate: optional });
 
-export const FILE_KINDS = ["items", "stock", "customers", "sales"] as const;
+/** One row per repair ticket, as it stands on the export's day. */
+const RepairColumns = z.object({
+  ticketId: Column,
+  customerId: Column,
+  item: Column,
+  work: Column,
+  promisedDate: Column,
+  estimate: Column,
+  declaredValue: optional,
+  receivedDate: optional,
+  status: optional,
+  /** When the ticket last changed status. The file's own time when absent. */
+  statusDate: optional,
+});
+
+export const FILE_KINDS = ["items", "stock", "customers", "sales", "repairs"] as const;
 export type FileKind = (typeof FILE_KINDS)[number];
 
 const PAYMENT_METHODS = ["card", "cash", "check", "financing", "trade_in", "gift_card", "wire", "other"] as const;
@@ -69,12 +84,14 @@ export const PosProfileSchema = z.object({
     stock: z.string().optional(),
     customers: z.string().optional(),
     sales: z.string().optional(),
+    repairs: z.string().optional(),
   }),
   columns: z.object({
     sales: SalesColumns.optional(),
     items: ItemColumns.optional(),
     stock: StockColumns.optional(),
     customers: CustomerColumns.optional(),
+    repairs: RepairColumns.optional(),
   }),
   /** The system's payment labels, lowercased, mapped to the sales department's methods. Checked before the built-in guesses. */
   payments: z.record(z.string(), z.enum(PAYMENT_METHODS)).default({}),
@@ -88,6 +105,7 @@ export type SalesColumnMap = z.output<typeof SalesColumns>;
 export type ItemColumnMap = z.output<typeof ItemColumns>;
 export type StockColumnMap = z.output<typeof StockColumns>;
 export type CustomerColumnMap = z.output<typeof CustomerColumns>;
+export type RepairColumnMap = z.output<typeof RepairColumns>;
 
 export class PosProfileError extends Error {
   constructor(message: string) {
@@ -122,7 +140,7 @@ export const GENERIC_POS_PROFILE: PosProfile = parsePosProfile({
   id: "generic",
   name: "Generic CSV",
   dateOrder: "mdy",
-  files: { items: "item|inventory", stock: "stock|on.?hand", customers: "customer|client", sales: "sale|transaction|receipt" },
+  files: { items: "item|inventory", stock: "stock|on.?hand", customers: "customer|client", sales: "sale|transaction|receipt", repairs: "repair|service.?ticket|job.?envelope" },
   columns: {
     sales: {
       saleId: ["Sale ID", "Receipt", "Ticket"],
@@ -159,6 +177,18 @@ export const GENERIC_POS_PROFILE: PosProfile = parsePosProfile({
       name: ["Name", "Customer Name"],
       marketingConsent: ["Marketing Opt In", "Opt In"],
       updatedDate: ["Updated", "Last Updated"],
+    },
+    repairs: {
+      ticketId: ["Ticket", "Ticket Number", "Repair ID", "Envelope", "Job Number"],
+      customerId: ["Customer ID", "Customer Number"],
+      item: ["Item", "Item Description", "Description"],
+      work: ["Work", "Repair", "Work Requested", "Service"],
+      promisedDate: ["Promised", "Promise Date", "Due Date", "Due"],
+      estimate: ["Estimate", "Price", "Quoted"],
+      declaredValue: ["Declared Value", "Value", "Insured Value"],
+      receivedDate: ["Received", "Taken In", "Date In"],
+      status: "Status",
+      statusDate: ["Status Date", "Last Updated", "Updated"],
     },
   },
 });

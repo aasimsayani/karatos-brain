@@ -8,8 +8,9 @@ import type { FileKind, PosProfile } from "./profile.js";
 /**
  * Turns rows of POS exports into Brain A events, following the retail
  * departments' schemas: sale.completed and sale.returned (sales),
- * inventory.received and inventory.counted (inventory) and
- * customer.profile_updated (clienteling). A row that can't be read becomes
+ * inventory.received and inventory.counted (inventory),
+ * customer.profile_updated (clienteling) and repair.received and
+ * repair.status_changed (repairs). A row that can't be read becomes
  * an event with the bad value left null, so the department schema
  * dead-letters it with the row kept. Only the mapped columns are read: no
  * email addresses, phone numbers or street addresses.
@@ -271,11 +272,79 @@ export function posSalesEvents(rows: CsvRow[], get: Getter, ctx: RowContext): Po
   return events;
 }
 
+/** A POS's repair status words, in the order they are tried, to the repairs department's statuses. */
+const REPAIR_STATUS_WORDS: [RegExp, string][] = [
+  [/cancel|void/, "cancelled"],
+  [/picked|deliver|closed|collected/, "picked_up"],
+  [/ready|await|finished|done|complete/, "ready"],
+  [/sent|vendor|trade shop|outside|out for/, "sent_out"],
+  [/bench|in progress|working|in shop|jeweler/, "at_bench"],
+  [/receiv|open|new|intake|taken in/, "received"],
+];
+
+/** The department's status for a POS's label, or null when it says none of them. */
+export function posRepairStatus(label: string): string | null {
+  const t = label.trim().toLowerCase();
+  return REPAIR_STATUS_WORDS.find(([pattern]) => pattern.test(t))?.[1] ?? null;
+}
+
+/** A date as the store's own calendar day (YYYY-MM-DD), or null when it can't be read. */
+function storeDay(ctx: RowContext, value: string | undefined): string | null {
+  const iso = parseDate(value, ctx.profile.dateOrder, ctx.profile.utcOffset);
+  if (iso === null) return null;
+  const offset = ctx.profile.utcOffset;
+  const m = /^([+-])(\d{2}):(\d{2})$/.exec(offset);
+  const minutes = m ? (m[1] === "-" ? -1 : 1) * (Number(m[2]) * 60 + Number(m[3])) : 0;
+  return new Date(Date.parse(iso) + minutes * 60_000).toISOString().slice(0, 10);
+}
+
+/**
+ * Each repair ticket row gives repair.received once, keyed by its ticket,
+ * and, when its status is past intake, repair.status_changed once per
+ * status it reaches. An export of open tickets taken each night therefore
+ * stores each ticket and each step it moves through exactly once.
+ */
+export function posRepairEvents(rows: CsvRow[], get: Getter, ctx: RowContext): PosEvent[] {
+  const events: PosEvent[] = [];
+  for (const row of rows) {
+    const ticketId = get(row, "ticketId")?.trim() ?? "";
+    const receivedAt = dateOrFile(ctx, get(row, "receivedDate"));
+    if (tooOld(ctx, receivedAt)) continue;
+    const customer = get(row, "customerId");
+    const declared = get(row, "declaredValue");
+    events.push(
+      event(ctx, `repair:${ticketId}`, "repair.received", receivedAt, {
+        ticketId,
+        customerId: present(customer) ? ref(ctx, "customer", customer) : "",
+        itemDescription: get(row, "item")?.trim() ?? "",
+        work: get(row, "work")?.trim() ?? "",
+        promisedBy: storeDay(ctx, get(row, "promisedDate")),
+        estimateCents: parseMoney(get(row, "estimate")),
+        ...(present(declared) ? { declaredValueCents: parseMoney(declared) } : {}),
+        sourceRow: where(ctx, row),
+      }),
+    );
+    const label = get(row, "status");
+    if (!present(label)) continue;
+    const status = posRepairStatus(label);
+    if (status === "received") continue;
+    events.push(
+      event(ctx, `repair:${ticketId}:status:${status ?? short(label)}`, "repair.status_changed", dateOrFile(ctx, get(row, "statusDate")), {
+        ticketId,
+        status,
+        sourceRow: where(ctx, row),
+      }),
+    );
+  }
+  return events;
+}
+
 export const REQUIRED_COLUMNS: Record<FileKind, string[]> = {
   items: ["sku", "title", "cost", "retailPrice"],
   stock: ["sku", "onHand"],
   customers: ["customerId", "name"],
   sales: ["saleId", "date", "sku", "quantity", "unitPrice"],
+  repairs: ["ticketId", "customerId", "item", "work", "promisedDate", "estimate"],
 };
 
 export const ROW_EVENTS: Record<FileKind, (rows: CsvRow[], get: Getter, ctx: RowContext) => PosEvent[]> = {
@@ -283,4 +352,5 @@ export const ROW_EVENTS: Record<FileKind, (rows: CsvRow[], get: Getter, ctx: Row
   stock: posStockEvents,
   customers: posCustomerEvents,
   sales: posSalesEvents,
+  repairs: posRepairEvents,
 };
