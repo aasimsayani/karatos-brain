@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { DepartmentModule } from "../department.js";
 import { ASSUMPTIONS, calendarDaysSince, daysBetween, dollars, estimate, extractor, latestBySubject, pct, recommend, signalFrom, value } from "../department.js";
+import { payoutExtractor, payoutReasoner } from "./payouts.js";
 
 const BankTransactionImported = z.object({
   transactionId: z.string().min(1),
@@ -96,11 +97,13 @@ const CLOSED_STATUSES = new Set(["paid", "voided", "deleted", "draft"]);
  * owed on them, so the console can show cash position and receivables.
  * Payroll software adds each processed payroll and what each employee was
  * paid, and a regular payroll far above the ones before it is flagged.
+ * The payment connectors add payouts and the sales, refunds and fees they
+ * cover, and a payout that is short, missing or late is flagged (see payouts.ts).
  */
 export const finance: DepartmentModule = {
   id: "finance",
   name: "Finance",
-  purpose: "Bank and card activity reconciled against sales, cash position, and what customers still owe.",
+  purpose: "Bank and card activity reconciled against sales, payouts matched to the sales they pay for, cash position, and what customers still owe.",
   events: {
     "bank.transaction_imported": BankTransactionImported,
     "bank.account_updated": BankAccountUpdated,
@@ -143,6 +146,7 @@ export const finance: DepartmentModule = {
       }
       return [];
     }),
+    payoutExtractor,
   ],
   reasoners: [
     {
@@ -252,5 +256,6 @@ export const finance: DepartmentModule = {
         });
       },
     },
+    payoutReasoner,
   ],
 };

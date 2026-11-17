@@ -12,6 +12,20 @@ import { repairs } from "./departments/repairs.js";
 import { sales } from "./departments/sales.js";
 
 export * from "./department.js";
+export {
+  DEFAULT_PAYOUT_SCHEDULE_DAYS,
+  money,
+  PAYOUT_LOOKBACK_DAYS,
+  PAYOUT_MISSING_AFTER_DAYS,
+  PAYOUT_SCHEDULE_DAYS,
+  PAYOUT_TOLERANCE_CENTS,
+  PAYOUT_TOLERANCE_SHARE,
+  processorOf,
+  type LineCategory,
+  type PayoutLine,
+  type PayoutRecord,
+  type PayoutStatus,
+} from "./departments/payouts.js";
 export { appraisals, buying, clienteling, compliance, customOrders, finance, inventory, marketing, metals, repairs, sales };
 
 /** Every retail jewelry department, in the order a store usually adopts them. */
