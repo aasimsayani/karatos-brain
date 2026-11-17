@@ -258,11 +258,20 @@ export function buildingNow(): IntegrationSpec[] {
 }
 
 /** The hero's early-access line, naming the connectors that are built. */
+/**
+ * Systems a jeweler recognises at a glance, named first in the hero. Only the
+ * ones already built are shown; the rest are counted, and the directory lists them all.
+ */
+export const HERO_SYSTEMS = ["shopify", "square", "clover", "quickbooks", "stripe", "gmail", "rapnet", "stuller", "gia"] as const;
+
 export function earlyAccessNote(): string {
-  const built = INTEGRATIONS.filter((i) => i.status === "built").map((i) => i.name);
+  const built = INTEGRATIONS.filter((i) => i.status === "built");
   if (!built.length) return "Early access. The first integrations are being built and tested now.";
-  const names = built.length === 1 ? built[0]! : `${built.slice(0, -1).join(", ")} and ${built.at(-1)}`;
-  return `Early access. ${names} ${built.length === 1 ? "is" : "are"} connected today, and more integrations are being built and tested now.`;
+  const featured = HERO_SYSTEMS.map((id) => built.find((i) => i.id === id)).filter((i): i is IntegrationSpec => !!i).map((i) => i.name);
+  const names = featured.length ? featured : built.slice(0, 6).map((i) => i.name);
+  const rest = built.length - names.length;
+  const list = rest > 0 ? `${names.join(", ")} and ${rest} more` : names.length === 1 ? names[0]! : `${names.slice(0, -1).join(", ")} and ${names.at(-1)}`;
+  return `Connectors built for ${list}. Live store checks start with the pilot.`;
 }
 
 export function escapeHtml(value: string): string {
@@ -278,7 +287,7 @@ function statusOf(integration: IntegrationSpec, selfServe: Set<string>): { label
 
 /**
  * One card per kind of connection (catalog domain), those with built systems
- * first: the question it answers, why it matters, and what is connected today,
+ * first: the question it answers, why it matters, and which connectors are built,
  * being built now, or on the roadmap.
  */
 export function renderValueCards(dataSources: readonly IntegrationSpec[], selfServe: ReadonlySet<string>): string {
@@ -294,7 +303,7 @@ export function renderValueCards(dataSources: readonly IntegrationSpec[], selfSe
       const built = systems.filter((i) => i.status === "built");
       const next = systems.filter((i) => i.status !== "built" && selfServe.has(i.id));
       const status = built.length
-        ? `<p class="value-status live"><strong>Connected today:</strong> ${escapeHtml(built.map((i) => i.name).join(", "))}</p>`
+        ? `<p class="value-status live"><strong>Built:</strong> ${escapeHtml(built.map((i) => i.name).join(", "))}</p>`
         : next.length
           ? `<p class="value-status"><strong>Building now:</strong> ${escapeHtml(next.map((i) => i.name).join(", "))}</p>`
           : `<p class="value-status"><strong>On the roadmap:</strong> ${systems.length} ${systems.length === 1 ? "system" : "systems"}</p>`;
@@ -373,7 +382,7 @@ export function renderCard(i: IntegrationSpec, selfServe: ReadonlySet<string>, d
     ["For", segments.join(", ")],
     ["Stage", STAGE_DETAIL[status.label] ?? status.label],
   ];
-  if (CONNECTED_ON[i.id]) rows.push(["Connected", formatDay(CONNECTED_ON[i.id]!)]);
+  if (CONNECTED_ON[i.id]) rows.push(["Built", formatDay(CONNECTED_ON[i.id]!)]);
   const found = researched.has(i.id) ? `<dt>What we found</dt><dd><a href="${escapeHtml(researchUrl(i.id))}">How ${escapeHtml(i.name)} can be reached, from its own docs</a></dd>` : "";
   return `<li class="card" data-domain="${i.domain}" data-segments="${i.segments.join(" ")}" data-departments="${i.departments.join(" ")}" data-search="${escapeHtml(search)}">
   <div class="card-top"><span class="domain">${escapeHtml(detail.company ? `By ${detail.company}` : domainLabel(i.domain))}</span><span class="pill ${status.tone}">${status.label}</span></div>
@@ -399,8 +408,8 @@ export function renderDirectory(dataSources: readonly IntegrationSpec[], selfSer
     .map((domain, n) => {
       const systems = dataSources.filter((i) => i.domain === domain);
       const built = systems.filter((i) => i.status === "built").length;
-      const counts = `${systems.length} ${systems.length === 1 ? "system" : "systems"}${built ? ` · ${built} connected` : ""}`;
-      return `<details class="group" data-group="${domain}" id="cat-${domain}"${n === 0 ? " open" : ""}>
+      const counts = `${systems.length} ${systems.length === 1 ? "system" : "systems"}${built ? ` · ${built} built` : ""}`;
+      return `<details class="group" data-group="${domain}" id="cat-${domain}">
   <summary class="group-head"><h3>${escapeHtml(domainLabel(domain))}</h3><span class="count">${counts}</span></summary>
   <ul class="cards">
 ${systems.map((i) => renderCard(i, selfServe, deptName, researched)).join("\n")}
@@ -518,7 +527,9 @@ header.nav{position:sticky;top:0;z-index:10;background:color-mix(in srgb,var(--b
 .btn.primary{background:var(--ink);color:var(--bg)}
 .btn.ghost{background:transparent;color:var(--ink)}
 .btn.small{padding:8px 16px;font-size:14px}
-.hero{padding-top:var(--section);padding-bottom:var(--section)}
+.hero{padding-top:var(--section);padding-bottom:var(--section);display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,.9fr);gap:var(--space-5);align-items:center}
+.hero-brief{align-self:center}
+@media (max-width:980px){.hero{grid-template-columns:1fr}}
 .eyebrow{display:block;width:fit-content;font-family:var(--mono);font-size:13px;font-weight:500;letter-spacing:.06em;text-transform:uppercase;color:var(--gold-text);margin-bottom:var(--space-2);line-height:1.4}
 h1,h2{font-weight:600;letter-spacing:-.015em;line-height:1.1;margin:0;text-wrap:balance}
 h1{font-size:clamp(40px,7vw,76px);max-width:14ch}
@@ -626,7 +637,7 @@ section{padding:var(--section) 0;border-top:1px solid var(--line);scroll-margin-
 .ladder p{margin:0;color:var(--ink-2);font-size:15px}
 #partners .rules{margin-bottom:var(--space-4)}
 @media (max-width:760px){.filters{grid-template-columns:1fr}.ladder{grid-template-columns:1fr}}
-.pillars{display:grid;grid-template-columns:repeat(3,1fr);gap:var(--space-3)}
+.pillars{display:grid;grid-template-columns:repeat(2,1fr);gap:var(--space-3)}
 .pillars div{padding-top:var(--space-3);border-top:2px solid var(--gold)}
 .pillars h3{margin:0 0 8px;font-size:18px}
 .pillars p{margin:0;color:var(--ink-2)}
@@ -701,47 +712,58 @@ footer .wrap{display:flex;flex-wrap:wrap;justify-content:space-between;gap:var(-
 <body>
 <header class="nav"><div class="wrap">
   <a class="brand" href="#top"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M16 3 28 12 16 29 4 12Z" fill="#c9a45c"/><path d="M4 12h24M16 3l-5 9 5 17 5-17-5-9" fill="none" stroke="#16140f" stroke-opacity=".35" stroke-width="1.2"/></svg>KaratOS</a>
-  <nav><a href="#how">How it works</a><a href="#together">Systems together</a><a href="#payback">Payback</a><a href="#write-back">Write-back</a><a href="#integrations">Integrations</a><a href="#partners">Partners</a><a href="#pilot">Holiday pilot</a><a href="#services">Pricing</a><a href="#broken">What's broken</a><a href="/demo/">Demo</a></nav>
+  <nav><a href="#together">What it solves</a><a href="#how">How it works</a><a href="#payback">Payback</a><a href="#services">Pricing</a><a href="#pilot">Holiday pilot</a><a href="#integrations">Integrations</a><a href="/demo/">Demo</a></nav>
   <a class="btn primary small" href="#services">Custom services</a>
 </div></header>
 
 <main id="top">
 <div class="wrap hero">
+  <div class="hero-copy">
   <span class="eyebrow">For jewelers, watch dealers, wholesalers, manufacturers and the businesses that serve them</span>
   <h1>The operating brain for jewelry businesses.</h1>
-  <p class="lede">KaratOS connects the many systems your business already runs, from the POS and the books to diamond feeds and the repair bench, reads them together and turns them into a short list of things to act on today. Every suggestion shows the evidence behind it, and when you allow it, KaratOS writes back carefully, one approved change at a time.</p>
-  <div class="actions"><a class="btn primary" href="#pilot">Join the holiday pilot</a><a class="btn ghost" href="#services">Custom services</a><a class="btn ghost" href="/demo/">Try the live demo</a></div>
-  <p class="note">The <a href="/demo/">live demo</a> is a made-up store running on the real connectors, so you can click through the dashboard before connecting anything. It resets every night.</p>
+  <p class="lede">KaratOS connects the many systems you already run, from the POS and the books to diamond feeds and the repair bench, and every morning hands you a short list of what to do, with the evidence behind each one.</p>
+  <div class="actions"><a class="btn primary" href="#pilot">Join the holiday pilot</a><a class="btn ghost" href="/demo/">Try the live demo</a></div>
+  <p class="note">The <a href="/demo/">live demo</a> is a made-up store running on the real connectors. No sign-up.</p>
   <ul class="proof" aria-label="KaratOS today">
-    <li><strong>${builtCount}</strong><span>systems connected</span></li>
+    <li><strong>${builtCount}</strong><span>connectors built</span></li>
     <li><strong>${dataSources.length}</strong><span>systems mapped</span></li>
-    <li><strong>${categories.length}</strong><span>categories, from the counter to the bench</span></li>
+    <li><strong>${CORE_PRICE}</strong><span>a store a month</span></li>
   </ul>
   <p class="note">${escapeHtml(earlyAccessNote())}</p>
+  </div>
+  <div class="console-preview hero-brief" aria-label="Example of a morning list in the Brain Console">
+    <div class="cp-head"><span>This morning</span><span class="pill gold">4 need you today</span></div>
+    <div class="cp-row act"><span class="cp-dept">Clienteling</span><p>Call the Hendersons. Their anniversary is in 9 days and the matching earrings are back in stock.</p></div>
+    <div class="cp-row"><span class="cp-dept">Pricing</span><p>Gold is up this week. Fourteen pieces are now priced below what they cost to replace.</p></div>
+    <div class="cp-row"><span class="cp-dept">Buying</span><p>Send back two memo stones before Friday. Their list price dropped.</p></div>
+    <div class="cp-row"><span class="cp-dept">Compliance</span><p>Yesterday's $12,400 cash sale needs a Form 8300 within 15 days.</p></div>
+    <p class="cp-note">Illustrative. Each item opens to the sales, tickets and statements behind it.</p>
+  </div>
 </div>
 
+<section id="together"><div class="wrap">
+  <span class="eyebrow">What it solves</span>
+  <h2>One system knows a little. Together they know what to do.</h2>
+  <p class="section-intro">The problems jewelers tell us cost them most, each solved by reading a few systems together:</p>
+  <ul class="plays">
+${playCards}
+  </ul>
+</div></section>
+
 <section id="how"><div class="wrap">
+  <span class="eyebrow">How it works</span>
   <h2>From scattered systems to a clear next step.</h2>
-  <p class="section-intro">Most jewelry businesses run a dozen systems that don't talk to each other. KaratOS connects to as many of them as you run, from ${dataSources.length} systems on our map, reads them together, and tells you what matters.</p>
+  <p class="section-intro">Connect what you run, from ${dataSources.length} systems on our map. Three steps:</p>
   <ol class="steps">
-    <li><h3>Connect everything, read-only</h3><p>Link your POS, store, books, bank statements (CSV or PDF), suppliers, messaging and price feeds, as many as you run. Every connection starts read-only.</p></li>
-    <li><h3>Understand across departments</h3><p>A sale, a late repair, a stone on memo and a jump in gold all become signals, and each department sees what the others are doing.</p></li>
-    <li><h3>Act, and write back carefully</h3><p>Each morning, a short list: what to do, why, and the records behind it. Accept, snooze or dismiss. Where you've turned write-back on, a person approves each draft before it goes into your system.</p></li>
+    <li><h3>Connect everything, read-only</h3><p>POS, store, books, bank statements, suppliers, messages and price feeds. Nothing is changed.</p></li>
+    <li><h3>Understand across departments</h3><p>A sale, a late repair, a stone on memo and a jump in gold become one picture.</p></li>
+    <li><h3>Act, and write back carefully</h3><p>Accept, snooze or dismiss each suggestion. Writing back stays off until you turn it on, and a person approves every change.</p></li>
   </ol>
   <div class="example">
     <span class="tag">Example</span>
     <p><strong>Call the Hendersons today.</strong> Their anniversary is in 9 days, they bought a band here three years ago, and the matching earrings came back in stock this week.</p>
     <p class="why">Why: based on 4 events from clienteling, sales and inventory. Illustrative.</p>
   </div>
-</div></section>
-
-<section id="together"><div class="wrap">
-  <span class="eyebrow">Systems that work together</span>
-  <h2>One system knows a little. Together they know what to do.</h2>
-  <p class="section-intro">The win isn't any single connection. It's a sale in the POS meeting a date in the client book, or a gold price meeting a supplier's catalog and your website. A few of the plays that only exist once your systems are read together:</p>
-  <ul class="plays">
-${playCards}
-  </ul>
 </div></section>
 
 <section id="payback"><div class="wrap">
@@ -757,84 +779,9 @@ ${paybackFields}
 ${paybackRows}
       </ul>
       <p class="pb-total">About <output id="pb-total">${dollars(paybackTotal)}</output> a month, or <output id="pb-times">${(paybackTotal / corePriceDollars()).toFixed(1)}</output>× what Core costs.</p>
-      <p class="fine">An estimate from the numbers above. Once you're running, each recommendation in the Brain Console will carry its own dollar figure and how it was worked out, and a monthly report will add up what each play actually returned. That report is being built now.</p>
+      <p class="fine">An estimate from the numbers above. Once you're running, each recommendation carries its own dollar figure and how it was worked out. After you act on one, KaratOS keeps a ledger of what it actually returned, measured from your own sales and payments at 30, 60 and 90 days where it can, or entered by your team where it can't, and adds it up month by month.</p>
     </div>
   </div>
-</div></section>
-
-<section id="value"><div class="wrap">
-  <span class="eyebrow">What each connection is worth</span>
-  <h2>Every system you connect answers a question the others can't.</h2>
-  <p class="section-intro">KaratOS is useful with one connection and sharper with each one. Here is the question each kind of system answers for the owner, why it matters, and what is connected today.</p>
-  <ul class="values">
-${valueCards}
-  </ul>
-</div></section>
-
-<section id="write-back"><div class="wrap">
-  <span class="eyebrow">Write-back</span>
-  <h2>Reads freely. Writes carefully.</h2>
-  <p class="section-intro">Reading more of your systems makes for better suggestions. Writing back saves your team the typing, but one wrong change in your system costs trust, so KaratOS has to be twice as sure before it writes as when it reads.</p>
-  <ul class="rules">
-${writeRules}
-  </ul>
-  <div class="source">
-    <h3>Your systems stay the source of truth.</h3>
-    <p>KaratOS writes into the POS, store, books and client book you already run, rather than becoming another database to pay for and keep in sync.</p>
-  </div>
-</div></section>
-
-<section id="departments"><div class="wrap">
-  <h2>Built for every department.</h2>
-  <p class="section-intro">Each business turns on the departments it runs. Recommendations cross departments, so a repair running late reaches the client book before the customer calls.</p>
-  <ul class="depts-grid">
-${deptCards}
-  </ul>
-</div></section>
-
-<section id="integrations"><div class="wrap">
-  <h2>Integrations</h2>
-  <p class="section-intro">Every system on our map, grouped by what it does, with what KaratOS reads from it and how it connects. Open any card for the details. "Building now" means we can build and test it without waiting on anyone. Everything else follows.</p>
-  <div class="newest">
-    <h3>Newest connections</h3>
-    <ul>
-${newest}
-    </ul>
-  </div>
-  <div class="stats">
-    <div class="stat"><strong>${builtCount}</strong><span>connected</span></div>
-    <div class="stat"><strong>${dataSources.length}</strong><span>systems mapped</span></div>
-    <div class="stat"><strong>${selfServe.size}</strong><span>building now</span></div>
-    <div class="stat"><strong>${departments.length}</strong><span>departments served</span></div>
-  </div>
-  <div class="filters" role="search">
-    <input id="q" type="search" placeholder="Search systems, e.g. Shopify, repairs, diamonds" aria-label="Search integrations">
-    <select id="segment" aria-label="Kind of business"><option value="">Every kind of business</option><option value="retail">Retail</option><option value="wholesale">Wholesale</option><option value="manufacturing">Manufacturing</option></select>
-    <select id="category" aria-label="Category"><option value="">Every category</option>${categoryOptions}</select>
-    <select id="department" aria-label="Department"><option value="">Every department</option>${deptOptions}</select>
-  </div>
-  <nav class="jump" aria-label="Categories">${categories.map((d) => `<a href="#cat-${d}">${escapeHtml(domainLabel(d))}</a>`).join("")}</nav>
-  <div id="cards">
-${directory}
-  </div>
-  <p class="empty" id="empty" hidden>Nothing matches. <a href="#broken">Tell us about it</a> and we'll add it.</p>
-</div></section>
-
-<section id="partners"><div class="wrap">
-  <span class="eyebrow">For partners</span>
-  <h2>Your system, read alongside everything else your customers run.</h2>
-  <p class="section-intro">When a jeweler connects your system to KaratOS, it gets read next to their POS, their books and their suppliers, so your data shows up in the decisions they make every morning. That makes your product harder to replace, not easier.</p>
-  <ul class="ladder" aria-label="How a system moves from the map to connected">
-    <li><strong>${dataSources.length - builtCount - selfServe.size}</strong><h3>On the map</h3><p>Every system our customers run, with how it can be reached. Each one moves up when a business asks for it or its vendor opens access.</p></li>
-    <li><strong>${selfServe.size}</strong><h3>Building now</h3><p>Systems with a public API and a free sandbox. We build and test these without waiting on anyone.</p></li>
-    <li><strong>${builtCount}</strong><h3>Connected</h3><p>Built and tested, checked every night against the vendor's sandbox, and watched for changes to the vendor's API.</p></li>
-  </ul>
-  <ul class="rules">
-    <li><h3>Read-only by default</h3><p>A connector reads only what it needs. It asks for read scopes, and where a key can't be limited, it sends only the read requests it lists.</p></li>
-    <li><h3>No surprise writes</h3><p>Writing back is off until the business turns it on for one action, and a person approves each change before it reaches your system.</p></li>
-    <li><h3>Kept current</h3><p>We follow your API changelog every day and run every connector against its sandbox every night, so a change on your side gets fixed quickly.</p></li>
-  </ul>
-  <div class="actions"><a class="btn primary" href="${REPORT_URL}">Ask for an integration</a><a class="btn ghost" href="${CONTACT_ANCHOR}">Talk to us about partnering</a></div>
 </div></section>
 
 <section id="pilot"><div class="wrap">
@@ -855,16 +802,6 @@ ${directory}
       <p>Sign-ups open ${HOLIDAY_PILOT.signupsOpen}. Places are limited so we can help every store connect.</p>
       <div class="actions"><a class="btn primary" href="${CONTACT_ANCHOR}" data-interest="pilot">Join the pilot</a></div>
     </div>
-  </div>
-</div></section>
-
-<section id="your-data"><div class="wrap">
-  <h2>Your instance. Your data.</h2>
-  <p class="section-intro">KaratOS runs as a private instance for your business alone. On Core it lives in accounts you own; on Managed we run it for you, still walled off from every other client.</p>
-  <div class="pillars">
-    <div><h3>No one else sees it</h3><p>On Core, once setup is done we have no access. On Managed, we reach your instance only to keep it running. Either way, your sales, customers, statements and margins stay in your instance.</p></div>
-    <div><h3>Nothing shared by default</h3><p>Your data is never used to price, benchmark or advise another business unless you both opt in.</p></div>
-    <div><h3>You choose who runs it</h3><p>Have the bandwidth? Keep it in your own accounts on Core. Rather not? Managed means we host it, keep it current and fix connections when a vendor changes something.</p></div>
   </div>
 </div></section>
 
@@ -953,6 +890,92 @@ ${directory}
     <div class="actions"><a class="btn primary" href="${CONTACT_ANCHOR}" data-interest="broken_system">Tell us privately</a></div>
     <p class="small">The private form goes only to our team, and we reply within a week. Happy to say it in public? <a href="${REPORT_URL}">Post it on GitHub</a> instead, leaving out passwords, customer names and figures.</p>
   </div>
+</div></section>
+
+<section id="write-back"><div class="wrap">
+  <span class="eyebrow">Write-back</span>
+  <h2>Reads freely. Writes carefully.</h2>
+  <p class="section-intro">Reading more of your systems makes for better suggestions. Writing back saves your team the typing, but one wrong change in your system costs trust, so KaratOS has to be twice as sure before it writes as when it reads.</p>
+  <ul class="rules">
+${writeRules}
+  </ul>
+  <div class="source">
+    <h3>Your systems stay the source of truth.</h3>
+    <p>KaratOS writes into the POS, store, books and client book you already run, rather than becoming another database to pay for and keep in sync.</p>
+  </div>
+</div></section>
+
+<section id="your-data"><div class="wrap">
+  <h2>Your instance. Your data.</h2>
+  <p class="section-intro">KaratOS runs as a private instance for your business alone. On Core it lives in accounts you own; on Managed we run it for you, still walled off from every other client.</p>
+  <div class="pillars">
+    <div><h3>No one else sees it</h3><p>On Core, once setup is done we have no access. On Managed, we reach your instance only to keep it running. Either way, your sales, customers, statements and margins stay in your instance.</p></div>
+    <div><h3>Nothing shared by default</h3><p>Your data is never used to price, benchmark or advise another business unless you both opt in.</p></div>
+    <div><h3>Help without handing over your records</h3><p>If you want help running it, give your helper a support key instead of your main one. It shows whether each connection is set up and syncing, its last error with anything sensitive blanked out, and how many records came in each day, but never your sales, customers, amounts or recommendations, and it can't change anything. Remove the key to take it back.</p></div>
+    <div><h3>You choose who runs it</h3><p>Have the bandwidth? Keep it in your own accounts on Core. Rather not? Managed means we host it, keep it current and fix connections when a vendor changes something.</p></div>
+  </div>
+</div></section>
+
+<section id="departments"><div class="wrap">
+  <h2>Built for every department.</h2>
+  <p class="section-intro">Each business turns on the departments it runs. Recommendations cross departments, so a repair running late reaches the client book before the customer calls.</p>
+  <ul class="depts-grid">
+${deptCards}
+  </ul>
+</div></section>
+
+<section id="value"><div class="wrap">
+  <span class="eyebrow">What each connection is worth</span>
+  <h2>Every system you connect answers a question the others can't.</h2>
+  <p class="section-intro">KaratOS is useful with one connection and sharper with each one. Here is the question each kind of system answers for the owner, why it matters, and which connectors are built.</p>
+  <ul class="values">
+${valueCards}
+  </ul>
+</div></section>
+
+<section id="integrations"><div class="wrap">
+  <h2>Integrations</h2>
+  <p class="section-intro">Every system on our map, grouped by what it does, with what KaratOS reads from it and how it connects. Open any card for the details. "Building now" means we can build and test it without waiting on anyone. Everything else follows.</p>
+  <div class="newest">
+    <h3>Newest connectors</h3>
+    <ul>
+${newest}
+    </ul>
+  </div>
+  <div class="stats">
+    <div class="stat"><strong>${builtCount}</strong><span>built</span></div>
+    <div class="stat"><strong>${dataSources.length}</strong><span>systems mapped</span></div>
+    <div class="stat"><strong>${selfServe.size}</strong><span>building now</span></div>
+    <div class="stat"><strong>${departments.length}</strong><span>departments served</span></div>
+  </div>
+  <div class="filters" role="search">
+    <input id="q" type="search" placeholder="Search systems, e.g. Shopify, repairs, diamonds" aria-label="Search integrations">
+    <select id="segment" aria-label="Kind of business"><option value="">Every kind of business</option><option value="retail">Retail</option><option value="wholesale">Wholesale</option><option value="manufacturing">Manufacturing</option></select>
+    <select id="category" aria-label="Category"><option value="">Every category</option>${categoryOptions}</select>
+    <select id="department" aria-label="Department"><option value="">Every department</option>${deptOptions}</select>
+  </div>
+  <nav class="jump" aria-label="Categories">${categories.map((d) => `<a href="#cat-${d}">${escapeHtml(domainLabel(d))}</a>`).join("")}</nav>
+  <div id="cards">
+${directory}
+  </div>
+  <p class="empty" id="empty" hidden>Nothing matches. <a href="#broken">Tell us about it</a> and we'll add it.</p>
+</div></section>
+
+<section id="partners"><div class="wrap">
+  <span class="eyebrow">For partners</span>
+  <h2>Your system, read alongside everything else your customers run.</h2>
+  <p class="section-intro">When a jeweler connects your system to KaratOS, it gets read next to their POS, their books and their suppliers, so your data shows up in the decisions they make every morning. That makes your product harder to replace, not easier.</p>
+  <ul class="ladder" aria-label="How a system moves from the map to built">
+    <li><strong>${dataSources.length - builtCount - selfServe.size}</strong><h3>On the map</h3><p>Every system our customers run, with how it can be reached. Each one moves up when a business asks for it or its vendor opens access.</p></li>
+    <li><strong>${selfServe.size}</strong><h3>Building now</h3><p>Systems with a public API and a free sandbox. We build and test these without waiting on anyone.</p></li>
+    <li><strong>${builtCount}</strong><h3>Built</h3><p>Built and tested against the vendor's sandbox or sample files, and watched for changes to the vendor's API. Each is checked on a live account as stores connect it.</p></li>
+  </ul>
+  <ul class="rules">
+    <li><h3>Read-only by default</h3><p>A connector reads only what it needs. It asks for read scopes, and where a key can't be limited, it sends only the read requests it lists.</p></li>
+    <li><h3>No surprise writes</h3><p>Writing back is off until the business turns it on for one action, and a person approves each change before it reaches your system.</p></li>
+    <li><h3>Kept current</h3><p>We follow your API changelog every day and run every connector against its sandbox every night, so a change on your side gets fixed quickly.</p></li>
+  </ul>
+  <div class="actions"><a class="btn primary" href="${REPORT_URL}">Ask for an integration</a><a class="btn ghost" href="${CONTACT_ANCHOR}">Talk to us about partnering</a></div>
 </div></section>
 </main>
 

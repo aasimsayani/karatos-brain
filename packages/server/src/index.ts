@@ -3,5 +3,6 @@ export * from "./config.js";
 export * from "./documentation.js";
 export * from "./brain.js";
 export * from "./sync.js";
+export * from "./support.js";
 export * from "./token-store.js";
 export * from "./retention.js";

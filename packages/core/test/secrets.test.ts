@@ -122,3 +122,22 @@ describe("the real manifest", () => {
     expect(generated).toEqual(expect.arrayContaining(["INSTANCE_API_KEY", "WEBHOOK_SIGNING_SECRET"]));
   });
 });
+
+describe("SUPPORT_API_KEY in the real manifest", () => {
+  it("is generated only when support access is asked for, and checked like the instance key", () => {
+    const real = realManifest();
+    const entry = real.entries.find((e) => e.name === "SUPPORT_API_KEY")!;
+    const instance = real.entries.find((e) => e.name === "INSTANCE_API_KEY")!;
+    expect(entry).toMatchObject({ kind: "secret", requiredFor: ["support"], generate: instance.generate, pattern: instance.pattern });
+    const status = (purposes: string[]) => planSecrets(real, {}, { purposes, integrations: [] }).items.find((i) => i.name === "SUPPORT_API_KEY")!.status;
+    expect(status(["core", "instance", "migrations"])).toBe("not_needed");
+    expect(status(["core", "instance", "migrations", "support"])).toBe("will_generate");
+    expect(generateSecret(entry, (n) => new Uint8Array(n))).toHaveLength(64);
+  });
+
+  it("accepts support as a purpose and nothing made up", () => {
+    const entry = { name: "X", kind: "secret", description: "x", howToGet: ["x"] } as const;
+    expect(() => parseManifest({ version: 1, entries: [{ ...entry, requiredFor: ["support"] }] })).not.toThrow();
+    expect(() => parseManifest({ version: 1, entries: [{ ...entry, requiredFor: ["supportx"] }] })).toThrow();
+  });
+});

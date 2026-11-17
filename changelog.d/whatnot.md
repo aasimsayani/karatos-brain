@@ -1,0 +1,3 @@
+- Added the Whatnot connector (read-only): every live-show and marketplace order from the Whatnot Seller API, with its line items, as sales (and a cancellation as a return, so it nets to zero), and every product with each variant's price and available stock; later syncs keep the last 60 days of orders and every product current. The seller's token needs only `read:orders` and `read:inventory`, the client only sends GET requests, and no buyer details or descriptions are kept. Cancelling an order is declared behind the write gate and turned down.
+- Connector test kit: a Whatnot Seller API mock built from Whatnot's docs, with order, order item, product and variant fixture builders.
+- The catalog's `whatnot_seller` entry is now `whatnot`.

@@ -5,7 +5,7 @@ import { pathToFileURL } from "node:url";
 import { describe, expect, it } from "vitest";
 import { INTEGRATIONS, type IntegrationSpec } from "../../packages/core/src/index.js";
 import { CONNECTED_ON, SYSTEM_DETAILS } from "../directory.js";
-import { DOMAIN_LABELS, REPO_URL, SITE_URL, directoryCategories, escapeHtml, formatDay, newestConnections, renderCard, renderDirectory, renderSite, researchUrl, researchedIds, systemDetail } from "../build.js";
+import { CORE_PRICE, DOMAIN_LABELS, REPO_URL, SITE_URL, directoryCategories, escapeHtml, formatDay, newestConnections, renderCard, renderDirectory, renderSite, researchUrl, researchedIds, systemDetail } from "../build.js";
 
 const html = renderSite();
 const dataSources = INTEGRATIONS.filter((i) => i.departments.length > 0);
@@ -86,7 +86,7 @@ describe("the directory, grouped by category", () => {
     expect(directory.match(/<details class="group"/g)).toHaveLength(categories.length);
     const marketing = dataSources.filter((i) => i.domain === "marketing");
     expect(marketing.length).toBeGreaterThan(10);
-    expect(directory).toContain(`<h3>${DOMAIN_LABELS.marketing}</h3><span class="count">${marketing.length} systems · ${marketing.filter((i) => i.status === "built").length} connected</span>`);
+    expect(directory).toContain(`<h3>${DOMAIN_LABELS.marketing}</h3><span class="count">${marketing.length} systems · ${marketing.filter((i) => i.status === "built").length} built</span>`);
     for (const d of categories) {
       expect(directory).toContain(`<option value="${d}">`);
       expect(directory).toContain(`<a href="#cat-${d}">`);
@@ -165,7 +165,7 @@ describe("renderCard", () => {
     expect(card).toContain("<dd>Sales &lt;floor&gt;</dd>");
     expect(card).toContain('data-domain="ecommerce"');
     expect(card).toContain("connected");
-    expect(card).toContain("<dt>Connected</dt><dd>Oct 28, 2026</dd>");
+    expect(card).toContain("<dt>Built</dt><dd>Oct 28, 2026</dd>");
   });
 
   it("falls back to the category label without a company, and words one year, no history and scheduled updates", () => {
@@ -173,7 +173,7 @@ describe("renderCard", () => {
     expect(one).toContain('<span class="domain">E-commerce</span>');
     expect(one).toContain("<dd>Up to 1 year imported on day one</dd>");
     expect(one).toContain("<dd>On a regular schedule</dd>");
-    expect(one).not.toContain("<dt>Connected</dt>");
+    expect(one).not.toContain("<dt>Built</dt>");
     expect(renderCard(spec({ id: "arms", historicalImportYears: 0 }), new Set(), dept)).toContain("<dd>From the day it is connected</dd>");
   });
 
@@ -228,14 +228,15 @@ describe("the partner section and the hero's proof", () => {
     expect(counts.reduce((a, b) => a + b, 0)).toBe(dataSources.length);
     expect(counts[2]).toBe(built.length);
     expect(partners).toContain("Read-only by default");
-    expect(html).toContain('<a href="#partners">Partners</a>');
+    // Partners are reached from the integrations section, not the top nav.
+    expect(html).toContain('<section id="partners">');
   });
 
   it("leads the hero with what is connected and mapped today", () => {
     const proof = html.slice(html.indexOf('<ul class="proof"'), html.indexOf("</ul>", html.indexOf('<ul class="proof"')));
-    expect(proof).toContain(`<strong>${built.length}</strong><span>systems connected</span>`);
+    expect(proof).toContain(`<strong>${built.length}</strong><span>connectors built</span>`);
     expect(proof).toContain(`<strong>${dataSources.length}</strong><span>systems mapped</span>`);
-    expect(proof).toContain(`<strong>${directoryCategories(dataSources).length}</strong>`);
+    expect(proof).toContain(`<strong>${CORE_PRICE}</strong><span>a store a month</span>`);
   });
 });
 

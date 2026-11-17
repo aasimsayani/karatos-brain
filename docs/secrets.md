@@ -5,7 +5,7 @@ Brain A keeps a value-free list of every secret and setting an instance needs in
 Each entry says:
 
 - what the value is for, and whether it is a **secret** (never shown) or plain **config**
-- when it's needed: always (`core`, `instance`), for migrations, or only once an integration is turned on (`integration:shopify`)
+- when it's needed: always (`core`, `instance`), for migrations, for support access (`support`), or only once an integration is turned on (`integration:shopify`)
 - plain-language steps to get it, with a link to the provider's docs
 - a pattern to check it against, so a half-copied key is caught immediately
 - whether a machine should **generate** it instead of asking a person
@@ -21,6 +21,8 @@ Each entry says:
 | `npm run secrets:setup -- --generate-only` | Generates values without prompting. Safe for agents and CI. |
 
 Both commands take `--env-file <path>` to work on another file, and `--purposes core,instance,migrations` to choose which purposes count.
+
+`SUPPORT_API_KEY` is needed only for support access, so it isn't asked for by default. To generate one, add the `support` purpose: `npm run secrets:setup -- --generate-only --purposes core,instance,migrations,support`. It must differ from `INSTANCE_API_KEY`; the instance won't start if they match. See [support access without seeing data](security.md#support-access-without-seeing-data).
 
 ## For AI agents
 

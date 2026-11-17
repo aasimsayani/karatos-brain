@@ -2,7 +2,7 @@ import { readFile, writeFile } from "node:fs/promises";
 import { INTEGRATIONS } from "../packages/core/src/index.js";
 import { MILESTONES, parseMilestones, renderReadme } from "./progress.js";
 
-// npm run progress:write   regenerates the README's progress section and its Connected today table
+// npm run progress:write   regenerates the README's progress section and its Built so far table
 // npm run progress:check   exits non-zero when the README is out of date
 
 const mode = process.argv[2];

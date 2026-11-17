@@ -1,0 +1,1 @@
+- The README is rebuilt so a jewelry store owner gets it in a minute: a one-line pitch, a sample morning list across departments, what is built (honestly, against vendor-doc mocks, none live yet), progress and getting started up front, with the long detail folded into collapsible sections.

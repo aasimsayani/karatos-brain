@@ -98,7 +98,7 @@ export function appointmentKind(title: string | undefined): AppointmentKind {
 }
 
 /** The title, unless it carries the invitee's name or email. */
-function safeTitle(title: string | undefined, invitee: Record<string, unknown>): string | undefined {
+export function safeTitle(title: string | undefined, invitee: Record<string, unknown>): string | undefined {
   if (!title) return undefined;
   const lower = title.toLowerCase();
   const email = typeof invitee.email === "string" ? invitee.email.toLowerCase() : "";

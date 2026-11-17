@@ -53,10 +53,35 @@ export function parseMilestones(json: unknown, catalog: readonly IntegrationSpec
   });
 }
 
-function resolve(item: MilestoneItem, catalog: readonly IntegrationSpec[]): { name: string; done: boolean } {
+interface Resolved {
+  name: string;
+  done: boolean;
+  /** An integration item: whether its connector is built, done or not. */
+  built?: boolean;
+}
+
+/** A built connector that has run against a real or sandbox account. */
+export const checkedLive = (spec: IntegrationSpec) => spec.status === "built" && spec.liveCheckedOn !== undefined;
+
+/** An integration item is done only once checked live: tests against mocks made from the docs don't prove it works with a real account. */
+function resolve(item: MilestoneItem, catalog: readonly IntegrationSpec[]): Resolved {
   if (item.integration === undefined) return { name: item.name!, done: item.done! };
   const spec = catalog.find((c) => c.id === item.integration)!;
-  return { name: item.name ?? spec.name, done: spec.status === "built" };
+  return { name: item.name ?? spec.name, done: checkedLive(spec), built: spec.status === "built" };
+}
+
+/** What's left in a milestone: open items by name, then built connectors waiting on a live check. */
+function remaining(items: readonly Resolved[]): string {
+  const open = items.filter((i) => !i.done);
+  const waiting = open.filter((i) => i.built).map((i) => i.name);
+  return [...open.filter((i) => !i.built).map((i) => i.name), ...(waiting.length ? [`check live: ${waiting.join(", ")}`] : [])].join("; ");
+}
+
+/** The progress cell: the bar, and for a milestone of integrations, how many are built and how many checked live. */
+function progressCell(items: readonly Resolved[], percent: number): string {
+  const integrations = items.filter((i) => i.built !== undefined);
+  const counts = integrations.length ? ` (${integrations.filter((i) => i.built).length} of ${integrations.length} built, ${integrations.filter((i) => i.done).length} checked live)` : "";
+  return `${bar(percent)} ${percent}%${counts}`;
 }
 
 export function bar(percent: number): string {
@@ -75,21 +100,24 @@ export function renderProgress(milestones: readonly Milestone[], catalog: readon
   const done = rows.reduce((n, r) => n + r.done, 0);
   const total = rows.reduce((n, r) => n + r.items.length, 0);
   const sources = catalog.filter((c) => c.departments.length > 0);
-  const connected = sources.filter((c) => c.status === "built").length;
+  const built = sources.filter((c) => c.status === "built").length;
+  const live = sources.filter(checkedLive).length;
   const next = rows
     .filter((r) => r.percent < 100)
     .sort((a, b) => a.m.target.localeCompare(b.m.target))
     .slice(0, 3)
-    .map((r) => `- **${r.m.name}** (target ${month(r.m.target)}): ${r.items.filter((i) => !i.done).map((i) => i.name).join("; ")}`);
+    .map((r) => `- **${r.m.name}** (target ${month(r.m.target)}): ${remaining(r.items)}`);
   const lines = [
     START,
     "<!-- Generated from docs/milestones.json and the integration catalog by npm run progress:write. Edit those, not this block. -->",
     "",
-    `**Overall: ${Math.round((done / total) * 100)}% complete**, ${done} of ${total} roadmap items done. ${connected} of the ${sources.length} systems in the integration catalog are connected.`,
+    `**Roadmap:** ${done} of ${total} items done. An integration counts as done once it has run against a real or sandbox account, not when its tests pass.`,
+    "",
+    `**Integrations:** ${built} of the ${sources.length} systems in the catalog are built and tested against mocks made from each vendor's docs. ${live} ${live === 1 ? "has" : "have"} been checked live so far.`,
     "",
     "| Milestone | What it gives a jeweler | Progress | Target |",
     "| --- | --- | --- | --- |",
-    ...rows.map((r) => `| ${r.m.name} | ${r.m.value} | ${bar(r.percent)} ${r.percent}% | ${r.percent === 100 ? "Done" : month(r.m.target)} |`),
+    ...rows.map((r) => `| ${r.m.name} | ${r.m.value} | ${progressCell(r.items, r.percent)} | ${r.percent === 100 ? "Done" : month(r.m.target)} |`),
     "",
     "### Up next",
     "",
@@ -105,7 +133,7 @@ const cell = (text: string) => text.replace(/\\/g, "\\\\").replace(/\|/g, "\\|")
 const label = (id: string) => id.replace(/_/g, " ").replace(/^./, (c) => c.toUpperCase());
 
 /**
- * The README's "Connected today" table: every built system, what it gives the
+ * The README's "Built so far" table: every built system, what it gives the
  * business (its first catalog capability) and the departments it feeds, so
  * the README names exactly what is built.
  */
@@ -121,7 +149,7 @@ export function renderConnected(catalog: readonly IntegrationSpec[]): string {
           "| --- | --- | --- |",
           ...built.map((c) => `| ${cell(c.name)} | ${cell(c.capabilities?.[0] ?? c.note ?? "")} | ${cell(c.departments.map(label).join(", "))} |`),
         ]
-      : ["Nothing is connected yet."]),
+      : ["Nothing is built yet."]),
     CONNECTED_END,
   ];
   return lines.join("\n");

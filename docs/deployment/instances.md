@@ -10,6 +10,7 @@ Brain A is open source, but every client's data lives in a deployment of its own
 | Running container | Yes | The `karatos-brain` image, started with that client's settings. |
 | `ORGANIZATION_ID` | Yes | Stamped on every row. The API refuses events for any other organization. |
 | `INSTANCE_API_KEY` | Yes | Only that client's agents and connectors can call the instance. |
+| `SUPPORT_API_KEY` | Optional | Whoever supports the instance can check its health, setup and syncs without seeing the business's data. See [support access](../security.md#support-access-without-seeing-data). |
 | Private instance repo | Yes | Holds the client's deploy settings and custom modules. Never holds secret values. |
 | Code | Shared | Every instance runs the same public image, so a fix ships to everyone. |
 
@@ -41,6 +42,7 @@ Isolation is layered. A request needs the right API key. Every event is pinned t
 4. **Create the tables:** `npm run db:migrate`. The instance also does this on start when `MIGRATE_ON_START=true`.
 5. **Deploy the image** to your host with the same settings in its secret store, and check `GET /healthz`. The log names any listed integration it can't sync yet and what it is missing; see [syncing on a schedule](../integrations.md#syncing-on-a-schedule).
 6. **Hand out the API key** only to that client's agents and connectors.
+7. **Set up support access, if the client wants it.** Generate a support key with `npm run secrets:setup -- --generate-only --purposes core,instance,migrations,support`, put `SUPPORT_API_KEY` in the host's secret store and restart. Give that key, never `INSTANCE_API_KEY`, to whoever supports the instance; it reaches only `GET /healthz`, `GET /v1/integrations` and `GET /v1/support/status`. For a client who wants their data kept from you, the client creates and owns the Supabase project and the host account in steps 1 and 5, and shares only the support key: anyone with database or host access can still read everything.
 
 ## Calling an instance
 
@@ -53,6 +55,8 @@ curl -X POST https://<instance-host>/v1/events \
        "idempotencyKey":"order-1001","payload":{"orderId":"1001"}}'
 ```
 
+The support key gets 403 on every endpoint below except `/healthz`, `GET /v1/integrations` and `GET /v1/support/status`.
+
 | Endpoint | Auth | Purpose |
 | --- | --- | --- |
 | `GET /healthz` | None | Liveness check |
@@ -64,7 +68,8 @@ curl -X POST https://<instance-host>/v1/events \
 | `GET /v1/value` | API key | The value ledger for the recommendations raised in a period: shown, approved, dismissed, overridden, returned and still to come, in cents by kind (`?from=2026-10-01&to=2026-11-01`, up to 366 days; this month by default). See [the value ledger](../value-ledger.md) |
 | `GET /v1/entities/:kind/:id` | API key | One canonical entity |
 | `GET /v1/signals` | API key | The latest signals, oldest first (`?kind=` up to 10 comma-separated kinds such as `bank.balance,receivable.invoice`; `?limit=`, 200 by default, up to 1,000). The console reads cash position and receivables this way |
-| `GET /v1/integrations` | API key | Every catalog integration and whether this instance has all its settings (`configured`, `missingSettings`). Names settings, never their values |
+| `GET /v1/integrations` | API key or support key | Every catalog integration and whether this instance has all its settings (`configured`, `missingSettings`). Names settings, never their values |
+| `GET /v1/support/status` | API key or support key | Operational metadata only: instance name, organization id, version, uptime, applied migrations, retention days, enabled departments and integrations, each integration's missing setting names and last sync (times, mode, outcome, counts, scrubbed last error), dead-letter counts by source and reason, and event counts by day, source and type (`?days=`, 14 by default, up to 90). Never payloads, ids, names, amounts, recommendation text or signal values |
 
 ## Choosing a host
 

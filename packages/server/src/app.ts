@@ -2,6 +2,7 @@ import { timingSafeEqual } from "node:crypto";
 import type { IncomingMessage, RequestListener, ServerResponse } from "node:http";
 import { z } from "zod";
 import { DeadLetteredError, measureValue, monthOf, readValueReport, type BrainPipeline, type IntegrationStatus, type MemoryStore } from "@karatos/core";
+import { MAX_SUPPORT_EVENT_DAYS, SUPPORT_EVENT_DAYS, supportStatus, type SupportStatusOptions } from "./support.js";
 
 export interface BrainAppOptions {
   pipeline: BrainPipeline;
@@ -9,6 +10,14 @@ export interface BrainAppOptions {
   /** The only organization this instance serves. */
   organizationId: string;
   apiKey: string;
+  /**
+   * Optional key for support access: it reaches only the diagnostic routes
+   * (health, integration setup and support status), never business data.
+   * Must differ from apiKey.
+   */
+  supportApiKey?: string;
+  /** What GET /v1/support/status reports. Without it that route answers 503. */
+  support?: SupportStatusOptions;
   /** Catalog integrations and whether this instance has their settings, worked out once at startup. */
   integrations?: IntegrationStatus[];
   maxBodyBytes?: number;
@@ -123,15 +132,86 @@ const SIGNAL_KIND = /^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*){0,3}$/;
 
 type Handler = (req: IncomingMessage, params: string[], url: URL) => Promise<[number, unknown]>;
 
+/** Who a route admits: only the instance key, or the support key too. */
+export type RouteAccess = "instance" | "support";
+
+export interface BrainRoute {
+  method: string;
+  pattern: RegExp;
+  handler: Handler;
+  access: RouteAccess;
+}
+
+/** Said to a caller using the support key on any route that isn't diagnostic. */
+export const SUPPORT_KEY_REFUSAL =
+  "the support key reaches only GET /healthz, GET /v1/integrations and GET /v1/support/status; this route needs the instance API key";
+
 /**
  * HTTP API for one client instance. Every request is pinned to the instance's
  * organization: events naming another organization are refused, so one
  * client's instance can never write into another client's data.
  */
 export function createBrainApp(options: BrainAppOptions): RequestListener {
+  const supportKey = options.supportApiKey || undefined;
+  if (supportKey !== undefined && supportKey === options.apiKey) throw new Error("the support key must differ from the instance API key");
+  const routes = brainRoutes(options);
+
+  return (req, res) => {
+    const url = new URL(req.url ?? "/", "http://localhost");
+    const path = url.pathname;
+
+    if (path === "/healthz") {
+      send(res, req.method === "GET" ? 200 : 405, req.method === "GET" ? { status: "ok" } : { error: "method not allowed" });
+      return;
+    }
+
+    const matches = routes.map((route) => ({ route, match: route.pattern.exec(path) })).filter((r) => r.match);
+    const found = matches.find((r) => r.route.method === req.method);
+    if (!found) {
+      send(res, matches.length ? 405 : 404, { error: matches.length ? "method not allowed" : "not found" });
+      return;
+    }
+    // Both keys are always compared, each in constant time, so timing never says which one a token was close to.
+    const instance = authorized(req, options.apiKey);
+    const support = supportKey !== undefined && authorized(req, supportKey);
+    if (!instance && !support) {
+      send(res, 401, { error: "missing or invalid API key" });
+      return;
+    }
+    if (!instance && found.route.access !== "support") {
+      send(res, 403, { error: SUPPORT_KEY_REFUSAL });
+      return;
+    }
+
+    found.route
+      .handler(req, found.match!.slice(1), url)
+      .then(([status, body]) => send(res, status, body))
+      .catch((error: unknown) => {
+        if (error instanceof HttpError) {
+          send(res, error.status, { error: error.message, ...(error.details ? { details: error.details } : {}) });
+        } else if (error instanceof DeadLetteredError) {
+          send(res, 400, {
+            error: "invalid event",
+            deadLetterId: error.deadLetterId,
+            details: error.cause.issues.map((i) => ({ path: i.path.join("."), message: i.message })),
+          });
+        } else {
+          console.error("unhandled error", error);
+          send(res, 500, { error: "internal error" });
+        }
+      });
+  };
+}
+
+/**
+ * Every route but /healthz, with who it admits. Only diagnostic routes,
+ * which carry names, timings and counts but no business data, admit the
+ * support key; a test walks this table so a new route is covered.
+ */
+export function brainRoutes(options: BrainAppOptions): BrainRoute[] {
   const limit = options.maxBodyBytes ?? 1_000_000;
 
-  const routes: [method: string, pattern: RegExp, handler: Handler][] = [
+  const table: [method: string, pattern: RegExp, handler: Handler, access?: RouteAccess][] = [
     [
       "POST",
       /^\/v1\/events$/,
@@ -253,7 +333,21 @@ export function createBrainApp(options: BrainAppOptions): RequestListener {
         return [200, { signals: await options.memory.recentSignals(options.organizationId, limit, kinds) }];
       },
     ],
-    ["GET", /^\/v1\/integrations$/, async () => [200, { integrations: options.integrations ?? [] }]],
+    ["GET", /^\/v1\/integrations$/, async () => [200, { integrations: options.integrations ?? [] }], "support"],
+    [
+      "GET",
+      /^\/v1\/support\/status$/,
+      async (_req, _params, url) => {
+        if (!options.support) throw new HttpError(503, "support status isn't set up on this instance");
+        const raw = url.searchParams.get("days");
+        const days = raw === null ? SUPPORT_EVENT_DAYS : Number(raw);
+        if (!Number.isInteger(days) || days < 1 || days > MAX_SUPPORT_EVENT_DAYS) {
+          throw new HttpError(400, `days must be a whole number from 1 to ${MAX_SUPPORT_EVENT_DAYS}`);
+        }
+        return [200, await supportStatus(options.organizationId, options.support, options.integrations ?? [], days)];
+      },
+      "support",
+    ],
     [
       "GET",
       /^\/v1\/entities\/([a-z][a-z0-9_]*)\/([^/]+)$/,
@@ -265,44 +359,5 @@ export function createBrainApp(options: BrainAppOptions): RequestListener {
     ],
   ];
 
-  return (req, res) => {
-    const url = new URL(req.url ?? "/", "http://localhost");
-    const path = url.pathname;
-
-    if (path === "/healthz") {
-      send(res, req.method === "GET" ? 200 : 405, req.method === "GET" ? { status: "ok" } : { error: "method not allowed" });
-      return;
-    }
-
-    const matches = routes
-      .map(([method, pattern, handler]) => ({ method, handler, match: pattern.exec(path) }))
-      .filter((r) => r.match);
-    const route = matches.find((r) => r.method === req.method);
-    if (!route) {
-      send(res, matches.length ? 405 : 404, { error: matches.length ? "method not allowed" : "not found" });
-      return;
-    }
-    if (!authorized(req, options.apiKey)) {
-      send(res, 401, { error: "missing or invalid API key" });
-      return;
-    }
-
-    route
-      .handler(req, route.match!.slice(1), url)
-      .then(([status, body]) => send(res, status, body))
-      .catch((error: unknown) => {
-        if (error instanceof HttpError) {
-          send(res, error.status, { error: error.message, ...(error.details ? { details: error.details } : {}) });
-        } else if (error instanceof DeadLetteredError) {
-          send(res, 400, {
-            error: "invalid event",
-            deadLetterId: error.deadLetterId,
-            details: error.cause.issues.map((i) => ({ path: i.path.join("."), message: i.message })),
-          });
-        } else {
-          console.error("unhandled error", error);
-          send(res, 500, { error: "internal error" });
-        }
-      });
-  };
+  return table.map(([method, pattern, handler, access]) => ({ method, pattern, handler, access: access ?? "instance" }));
 }

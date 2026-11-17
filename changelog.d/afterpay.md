@@ -1,0 +1,1 @@
+- Added the Afterpay connector (read-only): five years of pay-over-time orders and their refunds from List Payments, then the last 60 days kept current, matched to the store's order number. It keeps no shopper details, and sends only GET requests, since Afterpay's credentials can't be limited to reading.
