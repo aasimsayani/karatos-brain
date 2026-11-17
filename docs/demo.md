@@ -17,15 +17,18 @@ Card settlements in the bank are worked out from the week's card and financing s
 | --- | --- | --- |
 | Metals-API | `metals_api` | Spot prices close to the real market (gold about $4,040 an ounce in November 2026). Gold is up 6% today, so pieces heavy in gold need repricing |
 | POS exports | `inventory_pos` | The case, customers, two years of sales and the repair envelopes: aged stock, pieces to reorder, a chain that keeps coming back, a $14,900 cash sale that needs a Form 8300, cash payments to review under the AML program, two lapsed customers who spent over $5,000, diamond studs selling faster than they're restocked, a ring sizing five days late, an estate brooch overdue from the setter, a chain and a watch waiting for pickup, and a pearl restring unclaimed for 240 days |
+| RFID tray counts | `rfid_counts` | Each night's count of every case, tag by tag. Last night the fashion case came up two pieces short, and a silver chain was read in the wrong case |
 | Supplier invoices and memos | `supplier_invoices` | A loose diamond on a 45-day memo that sold three days ago, so the vendor is owed $8,200 before it asks, and the memo carries no System of Warranties statement |
+| Refiner statements | `refiner_statements` | Scrap gold settlements. One lot credits about 15 g less fine gold than its own assay works out to, and another paid 84% of spot |
 | Plaid | `plaid` | Bank balances and transactions. The cash deposits don't cover the cash the drawer took in |
+| Gusto | `gusto` | Payroll. The holiday payroll paid yesterday came to 44% more than the three before it |
 | QuickBooks | `quickbooks` | Invoices to trade and corporate accounts. $7,050 across 3 invoices is more than 30 days past due |
 | Twilio | `twilio` | A busy week on the phone line. Two callers didn't get through and nobody called them back |
 | WatchSearch | `watchsearch` | Two WhatsApp dealer groups. Three dealers are looking for the same Rolex |
 
 The brain reasons over the last 20,000 signals (`DEMO_REASONING_WINDOW`), well above all the demo store makes, so the earliest sources still count. Seeding the whole store takes well under a second.
 
-The dashboard shows 23 recommendations.
+The dashboard shows 27 recommendations.
 
 Every other built connector is listed in `DEMO_NOT_YET` (`packages/demo/src/sources/index.ts`) with the reason it isn't in the demo yet. A test fails when a connector is built but neither runs in the demo nor is listed there. Another test removes each source in turn and checks that something disappears from the dashboard, so no source is there for show.
 

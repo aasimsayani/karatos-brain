@@ -44,7 +44,7 @@ const seeded = async () => (brain ??= await seedDemo({ now: NOW }));
 describe("the demo store", () => {
   it("runs every demo source through its real connector without losing a record", async () => {
     const { sources } = await seeded();
-    expect(sources.map((s) => s.integration)).toEqual(["metals_api", "inventory_pos", "supplier_invoices", "plaid", "quickbooks", "twilio", "watchsearch"]);
+    expect(sources.map((s) => s.integration)).toEqual(["metals_api", "inventory_pos", "rfid_counts", "supplier_invoices", "refiner_statements", "plaid", "gusto", "quickbooks", "twilio", "watchsearch"]);
     for (const source of sources) {
       expect(source.ingested, source.integration).toBeGreaterThan(0);
       expect(source.deadLettered, source.integration).toBe(0);
@@ -79,13 +79,17 @@ describe("the demo store", () => {
         "rec_compliance_warranty_demo_diamond_exchange_memo_M-7731",
         "rec_finance_cash_gap",
         "rec_finance_overdue_receivables",
+        "rec_finance_payroll_jump_gusto:payroll:00000000-0000-4000-8000-007000000005",
         "rec_inventory_aged_ES-1002",
         "rec_inventory_aged_ES-1005",
         "rec_inventory_aged_ES-1010",
         "rec_inventory_reorder_ES-1001",
         "rec_inventory_reorder_ES-1003",
         "rec_inventory_reorder_ES-1011",
+        "rec_inventory_tray_Fashion case",
+        "rec_metals_assay_refiner:demo_refining_co:DR-2207:gold:0",
         "rec_metals_move_gold",
+        "rec_metals_payable_refiner:demo_refining_co:DR-2214:gold:0",
         "rec_repairs_late_T-501",
         "rec_repairs_pickup_T-502",
         "rec_repairs_unclaimed_T-503",
@@ -108,6 +112,11 @@ describe("the demo store", () => {
     expect(text).toContain("Repair T-503 has been ready for 240 days");
     expect(text).toContain("Repair T-506 (Estate diamond brooch) is 2 days past its promised date and still sent out");
     expect(text).toContain("Repair T-507 (Steel automatic watch) has been ready for 34 days");
+    // Newer systems: the nightly RFID count, the refiner's statements and payroll.
+    expect(text).toContain("came up 2 short: EST-1006-01 (ES-1006), EST-1009-01 (ES-1009)");
+    expect(text).toContain("Lot DR-2207 from demo_refining_co credits 227.68 g of fine gold, but 416.79 g at 58.3% is 242.99 g");
+    expect(text).toContain("Lot DR-2214 from demo_refining_co paid $17,959.05 for 5.625 oz of fine gold, 84% of spot");
+    expect(text).toContain("came to $41,850.00 gross, 44% more than the $29,033.33 average of the 3 before it");
     expect(text).toContain("Sawyer Fauxman has spent $12,050.00 with you but hasn't bought in 430 days");
     expect(text).toContain("Reorder 14K White Gold Diamond Stud Earrings, 1.00 ctw (ES-1011): 4 sold in the last 60 days and 1 left.");
     expect(text).toContain("is due back in 5 days. It has sold, so settle the memo and pay $8,200.00.");
@@ -207,7 +216,7 @@ describe("the demo API", () => {
     expect((await call("GET", "/v1/recommendations", undefined, ["wrong", "x".repeat(40)].join("-"))).status).toBe(401);
     const recs = await call("GET", "/v1/recommendations?limit=200");
     expect(recs.status).toBe(200);
-    expect(recs.body.recommendations).toHaveLength(23);
+    expect(recs.body.recommendations).toHaveLength(27);
     const signals = await call("GET", "/v1/signals?kind=bank.balance");
     expect(signals.body.signals.length).toBeGreaterThan(0);
     expect((await call("GET", "/healthz", undefined, null)).status).toBe(200);
@@ -232,7 +241,7 @@ describe("the demo API", () => {
     const event = { id: "evt_1", type: "sale.completed", occurredAt: NOW.toISOString(), receivedAt: NOW.toISOString(), idempotencyKey: "x", payload: {} };
     expect(await call("POST", "/v1/events", event)).toEqual({ status: 403, body: { error: "the demo store is read-only" } });
     expect(await call("POST", "/v1/reason", {})).toEqual({ status: 403, body: { error: "the demo store is read-only" } });
-    expect((await call("GET", "/v1/recommendations")).body.recommendations).toHaveLength(23);
+    expect((await call("GET", "/v1/recommendations")).body.recommendations).toHaveLength(27);
   });
 
   it("takes Accept and Dismiss as feedback, up to its limit", async () => {
