@@ -503,3 +503,224 @@ describe("payout matching: duplicates and age", () => {
     for (const type of ["payout.updated", "balance.transaction_recorded", "payment.charge_updated", "payment.refund_updated"]) expect(payloadSchemas[type]).toBeUndefined();
   });
 });
+
+describe("payout matching: edges", () => {
+  const pending = (payoutId: string, extra: Record<string, unknown> = {}) => ({ payoutId, amountCents: 10_000, currency: "USD", status: "pending", arrivalDate: null, settledOn: null, ...extra });
+
+  it("reads each kind of line the processors send", async () => {
+    const s = store();
+    const first = async (type: string, payload: Record<string, unknown>) => (await s.send(type, payload)).signals.find((x) => x.kind === "payout.line")?.value;
+    expect(await first("balance.transaction_recorded", stripeTxn("p1", "payment", 5_000, -50, "2026-10-03"))).toMatchObject({ category: "sale", feeCents: 0 });
+    expect(await first("balance.transaction_recorded", stripeTxn("p2", "payment_refund", -5_000, 0, "2026-10-03"))).toMatchObject({ category: "refund" });
+    // Only Stripe's balance transactions are swept; another processor's line keeps its payout.
+    expect(
+      await first("balance.transaction_recorded", { balanceTransactionId: "newpay:balance_transaction:1", payoutId: "newpay:payout:p", type: "sale", amountCents: 500, netCents: 500, currency: "USD" }),
+    ).toMatchObject({ processor: "newpay", payoutId: "newpay:payout:p", category: "sale", netCents: 500 });
+    expect(await first("balance.transaction_recorded", auroraTxn("s1", "b1", "sale", 3_000))).toMatchObject({ category: "sale", netCents: 3_000 });
+    expect(await first("balance.transaction_recorded", auroraTxn("r1", "b1", "refund", -3_000))).toMatchObject({ category: "refund", netCents: -3_000 });
+    expect(await first("balance.transaction_recorded", klarnaLine("R", "commission", -400))).toMatchObject({ category: "fee", feeCents: 400 });
+    expect(await first("balance.transaction_recorded", klarnaLine("R", "return", -400))).toMatchObject({ category: "refund" });
+    expect(await first("balance.transaction_recorded", klarnaLine("R", "fee", 300))).toMatchObject({ category: "fee", feeCents: 0 });
+    expect(await first("balance.transaction_recorded", klarnaLine("R", "sale", 300, { capturedAt: null }))).toMatchObject({ on: "2026-10-10" });
+    expect(await first("payment.charge_updated", { chargeId: "newpay:charge:1", batchId: "newpay:batch:1", captured: true, capturedCents: 500, currency: "USD" })).toMatchObject({
+      processor: "newpay",
+      payoutId: "newpay:batch:1",
+    });
+    expect(await first("payment.charge_updated", { ...authCharge("pc", 10_000, "77"), capturedCents: 6_000, orderId: "authorize_net:order:o-9" })).toMatchObject({
+      netCents: 6_000,
+      orderId: "authorize_net:order:o-9",
+    });
+    expect(await first("payment.refund_updated", authRefund("neg", -1_000, "77"))).toMatchObject({ netCents: -1_000 });
+    expect((await s.send("payout.updated", stripePayout("po_t", 1_000, "in_transit"))).signals[0]!.value).toMatchObject({ status: "paid" });
+  });
+
+  it("keeps nothing for transfers, dead transactions, uncaptured charges and canceled refunds", async () => {
+    const s = store();
+    const none = [
+      await s.send("balance.transaction_recorded", stripeTxn("tr", "transfer", -9_000, 0, "2026-10-03")),
+      await s.send("balance.transaction_recorded", stripeTxn("tu", "topup", 9_000, 0, "2026-10-03")),
+      await s.send("balance.transaction_recorded", auroraTxn("f", "b1", "sale", 5_000, "Failed")),
+      await s.send("balance.transaction_recorded", auroraTxn("e", "b1", "sale", 5_000, "Error")),
+      await s.send("balance.transaction_recorded", auroraTxn("j", "b1", "sale", 5_000, "Rejected")),
+      await s.send("payment.charge_updated", { chargeId: "authorize_net:transaction:u", captured: false, amountCents: 5_000, currency: "USD" }),
+      await s.send("payment.charge_updated", authCharge("zero", 0)),
+      await s.send("payment.refund_updated", authRefund("can", 1_000, "77", "canceled")),
+    ];
+    expect(none.flatMap((r) => r.signals.filter((x) => x.kind.startsWith("payout.")))).toEqual([]);
+  });
+
+  it("calls a pending payout late the day after each processor's schedule", async () => {
+    const s = store();
+    const pairs: [string, string, string][] = [
+      ["stripe:payout:", "2026-10-16", "2026-10-15"],
+      ["authorize_net:batch:", "2026-10-16", "2026-10-15"],
+      ["aurora:batch:", "2026-10-16", "2026-10-15"],
+      ["affirm:deposit:", "2026-10-13", "2026-10-12"],
+      ["klarna:payout:", "2026-10-10", "2026-10-09"],
+      ["newpay:payout:", "2026-10-13", "2026-10-12"],
+    ];
+    for (const [prefix, due, late] of pairs) {
+      await s.send("payout.updated", pending(`${prefix}due`), at(due));
+      await s.send("payout.updated", pending(`${prefix}late`), at(late));
+    }
+    // With no amount there is nothing to chase.
+    await s.send("payout.updated", pending("affirm:deposit:none", { amountCents: null }), at("2026-10-01"));
+    const recs = about(await s.ask(NOW), "payout");
+    expect(recs.map((r) => r.id).sort()).toEqual(pairs.map(([prefix]) => `rec_finance_payout_pending_${prefix}late_2026-10-20`).sort());
+    for (const r of recs) expect(r.summary).toContain(", 1 day after it would normally have landed");
+  });
+
+  it("counts a pending payout's schedule from the day it lands, or settled, when it says", async () => {
+    const s = store();
+    const landing = await s.send("payout.updated", pending("affirm:deposit:a", { settledOn: "2026-10-18" }), at("2026-10-01"));
+    const both = await s.send("payout.updated", pending("affirm:deposit:b", { arrivalDate: "2026-10-18", settledOn: "2026-10-01" }), at("2026-10-01"));
+    const garbled = await s.send("payout.updated", pending("affirm:deposit:c", { arrivalDate: " 2026-10-19", settledOn: "2026-13-45" }), at("2026-10-01"));
+    expect([landing, both, garbled].map((r) => (r.signals[0]!.value as { arrivalOn: unknown }).arrivalOn)).toEqual(["2026-10-18", "2026-10-18", null]);
+    expect(about(await s.ask(NOW), "payout").map((r) => r.id)).toEqual(["rec_finance_payout_pending_affirm:deposit:c_2026-10-20"]);
+  });
+
+  it("allows a dollar on a small payout", async () => {
+    const s = store();
+    await s.send("payout.updated", klarnaPayout("D1", 9_900, "2026-10-12"), at("2026-10-12"));
+    await s.send("balance.transaction_recorded", klarnaLine("D1", "sale", 10_000), at("2026-10-11"));
+    await s.send("payout.updated", klarnaPayout("D2", 9_899, "2026-10-12"), at("2026-10-12"));
+    await s.send("balance.transaction_recorded", klarnaLine("D2", "sale", 10_000), at("2026-10-11"));
+    expect(about(await s.ask(NOW), "payout").map((r) => r.id)).toEqual(["rec_finance_payout_short_klarna:payout:D2_2026-10-20"]);
+  });
+
+  it("judges payouts up to the lookback's last day, and names an id with no prefix as it is", async () => {
+    const s = store();
+    await s.send("payout.updated", stripePayout("po_edge", 45_000, "failed"), at("2026-07-22"));
+    await s.send("payout.updated", stripePayout("po_past", 45_000, "failed"), at("2026-07-21"));
+    await s.send("payout.updated", { payoutId: "solo", amountCents: 1_000, currency: "USD", status: "failed" }, at("2026-10-10"));
+    const recs = about(await s.ask(NOW), "payout");
+    expect(recs.map((r) => r.id).sort()).toEqual(["rec_finance_payout_failed_solo_2026-10-20", "rec_finance_payout_failed_stripe:payout:po_edge_2026-10-20"]);
+    expect(recs.find((r) => r.id.includes("solo"))!.summary).toMatch(/^solo payout solo of \$10\.00/);
+  });
+
+  it("reads reported totals however each processor signs and names them", async () => {
+    const s = store();
+    const affirm = (id: string, settled: number, extra: Record<string, unknown>) => ({ payoutId: `affirm:deposit:${id}`, amountCents: settled, currency: "USD", status: "paid", salesCents: 200_000, ...extra });
+    await s.send("payout.updated", affirm("comm", 170_000, { refundCents: 20_000, feeCents: 2_000, commissionCents: 4_000 }), at("2026-10-10"));
+    await s.send("payout.updated", affirm("neg", 170_000, { refundCents: -20_000, feeCents: -6_000 }), at("2026-10-10"));
+    // A status it doesn't know is not a payout made.
+    await s.send("payout.updated", affirm("odd", 1_000, { status: "reversed_maybe" }), at("2026-10-10"));
+    await s.send("payout.updated", { ...authBatch("rep", 80_000), chargeCents: 100_000, refundCents: 10_000 }, at("2026-10-10"));
+    await s.send("payout.updated", auroraBatch("b9", 100_000, "settled", { salesCents: 150_000, refundsCents: 10_000 }), at("2026-10-10"));
+    const recs = about(await s.ask(NOW), "payout");
+    const cents = Object.fromEntries(recs.map((r) => [r.id, r.impact?.cents]));
+    expect(cents).toEqual({
+      "rec_finance_payout_short_affirm:deposit:comm_2026-10-20": 4_000,
+      "rec_finance_payout_short_affirm:deposit:neg_2026-10-20": 4_000,
+      "rec_finance_payout_short_authorize_net:batch:rep_2026-10-20": 10_000,
+      "rec_finance_payout_short_aurora:batch:b9_2026-10-20": 40_000,
+    });
+  });
+
+  it("doesn't judge a payout with no currency that reads, nor one that covers nothing", async () => {
+    const s = store();
+    await s.send("payout.updated", klarnaPayout("NC", 1_000, "2026-10-12", { currency: "usdollar" }), at("2026-10-12"));
+    await s.send("balance.transaction_recorded", klarnaLine("NC", "sale", 100_000, { currency: "usdollar" }), at("2026-10-11"));
+    await s.send("payout.updated", klarnaPayout("NEG", -50_000, "2026-10-12"), at("2026-10-12"));
+    await s.send("balance.transaction_recorded", klarnaLine("NEG", "sale", 10_000), at("2026-10-11"));
+    await s.send("balance.transaction_recorded", klarnaLine("NEG", "return", -10_000), at("2026-10-11"));
+    expect(about(await s.ask(NOW), "payout")).toEqual([]);
+  });
+
+  it("puts no dollar figure on a failed payout in another currency", async () => {
+    const s = store();
+    await s.send("payout.updated", { ...stripePayout("po_eur", 45_000, "failed"), currency: "eur" }, at("2026-10-08"));
+    const [rec] = about(await s.ask(NOW), "payout");
+    expect(rec!.summary).toContain("payout po_eur of 450.00 EUR");
+    expect(rec!.impact).toBeUndefined();
+  });
+
+  it("sweeps Stripe lines only into payouts made or on their way, in order, in their currency", async () => {
+    // A failed payout paid nothing, so what came available before it is still owed.
+    const failed = store();
+    await failed.send("payout.updated", stripePayout("po_0", 1_000), at("2026-10-01"));
+    await failed.send("balance.transaction_recorded", stripeTxn("t1", "charge", 10_000, 0, "2026-10-03"));
+    await failed.send("payout.updated", stripePayout("po_f", 10_000, "failed"), at("2026-10-05"));
+    expect(about(await failed.ask(NOW), "payout").map((r) => r.id).sort()).toEqual(["rec_finance_payout_failed_stripe:payout:po_f_2026-10-20", "rec_finance_payout_late_stripe_USD_2026-10-20"]);
+
+    // A pending payout on its way covers what came available before it.
+    const onItsWay = store();
+    await onItsWay.send("payout.updated", stripePayout("po_0", 1_000), at("2026-10-01"));
+    await onItsWay.send("balance.transaction_recorded", stripeTxn("t1", "charge", 10_000, 0, "2026-10-14"));
+    await onItsWay.send("payout.updated", stripePayout("po_p", 10_000, "pending", { arrivalDate: "2026-10-19" }), at("2026-10-17"));
+    expect(about(await onItsWay.ask(NOW), "payout")).toEqual([]);
+
+    // Read out of order, the earliest payout is still the one with no known start.
+    const reversed = store();
+    await reversed.send("payout.updated", stripePayout("po_1", 70_000), at("2026-10-05"));
+    await reversed.send("balance.transaction_recorded", stripeTxn("txn_1", "charge", 50_000, 1_480, "2026-10-03"));
+    await reversed.send("balance.transaction_recorded", stripeTxn("txn_2", "charge", 30_000, 900, "2026-10-05"));
+    await reversed.send("payout.updated", stripePayout("po_0", 1_000), at("2026-10-01"));
+    expect(about(await reversed.ask(NOW), "payout").map((r) => r.id)).toEqual(["rec_finance_payout_short_stripe:payout:po_1_2026-10-20"]);
+
+    // A line that already names its payout isn't swept into it a second time.
+    const named = store();
+    await named.send("payout.updated", stripePayout("po_0", 1_000), at("2026-10-01"));
+    await named.send("balance.transaction_recorded", { payoutId: "stripe:payout:po_1", type: "sale", amountCents: 10_000, currency: "usd" }, at("2026-10-03"));
+    await named.send("payout.updated", stripePayout("po_1", 10_000), at("2026-10-05"));
+    expect(about(await named.ask(NOW), "payout")).toEqual([]);
+
+    // Euro payouts sweep euro lines, and euro sales after the last one are late.
+    const euro = store();
+    await euro.send("payout.updated", { ...stripePayout("po_e0", 1_000), currency: "eur" }, at("2026-10-01"));
+    await euro.send("balance.transaction_recorded", stripeTxn("e1", "charge", 50_000, 0, "2026-10-03", "eur"));
+    await euro.send("payout.updated", { ...stripePayout("po_e1", 40_000), currency: "eur" }, at("2026-10-05"));
+    await euro.send("balance.transaction_recorded", stripeTxn("e2", "charge", 20_000, 0, "2026-10-08", "eur"));
+    expect(about(await euro.ask(NOW), "payout").map((r) => r.id).sort()).toEqual(["rec_finance_payout_late_stripe_EUR_2026-10-20", "rec_finance_payout_short_stripe:payout:po_e1_2026-10-20"]);
+  });
+
+  it("waits for the newest line under a payout with no record to be due", async () => {
+    const s = store();
+    await s.send("balance.transaction_recorded", klarnaLine("SPLIT", "sale", 10_000, { capturedAt: "2026-10-01T00:00:00.000Z" }), at("2026-10-01"));
+    await s.send("balance.transaction_recorded", klarnaLine("SPLIT", "sale", 10_000, { capturedAt: "2026-10-18T00:00:00.000Z" }), at("2026-10-18"));
+    await s.send("balance.transaction_recorded", klarnaLine("EDGE", "sale", 10_000, { capturedAt: "2026-10-10T00:00:00.000Z" }), at("2026-10-10"));
+    expect(about(await s.ask(NOW), "payout")).toEqual([]);
+    const recs = about(await s.ask("2026-10-21T15:00:00.000Z"), "payout");
+    expect(recs.map((r) => r.id)).toEqual(["rec_finance_payout_unrecorded_klarna:payout:EDGE_2026-10-21"]);
+    expect(recs[0]).toMatchObject({ confidence: 0.6 });
+  });
+
+  it("splits unpaid sales into late and missing at the schedule's and the month's edges", async () => {
+    const s = store();
+    await s.send("payout.updated", authBatch("B", 10_000), at("2026-10-15"));
+    for (const [id, date] of [
+      ["d0", "2026-10-16"],
+      ["d1", "2026-10-15"],
+      ["d30", "2026-09-16"],
+      ["d31", "2026-09-15"],
+      ["d45", "2026-09-01"],
+    ] as const)
+      await s.send("payment.charge_updated", authCharge(id, 10_000), at(date));
+    const recs = about(await s.ask(NOW), "payout");
+    expect(recs.map((r) => r.id).sort()).toEqual(["rec_finance_payout_late_authorize_net_USD_2026-10-20", "rec_finance_payout_missing_authorize_net_USD_2026-10-20"]);
+    expect(recs.find((r) => r.id.includes("late"))!.summary).toMatch(/^2 Authorize\.net sales worth \$200\.00, the oldest from 2026-09-16,/);
+    expect(recs.find((r) => r.id.includes("missing"))!.summary).toMatch(/^2 Authorize\.net sales worth \$200\.00, the oldest from 2026-09-01,/);
+  });
+
+  it("raises missing sales in another currency in its own money, with no dollar figure", async () => {
+    const s = store();
+    await s.send("payout.updated", { ...authBatch("E", 10_000), currency: "EUR" }, at("2026-10-15"));
+    await s.send("payment.charge_updated", { ...authCharge("eu", 25_000), currency: "EUR" }, at("2026-09-01"));
+    const [rec, ...rest] = about(await s.ask(NOW), "payout");
+    expect(rest).toEqual([]);
+    expect(rec).toMatchObject({ id: "rec_finance_payout_missing_authorize_net_EUR_2026-10-20" });
+    expect(rec!.summary).toContain("1 Authorize.net sale worth 250.00 EUR");
+    expect(rec!.impact).toBeUndefined();
+  });
+
+  it("raises unpaid sales with no currency that reads without making one up", async () => {
+    const s = store();
+    await s.send("payout.updated", { ...authBatch("N", 10_000), currency: null }, at("2026-10-15"));
+    await s.send("payment.charge_updated", { ...authCharge("nc", 25_000), currency: null }, at("2026-10-10"));
+    const [rec, ...rest] = about(await s.ask(NOW), "payout");
+    expect(rest).toEqual([]);
+    expect(rec).toMatchObject({ id: "rec_finance_payout_late_authorize_net_unknown_2026-10-20", expectedImpact: "Brings in sales paid out late" });
+    expect(rec!.summary).toMatch(/^1 Authorize\.net sale, the oldest from 2026-10-10, has not been paid out/);
+    expect(rec!.impact).toBeUndefined();
+  });
+});

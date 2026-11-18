@@ -507,31 +507,32 @@ export const payoutReasoner: Reasoner = {
     }
 
     // Sales no payout has paid, past when their processor normally pays, for processors whose payouts are read.
-    const overdue = new Map<string, { late: Signal[]; missing: Signal[] }>();
+    const overdue = new Map<string, { processor: string; currency: string | null; late: Signal[]; missing: Signal[] }>();
     for (const s of [...unbatched, ...swept.unpaid]) {
       const l = value<PayoutLine>(s);
       if (l.category !== "sale" || !read.has(`${l.processor}:${l.currency}`)) continue;
       const past = calendarDaysSince(addDays(l.availableOn ?? l.on, scheduleOf(l.processor)), now);
       if (past <= 0) continue;
       const key = `${l.processor}:${l.currency}`;
-      const group = overdue.get(key) ?? { late: [], missing: [] };
+      const group = overdue.get(key) ?? { processor: l.processor, currency: l.currency, late: [], missing: [] };
       (past > PAYOUT_MISSING_AFTER_DAYS ? group.missing : group.late).push(s);
       overdue.set(key, group);
     }
-    for (const [key, group] of overdue) {
-      const [processor, currency] = [key.slice(0, key.lastIndexOf(":")), key.slice(key.lastIndexOf(":") + 1)];
+    for (const { processor, currency, ...group } of overdue.values()) {
       const name = nameOf(processor);
       const schedule = scheduleOf(processor);
-      const tag = `${processor}_${currency}`;
+      // A sale with no currency that reads is still raised, but with no amount put on it.
+      const tag = `${processor}_${currency ?? "unknown"}`;
+      const worth = (total: number) => (currency === null ? "" : ` worth ${money(total, currency)}`);
       if (group.late.length > 0) {
         const total = sum(group.late);
         const oldest = group.late.map((s) => value<PayoutLine>(s).on).sort()[0]!;
         out.push(
           rec(
             `payout_late_${tag}`,
-            `${plural(group.late.length, `${name} sale`)} worth ${money(total, currency)}, the oldest from ${oldest}, ${group.late.length === 1 ? "has" : "have"} not been paid out, though ${name} normally pays within ${plural(schedule, "day")}. Check ${name} for a hold or a paused payout schedule.`,
+            `${plural(group.late.length, `${name} sale`)}${worth(total)}, the oldest from ${oldest}, ${group.late.length === 1 ? "has" : "have"} not been paid out, though ${name} normally pays within ${plural(schedule, "day")}. Check ${name} for a hold or a paused payout schedule.`,
             0.6,
-            `Brings in ${money(total, currency)} paid out late`,
+            currency === null ? "Brings in sales paid out late" : `Brings in ${money(total, currency)} paid out late`,
             undefined,
             group.late,
           ),
@@ -543,9 +544,9 @@ export const payoutReasoner: Reasoner = {
         out.push(
           rec(
             `payout_missing_${tag}`,
-            `${plural(group.missing.length, `${name} sale`)} worth ${money(total, currency)}, the oldest from ${oldest}, ${group.missing.length === 1 ? "is" : "are"} in no payout more than ${PAYOUT_MISSING_AFTER_DAYS} days after ${name} would normally have paid. Ask ${name} where the money went.`,
+            `${plural(group.missing.length, `${name} sale`)}${worth(total)}, the oldest from ${oldest}, ${group.missing.length === 1 ? "is" : "are"} in no payout more than ${PAYOUT_MISSING_AFTER_DAYS} days after ${name} would normally have paid. Ask ${name} where the money went.`,
             0.7,
-            `Recovers ${money(total, currency)} of sales never paid out`,
+            currency === null ? "Recovers sales never paid out" : `Recovers ${money(total, currency)} of sales never paid out`,
             protects(total, currency, `The ${dollars(total)} of ${name} sales in no payout.`),
             group.missing,
           ),
