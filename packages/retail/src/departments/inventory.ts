@@ -2,6 +2,7 @@ import { meltValueCents, type Metal, type Signal } from "@karatos/core";
 import { z } from "zod";
 import type { DepartmentModule } from "../department.js";
 import { ASSUMPTIONS, daysBetween, dollars, entityFrom, estimate, extractor, latestBySubject, pct, recommend, signalFrom, value } from "../department.js";
+import { stockAgreementReasoner, stockLevelExtractor } from "./stock-agreement.js";
 
 export const CATEGORIES = ["ring", "engagement_ring", "wedding_band", "necklace", "pendant", "earrings", "bracelet", "watch", "loose_stone", "other"] as const;
 export const METALS = ["gold", "silver", "platinum", "palladium"] as const;
@@ -26,7 +27,10 @@ const InventoryAdjusted = z.object({
   reason: z.enum(["count", "damage", "theft", "sent_to_repair", "returned_to_vendor", "other"]),
 });
 
-/** What a stock count found on hand. Recorded for reconciliation; on-hand positions still come from receipts, sales and adjustments. */
+/**
+ * What a stock count found on hand. On-hand positions still come from receipts, sales and adjustments;
+ * counts from different systems are checked against each other (see stock-agreement.ts).
+ */
 const InventoryCounted = z.object({
   sku: z.string().min(1),
   onHand: z.number().int().nonnegative(),
@@ -128,12 +132,14 @@ function latestSpot(signals: Signal[], metal: Metal): Signal | undefined {
 
 /**
  * Inventory and merchandising: what is in the case, what sells, what sits.
- * Uses the metals department's spot prices to value aged gold pieces.
+ * Uses the metals department's spot prices to value aged gold pieces, and
+ * checks that the systems counting stock agree on what is on hand (see
+ * stock-agreement.ts).
  */
 export const inventory: DepartmentModule = {
   id: "inventory",
   name: "Inventory and Merchandising",
-  purpose: "What's in the cases and the safe, what sells, what sits, and when to reorder, mark down or remake.",
+  purpose: "What's in the cases and the safe, what sells, what sits, when to reorder, mark down or remake, and whether every system counting stock agrees.",
   events: {
     "inventory.received": InventoryReceived,
     "inventory.adjusted": InventoryAdjusted,
@@ -162,6 +168,7 @@ export const inventory: DepartmentModule = {
       }
       return [];
     }),
+    stockLevelExtractor,
   ],
   reasoners: [
     {
@@ -281,5 +288,6 @@ export const inventory: DepartmentModule = {
             ];
           }),
     },
+    stockAgreementReasoner,
   ],
 };

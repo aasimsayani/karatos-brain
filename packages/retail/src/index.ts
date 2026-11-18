@@ -26,6 +26,16 @@ export {
   type PayoutRecord,
   type PayoutStatus,
 } from "./departments/payouts.js";
+export {
+  STOCK_COMPARABLE_HOURS,
+  STOCK_LOOKBACK_DAYS,
+  STOCK_SYSTEMIC_MIN_ITEMS,
+  STOCK_SYSTEMIC_SHARE,
+  STOCK_TOLERANCE_SHARE,
+  stockSkuKey,
+  type StockReading,
+  type StockReadingKind,
+} from "./departments/stock-agreement.js";
 export { appraisals, buying, clienteling, compliance, customOrders, finance, inventory, marketing, metals, repairs, sales };
 
 /** Every retail jewelry department, in the order a store usually adopts them. */
