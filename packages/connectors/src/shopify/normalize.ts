@@ -5,7 +5,14 @@
  * own shape under a Shopify-neutral type (order.updated, product.updated,
  * fulfillment.updated). Only what the departments use is kept: no email
  * addresses, phone numbers or street addresses.
+ *
+ * When customer linking is on (a CUSTOMER_REF_KEY is given), a customer's
+ * email address and phone number are read only to become `contactRefs`:
+ * the keyed references custom forms, Klaviyo, Quo and the other systems
+ * make for the same details, so the customer's orders line up with their
+ * texts, messages and emails. The details themselves are never kept.
  */
+import { formCustomerRefs } from "../custom_forms/customer.js";
 
 export interface Money {
   shopMoney: { amount: string; currencyCode?: string };
@@ -70,6 +77,10 @@ export interface ShopifyCustomer {
   displayName: string | null;
   updatedAt: string;
   emailMarketingConsent: { marketingState: string } | null;
+  /** Read only when customer linking is on, and only to be hashed. */
+  defaultEmailAddress?: { emailAddress: string | null } | null;
+  /** Read only when customer linking is on, and only to be hashed. */
+  defaultPhoneNumber?: { phoneNumber: string | null } | null;
 }
 
 /** The raw event the pipeline receives; organizationId and source are added by runSync. */
@@ -217,13 +228,24 @@ export function productEvents(product: ShopifyProduct, receivedAt: string): Shop
   ];
 }
 
-export function customerEvents(customer: ShopifyCustomer, receivedAt: string): ShopifyEvent[] {
+/**
+ * A customer's profile. With a CUSTOMER_REF_KEY it also carries
+ * `contactRefs` for their email address and phone number, and its key says
+ * so, so turning linking on and importing again stores each customer once
+ * more with their references, and a replay is still a duplicate.
+ */
+export function customerEvents(customer: ShopifyCustomer, receivedAt: string, customerKey?: string): ShopifyEvent[] {
   const id = legacyId(customer.id ?? "");
+  const contactRefs =
+    customerKey === undefined
+      ? undefined
+      : formCustomerRefs(customerKey, { email: customer.defaultEmailAddress?.emailAddress, phone: customer.defaultPhoneNumber?.phoneNumber });
   return [
-    event(`customer:${id}:${customer.updatedAt}`, "customer.profile_updated", customer.updatedAt, receivedAt, {
+    event(`customer:${id}:${customer.updatedAt}${contactRefs ? ":linked" : ""}`, "customer.profile_updated", customer.updatedAt, receivedAt, {
       customerId: customerRef(customer.id ?? ""),
       name: customer.displayName?.trim() || `Shopify customer ${id}`,
       marketingConsent: customer.emailMarketingConsent?.marketingState === "SUBSCRIBED",
+      ...(contactRefs ? { contactRefs } : {}),
     }),
   ];
 }

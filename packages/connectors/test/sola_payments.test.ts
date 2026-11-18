@@ -252,7 +252,8 @@ describe("Sola events", () => {
       paid: true,
       captured: true,
     });
-    expect(read.event!.payload.customerRefs).toHaveLength(2);
+    // The email address, the number's digits, and the number's E.164 form (it was written without the country code).
+    expect(read.event!.payload.customerRefs).toHaveLength(3);
     const flat = JSON.stringify(read.event);
     for (const kept of ["4xxxxxxxxxxx1111", String(r.xToken), synthetic.name(1), synthetic.email(1), "2125550001", "INV-1", "Engagement ring"]) expect(flat).not.toContain(kept);
     expect([SOLA_CHARGE_EVENT, SOLA_REFUND_EVENT]).toEqual(["payment.charge_updated", "payment.refund_updated"]);

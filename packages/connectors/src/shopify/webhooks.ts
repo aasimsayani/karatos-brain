@@ -126,11 +126,14 @@ export function restCustomer(c: Rest): ShopifyCustomer {
     displayName: name || null,
     updatedAt: c.updated_at,
     emailMarketingConsent: c.email_marketing_consent?.state ? { marketingState: String(c.email_marketing_consent.state).toUpperCase() } : null,
+    // Only hashed, and only when customer linking is on; see customerEvents.
+    defaultEmailAddress: { emailAddress: c.email ?? null },
+    defaultPhoneNumber: { phoneNumber: c.phone ?? null },
   };
 }
 
 /** Events for one verified delivery. Topics the connector doesn't read give none. */
-export function shopifyWebhookEvents(delivery: ShopifyWebhookDelivery, receivedAt: string): ShopifyEvent[] {
+export function shopifyWebhookEvents(delivery: ShopifyWebhookDelivery, receivedAt: string, customerKey?: string): ShopifyEvent[] {
   const p = delivery.payload ?? {};
   if (delivery.topic.startsWith("orders/")) return orderEvents(restOrder(p), receivedAt);
   if (delivery.topic === "refunds/create") {
@@ -139,6 +142,6 @@ export function shopifyWebhookEvents(delivery: ShopifyWebhookDelivery, receivedA
     return orderEvents(order, receivedAt).filter((e) => e.type === "sale.returned");
   }
   if (delivery.topic.startsWith("products/")) return productEvents(restProduct(p), receivedAt);
-  if (delivery.topic.startsWith("customers/")) return customerEvents(restCustomer(p), receivedAt);
+  if (delivery.topic.startsWith("customers/")) return customerEvents(restCustomer(p), receivedAt, customerKey);
   return [];
 }

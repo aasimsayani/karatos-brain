@@ -25,4 +25,10 @@ describe("the Twilio factory", () => {
   it("turns down the account's Auth Token in place of an API key before reading anything", async () => {
     await expect(buildsFromSettings("twilio", { ...ENV, TWILIO_API_KEY_SID: ENV.TWILIO_ACCOUNT_SID })).rejects.toThrow("not the account SID");
   });
+
+  it("hands over CUSTOMER_REF_KEY when the instance has one, so texts and calls link with other systems", async () => {
+    expect(skipReason("twilio", ENV)).toBeNull();
+    await buildsFromSettings("twilio", { ...ENV, CUSTOMER_REF_KEY: "c".repeat(40) });
+    await expect(buildsFromSettings("twilio", { ...ENV, CUSTOMER_REF_KEY: "short" })).rejects.toThrow("CUSTOMER_REF_KEY must be at least 32 characters");
+  });
 });

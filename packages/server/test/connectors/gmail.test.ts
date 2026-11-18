@@ -19,4 +19,15 @@ describe("the Gmail factory", () => {
       CORRESPONDENT_HASH_KEY: "0".repeat(64),
     });
   });
+
+  it("hands over CUSTOMER_REF_KEY when the instance has one, so a customer's email links with other systems", async () => {
+    const env = {
+      GOOGLE_CLIENT_ID: "000000000000-test.apps.googleusercontent.com",
+      GOOGLE_CLIENT_SECRET: "client-secret-value",
+      GMAIL_REFRESH_TOKEN: "refresh-value",
+      CORRESPONDENT_HASH_KEY: "0".repeat(64),
+    };
+    await buildsFromSettings("gmail", { ...env, CUSTOMER_REF_KEY: "c".repeat(40) });
+    await expect(buildsFromSettings("gmail", { ...env, CUSTOMER_REF_KEY: "short" })).rejects.toThrow("CUSTOMER_REF_KEY must be at least 32 characters");
+  });
 });

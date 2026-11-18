@@ -1,4 +1,5 @@
 import { createHash, createHmac } from "node:crypto";
+import { checkCustomerRefKey, formCustomerRefs } from "../custom_forms/customer.js";
 
 /**
  * Turns Gmail message metadata and labels into Brain A events:
@@ -23,6 +24,13 @@ import { createHash, createHmac } from "node:crypto";
  * from a customer's; addresses at consumer mail services (gmail.com,
  * outlook.com, yahoo.com, icloud.com, ...) keep no domain.
  *
+ * When the instance has a CUSTOMER_REF_KEY, the other side of each message
+ * (who wrote a received one; who a sent one went to) also becomes
+ * `customerRefs`: the references custom forms, Klaviyo, Gorgias and
+ * Zendesk make for the same address, so a customer's email lines up with
+ * their texts, messages and orders elsewhere. Correspondent references
+ * stay as they were.
+ *
  * Drafts and spam are skipped: a draft isn't a conversation yet, and spam
  * isn't one with anybody the business knows.
  */
@@ -42,6 +50,8 @@ export interface GmailNormalizeOptions {
   correspondentKey: string;
   /** "keep" (default) keeps user label names that don't look like an address or a number; "drop" keeps none. */
   labelNames?: "keep" | "drop";
+  /** The instance's CUSTOMER_REF_KEY, when it has one: each message then also carries `customerRefs` for the other side. */
+  customerKey?: string | undefined;
 }
 
 export interface GmailCorrespondent {
@@ -187,6 +197,7 @@ export function gmailNormalizer(options: GmailNormalizeOptions) {
   const key = options.correspondentKey?.trim() ?? "";
   if (key.length < 32) throw new Error("set CORRESPONDENT_HASH_KEY to at least 32 characters; npm run secrets:setup generates one");
   const keepLabelNames = (options.labelNames ?? "keep") === "keep";
+  const customerKey = options.customerKey === undefined ? undefined : checkCustomerRefKey(options.customerKey);
 
   /** The keyed reference for one address, with its domain if that's a business's. */
   function correspondent(address: string): GmailCorrespondent {
@@ -204,9 +215,15 @@ export function gmailNormalizer(options: GmailNormalizeOptions) {
       .join(", ");
   }
 
-  function people(message: GmailMessage, name: string): { list: GmailCorrespondent[]; count: number } {
+  function people(message: GmailMessage, name: string): { list: GmailCorrespondent[]; count: number; addresses: string[] } {
     const addresses = [...new Set(gmailAddresses(header(message, name)))];
-    return { list: addresses.slice(0, MAX_ADDRESSES).map(correspondent), count: addresses.length };
+    return { list: addresses.slice(0, MAX_ADDRESSES).map(correspondent), count: addresses.length, addresses: addresses.slice(0, MAX_ADDRESSES) };
+  }
+
+  /** The other side's customer references: undefined without a CUSTOMER_REF_KEY. */
+  function customerRefs(addresses: string[]): string[] | undefined {
+    if (customerKey === undefined) return undefined;
+    return [...new Set(addresses.flatMap((email) => formCustomerRefs(customerKey, { email })))].sort();
   }
 
   return {
@@ -230,13 +247,15 @@ export function gmailNormalizer(options: GmailNormalizeOptions) {
       const to = people(message, "To");
       const cc = people(message, "Cc");
       const version = shortHash(labelIds.join(","));
+      const sent = labelIds.includes("SENT");
       return [
         event(`message:${id}:${version}`, "communication.message_logged", iso(message.internalDate), receivedAt, defined({
           channel: "email",
           messageId: gmailRef("message", id),
           threadId: threadId && gmailRef("thread", threadId),
-          direction: labelIds.includes("SENT") ? "sent" : "received",
+          direction: sent ? "sent" : "received",
           sentAt: iso(message.internalDate),
+          customerRefs: customerRefs(sent ? [...to.addresses, ...cc.addresses] : from.addresses.slice(0, 1)),
           from: from.list[0],
           to: to.list,
           cc: cc.list,

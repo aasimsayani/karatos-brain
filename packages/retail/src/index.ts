@@ -36,6 +36,21 @@ export {
   type StockReading,
   type StockReadingKind,
 } from "./departments/stock-agreement.js";
+export {
+  MAX_REFS_PER_RECORD,
+  REPLY_BUSINESS_HOURS,
+  REPLY_HIGH_VALUE_CENTS,
+  REPLY_LOOKBACK_DAYS,
+  STORE_HOURS,
+  awaitingReplyReasoner,
+  businessHoursBetween,
+  customerLinks,
+  customerRefsOf,
+  waitingCustomers,
+  CustomerLinks,
+  type CustomerTouch,
+  type StoreHours,
+} from "./departments/customer-match.js";
 export { appraisals, buying, clienteling, compliance, customOrders, finance, inventory, marketing, metals, repairs, sales };
 
 /** Every retail jewelry department, in the order a store usually adopts them. */

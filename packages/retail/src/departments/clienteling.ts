@@ -2,6 +2,7 @@ import type { Signal } from "@karatos/core";
 import { z } from "zod";
 import type { DepartmentModule } from "../department.js";
 import { ASSUMPTIONS, daysBetween, dollars, entityFrom, estimate, extractor, latestBySubject, measured, pct, recommend, signalFrom, value } from "../department.js";
+import { awaitingReply, customerMatchExtractor } from "./customer-match.js";
 
 const ProfileUpdated = z.object({
   customerId: z.string().min(1),
@@ -90,12 +91,14 @@ function consentByCustomer(signals: Signal[]): Map<string, { consent: boolean; n
 
 /**
  * Clienteling: knowing each customer, their occasions and wishes, and
- * reaching out at the right moment. Reads sales signals for lifetime value.
+ * reaching out at the right moment. Reads sales signals for lifetime value,
+ * and recognizes the same customer across channels by their references to
+ * notice one waiting on a reply (see customer-match.ts).
  */
 export const clienteling: DepartmentModule = {
   id: "clienteling",
   name: "Clienteling and CRM",
-  purpose: "Each customer's story: occasions, wish lists, preferences and when to reach out.",
+  purpose: "Each customer's story across every channel: occasions, wish lists, preferences, when to reach out, and who is waiting on a reply.",
   events: {
     "customer.profile_updated": ProfileUpdated,
     "customer.occasion_recorded": OccasionRecorded,
@@ -139,6 +142,7 @@ export const clienteling: DepartmentModule = {
           return [];
       }
     }),
+    customerMatchExtractor,
   ],
   reasoners: [
     {
@@ -251,5 +255,6 @@ export const clienteling: DepartmentModule = {
         ];
       },
     },
+    awaitingReply,
   ],
 };
