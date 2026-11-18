@@ -1,10 +1,14 @@
 # KaratOS website
 
-The public site lives in [`site/`](../site). `site/build.ts` renders one static page, and the integration directory and department list are generated from `packages/core/src/integrations.ts` and `@karatos/retail`, so the site always matches the catalog. Built connectors show a "Connector built" label and their `capabilities`, the plain-language list of what a business gets once that system is connected. Tests in `site/test` check every integration and department appears and that no client is named.
+The public site lives in [`site/`](../site). `site/build.ts` renders two static pages: the home page, and an integrations page at `/integrations/` (`INTEGRATIONS_PATH`) with what each connection is worth, the full directory and the partner section. The integration directory and department list are generated from `packages/core/src/integrations.ts` and `@karatos/retail`, so the site always matches the catalog. Built connectors show a "Connector built" label and their `capabilities`, the plain-language list of what a business gets once that system is connected. Tests in `site/test` check every integration and department appears and that no client is named.
 
 ## Reading order
 
-A visitor gives the page about a minute, so it leads with what they need to decide: the hero (one sentence, two buttons, three figures, a short "Connectors built for" line naming well-known built systems from `HERO_SYSTEMS` and counting the rest, and beside them an illustrative morning list from the Brain Console), then what it solves (the plays), how it works in three short steps, payback, the holiday pilot and pricing. The reference sections follow: write-back rules, your data, departments, what each connection is worth, the integration directory and partners. The nav keeps seven links or fewer. A test checks the order and the limits on the hero sentence and the "Connectors built for" line. The page says "built", never "connected" or "works today", because a built connector has been tested against the vendor's sandbox or sample files but not yet run on a live store account.
+A visitor gives the page about a minute, so it leads with what they need to decide: the hero (one sentence, two buttons, three figures, a short "Connectors built for" line naming well-known built systems from `HERO_SYSTEMS` and counting the rest, and beside them an illustrative morning list from the Brain Console), then the holiday pilot straight after the morning list, what it solves (the plays), how it works in three short steps, payback and pricing. The reference sections follow: write-back rules, your data, departments, and a short integrations section with the four newest connectors and a "See all N systems" link to the integrations page. The nav keeps seven links or fewer. A test checks the order and the limits on the hero sentence and the "Connectors built for" line. The page says "built", never "connected" or "works today", because a built connector has been tested against the vendor's sandbox or sample files but not yet run on a live store account.
+
+The full directory has its own page because it was about half of the home page's length on a phone, which pushed the pilot and the contact form far down for a store owner reading between customers. Links on the integrations page back to the home page's sections and contact form are absolute (`/#pilot`, `/#contact`), and a test checks it has no anchor it doesn't contain. Only the home page carries the `karatos-connected` and `karatos-mapped` meta tags the freshness check reads.
+
+The pilot card says sign-ups are open, so it agrees with its "Join the pilot" button. Both plans say the one-time setup fee is quoted on the first call (`SETUP_FEE_LINE`), so it never reads as unpriced.
 
 ## The integration directory
 
@@ -12,7 +16,7 @@ The directory groups every system by category (the catalog domain), with the cat
 
 Every card carries one plain sentence on what KaratOS reads from the system, and the company behind it when that company makes several systems on the map ("By Google"). A Details panel adds how it connects, how much history is imported, whether updates arrive live, how it is tested, the departments it feeds, who uses it and what stage it is at. The sentence and company live in `SYSTEM_DETAILS` in [`site/directory.ts`](../site/directory.ts); the rest comes from the catalog. A test fails when a system joins the catalog without an entry, so every new system arrives with its details.
 
-"Newest connectors" shows the eight most recently built connectors. The day each connector landed on `main` lives in `CONNECTED_ON` in the same file, and a test fails until a newly built connector has one, so each release shows what it added. The hero's figures (connectors built and systems mapped) and the Partners section's three stages (on the map, building now, built) are counted from the catalog.
+"Newest connectors" shows the eight most recently built connectors on the integrations page, and the four newest (`HOME_NEWEST`) on the home page. The day each connector landed on `main` lives in `CONNECTED_ON` in the same file, and a test fails until a newly built connector has one, so each release shows what it added. The hero's figures (connectors built and systems mapped) and the Partners section's three stages (on the map, building now, built) are counted from the catalog.
 
 ## Partners
 
@@ -36,7 +40,7 @@ The hero names watch dealers in its audience line and mentions careful write-bac
 ## Build and preview
 
 ```sh
-node --import tsx site/build.ts   # writes site/dist/index.html
+node --import tsx site/build.ts   # writes site/dist/index.html and site/dist/integrations/index.html
 node site/server.ts                # serves it on :8080
 ```
 
@@ -54,7 +58,7 @@ Type is set in IBM Plex: Sans for words, Mono for labels, prices and figures. Th
 
 Spacing comes from one scale (`--space-1` to `--space-5`: 8, 16, 24, 32 and 48px). Every section and the hero are padded `--section` (64px on phones up to 96px) top and bottom, each section's heading, intro and content sit 16px and 48px apart, and any spacing written in pixels stays on a 4px grid. A test enforces all three.
 
-Every response carries a strict `Content-Security-Policy` (the page's inline script and style are allowed only by hash), HSTS, `X-Frame-Options: DENY`, `nosniff` and same-origin opener and resource policies; [docs/security.md](security.md) lists them all. Keep the page free of inline `style=""` attributes and `on…=""` handlers, which the policy would block; a test checks. Another test pins the whole policy for the built page, recomputing both hashes, so a loosened directive or an extra inline script fails.
+Every response carries a strict `Content-Security-Policy` (each page's inline script and style are allowed only by hash, and the server pins the policy to the page it serves), HSTS, `X-Frame-Options: DENY`, `nosniff` and same-origin opener and resource policies; [docs/security.md](security.md) lists them all. Keep the page free of inline `style=""` attributes and `on…=""` handlers, which the policy would block; a test checks. Another test pins the whole policy for the built page, recomputing both hashes, so a loosened directive or an extra inline script fails.
 
 The page is served gzipped, and small gold or grey text uses the darker `--gold-text` and `--muted` colors so it stays at WCAG AA contrast.
 

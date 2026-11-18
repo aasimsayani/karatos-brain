@@ -19,6 +19,8 @@ export const SITE_URL = "https://karatos.app/";
 export const CONTACT_ANCHOR = "#contact";
 export const CORE_PRICE = "$299";
 export const MANAGED_PRICE = "$599";
+/** The setup fee depends on the store's systems, so the plans say when it is quoted rather than leave it unpriced. */
+export const SETUP_FEE_LINE = "One-time setup fee, quoted on your first call.";
 /**
  * IBM Plex, served from the site itself: IBM drew it as a nod to its own
  * early typewriter and terminal faces. Sans carries the words, Mono the
@@ -96,7 +98,7 @@ export const DOMAIN_VALUE: Readonly<Record<string, { question: string; why: stri
 };
 
 /** Dates for the holiday pilot the site announces. */
-export const HOLIDAY_PILOT = { weekend: "November 21–22, 2026", signupsOpen: "November 16" } as const;
+export const HOLIDAY_PILOT = { weekend: "November 21–22, 2026" } as const;
 
 /**
  * Illustrative plays: what happens when several connected systems are read
@@ -435,77 +437,17 @@ export function newestConnections(limit = 8): IntegrationSpec[] {
     .map((x) => x.i);
 }
 
-export function renderSite(plays: readonly Play[] = PLAYS): string {
-  const selfServe = new Set(buildingNow().map((i) => i.id));
-  const departments = [
-    ...RETAIL_DEPARTMENTS.map((d) => ({ id: d.id, name: d.name, purpose: d.purpose, planned: false })),
-    ...PLANNED_DEPARTMENTS.map((d) => ({ ...d, planned: true })),
-  ];
-  // Built connectors come first, then systems we are building now, then the rest in catalog order.
-  const rank = (i: IntegrationSpec) => (i.status === "built" ? 2 : selfServe.has(i.id) ? 1 : 0);
-  const dataSources = INTEGRATIONS.filter((i) => i.departments.length > 0).sort((a, b) => rank(b) - rank(a));
-  const deptName = new Map(departments.map((d) => [d.id, d.name]));
+/** The connector directory's own page, so the home page stays short on a phone. */
+export const INTEGRATIONS_PATH = "/integrations/";
+/** How many of the newest connectors the home page shows; the integrations page shows the full strip. */
+export const HOME_NEWEST = 4;
 
-  const directory = renderDirectory(dataSources, selfServe, deptName, researchedIds());
-  const categories = directoryCategories(dataSources);
-  const categoryOptions = categories.map((d) => `<option value="${d}">${escapeHtml(domainLabel(d))}</option>`).join("");
-  const builtCount = dataSources.filter((i) => i.status === "built").length;
-  const newest = newestConnections()
-    .map((i) => `<li><span class="pill gold">${escapeHtml(formatDay(CONNECTED_ON[i.id]!))}</span><strong>${escapeHtml(i.name)}</strong><span>${escapeHtml(systemDetail(i.id).about)}</span></li>`)
-    .join("\n");
+const SITE_DESCRIPTION = "KaratOS connects the many systems a jewelry or watch business already runs, reads them together and turns them into a short list of things to act on, each with the evidence behind it. It writes back only with a person's approval.";
 
-  const byId = new Map(INTEGRATIONS.map((i) => [i.id, i]));
-  const playCards = plays.map((play) => {
-    const systems = play.systems.map((id) => {
-      const integration = byId.get(id);
-      if (!integration) throw new Error(`play "${play.title}" names ${id}, which is not in the integrations catalog`);
-      return `<li>${escapeHtml(integration.name)}</li>`;
-    });
-    return `<li class="play">
-  <span class="tag">Illustrative</span>
-  <h3>${escapeHtml(play.title)}</h3>
-  <ul class="play-systems" aria-label="Systems combined">${systems.join("")}</ul>
-  <p class="play-action"><strong>Result:</strong> ${escapeHtml(play.action)}</p>
-  <p class="play-value"><strong>${VALUE_LABELS[play.value.kind]}:</strong> ${escapeHtml(play.value.how)}</p>
-</li>`;
-  }).join("\n");
-  const start = paybackDefaults();
-  const paybackFields = PAYBACK_INPUTS.map(
-    (i) => `<label>${escapeHtml(i.label)}${i.unit === "%" ? " (%)" : i.unit === "$" ? " ($)" : ""}<input type="number" inputmode="decimal" min="0" max="${i.max}" step="any" name="${i.id}" value="${i.value}" data-unit="${i.unit}"></label>`,
-  ).join("\n");
-  const paybackRows = PAYBACK_LINES.map(
-    (l) => `<li data-factors="${l.factors.join(" ")}" data-per="${l.per}"><span class="pb-kind">${VALUE_LABELS[l.kind]}</span><strong>${escapeHtml(l.title)}</strong><span class="pb-how">${escapeHtml(l.how)}</span><output>${dollars(paybackLine(l, start))}</output></li>`,
-  ).join("\n");
-  const paybackTotal = PAYBACK_LINES.reduce((sum, l) => sum + paybackLine(l, start), 0);
-  const writeRules = WRITE_RULES.map((r) => `<li><h3>${escapeHtml(r.title)}</h3><p>${escapeHtml(r.body)}</p></li>`).join("\n");
+/** The home page's sections in the top nav, in page order. */
+const NAV_LINKS = [["pilot", "Holiday pilot"], ["together", "What it solves"], ["how", "How it works"], ["payback", "Payback"], ["services", "Pricing"]] as const;
 
-  const valueCards = renderValueCards(dataSources, selfServe);
-
-  const deptOptions = departments.map((d) => `<option value="${d.id}">${escapeHtml(d.name)}</option>`).join("");
-  const deptCards = departments
-    .map(
-      (d) => `<li class="dept${d.planned ? " planned" : ""}"><h3>${escapeHtml(d.name)}${d.planned ? ' <span class="pill muted">Next</span>' : ""}</h3><p>${escapeHtml(d.purpose)}</p></li>`,
-    )
-    .join("\n");
-
-  return `<!doctype html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>KaratOS</title>
-<meta name="karatos-connected" content="${connectedIds().join(",")}">
-<meta name="karatos-mapped" content="${dataSources.length}">
-<meta name="description" content="KaratOS connects the many systems a jewelry or watch business already runs, reads them together and turns them into a short list of things to act on, each with the evidence behind it. It writes back only with a person's approval.">
-<link rel="canonical" href="${SITE_URL}">
-<meta property="og:type" content="website">
-<meta property="og:url" content="${SITE_URL}">
-<meta property="og:title" content="KaratOS: the operating brain for jewelry businesses">
-<meta property="og:description" content="KaratOS connects the many systems a jewelry or watch business already runs, reads them together and turns them into a short list of things to act on, each with the evidence behind it. It writes back only with a person's approval.">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath d='M16 3 28 12 16 29 4 12Z' fill='%23c9a45c'/%3E%3C/svg%3E">
-${fontPreloads}
-<style>
-${fontFaces}
+const SITE_CSS = `${fontFaces}
 /* --gold-text and --gold-on-ink keep gold lettering at 4.5:1 or better (WCAG AA) on light surfaces and on the inverted campaign panel. */
 :root{--bg:#faf8f4;--surface:#ffffff;--ink:#16140f;--ink-2:#4a463d;--muted:#6b665b;--line:#e7e2d8;--gold:#a8833d;--gold-text:#82632a;--gold-on-ink:#d4b06a;--gold-soft:#f4ecdc;--radius:14px;--space-1:8px;--space-2:16px;--space-3:24px;--space-4:32px;--space-5:48px;--section:clamp(64px,9vw,96px);--sans:'IBM Plex Sans',system-ui,-apple-system,'Segoe UI',sans-serif;--mono:'IBM Plex Mono',ui-monospace,'SF Mono',Menlo,Consolas,monospace}
 @media (prefers-color-scheme:dark){:root{--bg:#121110;--surface:#1b1a17;--ink:#f3efe6;--ink-2:#c8c1b3;--muted:#948d80;--line:#2e2b26;--gold:#d4b06a;--gold-text:#d4b06a;--gold-on-ink:#82632a;--gold-soft:#2a2418}body{-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}}
@@ -707,17 +649,208 @@ section{padding:var(--section) 0;border-top:1px solid var(--line);scroll-margin-
 .campaign .small a{color:var(--gold)}
 footer{padding:var(--space-5) 0;color:var(--muted);font-size:14px;border-top:1px solid var(--line)}
 footer .wrap{display:flex;flex-wrap:wrap;justify-content:space-between;gap:var(--space-2)}
+.page-head{padding-top:var(--section);padding-bottom:var(--space-5)}
+.page-head .lede{max-width:60ch}`;
+
+/** Filters the connector directory on the integrations page. */
+const DIRECTORY_SCRIPT = `(function(){
+  var q=document.getElementById('q'),seg=document.getElementById('segment'),dep=document.getElementById('department'),cat=document.getElementById('category');
+  var groups=[].slice.call(document.querySelectorAll('#cards .group')),empty=document.getElementById('empty');
+  function apply(){
+    var text=q.value.trim().toLowerCase(),s=seg.value,d=dep.value,k=cat.value,shown=0,filtering=!!(text||s||d||k);
+    groups.forEach(function(g){
+      var inGroup=0;
+      [].forEach.call(g.querySelectorAll('.card'),function(c){
+        var ok=(!k||c.dataset.domain===k)&&(!text||c.dataset.search.indexOf(text)>-1)&&(!s||c.dataset.segments.split(' ').indexOf(s)>-1)&&(!d||c.dataset.departments.split(' ').indexOf(d)>-1);
+        c.hidden=!ok; if(ok) inGroup++;
+      });
+      g.hidden=inGroup===0; shown+=inGroup;
+      if(filtering&&inGroup) g.open=true;
+    });
+    empty.hidden=shown>0;
+  }
+  function openFromHash(){var g=document.getElementById(location.hash.slice(1));if(g&&g.classList.contains('group')){g.open=true;g.scrollIntoView()}}
+  window.addEventListener('hashchange',openFromHash);openFromHash();
+  q.addEventListener('input',apply);seg.addEventListener('change',apply);dep.addEventListener('change',apply);cat.addEventListener('change',apply);
+})();`;
+
+/** The payback calculator and the private inquiry form on the home page. */
+const HOME_SCRIPT = `(function(){
+  var form=document.getElementById('payback-form'),price=${corePriceDollars()};
+  if(!form) return;
+  function money(n){return '$'+Math.round(n).toLocaleString('en-US')}
+  function update(){
+    var v={};
+    [].forEach.call(form.elements,function(el){var n=Math.max(0,Number(el.value)||0);v[el.name]=el.dataset.unit==='%'?n/100:n});
+    var total=0;
+    [].forEach.call(document.querySelectorAll('.pb-lines li'),function(li){
+      var x=1;li.dataset.factors.split(' ').forEach(function(f){x*=v[f]||0});x/=Number(li.dataset.per);
+      total+=x;li.querySelector('output').textContent=money(x);
+    });
+    document.getElementById('pb-total').textContent=money(total);
+    document.getElementById('pb-times').textContent=(total/price).toFixed(1);
+  }
+  form.addEventListener('input',update);
+  form.addEventListener('submit',function(e){e.preventDefault()});
+})();
+(function(){
+  var form=document.getElementById('inquiry'),status=document.getElementById('inquiry-status');
+  document.querySelectorAll('[data-interest]').forEach(function(a){
+    a.addEventListener('click',function(){
+      var box=form.querySelector('input[name=interests][value="'+a.dataset.interest+'"]'); if(box) box.checked=true;
+    });
+  });
+  form.addEventListener('submit',function(e){
+    e.preventDefault();
+    form.querySelectorAll('.invalid').forEach(function(el){el.classList.remove('invalid')});
+    var data={interests:[].map.call(form.querySelectorAll('input[name=interests]:checked'),function(b){return b.value})};
+    ['name','email','business','businessType','seats','system','message','website'].forEach(function(k){data[k]=form.elements[k].value});
+    var button=form.querySelector('button');button.disabled=true;status.textContent='Sending...';
+    fetch('/api/inquiry',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)})
+      .then(function(r){return r.json().catch(function(){return {}}).then(function(b){return {status:r.status,body:b}})})
+      .then(function(r){
+        if(r.status===202){form.reset();status.textContent='Thanks. We have it and will be in touch.';return}
+        if(r.status===400&&r.body.fields){
+          r.body.fields.forEach(function(f){var el=f==='interests'?form.querySelector('.interests'):form.elements[f];if(el)el.classList.add('invalid')});
+          status.textContent='Please check the highlighted fields.';return}
+        status.textContent=r.status===429?'That is a lot of messages. Please try again in an hour.':'We could not send that just now. Please try again soon.';
+      })
+      .catch(function(){status.textContent='We could not send that just now. Please try again soon.'})
+      .then(function(){button.disabled=false});
+  });
+})();`;
+
+/** Everything in a page but its main content: head, styles, header, footer and its one inline script. */
+interface PageParts {
+  title: string;
+  description: string;
+  url: string;
+  /** Extra head tags, already escaped. */
+  meta: string;
+  /** Prefix for links to sections of the home page: "" on the home page, "/" elsewhere. */
+  home: "" | "/";
+  main: string;
+  script: string;
+}
+
+function renderPage(p: PageParts): string {
+  const nav = NAV_LINKS.map(([id, label]) => `<a href="${p.home}#${id}">${label}</a>`).join("") + `<a href="${INTEGRATIONS_PATH}">Integrations</a><a href="/demo/">Demo</a>`;
+  return `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>${escapeHtml(p.title)}</title>
+${p.meta}
+<meta name="description" content="${escapeHtml(p.description)}">
+<link rel="canonical" href="${p.url}">
+<meta property="og:type" content="website">
+<meta property="og:url" content="${p.url}">
+<meta property="og:title" content="${escapeHtml(p.title === "KaratOS" ? "KaratOS: the operating brain for jewelry businesses" : p.title)}">
+<meta property="og:description" content="${escapeHtml(p.description)}">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath d='M16 3 28 12 16 29 4 12Z' fill='%23c9a45c'/%3E%3C/svg%3E">
+${fontPreloads}
+<style>
+${SITE_CSS}
 </style>
 </head>
 <body>
 <header class="nav"><div class="wrap">
-  <a class="brand" href="#top"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M16 3 28 12 16 29 4 12Z" fill="#c9a45c"/><path d="M4 12h24M16 3l-5 9 5 17 5-17-5-9" fill="none" stroke="#16140f" stroke-opacity=".35" stroke-width="1.2"/></svg>KaratOS</a>
-  <nav><a href="#together">What it solves</a><a href="#how">How it works</a><a href="#payback">Payback</a><a href="#services">Pricing</a><a href="#pilot">Holiday pilot</a><a href="#integrations">Integrations</a><a href="/demo/">Demo</a></nav>
-  <a class="btn primary small" href="#services">Custom services</a>
+  <a class="brand" href="${p.home ? "/" : "#top"}"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M16 3 28 12 16 29 4 12Z" fill="#c9a45c"/><path d="M4 12h24M16 3l-5 9 5 17 5-17-5-9" fill="none" stroke="#16140f" stroke-opacity=".35" stroke-width="1.2"/></svg>KaratOS</a>
+  <nav>${nav}</nav>
+  <a class="btn primary small" href="${p.home}#services">Custom services</a>
 </div></header>
 
 <main id="top">
-<div class="wrap hero">
+${p.main}
+</main>
+
+<footer><div class="wrap">
+  <span>KaratOS. The core engine is open source under the MIT license. The Brain Console and custom services are paid.</span>
+  <a href="${REPO_URL}">Open-source core on GitHub</a>
+</div></footer>
+
+<script>
+${p.script}
+</script>
+</body>
+</html>
+`;
+}
+
+/** The home page. */
+export function renderSite(plays: readonly Play[] = PLAYS): string {
+  return renderSitePages(plays).home;
+}
+
+/** The integrations page: what each connection is worth, the full directory and the partner section. */
+export function renderIntegrationsPage(): string {
+  return renderSitePages().integrations;
+}
+
+export function renderSitePages(plays: readonly Play[] = PLAYS): { home: string; integrations: string } {
+  const selfServe = new Set(buildingNow().map((i) => i.id));
+  const departments = [
+    ...RETAIL_DEPARTMENTS.map((d) => ({ id: d.id, name: d.name, purpose: d.purpose, planned: false })),
+    ...PLANNED_DEPARTMENTS.map((d) => ({ ...d, planned: true })),
+  ];
+  // Built connectors come first, then systems we are building now, then the rest in catalog order.
+  const rank = (i: IntegrationSpec) => (i.status === "built" ? 2 : selfServe.has(i.id) ? 1 : 0);
+  const dataSources = INTEGRATIONS.filter((i) => i.departments.length > 0).sort((a, b) => rank(b) - rank(a));
+  const deptName = new Map(departments.map((d) => [d.id, d.name]));
+
+  const directory = renderDirectory(dataSources, selfServe, deptName, researchedIds());
+  const categories = directoryCategories(dataSources);
+  const categoryOptions = categories.map((d) => `<option value="${d}">${escapeHtml(domainLabel(d))}</option>`).join("");
+  const builtCount = dataSources.filter((i) => i.status === "built").length;
+  const newestItem = (i: IntegrationSpec) =>
+    `<li><span class="pill gold">${escapeHtml(formatDay(CONNECTED_ON[i.id]!))}</span><strong>${escapeHtml(i.name)}</strong><span>${escapeHtml(systemDetail(i.id).about)}</span></li>`;
+  const newest = newestConnections().map(newestItem).join("\n");
+  // The home page shows a shorter strip, so it stays short on a phone.
+  const newestHome = newestConnections(HOME_NEWEST).map(newestItem).join("\n");
+
+  const byId = new Map(INTEGRATIONS.map((i) => [i.id, i]));
+  const playCards = plays.map((play) => {
+    const systems = play.systems.map((id) => {
+      const integration = byId.get(id);
+      if (!integration) throw new Error(`play "${play.title}" names ${id}, which is not in the integrations catalog`);
+      return `<li>${escapeHtml(integration.name)}</li>`;
+    });
+    return `<li class="play">
+  <span class="tag">Illustrative</span>
+  <h3>${escapeHtml(play.title)}</h3>
+  <ul class="play-systems" aria-label="Systems combined">${systems.join("")}</ul>
+  <p class="play-action"><strong>Result:</strong> ${escapeHtml(play.action)}</p>
+  <p class="play-value"><strong>${VALUE_LABELS[play.value.kind]}:</strong> ${escapeHtml(play.value.how)}</p>
+</li>`;
+  }).join("\n");
+  const start = paybackDefaults();
+  const paybackFields = PAYBACK_INPUTS.map(
+    (i) => `<label>${escapeHtml(i.label)}${i.unit === "%" ? " (%)" : i.unit === "$" ? " ($)" : ""}<input type="number" inputmode="decimal" min="0" max="${i.max}" step="any" name="${i.id}" value="${i.value}" data-unit="${i.unit}"></label>`,
+  ).join("\n");
+  const paybackRows = PAYBACK_LINES.map(
+    (l) => `<li data-factors="${l.factors.join(" ")}" data-per="${l.per}"><span class="pb-kind">${VALUE_LABELS[l.kind]}</span><strong>${escapeHtml(l.title)}</strong><span class="pb-how">${escapeHtml(l.how)}</span><output>${dollars(paybackLine(l, start))}</output></li>`,
+  ).join("\n");
+  const paybackTotal = PAYBACK_LINES.reduce((sum, l) => sum + paybackLine(l, start), 0);
+  const writeRules = WRITE_RULES.map((r) => `<li><h3>${escapeHtml(r.title)}</h3><p>${escapeHtml(r.body)}</p></li>`).join("\n");
+
+  const valueCards = renderValueCards(dataSources, selfServe);
+
+  const deptOptions = departments.map((d) => `<option value="${d.id}">${escapeHtml(d.name)}</option>`).join("");
+  const deptCards = departments
+    .map(
+      (d) => `<li class="dept${d.planned ? " planned" : ""}"><h3>${escapeHtml(d.name)}${d.planned ? ' <span class="pill muted">Next</span>' : ""}</h3><p>${escapeHtml(d.purpose)}</p></li>`,
+    )
+    .join("\n");
+
+  const home = renderPage({
+    title: "KaratOS",
+    description: SITE_DESCRIPTION,
+    url: SITE_URL,
+    meta: `<meta name="karatos-connected" content="${connectedIds().join(",")}">
+<meta name="karatos-mapped" content="${dataSources.length}">`,
+    home: "",
+    main: `<div class="wrap hero">
   <div class="hero-copy">
   <span class="eyebrow">For jewelers, watch dealers, wholesalers, manufacturers and the businesses that serve them</span>
   <h1>The operating brain for jewelry businesses.</h1>
@@ -740,6 +873,27 @@ footer .wrap{display:flex;flex-wrap:wrap;justify-content:space-between;gap:var(-
     <p class="cp-note">Illustrative. Each item opens to the sales, tickets and statements behind it.</p>
   </div>
 </div>
+
+<section id="pilot"><div class="wrap">
+  <span class="eyebrow">Holiday pilot</span>
+  <h2>Test it before Black Friday.</h2>
+  <div class="pilot">
+    <div>
+      <p class="section-intro">The weeks before Black Friday decide a jeweler's year, so that is when KaratOS has to prove itself. Join the open testing weekend and get your first list of recommendations before the rush.</p>
+      <ul>
+        <li><strong>Read-only from the first minute.</strong> Connect your store, POS, payments or bank. Nothing in your systems is changed.</li>
+        <li><strong>A list by the end of the day.</strong> Aged pieces to reprice, late repairs to call about, deposits that don't match, deadlines coming up.</li>
+        <li><strong>Your feedback shapes the launch.</strong> Every accept, snooze and dismiss tells us what to sharpen before stores rely on it.</li>
+      </ul>
+    </div>
+    <div class="when">
+      <span class="eyebrow">Testing weekend</span>
+      <strong>${HOLIDAY_PILOT.weekend}</strong>
+      <p>Sign-ups are open now. Save your place and we'll confirm your store before the weekend. Places are limited so we can help every store connect.</p>
+      <div class="actions"><a class="btn primary" href="${CONTACT_ANCHOR}" data-interest="pilot">Join the pilot</a></div>
+    </div>
+  </div>
+</div></section>
 
 <section id="together"><div class="wrap">
   <span class="eyebrow">What it solves</span>
@@ -784,27 +938,6 @@ ${paybackRows}
   </div>
 </div></section>
 
-<section id="pilot"><div class="wrap">
-  <span class="eyebrow">Holiday pilot</span>
-  <h2>Test it before Black Friday.</h2>
-  <div class="pilot">
-    <div>
-      <p class="section-intro">The weeks before Black Friday decide a jeweler's year, so that is when KaratOS has to prove itself. Join the open testing weekend and get your first list of recommendations before the rush.</p>
-      <ul>
-        <li><strong>Read-only from the first minute.</strong> Connect your store, POS, payments or bank. Nothing in your systems is changed.</li>
-        <li><strong>A list by the end of the day.</strong> Aged pieces to reprice, late repairs to call about, deposits that don't match, deadlines coming up.</li>
-        <li><strong>Your feedback shapes the launch.</strong> Every accept, snooze and dismiss tells us what to sharpen before stores rely on it.</li>
-      </ul>
-    </div>
-    <div class="when">
-      <span class="eyebrow">Testing weekend</span>
-      <strong>${HOLIDAY_PILOT.weekend}</strong>
-      <p>Sign-ups open ${HOLIDAY_PILOT.signupsOpen}. Places are limited so we can help every store connect.</p>
-      <div class="actions"><a class="btn primary" href="${CONTACT_ANCHOR}" data-interest="pilot">Join the pilot</a></div>
-    </div>
-  </div>
-</div></section>
-
 <section id="services"><div class="wrap">
   <span class="eyebrow">Custom services</span>
   <h2>We build it, connect it and keep it running.</h2>
@@ -832,14 +965,14 @@ ${paybackRows}
       <h3>Core</h3>
       <p class="price"><strong>${CORE_PRICE}</strong> per store per month</p>
       <p>The Brain Console with 3 seats, every standard connection and every retail department, running in accounts your business owns.</p>
-      <p class="fine">One-time setup fee. Extra seats $49 a month.</p>
+      <p class="fine">${SETUP_FEE_LINE} Extra seats $49 a month.</p>
       <a class="btn ghost" href="${CONTACT_ANCHOR}" data-interest="brain_console">Start on Core</a>
     </li>
     <li class="plan featured">
       <h3>Managed</h3>
       <p class="price"><strong>${MANAGED_PRICE}</strong> per store per month</p>
       <p>Everything in Core with 5 seats, and we host it, watch every sync, keep it current and fix connections when a vendor changes something. Includes Dashboard Studio.</p>
-      <p class="fine">One-time setup fee. Extra seats $49 a month.</p>
+      <p class="fine">${SETUP_FEE_LINE} Extra seats $49 a month.</p>
       <a class="btn primary" href="${CONTACT_ANCHOR}" data-interest="maintenance">Go Managed</a>
     </li>
     <li class="plan">
@@ -924,6 +1057,34 @@ ${deptCards}
   </ul>
 </div></section>
 
+<section id="integrations"><div class="wrap">
+  <span class="eyebrow">Integrations</span>
+  <h2>Connect what you already run.</h2>
+  <p class="section-intro">${builtCount} connectors are built and ${dataSources.length} systems are on our map, from the POS and the books to diamond feeds and the repair bench. Each one answers a question the others can't.</p>
+  <div class="newest">
+    <h3>Newest connectors</h3>
+    <ul>
+${newestHome}
+    </ul>
+  </div>
+  <div class="actions"><a class="btn primary" href="${INTEGRATIONS_PATH}">See all ${dataSources.length} systems</a><a class="btn ghost" href="${INTEGRATIONS_PATH}#partners">For partners</a></div>
+</div></section>`,
+    script: HOME_SCRIPT,
+  });
+
+  const integrations = renderPage({
+    title: "KaratOS integrations",
+    description: `Every system KaratOS connects to, grouped by what it does: ${builtCount} connectors built and ${dataSources.length} systems mapped for jewelry and watch businesses.`,
+    url: `${SITE_URL}${INTEGRATIONS_PATH.slice(1)}`,
+    meta: "",
+    home: "/",
+    main: `<div class="wrap page-head">
+  <span class="eyebrow">Integrations</span>
+  <h1>Every system KaratOS connects to.</h1>
+  <p class="lede">${builtCount} connectors built and ${dataSources.length} systems mapped, grouped by what they do. Every connection is read-only until you turn writing back on.</p>
+  <div class="actions"><a class="btn primary" href="/#pilot">Join the holiday pilot</a><a class="btn ghost" href="/demo/">Try the live demo</a></div>
+</div>
+
 <section id="value"><div class="wrap">
   <span class="eyebrow">What each connection is worth</span>
   <h2>Every system you connect answers a question the others can't.</h2>
@@ -958,7 +1119,7 @@ ${newest}
   <div id="cards">
 ${directory}
   </div>
-  <p class="empty" id="empty" hidden>Nothing matches. <a href="#broken">Tell us about it</a> and we'll add it.</p>
+  <p class="empty" id="empty" hidden>Nothing matches. <a href="/#broken">Tell us about it</a> and we'll add it.</p>
 </div></section>
 
 <section id="partners"><div class="wrap">
@@ -975,90 +1136,22 @@ ${directory}
     <li><h3>No surprise writes</h3><p>Writing back is off until the business turns it on for one action, and a person approves each change before it reaches your system.</p></li>
     <li><h3>Kept current</h3><p>We follow your API changelog every day and run every connector against its sandbox every night, so a change on your side gets fixed quickly.</p></li>
   </ul>
-  <div class="actions"><a class="btn primary" href="${REPORT_URL}">Ask for an integration</a><a class="btn ghost" href="${CONTACT_ANCHOR}">Talk to us about partnering</a></div>
-</div></section>
-</main>
-
-<footer><div class="wrap">
-  <span>KaratOS. The core engine is open source under the MIT license. The Brain Console and custom services are paid.</span>
-  <a href="${REPO_URL}">Open-source core on GitHub</a>
-</div></footer>
-
-<script>
-(function(){
-  var q=document.getElementById('q'),seg=document.getElementById('segment'),dep=document.getElementById('department'),cat=document.getElementById('category');
-  var groups=[].slice.call(document.querySelectorAll('#cards .group')),empty=document.getElementById('empty');
-  function apply(){
-    var text=q.value.trim().toLowerCase(),s=seg.value,d=dep.value,k=cat.value,shown=0,filtering=!!(text||s||d||k);
-    groups.forEach(function(g){
-      var inGroup=0;
-      [].forEach.call(g.querySelectorAll('.card'),function(c){
-        var ok=(!k||c.dataset.domain===k)&&(!text||c.dataset.search.indexOf(text)>-1)&&(!s||c.dataset.segments.split(' ').indexOf(s)>-1)&&(!d||c.dataset.departments.split(' ').indexOf(d)>-1);
-        c.hidden=!ok; if(ok) inGroup++;
-      });
-      g.hidden=inGroup===0; shown+=inGroup;
-      if(filtering&&inGroup) g.open=true;
-    });
-    empty.hidden=shown>0;
-  }
-  function openFromHash(){var g=document.getElementById(location.hash.slice(1));if(g&&g.classList.contains('group')){g.open=true;g.scrollIntoView()}}
-  window.addEventListener('hashchange',openFromHash);openFromHash();
-  q.addEventListener('input',apply);seg.addEventListener('change',apply);dep.addEventListener('change',apply);cat.addEventListener('change',apply);
-})();
-(function(){
-  var form=document.getElementById('payback-form'),price=${corePriceDollars()};
-  if(!form) return;
-  function money(n){return '$'+Math.round(n).toLocaleString('en-US')}
-  function update(){
-    var v={};
-    [].forEach.call(form.elements,function(el){var n=Math.max(0,Number(el.value)||0);v[el.name]=el.dataset.unit==='%'?n/100:n});
-    var total=0;
-    [].forEach.call(document.querySelectorAll('.pb-lines li'),function(li){
-      var x=1;li.dataset.factors.split(' ').forEach(function(f){x*=v[f]||0});x/=Number(li.dataset.per);
-      total+=x;li.querySelector('output').textContent=money(x);
-    });
-    document.getElementById('pb-total').textContent=money(total);
-    document.getElementById('pb-times').textContent=(total/price).toFixed(1);
-  }
-  form.addEventListener('input',update);
-  form.addEventListener('submit',function(e){e.preventDefault()});
-})();
-(function(){
-  var form=document.getElementById('inquiry'),status=document.getElementById('inquiry-status');
-  document.querySelectorAll('[data-interest]').forEach(function(a){
-    a.addEventListener('click',function(){
-      var box=form.querySelector('input[name=interests][value="'+a.dataset.interest+'"]'); if(box) box.checked=true;
-    });
+  <div class="actions"><a class="btn primary" href="${REPORT_URL}">Ask for an integration</a><a class="btn ghost" href="/${CONTACT_ANCHOR}">Talk to us about partnering</a></div>
+</div></section>`,
+    script: DIRECTORY_SCRIPT,
   });
-  form.addEventListener('submit',function(e){
-    e.preventDefault();
-    form.querySelectorAll('.invalid').forEach(function(el){el.classList.remove('invalid')});
-    var data={interests:[].map.call(form.querySelectorAll('input[name=interests]:checked'),function(b){return b.value})};
-    ['name','email','business','businessType','seats','system','message','website'].forEach(function(k){data[k]=form.elements[k].value});
-    var button=form.querySelector('button');button.disabled=true;status.textContent='Sending...';
-    fetch('/api/inquiry',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)})
-      .then(function(r){return r.json().catch(function(){return {}}).then(function(b){return {status:r.status,body:b}})})
-      .then(function(r){
-        if(r.status===202){form.reset();status.textContent='Thanks. We have it and will be in touch.';return}
-        if(r.status===400&&r.body.fields){
-          r.body.fields.forEach(function(f){var el=f==='interests'?form.querySelector('.interests'):form.elements[f];if(el)el.classList.add('invalid')});
-          status.textContent='Please check the highlighted fields.';return}
-        status.textContent=r.status===429?'That is a lot of messages. Please try again in an hour.':'We could not send that just now. Please try again soon.';
-      })
-      .catch(function(){status.textContent='We could not send that just now. Please try again soon.'})
-      .then(function(){button.disabled=false});
-  });
-})();
-</script>
-</body>
-</html>
-`;
+
+  return { home, integrations };
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const out = new URL("./dist/", import.meta.url);
   mkdirSync(out, { recursive: true });
-  writeFileSync(new URL("index.html", out), renderSite());
+  const pages = renderSitePages();
+  writeFileSync(new URL("index.html", out), pages.home);
+  const integrations = new URL(`.${INTEGRATIONS_PATH}`, out);
+  mkdirSync(integrations, { recursive: true });
+  writeFileSync(new URL("index.html", integrations), pages.integrations);
   const fonts = new URL("fonts/", out);
   mkdirSync(fonts, { recursive: true });
   const require = createRequire(import.meta.url);

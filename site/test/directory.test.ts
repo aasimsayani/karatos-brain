@@ -5,14 +5,16 @@ import { pathToFileURL } from "node:url";
 import { describe, expect, it } from "vitest";
 import { INTEGRATIONS, type IntegrationSpec } from "../../packages/core/src/index.js";
 import { CONNECTED_ON, SYSTEM_DETAILS } from "../directory.js";
-import { CORE_PRICE, DOMAIN_LABELS, REPO_URL, SITE_URL, directoryCategories, escapeHtml, formatDay, newestConnections, renderCard, renderDirectory, renderSite, researchUrl, researchedIds, systemDetail } from "../build.js";
+import { CORE_PRICE, DOMAIN_LABELS, HOME_NEWEST, REPO_URL, SITE_URL, directoryCategories, escapeHtml, formatDay, newestConnections, renderCard, renderDirectory, renderIntegrationsPage, renderSite, researchUrl, researchedIds, systemDetail } from "../build.js";
 
 const html = renderSite();
+/** The connector directory, what each connection is worth and the partner section live on their own page. */
+const page = renderIntegrationsPage();
 const dataSources = INTEGRATIONS.filter((i) => i.departments.length > 0);
 const built = INTEGRATIONS.filter((i) => i.status === "built");
-const section = (id: string) => {
-  const start = html.indexOf(`<section id="${id}"`);
-  return start < 0 ? "" : html.slice(start, html.indexOf("</section>", start));
+const section = (id: string, from = page) => {
+  const start = from.indexOf(`<section id="${id}"`);
+  return start < 0 ? "" : from.slice(start, from.indexOf("</section>", start));
 };
 const spec = (over: Partial<IntegrationSpec>): IntegrationSpec => ({
   id: "shopify",
@@ -113,13 +115,13 @@ describe("the directory, grouped by category", () => {
   });
 
   it("filters by category as well as text, business and department, and hides empty groups", () => {
-    const script = html.slice(html.indexOf("<script>"), html.indexOf("</script>"));
+    const script = page.slice(page.indexOf("<script>"), page.indexOf("</script>"));
     expect(script).toContain("c.dataset.domain===k");
     expect(script).toContain("g.hidden=inGroup===0");
     // A filter opens the groups it matches, and a category link opens its group.
     expect(script).toContain("if(filtering&&inGroup) g.open=true;");
     expect(script).toContain("g.open=true;g.scrollIntoView()");
-    expect(html).toContain('<select id="category" aria-label="Category">');
+    expect(page).toContain('<select id="category" aria-label="Category">');
   });
 });
 
@@ -147,7 +149,7 @@ describe("research write-ups", () => {
   it("links every write-up from its system's card on the site", () => {
     for (const id of researched) {
       if (!dataSources.some((i) => i.id === id)) continue;
-      expect(html, id).toContain(`href="${researchUrl(id)}"`);
+      expect(page, id).toContain(`href="${researchUrl(id)}"`);
     }
   });
 });
@@ -210,9 +212,13 @@ describe("newest connections", () => {
     expect([...days].sort().reverse()).toEqual(days);
     const latest = Object.values(CONNECTED_ON).sort().at(-1)!;
     expect(days[0]).toBe(latest);
-    const strip = html.slice(html.indexOf('<div class="newest">'), html.indexOf("</div>", html.indexOf('<div class="newest">')));
+    const strip = page.slice(page.indexOf('<div class="newest">'), page.indexOf("</div>", page.indexOf('<div class="newest">')));
     for (const i of newest) expect(strip).toContain(`<strong>${escapeHtml(i.name)}</strong>`);
     expect(strip).toContain(formatDay(latest));
+    // The home page keeps a shorter strip, so it still shows the pace of work without the full directory.
+    const home = section("integrations", html);
+    expect(home.match(/<li><span class="pill gold">/g)).toHaveLength(HOME_NEWEST);
+    expect(home).toContain(`<strong>${escapeHtml(newest[0]!.name)}</strong>`);
   });
 
   it("returns fewer when asked", () => {
@@ -228,8 +234,9 @@ describe("the partner section and the hero's proof", () => {
     expect(counts.reduce((a, b) => a + b, 0)).toBe(dataSources.length);
     expect(counts[2]).toBe(built.length);
     expect(partners).toContain("Read-only by default");
-    // Partners are reached from the integrations section, not the top nav.
-    expect(html).toContain('<section id="partners">');
+    // Partners are reached from the integrations page, not the top nav.
+    expect(page).toContain('<section id="partners">');
+    expect(section("integrations", html)).toContain('href="/integrations/#partners"');
   });
 
   it("leads the hero with what is connected and mapped today", () => {
