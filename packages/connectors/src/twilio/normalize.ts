@@ -1,4 +1,5 @@
 import { createHmac } from "node:crypto";
+import { checkCustomerRefKey, formCustomerRefs } from "../custom_forms/customer.js";
 import type { TwilioCall, TwilioMessage } from "./client.js";
 
 /**
@@ -12,6 +13,10 @@ import type { TwilioCall, TwilioMessage } from "./client.js";
  * - The customer's number becomes a contact reference, an HMAC-SHA256 under
  *   TWILIO_CONTACT_KEY, so the same customer lines up across texts and
  *   calls without the number being kept.
+ * - When the instance has a CUSTOMER_REF_KEY, the number also becomes
+ *   `customerRefs`: the same references custom forms, Quo, WhatsApp and
+ *   Klaviyo make for it, so the same person lines up with their texts,
+ *   messages and orders in other systems. `contactRef` stays as it was.
  * - The store's own line is kept as its last four digits, enough to tell
  *   two lines apart.
  */
@@ -90,8 +95,16 @@ const event = (kind: "message" | "call", sid: string, status: string, type: Twil
 
 const STATUS = /^[a-z][a-z_-]{1,30}$/;
 
-export function twilioNormalizer(key: string) {
+/** The customer references for the far end of a record, under CUSTOMER_REF_KEY: none for a client or SIP address. */
+export function twilioCustomerRefs(customerKey: string, address: string | null | undefined): string[] {
+  const { number } = channelOf(address);
+  return number ? formCustomerRefs(customerKey, { phone: `+${number}` }) : [];
+}
+
+export function twilioNormalizer(key: string, customerKey?: string) {
   if (key.length < MIN_CONTACT_KEY_LENGTH) throw new TwilioContactKeyError();
+  const refsKey = customerKey === undefined ? undefined : checkCustomerRefKey(customerKey);
+  const customerRefs = (address: string | null | undefined) => (refsKey === undefined ? undefined : twilioCustomerRefs(refsKey, address));
   return {
     /** One event per status a message reaches; a record that isn't a Twilio message is skipped. */
     message(m: TwilioMessage, receivedAt: string): TwilioEvent[] {
@@ -105,6 +118,7 @@ export function twilioNormalizer(key: string) {
           channel: channel === "whatsapp" ? "whatsapp" : media ? "mms" : channel === "phone" ? "sms" : "other",
           messageId: `twilio:message:${m.sid}`,
           contactRef: contactRef(key, customer),
+          customerRefs: customerRefs(customer),
           storeLine: storeLine(store),
           direction: m.direction === "inbound" ? "inbound" : "outbound",
           kind: m.direction,
@@ -130,6 +144,7 @@ export function twilioNormalizer(key: string) {
           channel: "voice",
           callId: `twilio:call:${c.sid}`,
           contactRef: contactRef(key, customer),
+          customerRefs: customerRefs(customer),
           storeLine: storeLine(store),
           direction: inbound ? "inbound" : "outbound",
           kind: c.direction,

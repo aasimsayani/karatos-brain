@@ -9,6 +9,7 @@ Reads the GraphQL Admin API (`https://<store>.myshopify.com/admin/api/<version>/
 | `SHOPIFY_ADMIN_ACCESS_TOKEN` | Instead of the two above, only for a store that already has a custom app made in the admin. Shopify stopped letting merchants create those on 2026-01-01 |
 | `SHOPIFY_API_VERSION` | Optional. Shopify supports each quarterly version for 12 months |
 | `SHOPIFY_WEBHOOK_SECRET` | Optional. The app's client secret, which signs webhook deliveries |
+| `SHOPIFY_LINK_CUSTOMERS` | Optional, `on` or `off`. `on` links customers with the same person in other systems; it needs `CUSTOMER_REF_KEY` and the app's protected customer data access to the email and phone fields |
 
 **What it reads.** Orders with their refunds and fulfillments, then products with their variants and stock, then customers. Each stream is paged by `updated_at`, oldest first. The first import reads five years. The checkpoint records the stream, Shopify's page cursor and the latest `updated_at` seen, so a crash resumes at the next page and each incremental sync starts where the last one got to. An incremental sync with no checkpoint looks back 48 hours. If Shopify throttles a query, the client waits for its cost bucket to refill, using the `throttleStatus` Shopify returns, and gives up to `runSync` after three tries.
 
@@ -23,7 +24,9 @@ Reads the GraphQL Admin API (`https://<store>.myshopify.com/admin/api/<version>/
 | `product.updated` | Products with variant SKUs, prices and total stock | product and `updatedAt` |
 | `customer.profile_updated` | Name and email marketing consent, in the clienteling shape | customer and `updatedAt` |
 
-Only what the departments use is kept: no email addresses, phone numbers or street addresses. A line with no SKU uses `shopify-variant-<id>` instead. No sale is recorded for an order with more than 50 lines (its `order.updated` says `linesComplete: false`) or with a price that can't be read. A record that arrives without its timestamp is dead-lettered with the raw record kept.
+Only what the departments use is kept: no email addresses, phone numbers or street addresses.
+
+**Linking customers.** With `SHOPIFY_LINK_CUSTOMERS=on`, the customers query and the customer webhooks also read each customer's default email address and phone number, only to hash them into `contactRefs` on `customer.profile_updated`: the `form_customer:` references custom forms, Klaviyo, Quo, WhatsApp and the other systems make for the same details, under `CUSTOMER_REF_KEY`. The details themselves are never kept. Orders keep their `shopify:customer:` id, which the profile links to those references, so clienteling sees a customer's orders beside their texts, messages and email (see [customers waiting on a reply](../departments/README.md#customers-waiting-on-a-reply)). A linked profile's key ends in `:linked`, and the first sync after linking is turned on reads every customer again, so customers read before get their references once. A line with no SKU uses `shopify-variant-<id>` instead. No sale is recorded for an order with more than 50 lines (its `order.updated` says `linesComplete: false`) or with a price that can't be read. A record that arrives without its timestamp is dead-lettered with the raw record kept.
 
 **Webhooks.** `verifyShopifyWebhook` checks `X-Shopify-Hmac-SHA256` against the raw body before it's parsed. `handleWebhook({ topic, payload })` maps the REST-shaped delivery onto the same events the sync produces, so a webhook for a record already synced, or a redelivery, is a duplicate. Topics read: orders, refunds, products and customers.
 

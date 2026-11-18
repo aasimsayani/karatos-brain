@@ -1,4 +1,5 @@
 import type { Connector, SourceBatch, SyncContext, WriteAction } from "@karatos/core";
+import { checkCustomerRefKey } from "../custom_forms/customer.js";
 import { shopifyClient, type ShopifyClient, type ShopifyClientOptions } from "./client.js";
 import {
   customerEvents,
@@ -81,6 +82,15 @@ export const SHOPIFY_QUERIES: Record<ShopifyStream, { query: string; first: numb
   },
 };
 
+/**
+ * The customers query when customer linking is on: the email address and phone number too, read only to be
+ * hashed into references. The app needs Shopify's protected customer data access to the email and phone fields.
+ */
+export const SHOPIFY_LINKED_CUSTOMERS_QUERY = SHOPIFY_QUERIES.customers.query.replace(
+  "emailMarketingConsent { marketingState } }",
+  "emailMarketingConsent { marketingState } defaultEmailAddress { emailAddress } defaultPhoneNumber { phoneNumber } }",
+);
+
 /** Where a sync stands. Serialized as the runSync checkpoint. */
 export interface ShopifyCursor {
   /** The stream being read, or "done" once every stream finished. */
@@ -91,6 +101,8 @@ export interface ShopifyCursor {
   since: Record<ShopifyStream, string>;
   /** Latest `updated_at` seen per stream; the next incremental pass starts there. */
   latest: Partial<Record<ShopifyStream, string>>;
+  /** Set once a pass has read customers with linking on, so customers read before it was on are read again once. */
+  customersLinked?: true;
 }
 
 export interface ShopifyConnectorOptions extends ShopifyClientOptions {
@@ -101,6 +113,11 @@ export interface ShopifyConnectorOptions extends ShopifyClientOptions {
   now?: () => Date;
   /** Injected client, for tests; built from the other options otherwise. */
   client?: ShopifyClient;
+  /**
+   * The instance's CUSTOMER_REF_KEY, to link customers: each customer's email address and phone number are read
+   * and become `contactRefs`, never kept. Off when not given.
+   */
+  customerKey?: string | undefined;
 }
 
 interface Page<T> {
@@ -127,18 +144,25 @@ export function shopifyConnector(options: ShopifyConnectorOptions): Connector {
   const now = options.now ?? (() => new Date());
   const historyYears = options.historyYears ?? 5;
   const lookbackHours = options.incrementalLookbackHours ?? 48;
+  const customerKey = options.customerKey === undefined ? undefined : checkCustomerRefKey(options.customerKey);
+
+  const linked = customerKey === undefined ? {} : { customersLinked: true as const };
+
+  function historyStart(): string {
+    const start = new Date(now());
+    start.setUTCFullYear(start.getUTCFullYear() - historyYears);
+    return start.toISOString();
+  }
 
   function startPass(mode: "historical" | "incremental", previous: ShopifyCursor | null): ShopifyCursor {
-    if (mode === "historical") {
-      const start = new Date(now());
-      start.setUTCFullYear(start.getUTCFullYear() - historyYears);
-      return { stream: SHOPIFY_STREAMS[0], after: null, since: byStream(start.toISOString()), latest: {} };
-    }
+    if (mode === "historical") return { stream: SHOPIFY_STREAMS[0], after: null, since: byStream(historyStart()), latest: {}, ...linked };
     const fallback = new Date(now().getTime() - lookbackHours * 3_600_000).toISOString();
     const since = Object.fromEntries(
       SHOPIFY_STREAMS.map((s) => [s, previous?.latest[s] ?? previous?.since[s] ?? fallback]),
     ) as Record<ShopifyStream, string>;
-    return { stream: SHOPIFY_STREAMS[0], after: null, since, latest: { ...previous?.latest } };
+    // The first pass after linking is turned on reads every customer again, so those read before get their references.
+    if (customerKey !== undefined && previous !== null && previous.customersLinked !== true) since.customers = historyStart();
+    return { stream: SHOPIFY_STREAMS[0], after: null, since, latest: { ...previous?.latest }, ...linked };
   }
 
   async function* pages(mode: "historical" | "incremental", context: SyncContext): AsyncIterable<SourceBatch> {
@@ -149,7 +173,8 @@ export function shopifyConnector(options: ShopifyConnectorOptions): Connector {
 
     while (cursor.stream !== "done") {
       const stream: ShopifyStream = cursor.stream;
-      const { query, first }: { query: string; first: number } = SHOPIFY_QUERIES[stream];
+      const { first }: { query: string; first: number } = SHOPIFY_QUERIES[stream];
+      const query = stream === "customers" && customerKey !== undefined ? SHOPIFY_LINKED_CUSTOMERS_QUERY : SHOPIFY_QUERIES[stream].query;
       const data: Record<ShopifyStream, Page<{ updatedAt?: string }>> = await client.query<Record<ShopifyStream, Page<{ updatedAt?: string }>>>(query, {
         first,
         after: cursor.after,
@@ -161,7 +186,7 @@ export function shopifyConnector(options: ShopifyConnectorOptions): Connector {
       const events: ShopifyEvent[] = page.nodes.flatMap((node) => {
         if (stream === "orders") return orderEvents(node as ShopifyOrder, receivedAt);
         if (stream === "products") return productEvents(node as ShopifyProduct, receivedAt);
-        return customerEvents(node as ShopifyCustomer, receivedAt);
+        return customerEvents(node as ShopifyCustomer, receivedAt, customerKey);
       });
 
       const latest: ShopifyCursor["latest"] = { ...cursor.latest };
@@ -180,7 +205,7 @@ export function shopifyConnector(options: ShopifyConnectorOptions): Connector {
     source: "shopify",
     historicalImport: (context) => pages("historical", context),
     incrementalSync: (context) => pages("incremental", context),
-    handleWebhook: (body) => shopifyWebhookEvents(body as ShopifyWebhookDelivery, now().toISOString()),
+    handleWebhook: (body) => shopifyWebhookEvents(body as ShopifyWebhookDelivery, now().toISOString(), customerKey),
     writes: SHOPIFY_WRITES,
   };
 }

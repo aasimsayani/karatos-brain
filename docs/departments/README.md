@@ -25,7 +25,7 @@ A department's events are only validated when it is enabled, and departments tha
 | --- | --- | --- | --- |
 | `sales` | Sales and POS | `sale.completed`, `sale.returned` | SKUs returned 25% of the time or more (once 4 or more have sold) |
 | `inventory` | Inventory and Merchandising | `inventory.received`, `inventory.adjusted`, `inventory.counted` | Pieces unsold for 270 days, with their gold melt value; reorders when 1 or fewer are left and 2 or more sold in 60 days; items whose stock counts disagree between systems (see [checking stock counts agree](#checking-stock-counts-agree)) |
-| `clienteling` | Clienteling and CRM | `customer.profile_updated`, `customer.occasion_recorded`, `wishlist.item_added` | Birthdays and anniversaries within 21 days (only for customers who consented to marketing), with their wish list; VIPs with $5,000+ lifetime spend and no purchase in a year |
+| `clienteling` | Clienteling and CRM | `customer.profile_updated`, `customer.occasion_recorded`, `wishlist.item_added` | Birthdays and anniversaries within 21 days (only for customers who consented to marketing), with their wish list; VIPs with $5,000+ lifetime spend and no purchase in a year; customers whose message has had no answer on any channel for 4 business hours, a past buyer on their own with what they have spent (see [customers waiting on a reply](#customers-waiting-on-a-reply)) |
 | `repairs` | Repairs and Service | `repair.received`, `repair.status_changed` | Repairs past their promised date; pickup reminders after 30 days ready; a final-notice review after 180 days |
 | `custom_orders` | Custom and Special Orders | `custom_order.created`, `custom_order.stage_changed`, `custom_order.payment_received` | Orders stuck 14 days in one stage; orders due within 7 days (or overdue) that haven't reached finishing; balances due when ready |
 | `appraisals` | Appraisals | `appraisal.completed` | Insurance appraisals more than 3 years old |
@@ -48,6 +48,7 @@ These links already exist, and each one makes both departments more useful than 
 - **Store systems → inventory:** each system's stock count of an item is checked against the others'.
 - **Metals → gold buying:** spot prices check what was paid for gold bought from the public.
 - **Clienteling → sales:** wish lists appear in occasion reminders.
+- **Every channel → clienteling:** texts, calls, DMs and email from the same customer are linked by their references, and to their orders, so an answer on any channel counts and a waiting buyer is raised first.
 - **Payments → finance:** each processor's payouts are matched to the sales, refunds and fees they cover.
 
 See [compounding value](../vision/compounding-value.md) for why these links matter more as departments are added.
@@ -84,6 +85,8 @@ A recommendation with no honest number carries no `impact`: compliance reminders
 | `clienteling.upcoming-occasions` | makes | Occasion sale rate times average order times margin |
 | `clienteling.lapsed-vip` | makes | Win-back rate times their average order times margin |
 | `clienteling.missed-calls` | makes | Callers times close rate times average order times margin |
+| `clienteling.awaiting-reply` (a past buyer) | makes | Close rate times their average order times margin |
+| `clienteling.awaiting-reply` (everyone else) | makes | Customers waiting times close rate times average order times margin |
 | `sales.high-return-rate` | saves | Returns so far times the cost of handling one |
 | `finance.cash-deposits` | protects | Cash taken with no matching deposit |
 | `finance.overdue-receivables` | protects | Past-due balance times the share follow-up collects |
@@ -154,6 +157,40 @@ What the records allow, and what they don't:
 - A system's last read is the latest count it stored. A system whose sync has stopped keeps its last counts, and when nothing changed in it for a day, its counts are no longer compared with a system read since.
 - Places are added up from their latest count, so a location that stops reporting an item keeps its last count in that system's total.
 - Like every rule, the check sees the most recent signals in the reasoning window, so in a large catalog the items compared are those counted most recently.
+
+## Customers waiting on a reply
+
+Clienteling recognizes the same customer across channels without knowing who they are. No connector keeps a name, email address or phone number: each turns them into a keyed reference, an HMAC-SHA256 under the instance's `CUSTOMER_REF_KEY`, and the same detail gives the same reference everywhere. The shared form is `form_customer:` and the digest of `email:<address>` (trimmed and lowercased) or `phone:<digits>`:
+
+| What it links on | Systems |
+| --- | --- |
+| Email address | Custom forms, Klaviyo, Mailchimp, Gorgias, Zendesk, Yotpo, Judge.me, Smile.io, AvaTax, Sola, Calendly, Acuity, Zoom, DocuSign; Gmail and Shopify when set up as below |
+| Phone number | Custom forms, Klaviyo, Quo, RingCentral, WhatsApp, Zendesk, Yotpo, Judge.me, Sola, Calendly, Acuity; Twilio and Shopify when set up as below |
+| A record that names one person's references together | Profiles (`customer.profile_updated` from Klaviyo, Shopify, Zendesk and the others), form submissions, loyalty members, reviews, card payments and bookings |
+
+Each message and call (`communication.message_logged`, `communication.call_logged`) is kept as a `customer.touch` signal with the references of who it was with, and each record about one person as a `customer.identity` signal with the references it names together. Nothing else is kept: a value that doesn't read as a reference (anything with an `@`, a `+` or a space, or without a `prefix:`) is dropped, and a record naming more than 8 (`MAX_REFS_PER_RECORD`) is left out. The rule then links references that any one record names together, so a Shopify customer's orders, the email address and number on their profile, their texts from that number and their email all become one customer. Records about several people at once (a group text, a meeting, a help desk ticket) never link the people in them; a Twilio record, which is always with one number, links its `contactRef` with that number's references.
+
+`clienteling.awaiting-reply` follows each customer's last 14 days (`REPLY_LOOKBACK_DAYS`) of messages on every channel. A message the customer sent counts as answered once anyone at the store writes to them, calls them or picks up their call, on any of their channels, at or after it. A send that failed or wasn't delivered, a help desk rule's automatic reply, a missed call and a deleted message aren't answers, and a later status of a record replaces an earlier one, so a text queued and then undelivered is no answer. A customer whose first unanswered message has waited 4 or more of the store's open hours (`REPLY_BUSINESS_HOURS`) is raised. Open hours are Monday to Saturday, 10:00 to 18:00, New York time (`STORE_HOURS`), until the store's own hours are known; `awaitingReplyReasoner` takes other hours. Email alone also brings newsletters, receipts and vendors, so a correspondent known only from email is raised only once another record says they are a customer, or they have bought.
+
+A customer with linked orders is raised on their own, those who spent the most first, saying what they have spent over how many orders, how long they have waited, which channels they wrote on, and where they wrote last. From $5,000 of lifetime spend (`REPLY_HIGH_VALUE_CENTS`, the lapsed-VIP threshold) they are called high-value. Everyone else waiting is raised together, counted by the channel they wrote on last. Each recommendation cites the messages and orders it is based on, so the console opens the conversations themselves. A buyer's recommendation is keyed by their first unanswered message, so the same wait raises the same one each day.
+
+Why this rule: an unanswered message is the one thing every channel's records show, it costs a sale the longer it goes on, and a jeweler can act on it in minutes. Linking matters most for it: without links an email answer to a WhatsApp message, or a call back from another line, looks like no answer, and a buyer's message looks like a stranger's. Missed calls stay with `clienteling.missed-calls`.
+
+Turning linking on for the systems that don't link by default:
+
+- **Twilio** adds `customerRefs` beside its own `contactRef` when the instance has a `CUSTOMER_REF_KEY`. Texts read before then keep only `contactRef`, which links through later records of the same number that carry both.
+- **Gmail** adds `customerRefs` for the other side of each message (who wrote a received one; who a sent one went to) when the instance has a `CUSTOMER_REF_KEY`. Its correspondent references stay as they were. IMAP and Outlook mail don't carry them yet.
+- **Shopify** reads a customer's email address and phone number only with `SHOPIFY_LINK_CUSTOMERS=on` and a `CUSTOMER_REF_KEY`, and only to hash them into `contactRefs`. The app needs Shopify's protected customer data access to those two fields. The first sync after it is turned on reads every customer again, so those read before get their references.
+
+Phone numbers are matched in their E.164 form. A number written the North American way without its country code, such as `(212) 555-0123` on a form or in Zendesk, also gets the reference of `+1 212 555 0123`, the form Quo, Twilio, WhatsApp and Klaviyo give. The digits-only reference it had before comes first and is unchanged, so customers already linked stay linked. An extension (`x12`, `ext. 12`, `#12`) and an international `00` are dropped.
+
+What the records allow, and what they don't:
+
+- Messenger and Instagram give no email address or number, so a DM links only to the same person's other DMs on that channel, until a record names both.
+- Two people sharing an email address or a phone number are one customer to these rules.
+- A ten-digit number from outside North America written without its `+` is read as North American.
+- Outgoing messages sent by automation in the store's phone system, such as appointment reminders, count as answers.
+- Like every rule, it sees the most recent signals in the reasoning window. A profile or an order that fell out of the window no longer links until it is read again, so in a busy store a waiting buyer can show up among everyone else.
 
 ## Sending department events
 

@@ -47,6 +47,8 @@ export interface TwilioCursor {
 export interface TwilioOptions extends Omit<TwilioClientOptions, "fetch"> {
   /** The instance's TWILIO_CONTACT_KEY, for contact references. */
   contactKey: string;
+  /** The instance's CUSTOMER_REF_KEY, when it has one: each event then also carries `customerRefs`, so it links with other systems. */
+  customerKey?: string | undefined;
   fetch?: typeof globalThis.fetch;
   /** Years the historical import reaches back. Twilio keeps what its retention allows. */
   historyYears?: number;
@@ -74,7 +76,7 @@ export function parseTwilioCursor(raw: string | null): TwilioCursor | null {
 }
 
 export function twilioConnector(options: TwilioOptions): Connector {
-  const normalizer = twilioNormalizer(options.contactKey);
+  const normalizer = twilioNormalizer(options.contactKey, options.customerKey);
   const client = options.client ?? twilioClient(options);
   const now = options.now ?? (() => new Date());
   const historyYears = options.historyYears ?? 5;

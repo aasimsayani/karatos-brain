@@ -1,4 +1,5 @@
 import { createHmac } from "node:crypto";
+import { canonicalPhone } from "../custom_forms/customer.js";
 
 /**
  * A Klaviyo profile becomes keyed references, never an email address, phone
@@ -20,7 +21,9 @@ import { createHmac } from "node:crypto";
  *   email address is the one detail both sides hold.
  *
  * The derivation must stay byte for byte the same as custom forms'
- * formCustomerRef; a test pins a vector computed with that code.
+ * formCustomerRef, including the E.164 reference a number without its
+ * country code also gets (formCustomerRefs); a test pins a vector computed
+ * with that code.
  *
  * Changing the key breaks every link already made, so it is never rotated.
  */
@@ -80,5 +83,11 @@ export function klaviyoContactRef(key: string, kind: "email" | "phone", normaliz
 export function klaviyoContactRefs(key: string, contact: { email?: unknown; phone?: unknown }): string[] {
   const email = klaviyoNormalizeEmail(contact.email);
   const phone = klaviyoNormalizePhone(contact.phone);
-  return [...(email ? [klaviyoContactRef(key, "email", email)] : []), ...(phone ? [klaviyoContactRef(key, "phone", phone)] : [])];
+  // A number stored without its country code also gets its E.164 reference, as custom forms gives it.
+  const e164 = typeof contact.phone === "string" ? canonicalPhone(contact.phone) : undefined;
+  return [
+    ...(email ? [klaviyoContactRef(key, "email", email)] : []),
+    ...(phone ? [klaviyoContactRef(key, "phone", phone)] : []),
+    ...(e164 && e164 !== phone ? [klaviyoContactRef(key, "phone", e164)] : []),
+  ];
 }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { scheduledConnectors } from "../../src/index.js";
-import { buildsFromSettings } from "../connector-harness.js";
+import { buildsFromSettings, skipReason } from "../connector-harness.js";
 
 describe("the Shopify factory", () => {
   it("accepts either Shopify sign-in and lists both client settings when neither is set", () => {
@@ -13,5 +13,16 @@ describe("the Shopify factory", () => {
   it("builds the connector from the client credentials or an admin token", async () => {
     await buildsFromSettings("shopify", { SHOPIFY_SHOP_DOMAIN: "demo.myshopify.com", SHOPIFY_CLIENT_ID: "id", SHOPIFY_CLIENT_SECRET: "secret", SHOPIFY_API_VERSION: "2026-07" });
     await buildsFromSettings("shopify", { SHOPIFY_SHOP_DOMAIN: "demo.myshopify.com", SHOPIFY_ADMIN_ACCESS_TOKEN: "t" });
+  });
+
+  it("links customers only when asked, and then needs CUSTOMER_REF_KEY", async () => {
+    const env = { SHOPIFY_SHOP_DOMAIN: "demo.myshopify.com", SHOPIFY_ADMIN_ACCESS_TOKEN: "t" };
+    expect(skipReason("shopify", { ...env, SHOPIFY_LINK_CUSTOMERS: "on" })).toBe("missing CUSTOMER_REF_KEY");
+    expect(skipReason("shopify", { ...env, SHOPIFY_LINK_CUSTOMERS: "off" })).toBeNull();
+    await buildsFromSettings("shopify", { ...env, SHOPIFY_LINK_CUSTOMERS: "on", CUSTOMER_REF_KEY: "c".repeat(40) });
+    await buildsFromSettings("shopify", { ...env, SHOPIFY_LINK_CUSTOMERS: "off", CUSTOMER_REF_KEY: "short" });
+    // The key is handed over only when linking is on, so a short one is turned down then.
+    await expect(buildsFromSettings("shopify", { ...env, SHOPIFY_LINK_CUSTOMERS: "on", CUSTOMER_REF_KEY: "short" })).rejects.toThrow("CUSTOMER_REF_KEY must be at least 32 characters");
+    await expect(buildsFromSettings("shopify", { ...env, SHOPIFY_LINK_CUSTOMERS: "yes" })).rejects.toThrow("SHOPIFY_LINK_CUSTOMERS must be on or off");
   });
 });
