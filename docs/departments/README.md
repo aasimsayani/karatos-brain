@@ -32,7 +32,7 @@ A department's events are only validated when it is enabled, and departments tha
 | `buying` | Buying, Vendors and Memo | `memo.received`, `memo.settled`, `purchase_order.created`, `purchase_order.received` | Memo goods due back within 14 days (pay if sold, return if not); late purchase orders |
 | `metals` | Metals and Gold Buying | `metal.price_updated`, `gold_purchase.completed` | Spot moves of 5% or more, with the pieces affected; gold bought at more than 85% of melt |
 | `marketing` | Marketing | `campaign.sent`, `campaign.sale_attributed` | After 14 days, campaigns returning 3x or more (repeat them) or less than 1x (rethink them) |
-| `finance` | Finance | `bank.transaction_imported`, `bank.account_updated`, `accounting.invoice_updated`, `accounting.record_deleted` | Cash sales over 30 days that are more than 5% (and $200) above cash deposits; $500 or more in US dollar invoices more than 30 days past due. Keeps each bank account's balance (`bank.balance`) and each invoice with what is still owed (`receivable.invoice`, or `receivable.removed` once deleted) as signals for the console |
+| `finance` | Finance | `bank.transaction_imported`, `bank.account_updated`, `accounting.invoice_updated`, `accounting.record_deleted` | Cash sales over 30 days that are more than 5% (and $200) above cash deposits; $500 or more in US dollar invoices more than 30 days past due. Keeps each bank account's balance (`bank.balance`) and each invoice with what is still owed (`receivable.invoice`, or `receivable.removed` once deleted) as signals for the console. Matches payment processors' payouts to the sales they pay for and raises payouts that are short, missing or late (see [matching payouts to sales](#matching-payouts-to-sales)) |
 | `compliance` | Compliance | none, it reads other departments | IRS Form 8300 for cash over $10,000 in 24 hours, with the 15-day deadline; possible structuring across 30 days; gold bought from the public without seller ID |
 
 Compliance recommendations are reminders for the owner, not legal advice. State rules for secondhand dealers and unclaimed property differ, so those recommendations say to follow the state's rules rather than naming a period.
@@ -47,6 +47,7 @@ These links already exist, and each one makes both departments more useful than 
 - **Metals → inventory:** spot prices value aged gold pieces at melt.
 - **Metals → gold buying:** spot prices check what was paid for gold bought from the public.
 - **Clienteling → sales:** wish lists appear in occasion reminders.
+- **Payments → finance:** each processor's payouts are matched to the sales, refunds and fees they cover.
 
 See [compounding value](../vision/compounding-value.md) for why these links matter more as departments are added.
 
@@ -84,6 +85,7 @@ A recommendation with no honest number carries no `impact`: compliance reminders
 | `sales.high-return-rate` | saves | Returns so far times the cost of handling one |
 | `finance.cash-deposits` | protects | Cash taken with no matching deposit |
 | `finance.overdue-receivables` | protects | Past-due balance times the share follow-up collects |
+| `finance.payout-match` (short, failed, unrecorded, missing) | protects | The shortfall, or the sales never paid out, in US dollars only |
 | `appraisals.insurance-update` | makes | Update fee times the share who take one |
 | `repairs.follow-up` (pickup) | protects | The repair estimate |
 | `custom-orders.progress` (balance) | protects | The balance still due |
@@ -94,6 +96,33 @@ A recommendation with no honest number carries no `impact`: compliance reminders
 | `metals.refiner-assay` | protects | Short fine metal at the settlement's own rate |
 | `metals.refiner-payable` | makes | The lot at a fair share of spot, less what it paid |
 | `marketing.campaign-return` | makes or saves | One more run of a winner, or the loss of a loser not repeated |
+
+## Matching payouts to sales
+
+Finance reads the payment connectors' records without owning them, so a connector's record is never dead-lettered by these rules. The connectors write every processor in the same types:
+
+| Event | What it is | Kept as |
+| --- | --- | --- |
+| `payout.updated` | A payout or settlement batch: what was paid, when, its status, and any sales, refunds and fees reported with it | `payout.record`, one per payout |
+| `balance.transaction_recorded` | A line of a payout: a sale, refund, fee or adjustment (Stripe, Klarna, Aurora Payments) | `payout.line`, with what it adds to its payout |
+| `payment.charge_updated`, `payment.refund_updated` | A charge or refund; Authorize.net's say which settlement batch paid them | `payout.line`, for a processor whose charges name their batch |
+
+Each payout is matched to the lines that name it. Stripe's lines don't name a payout, so each goes to the first payout in its currency made on or after the day it came available. A payout with no lines is checked against the sales, refunds and fees it reports itself (Affirm, Aurora Payments, Authorize.net). `finance.payout-match` then raises:
+
+- **Short:** a paid payout more than the larger of $1 and 0.5% under its sales less refunds and fees. A payout paid over is the processor's loss, not the store's.
+- **Missing:** a payout that failed or was canceled; lines that name a payout with no record, once that payout is due (the connector may have dead-lettered it); and sales in no payout more than 30 days past their processor's schedule.
+- **Late:** sales in no payout past their processor's schedule, and a payout still pending or open past when it normally lands. Money paid out late isn't lost, so these carry no dollar figure.
+
+A processor's schedule is the days after a sale is captured (for Stripe, after it comes available) by which it normally pays: Stripe, Authorize.net and Aurora Payments 4, Affirm 7, Klarna 10, and 7 for any other. These are in `PAYOUT_SCHEDULE_DAYS`. Payouts and sales more than 90 days old are left alone. Each recommendation's id carries the payout, or the processor and currency, so a run on the same day raises the same one, and a record read twice, or a newer version of it, counts once.
+
+What the records allow, and what they don't:
+
+- Square, Afterpay, Clover and Sola Payments write charges but no payouts, so their sales aren't matched. A sale is only called late or missing for a processor and currency whose payouts KaratOS reads.
+- Stripe lines carry no payout id, so Stripe matching assumes automatic payouts that sweep the whole available balance. Manual payouts, reserves or a negative balance can make a Stripe payout look short; its recommendations carry lower confidence. The first Stripe payout seen has no known start, so it isn't judged.
+- Authorize.net reports no fees on a batch (they are billed monthly), so its batches are matched to charges less refunds. Klarna's totals carry holdbacks and debt, so a Klarna payout is only checked against its lines.
+- Lines are matched to the processor's own charge and capture ids, with Klarna's order reference and the store's own reference kept on each line. A POS sale (`sale.completed`) carries no processor id, so a payout isn't tied to it directly.
+- A payout isn't judged against lines in another currency, since there is no rate to convert them; a short payout in another currency is raised in its own money with no dollar figure.
+- Like every rule, matching sees the most recent signals in the reasoning window. A payout whose record fell out of the window can make its lines look unrecorded until the next sync reads it again.
 
 ## Sending department events
 
