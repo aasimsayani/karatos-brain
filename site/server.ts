@@ -115,6 +115,8 @@ export function issueFor(inquiry: Inquiry, receivedAt: string): { title: string;
 
 export interface ServerOptions {
   html: string;
+  /** Other pages by path, such as "/integrations/". Each is also served without its trailing slash. */
+  pages?: Readonly<Record<string, string>>;
   /** Fine-grained token with Issues read and write on the inquiry repository only. */
   token?: string | undefined;
   /** owner/name of the private repository that receives inquiries. */
@@ -259,9 +261,19 @@ export function createSiteHandler(options: ServerOptions) {
   const now = options.now ?? (() => new Date());
   const limit = options.rateLimit ?? 5;
   const recent = new Map<string, number[]>();
-  // The page never changes while the server runs, so compress it once.
-  const gzippedHtml = gzipSync(options.html);
-  const security = securityHeaders(options.html);
+  // Pages never change while the server runs, so compress each once and pin its policy to it.
+  const page = (html: string) => ({ html, gzipped: gzipSync(html), security: securityHeaders(html) });
+  const home = page(options.html);
+  const pages = new Map<string, ReturnType<typeof page>>([["/", home], ["/index.html", home]]);
+  for (const [path, html] of Object.entries(options.pages ?? {})) {
+    const served = page(html);
+    pages.set(path, served);
+    if (path.endsWith("/")) {
+      pages.set(path.slice(0, -1), served);
+      pages.set(`${path}index.html`, served);
+    }
+  }
+  const security = home.security;
   const send = (res: ServerResponse, status: number, body: string | Buffer, type: string, headers: Record<string, string> = {}) =>
     sendWith(res, status, body, type, headers, security);
   const json = (res: ServerResponse, status: number, body: unknown) => send(res, status, JSON.stringify(body), "application/json");
@@ -378,10 +390,11 @@ export function createSiteHandler(options: ServerOptions) {
       const font = Object.hasOwn(fonts, name) ? fonts[name] : undefined;
       if (font) return send(res, 200, font, "font/woff2", { "Cache-Control": "public, max-age=2592000" });
     }
-    if ((req.method === "GET" || req.method === "HEAD") && (path === "/" || path === "/index.html")) {
+    const served = req.method === "GET" || req.method === "HEAD" ? pages.get(path) : undefined;
+    if (served) {
       return acceptsGzip(req)
-        ? send(res, 200, gzippedHtml, "text/html; charset=utf-8", { "Content-Encoding": "gzip", Vary: "Accept-Encoding" })
-        : send(res, 200, options.html, "text/html; charset=utf-8", { Vary: "Accept-Encoding" });
+        ? sendWith(res, 200, served.gzipped, "text/html; charset=utf-8", { "Content-Encoding": "gzip", Vary: "Accept-Encoding" }, served.security)
+        : sendWith(res, 200, served.html, "text/html; charset=utf-8", { Vary: "Accept-Encoding" }, served.security);
     }
     return send(res, 404, "Not found", "text/plain; charset=utf-8");
   }
@@ -396,8 +409,10 @@ if (process.argv[1] && import.meta.url === new URL(`file://${process.argv[1]}`).
   const fonts = Object.fromEntries(
     (existsSync(fontDir) ? readdirSync(fontDir) : []).filter((f) => f.endsWith(".woff2")).map((f) => [f, readFileSync(new URL(f, fontDir))]),
   );
+  const integrations = new URL("./dist/integrations/index.html", import.meta.url);
   const handler = createSiteHandler({
     html,
+    pages: existsSync(integrations) ? { "/integrations/": readFileSync(integrations, "utf8") } : {},
     fonts,
     token: process.env.INQUIRY_GITHUB_TOKEN,
     repo: process.env.INQUIRY_REPO,

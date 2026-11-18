@@ -4,12 +4,14 @@ import { contentSecurityPolicy } from "../server.js";
 import { INTEGRATIONS, selfServeIntegrations } from "../../packages/core/src/index.js";
 import { RETAIL_DEPARTMENTS } from "../../packages/retail/src/index.js";
 import { PAYBACK_INPUTS, PAYBACK_LINES, VALUE_LABELS, corePriceDollars, dollars, paybackDefaults, paybackLine } from "../build.js";
-import { CONTACT_ANCHOR, CORE_PRICE, HERO_SYSTEMS, DOMAIN_LABELS, DOMAIN_VALUE, FONTS, HOLIDAY_PILOT, MANAGED_PRICE, PLAYS, REPORT_URL, WRITE_RULES, buildingNow, domainLabel, renderValueCards, earlyAccessNote, escapeHtml, renderSite } from "../build.js";
+import { CONTACT_ANCHOR, CORE_PRICE, HERO_SYSTEMS, DOMAIN_LABELS, DOMAIN_VALUE, FONTS, HOLIDAY_PILOT, MANAGED_PRICE, PLAYS, REPORT_URL, WRITE_RULES, buildingNow, domainLabel, renderValueCards, earlyAccessNote, escapeHtml, renderIntegrationsPage, renderSite, SETUP_FEE_LINE, INTEGRATIONS_PATH } from "../build.js";
 
 const html = renderSite();
-const sectionOf = (id: string) => {
-  const start = html.indexOf(`<section id="${id}"`);
-  return start < 0 ? "" : html.slice(start, html.indexOf("</section>", start));
+/** The connector directory, what each connection is worth and the partner section live on their own page. */
+const page = renderIntegrationsPage();
+const sectionOf = (id: string, from = html) => {
+  const start = from.indexOf(`<section id="${id}"`);
+  return start < 0 ? "" : from.slice(start, from.indexOf("</section>", start));
 };
 
 describe("KaratOS website", () => {
@@ -22,7 +24,7 @@ describe("KaratOS website", () => {
   });
 
   it("lists every data integration from the catalog", () => {
-    const missing = INTEGRATIONS.filter((i) => i.departments.length > 0 && !html.includes(`<h3>${escapeHtml(i.name)}</h3>`)).map((i) => i.id);
+    const missing = INTEGRATIONS.filter((i) => i.departments.length > 0 && !page.includes(`<h3>${escapeHtml(i.name)}</h3>`)).map((i) => i.id);
     expect(missing).toEqual([]);
   });
 
@@ -31,19 +33,19 @@ describe("KaratOS website", () => {
     expect(building.length).toBe(selfServeIntegrations().filter((i) => i.status === "planned").length);
     const built = INTEGRATIONS.filter((i) => i.status === "built");
     expect(built.map((i) => i.id)).toContain("shopify");
-    expect(html.match(/pill gold">Connector built/g)?.length).toBe(built.length);
+    expect(page.match(/pill gold">Connector built/g)?.length).toBe(built.length);
     // Built connectors lead the directory.
-    expect(html.indexOf(escapeHtml(built[0]!.name))).toBeLessThan(html.indexOf(escapeHtml(building[0]!.name)));
-    expect(html.match(/pill gold">Building now/g)?.length).toBe(building.length);
-    expect(html).toContain(`<strong>${building.length}</strong><span>building now</span>`);
+    expect(page.indexOf(escapeHtml(built[0]!.name))).toBeLessThan(page.indexOf(escapeHtml(building[0]!.name)));
+    expect(page.match(/pill gold">Building now/g)?.length).toBe(building.length);
+    expect(page).toContain(`<strong>${building.length}</strong><span>building now</span>`);
   });
 
   it("explains what each built connector gives the business, and names the best-known ones in the hero", () => {
     const built = INTEGRATIONS.filter((i) => i.status === "built");
     for (const integration of built) {
       const list = `<ul class="caps" aria-label="What you get with ${escapeHtml(integration.name)}">`;
-      expect(html).toContain(list);
-      for (const capability of integration.capabilities ?? []) expect(html).toContain(`<li>${escapeHtml(capability)}</li>`);
+      expect(page).toContain(list);
+      for (const capability of integration.capabilities ?? []) expect(page).toContain(`<li>${escapeHtml(capability)}</li>`);
     }
     // The hero names systems a jeweler recognises and counts the rest, so it reads in one glance.
     const featured = HERO_SYSTEMS.filter((id) => built.some((i) => i.id === id));
@@ -52,7 +54,7 @@ describe("KaratOS website", () => {
     expect(earlyAccessNote().length).toBeLessThan(240);
     // Built is not the same as running on a live account, so the hero never says "connected" or "works today".
     expect(earlyAccessNote()).not.toMatch(/connected|works today/i);
-    expect(html.match(/<ul class="caps"/g)?.length).toBe(built.length);
+    expect(page.match(/<ul class="caps"/g)?.length).toBe(built.length);
     expect(html).toContain(`<p class="note">${escapeHtml(earlyAccessNote())}</p>`);
   });
 
@@ -120,10 +122,10 @@ describe("KaratOS website", () => {
 
   it("folds the directory by category, so the growing catalog doesn't block the first paint and links land where they point", () => {
     // Skipped sections were sized by guess, which sent nav links to the wrong place on long pages.
-    expect(html).not.toContain("content-visibility");
+    expect(html + page).not.toContain("content-visibility");
     // Every category starts folded so the page stays short; a #cat- link or a filter opens its group.
-    expect(html.match(/<details class="group"[^>]*>/g)!.filter((t) => t.includes(" open"))).toHaveLength(0);
-    expect(html).toContain("function openFromHash()");
+    expect(page.match(/<details class="group"[^>]*>/g)!.filter((t) => t.includes(" open"))).toHaveLength(0);
+    expect(page).toContain("function openFromHash()");
     // The hero is not a section, so the first screen always renders straight away.
     expect(html).not.toMatch(/<section[^>]*class="[^"]*hero/);
   });
@@ -308,13 +310,36 @@ describe("KaratOS website", () => {
   });
 
   it("puts what a first-time visitor needs first, and the detail after", () => {
-    // A visitor gives the page about a minute: problems, how, payback, pilot and price come before the reference sections.
+    // A visitor gives the page about a minute: the pilot, problems, how, payback and price come before the reference sections.
     const at = (id: string) => html.indexOf(`<section id="${id}"`);
-    const path = ["together", "how", "payback", "pilot", "services"].map(at);
-    const detail = ["write-back", "departments", "value", "integrations", "partners"].map(at);
+    const path = ["pilot", "together", "how", "payback", "services"].map(at);
+    const detail = ["write-back", "departments", "integrations"].map(at);
     for (const i of [...path, ...detail]) expect(i).toBeGreaterThan(0);
     expect(path).toEqual([...path].sort((a, b) => a - b));
     expect(Math.max(...path)).toBeLessThan(Math.min(...detail));
+    // The pilot sign-up follows the morning list straight away.
+    expect(html.indexOf("<section", html.indexOf('<div class="wrap hero">'))).toBe(html.indexOf('<section id="pilot"'));
+  });
+
+  it("keeps the home page short on a phone by giving the full connector list its own page", () => {
+    // The directory, what each connection is worth and the partner section are on the integrations page only.
+    for (const id of ["value", "partners"]) {
+      expect(html).not.toContain(`<section id="${id}"`);
+      expect(page).toContain(`<section id="${id}"`);
+    }
+    expect(html).not.toContain('<div id="cards">');
+    expect(page).toContain('<div id="cards">');
+    // The home page links to it from the nav and from a short integrations section.
+    expect(INTEGRATIONS_PATH).toBe("/integrations/");
+    expect(html).toContain(`<a href="${INTEGRATIONS_PATH}">Integrations</a>`);
+    expect(sectionOf("integrations")).toMatch(/<a class="btn primary" href="\/integrations\/">See all \d+ systems<\/a>/);
+    // The directory was most of the page's length.
+    expect(html.length).toBeLessThan(page.length);
+    // The integrations page links back to the home page's sections and form, never to anchors it doesn't have.
+    for (const [, id] of page.matchAll(/href="#([^"]+)"/g)) expect(page, id).toContain(`id="${id}"`);
+    expect(page).toContain('<a href="/#pilot">Holiday pilot</a>');
+    expect(page).toContain(`<link rel="canonical" href="https://karatos.app/integrations/">`);
+    expect(page).not.toContain("karatos-connected");
   });
 
   it("labels every catalog domain in plain language", () => {
@@ -360,8 +385,12 @@ describe("KaratOS website", () => {
     expect(html).toContain(`<strong>${MANAGED_PRICE}</strong> per store per month`);
     expect(html).not.toContain("per user per month");
     expect(html.match(/<strong>By quote<\/strong>/g)?.length).toBe(1);
-    // Three plans, the holiday pilot, the broken-systems campaign and the partner section.
-    expect(html.split(`href="${CONTACT_ANCHOR}"`).length - 1).toBe(6);
+    // Three plans, the holiday pilot and the broken-systems campaign; the partner section links back from its own page.
+    expect(html.split(`href="${CONTACT_ANCHOR}"`).length - 1).toBe(5);
+    expect(page).toContain(`href="/${CONTACT_ANCHOR}">Talk to us about partnering</a>`);
+    // Both plans say when the setup fee is quoted, so it never reads as an unpriced "it depends".
+    expect(html).not.toContain("One-time setup fee.</");
+    expect(html.split(`<p class="fine">${SETUP_FEE_LINE} Extra seats $49 a month.</p>`).length - 1).toBe(2);
     // Managed is the featured plan.
     const featured = html.slice(html.indexOf('<li class="plan featured">'));
     expect(featured.slice(0, featured.indexOf("</li>"))).toContain("<h3>Managed</h3>");
@@ -384,7 +413,7 @@ describe("KaratOS website", () => {
   });
 
   it("says what each kind of connection is worth, connected kinds first, naming what is built", () => {
-    const value = sectionOf("value");
+    const value = sectionOf("value", page);
     const domains = [...new Set(INTEGRATIONS.filter((i) => i.departments.length > 0).map((i) => i.domain))];
     for (const domain of domains) {
       expect(DOMAIN_VALUE[domain], domain).toBeTruthy();
@@ -457,10 +486,12 @@ describe("KaratOS website", () => {
   it("invites jewelers to the holiday pilot, sending sign-ups to the private form", () => {
     const pilot = sectionOf("pilot");
     expect(pilot).toContain(`<strong>${HOLIDAY_PILOT.weekend}</strong>`);
-    expect(pilot).toContain(`Sign-ups open ${HOLIDAY_PILOT.signupsOpen}.`);
+    // The line and the button agree: sign-ups are open, so the button works today.
+    expect(pilot).toContain("Sign-ups are open now.");
+    expect(pilot).not.toMatch(/Sign-ups open [A-Z]/);
     expect(pilot).toContain(`href="${CONTACT_ANCHOR}" data-interest="pilot">Join the pilot</a>`);
     expect(pilot).toContain("Nothing in your systems is changed.");
-    const hero = html.slice(html.indexOf('<div class="wrap hero">'), html.indexOf('<section id="how"'));
+    const hero = html.slice(html.indexOf('<div class="wrap hero">'), html.indexOf('<section id="pilot"'));
     expect(hero).toContain('<a class="btn primary" href="#pilot">Join the holiday pilot</a>');
     expect(html).toContain('<a href="#pilot">Holiday pilot</a>');
   });

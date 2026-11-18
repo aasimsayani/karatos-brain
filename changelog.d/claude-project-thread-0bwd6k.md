@@ -1,0 +1,4 @@
+- Website: the full connector directory, what each connection is worth and the partner section moved to their own page at `/integrations/`, so the home page on a phone is about a third shorter. The home page keeps a short integrations section with the four newest connectors and a link to the full list.
+- Website: the holiday pilot now sits right after the morning list near the top, and its card says sign-ups are open instead of naming a date that had passed, so the line agrees with the "Join the pilot" button.
+- Website: both plans say the one-time setup fee is quoted on the first call, instead of naming a fee with no amount.
+- Website server: serves extra pages by path, with or without the trailing slash, each under its own content security policy.

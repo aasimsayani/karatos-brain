@@ -279,6 +279,25 @@ describe("site server", () => {
     }
   });
 
+  it("serves other pages at their path, with or without the trailing slash, each under its own policy", async () => {
+    const other = "<html><head><style>p{color:red}</style></head><body><script>console.log(2)</script><p>Integrations</p></body></html>";
+    const { base } = await start({ pages: { "/integrations/": other } });
+    const hash = (text: string) => `'sha256-${createHash("sha256").update(text).digest("base64")}'`;
+    for (const path of ["/integrations/", "/integrations", "/integrations/index.html"]) {
+      const res = await fetch(base + path);
+      expect(res.status, path).toBe(200);
+      expect(await res.text()).toContain("<p>Integrations</p>");
+      const csp = res.headers.get("content-security-policy")!;
+      expect(csp).toContain(`script-src 'self' ${hash("console.log(2)")}`);
+      expect(csp).toContain(`style-src 'self' ${hash("p{color:red}")}`);
+    }
+    const gzipped = await fetch(`${base}/integrations/`, { headers: { "Accept-Encoding": "gzip" } });
+    expect(await gzipped.text()).toContain("<p>Integrations</p>");
+    expect(await (await fetch(base + "/")).text()).toBe("<h1>KaratOS</h1>");
+    expect((await fetch(base + "/integrations/missing")).status).toBe(404);
+    expect((await fetch(base + "/integrations/", { method: "POST" })).status).toBe(404);
+  });
+
   it("sends the same headers on inquiry errors", async () => {
     const failed = await (await start({ token: "fails" })).post(valid);
     expect(failed.status).toBe(502);
