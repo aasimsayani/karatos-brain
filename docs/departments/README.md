@@ -24,7 +24,7 @@ A department's events are only validated when it is enabled, and departments tha
 | Id | Department | Events it owns | What it raises |
 | --- | --- | --- | --- |
 | `sales` | Sales and POS | `sale.completed`, `sale.returned` | SKUs returned 25% of the time or more (once 4 or more have sold) |
-| `inventory` | Inventory and Merchandising | `inventory.received`, `inventory.adjusted`, `inventory.counted` | Pieces unsold for 270 days, with their gold melt value; reorders when 1 or fewer are left and 2 or more sold in 60 days |
+| `inventory` | Inventory and Merchandising | `inventory.received`, `inventory.adjusted`, `inventory.counted` | Pieces unsold for 270 days, with their gold melt value; reorders when 1 or fewer are left and 2 or more sold in 60 days; items whose stock counts disagree between systems (see [checking stock counts agree](#checking-stock-counts-agree)) |
 | `clienteling` | Clienteling and CRM | `customer.profile_updated`, `customer.occasion_recorded`, `wishlist.item_added` | Birthdays and anniversaries within 21 days (only for customers who consented to marketing), with their wish list; VIPs with $5,000+ lifetime spend and no purchase in a year |
 | `repairs` | Repairs and Service | `repair.received`, `repair.status_changed` | Repairs past their promised date; pickup reminders after 30 days ready; a final-notice review after 180 days |
 | `custom_orders` | Custom and Special Orders | `custom_order.created`, `custom_order.stage_changed`, `custom_order.payment_received` | Orders stuck 14 days in one stage; orders due within 7 days (or overdue) that haven't reached finishing; balances due when ready |
@@ -45,6 +45,7 @@ These links already exist, and each one makes both departments more useful than 
 - **Sales → clienteling:** lifetime value finds lapsed VIPs.
 - **Sales → compliance and finance:** cash payments drive Form 8300, structuring and deposit checks.
 - **Metals → inventory:** spot prices value aged gold pieces at melt.
+- **Store systems → inventory:** each system's stock count of an item is checked against the others'.
 - **Metals → gold buying:** spot prices check what was paid for gold bought from the public.
 - **Clienteling → sales:** wish lists appear in occasion reminders.
 - **Payments → finance:** each processor's payouts are matched to the sales, refunds and fees they cover.
@@ -79,6 +80,7 @@ A recommendation with no honest number carries no `impact`: compliance reminders
 | --- | --- | --- |
 | `inventory.aged-stock` | saves | Cost on hand times a year's carrying rate |
 | `inventory.reorder` | makes | A month of sales at the last 60 days' pace, times margin |
+| `inventory.stock-agreement` (one item) | protects | The pieces the counts disagree by, at the cost of the latest receipt, when one is known |
 | `clienteling.upcoming-occasions` | makes | Occasion sale rate times average order times margin |
 | `clienteling.lapsed-vip` | makes | Win-back rate times their average order times margin |
 | `clienteling.missed-calls` | makes | Callers times close rate times average order times margin |
@@ -123,6 +125,35 @@ What the records allow, and what they don't:
 - Lines are matched to the processor's own charge and capture ids, with Klarna's order reference and the store's own reference kept on each line. A POS sale (`sale.completed`) carries no processor id, so a payout isn't tied to it directly.
 - A payout isn't judged against lines in another currency, since there is no rate to convert them; a short payout in another currency is raised in its own money with no dollar figure.
 - Like every rule, matching sees the most recent signals in the reasoning window. A payout whose record fell out of the window can make its lines look unrecorded until the next sync reads it again.
+
+## Checking stock counts agree
+
+Inventory reads every system's stock counts and checks that systems counting the same item agree. The connectors write them in two types:
+
+| Event | Systems | Kept as |
+| --- | --- | --- |
+| `inventory.counted` | Katana, Acumatica JewelShop, Cin7 Core, NetSuite, Square, Clover, Lightspeed, BigCommerce, WooCommerce, Wix, Etsy, Squarespace, Whatnot, WatchTraderHub, and the POS export's stock file | `inventory.stock_level`, one per system, item and place counted (a location, or for Cin7 Core a location's bin and batch) |
+| `product.updated` | Shopify, whose variants carry the quantity Shopify has across its locations | `inventory.stock_level`, one per variant, for a system that writes no counts of the item |
+
+Items are matched by SKU, read without case, spaces, dashes (any kind) or underscores, so `rg-1001`, `RG 1001` and `RG_1001` are one item. A SKU a connector makes up for a record that has none (such as `shopify-variant-…` or `katana-variant-…`) is left out, since no other system knows it.
+
+Each system's places are added up, so a total is compared with a total: Katana's two locations against Shopify's quantity, or Cin7 Core's bins against Acumatica's warehouses. Each system names its places in its own terms, so places aren't matched across systems. `inventory.stock-agreement` then raises an item when the systems' totals differ by more than 5% of the larger, rounded down, so any difference counts under 20 on hand. One recommendation names every system with its count and when it held. With three or more, when all but one agree, it names the one that is out. When five or more items, and half or more of those the same systems all count, disagree at once, they are raised once, for the systems, as that usually means they count different locations or one has stopped syncing. These figures are `STOCK_TOLERANCE_SHARE`, `STOCK_SYSTEMIC_MIN_ITEMS` and `STOCK_SYSTEMIC_SHARE`.
+
+Counts are compared only when they held within 24 hours of each other (`STOCK_COMPARABLE_HOURS`), and are left alone once last known more than 7 days ago (`STOCK_LOOKBACK_DAYS`). When a count held depends on where it came from:
+
+- A store system's count (any `inventory.counted` but the POS export's) holds from the time the system gives it until that system was last read, since these connectors read every count each pass and store one again when it changes.
+- A row of the POS export holds on its own date only, since a later export may simply leave an item out.
+- A Shopify quantity holds when it was read. Shopify doesn't change a product's update time when only its stock moves, so a product read again unchanged is a duplicate and its quantity grows older until the product changes.
+
+A system whose places were counted more than 24 hours apart has no total for that item, and the systems compared are the latest ones that all held within 24 hours of each other. Each recommendation's id carries the item's SKU as matched, or the systems, so a run on the same day raises the same one, and a count read twice, or a newer count of the same place, counts once.
+
+What the records allow, and what they don't:
+
+- Gem Logic's products carry no quantity, and Amazon's counts are of stock in Amazon's own warehouses, which no other system counts, so neither is compared. An item only one system counts isn't raised.
+- A system that counts only some of the store's locations, such as a website that sells only what is in the shop, will disagree with one that counts every location. That shows up as many items at once and is raised once for the two systems, not item by item.
+- A system's last read is the latest count it stored. A system whose sync has stopped keeps its last counts, and when nothing changed in it for a day, its counts are no longer compared with a system read since.
+- Places are added up from their latest count, so a location that stops reporting an item keeps its last count in that system's total.
+- Like every rule, the check sees the most recent signals in the reasoning window, so in a large catalog the items compared are those counted most recently.
 
 ## Sending department events
 
