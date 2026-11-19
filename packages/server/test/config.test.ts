@@ -108,3 +108,33 @@ describe("loadInstanceConfig: SUPPORT_API_KEY", () => {
     expect(loadInstanceConfig({ ...valid, INSTANCE_API_KEY: shared, SUPPORT_API_KEY: other }).SUPPORT_API_KEY).toBe(other);
   });
 });
+
+describe("daily brief settings", () => {
+  const base = { INSTANCE_NAME: "Example Jewelers", ORGANIZATION_ID: "example-jewelers", INSTANCE_API_KEY: "b".repeat(64), SUPABASE_DB_URL: "postgresql://user:pass@db.example.test:5432/postgres" };
+
+  it("defaults to 7:00 in New York with no webhook", () => {
+    const config = loadInstanceConfig(base);
+    expect(config).toMatchObject({ STORE_TIME_ZONE: "America/New_York", BRIEF_HOUR: 7 });
+    expect(config.BRIEF_WEBHOOK_URL).toBeUndefined();
+    expect(loadInstanceConfig({ ...base, BRIEF_WEBHOOK_URL: "" }).BRIEF_WEBHOOK_URL).toBeUndefined();
+  });
+
+  it("takes a real time zone and a whole hour from 0 to 23", () => {
+    expect(loadInstanceConfig({ ...base, STORE_TIME_ZONE: "America/Los_Angeles", BRIEF_HOUR: "0" })).toMatchObject({ STORE_TIME_ZONE: "America/Los_Angeles", BRIEF_HOUR: 0 });
+    expect(loadInstanceConfig({ ...base, BRIEF_HOUR: "23" }).BRIEF_HOUR).toBe(23);
+    expect(() => loadInstanceConfig({ ...base, STORE_TIME_ZONE: "Eastern" })).toThrow(/STORE_TIME_ZONE: use an IANA time zone/);
+    for (const hour of ["24", "-1", "7.5", "seven"]) expect(() => loadInstanceConfig({ ...base, BRIEF_HOUR: hour }), hour).toThrow(/BRIEF_HOUR/);
+  });
+
+  it("takes only an https webhook, and never echoes it", () => {
+    const url = "https://hooks.example.test/services/T000/B000/abcdef";
+    expect(loadInstanceConfig({ ...base, BRIEF_WEBHOOK_URL: url }).BRIEF_WEBHOOK_URL).toBe(url);
+    const plain = "http://hooks.example.test/services/T000/B000/secretpart";
+    expect(() => loadInstanceConfig({ ...base, BRIEF_WEBHOOK_URL: plain })).toThrow(/BRIEF_WEBHOOK_URL/);
+    try {
+      loadInstanceConfig({ ...base, BRIEF_WEBHOOK_URL: plain });
+    } catch (error) {
+      expect(String(error)).not.toContain("secretpart");
+    }
+  });
+});

@@ -7,6 +7,7 @@ import { selectDepartments } from "@karatos/retail";
 import { loadMigrations, migrate, PostgresMemoryStore } from "@karatos/store-postgres";
 import { createBrainApp } from "./app.js";
 import { createInstancePipeline } from "./brain.js";
+import { createBriefRunner, readDailyBrief, webhookDelivery } from "./brief.js";
 import { loadInstanceConfig } from "./config.js";
 import { StaticDocumentationSource } from "./documentation.js";
 import { createRetentionRunner } from "./retention.js";
@@ -54,6 +55,9 @@ const sync = createSyncRunner({
   intervalMs: config.SYNC_INTERVAL_MINUTES * 60_000,
 });
 
+// What the daily brief knows about syncing: which connectors run, how each last went, and which are turned on but not syncing.
+const briefSync = () => ({ scheduled: connectors.map((c) => c.id), statuses: sync.latest(), skipped });
+
 const server = createServer(
   createBrainApp({
     pipeline,
@@ -63,6 +67,7 @@ const server = createServer(
     // Support access: diagnostic routes only, never business data. See docs/security.md.
     ...(config.SUPPORT_API_KEY ? { supportApiKey: config.SUPPORT_API_KEY } : {}),
     integrations: integrationStatuses(process.env),
+    brief: { timeZone: config.STORE_TIME_ZONE, sync: briefSync },
     support: {
       instanceName: config.INSTANCE_NAME,
       version,
@@ -85,7 +90,18 @@ sync.start();
 const retention = createRetentionRunner({ store: memory, organizationId: config.ORGANIZATION_ID, retentionDays: config.RAW_RETENTION_DAYS });
 retention.start();
 
+// Yesterday's brief, built and saved once each morning at BRIEF_HOUR on the store's clock. Sent on only to BRIEF_WEBHOOK_URL, when an operator set one.
+const brief = createBriefRunner({
+  store: memory,
+  organizationId: config.ORGANIZATION_ID,
+  timeZone: config.STORE_TIME_ZONE,
+  hour: config.BRIEF_HOUR,
+  build: (date) => readDailyBrief({ memory, organizationId: config.ORGANIZATION_ID, timeZone: config.STORE_TIME_ZONE, sync: briefSync }, date),
+  ...(config.BRIEF_WEBHOOK_URL ? { deliver: webhookDelivery(config.BRIEF_WEBHOOK_URL) } : {}),
+});
+brief.start();
+
 const shutdown = () =>
-  server.close(() => void Promise.all([sync.stop(), retention.stop()]).then(() => pool.end()).then(() => process.exit(0)));
+  server.close(() => void Promise.all([sync.stop(), retention.stop(), brief.stop()]).then(() => pool.end()).then(() => process.exit(0)));
 process.on("SIGTERM", shutdown);
 process.on("SIGINT", shutdown);

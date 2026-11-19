@@ -12,6 +12,7 @@ import { repairs } from "./departments/repairs.js";
 import { sales } from "./departments/sales.js";
 
 export * from "./department.js";
+export * from "./brief.js";
 export {
   DEFAULT_PAYOUT_SCHEDULE_DAYS,
   money,

@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { DEFAULT_RAW_RETENTION_DAYS, INTEGRATIONS, invalidWriteEntries, MAX_RAW_RETENTION_DAYS, MIN_RAW_RETENTION_DAYS } from "@karatos/core";
-import { RETAIL_DEPARTMENTS } from "@karatos/retail";
+import { DEFAULT_BRIEF_TIME_ZONE, isTimeZone, RETAIL_DEPARTMENTS } from "@karatos/retail";
 
 const DEPARTMENT_IDS = RETAIL_DEPARTMENTS.map((d) => d.id);
 const INTEGRATION_IDS = INTEGRATIONS.map((i) => i.id);
@@ -65,6 +65,12 @@ export const InstanceConfigSchema = z
    * references are kept. See docs/architecture/data-retention.md.
    */
   RAW_RETENTION_DAYS: z.coerce.number().int().min(MIN_RAW_RETENTION_DAYS).max(MAX_RAW_RETENTION_DAYS).default(DEFAULT_RAW_RETENTION_DAYS),
+  /** The store's IANA time zone: the daily brief's days run midnight to midnight there. */
+  STORE_TIME_ZONE: z.string().default(DEFAULT_BRIEF_TIME_ZONE).refine(isTimeZone, { message: "use an IANA time zone, e.g. America/New_York" }),
+  /** The hour on the store's clock from which yesterday's daily brief is built. See docs/daily-brief.md. */
+  BRIEF_HOUR: z.coerce.number().int().min(0).max(23).default(7),
+  /** Optional https address the daily brief is posted to. Off when unset. A secret: such addresses carry tokens. */
+  BRIEF_WEBHOOK_URL: z.url({ protocol: /^https$/ }).optional(),
   })
   // The same value would hand the support holder every route.
   .refine((c) => c.SUPPORT_API_KEY === undefined || c.SUPPORT_API_KEY !== c.INSTANCE_API_KEY, {

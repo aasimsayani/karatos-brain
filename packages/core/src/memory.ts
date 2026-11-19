@@ -5,6 +5,7 @@ import type { Signal } from "./signals.js";
 import type { Feedback, ReasoningRun, Recommendation } from "./reasoning.js";
 import { valueResultProblem, type ValueResult } from "./value.js";
 import type { MemoryStore } from "./layers.js";
+import type { BriefStore, SavedBrief } from "./briefs.js";
 import {
   clearedPayload,
   isRawExpired,
@@ -25,7 +26,7 @@ interface EventMeta {
 }
 
 /** In-process MemoryStore for tests and local experiments. */
-export class InMemoryStore implements MemoryStore, RawDataRetention {
+export class InMemoryStore implements MemoryStore, RawDataRetention, BriefStore {
   readonly events: EventEnvelope[] = [];
   readonly deadLetters: DeadLetter[] = [];
   readonly entities = new Map<string, NormalizedEntity>();
@@ -36,6 +37,7 @@ export class InMemoryStore implements MemoryStore, RawDataRetention {
   readonly feedback: Feedback[] = [];
   readonly valueResults: ValueResult[] = [];
   readonly checkpoints = new Map<string, string>();
+  readonly briefs = new Map<string, SavedBrief>();
   /** Every purgeRawData run, so the owner can see retention ran. */
   readonly retentionRuns: PurgeResult[] = [];
   private readonly idempotencyKeys = new Set<string>();
@@ -59,6 +61,26 @@ export class InMemoryStore implements MemoryStore, RawDataRetention {
     const event = this.events.find((e) => e.organizationId === organizationId && e.id === id);
     const meta = this.eventMeta.get(`${organizationId}:${id}`);
     return event && meta ? { ...event, ...meta } : null;
+  }
+
+  async eventsBetween(organizationId: string, types: readonly string[], from: string, to: string, limit: number): Promise<StoredEvent[]> {
+    const [start, end] = [Date.parse(from), Date.parse(to)];
+    return this.storedOfType(organizationId, types)
+      .filter((e) => Date.parse(e.occurredAt) >= start && Date.parse(e.occurredAt) < end)
+      .slice(0, Math.max(0, limit));
+  }
+
+  async latestEventBefore(organizationId: string, types: readonly string[], before: string): Promise<StoredEvent | null> {
+    const end = Date.parse(before);
+    return this.storedOfType(organizationId, types).filter((e) => Date.parse(e.occurredAt) < end).at(-1) ?? null;
+  }
+
+  /** Stored events of these types, oldest first, ties by id, as Postgres orders them. */
+  private storedOfType(organizationId: string, types: readonly string[]): StoredEvent[] {
+    return this.events
+      .filter((e) => e.organizationId === organizationId && types.includes(e.type))
+      .map((e) => ({ ...e, ...this.eventMeta.get(`${organizationId}:${e.id}`)! }))
+      .sort((a, b) => Date.parse(a.occurredAt) - Date.parse(b.occurredAt) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
   }
 
   async purgeRawData(organizationId: string, now: Date, retentionDays = DEFAULT_RAW_RETENTION_DAYS): Promise<PurgeResult> {
@@ -187,5 +209,17 @@ export class InMemoryStore implements MemoryStore, RawDataRetention {
 
   async getCheckpoint(organizationId: string, source: string, stream: string): Promise<string | null> {
     return this.checkpoints.get(`${organizationId}:${source}:${stream}`) ?? null;
+  }
+
+  async saveBrief(brief: SavedBrief): Promise<boolean> {
+    const key = `${brief.organizationId}:${brief.date}`;
+    if (this.briefs.has(key)) return false;
+    this.briefs.set(key, structuredClone(brief));
+    return true;
+  }
+
+  async getBrief(organizationId: string, date: string): Promise<SavedBrief | null> {
+    const saved = this.briefs.get(`${organizationId}:${date}`);
+    return saved ? structuredClone(saved) : null;
   }
 }

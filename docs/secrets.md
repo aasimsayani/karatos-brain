@@ -48,6 +48,8 @@ Never store secrets in this repo, a private instance repo, Google Docs or chat. 
 
 The manifest also lists plain settings, marked `config`. For example, `RAW_RETENTION_DAYS` sets how many days raw vendor data is kept before it is cleared (default 30, a whole number from 1 to 365); see [data retention](architecture/data-retention.md).
 
+The daily brief reads `STORE_TIME_ZONE` (default America/New_York) and `BRIEF_HOUR` (default 7), both plain settings. Its optional `BRIEF_WEBHOOK_URL` is a **secret**, because webhook addresses usually carry a token: put it only in the host's secret store, and leave it unset to keep delivery off. See [the daily brief](daily-brief.md).
+
 ## Adding a new secret
 
 Add an entry to the right file in `secrets/manifest/` in the same PR that starts reading the value, then run `npm run registry:write`. Don't edit `secrets/manifest.json` itself; a test fails when it doesn't match its parts. A test fails if the runtime reads a setting the manifest doesn't document.

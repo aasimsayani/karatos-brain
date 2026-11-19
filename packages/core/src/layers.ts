@@ -24,6 +24,13 @@ export interface MemoryStore {
   appendEvent(event: EventEnvelope): Promise<{ inserted: boolean }>;
   /** An event with its source reference. Its payload may have been cleared by retention; the row never goes away. */
   getEvent(organizationId: string, id: string): Promise<StoredEvent | null>;
+  /**
+   * Events of these types that occurred in [from, to), oldest first (ties by
+   * id), at most `limit` of them. Payloads may have been cleared by retention.
+   */
+  eventsBetween(organizationId: string, types: readonly string[], from: string, to: string, limit: number): Promise<StoredEvent[]>;
+  /** The latest event of these types that occurred before `before`, or null when there is none. */
+  latestEventBefore(organizationId: string, types: readonly string[], before: string): Promise<StoredEvent | null>;
   appendDeadLetter(deadLetter: DeadLetter): Promise<void>;
   upsertEntities(entities: NormalizedEntity[]): Promise<void>;
   getEntity(organizationId: string, kind: EntityKind, id: string): Promise<NormalizedEntity | null>;
