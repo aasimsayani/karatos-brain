@@ -103,6 +103,15 @@ describe("readDailyBrief", () => {
     expect(brief.text).toContain("This instance has no synced data yet");
   });
 
+  it("sees sales between the two days, so a quiet day and a quiet week ago aren't called no data", async () => {
+    const b = brain();
+    await b.sale("square", "2026-11-14T16:00:00Z", 700); // Saturday between last Wednesday and this one
+    const brief = await readDailyBrief({ memory: b.memory, organizationId: ORG, timeZone: TZ, now: () => new Date("2026-11-19T12:00:00Z") }, "2026-11-18");
+    const s = salesOf(brief);
+    expect(s.lastSaleBefore).toEqual({ eventId: "evt_square_1", system: "square", occurredAt: "2026-11-14T16:00:00Z" });
+    expect(s.notes[0]).toBe("No sales or refunds dated 2026-11-18 have synced. The latest sale before 2026-11-18 is event evt_square_1 from square at 2026-11-14T16:00:00Z.");
+  });
+
   it("cites the latest earlier sale on a quiet day, from before the comparison day", async () => {
     const b = brain();
     await b.sale("shopify", "2026-11-11T04:00:00Z", 500); // 23:00 on Nov 10, before last week's day
@@ -498,6 +507,21 @@ describe("GET /v1/brief", () => {
     void get;
     const res = await fetch(`http://127.0.0.1:${(server!.address() as AddressInfo).port}/v1/brief`, { method: "POST", headers: { authorization: `Bearer ${INSTANCE_KEY}` } });
     expect(res.status).toBe(405);
+  });
+
+  it("uses the instance's time zone for yesterday and for the day's edges", async () => {
+    const b = brain();
+    await b.sale("shopify", "2026-11-18T19:00:00Z", 500); // 00:30 on the 19th in Kolkata
+    server = createServer(createBrainApp({ pipeline: b.pipeline, memory: b.memory, organizationId: ORG, apiKey: INSTANCE_KEY, brief: { timeZone: "Asia/Kolkata", now: () => new Date("2026-11-19T03:00:00Z") } }));
+    await new Promise<void>((resolve) => server!.listen(0, resolve));
+    const base = `http://127.0.0.1:${(server!.address() as AddressInfo).port}`;
+    const read = async (q: string) => ((await (await fetch(`${base}/v1/brief${q}`, { headers: { authorization: `Bearer ${INSTANCE_KEY}` } })).json()) as { brief: DailyBrief }).brief;
+    const yesterday = await read("");
+    expect(yesterday.date).toBe("2026-11-18");
+    expect(yesterday.timeZone).toBe("Asia/Kolkata");
+    expect(salesOf(await read("?date=2026-11-19")).day.totals.sales).toBe(1);
+    // In New York that sale is on the 18th; in Kolkata the 18th has none and nothing came before it.
+    expect((await read("?date=2026-11-18")).sales.status).toBe("no_data");
   });
 
   it("defaults to New York days and no sync results without brief options", async () => {

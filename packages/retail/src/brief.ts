@@ -70,7 +70,6 @@ function formatter(timeZone: string): Intl.DateTimeFormat {
 
 /** True when the name is an IANA time zone this runtime knows, such as America/New_York. */
 export function isTimeZone(timeZone: string): boolean {
-  if (!timeZone.trim()) return false;
   try {
     formatter(timeZone);
     return true;
@@ -102,10 +101,9 @@ export function localDay(instant: number, timeZone: string): string {
   return wallClock(instant, timeZone).slice(0, 10);
 }
 
-/** How far the zone's wall clock is ahead of UTC at an instant, in ms. */
+/** How far the zone's wall clock is ahead of UTC at a whole-second instant, in ms. */
 function offsetAt(instant: number, timeZone: string): number {
-  const wall = wallClock(instant, timeZone);
-  return Date.parse(`${wall}Z`) - Math.floor(instant / 1000) * 1000;
+  return Date.parse(`${wallClock(instant, timeZone)}Z`) - instant;
 }
 
 /**
@@ -117,8 +115,9 @@ export function zonedInstant(day: string, hour: number, timeZone: string): numbe
   const target = `${day}T${String(hour).padStart(2, "0")}:00:00`;
   const naive = Date.parse(`${target}Z`);
   const candidates = [offsetAt(naive - 86_400_000, timeZone), offsetAt(naive + 86_400_000, timeZone)].map((offset) => naive - offset);
-  const reached = candidates.filter((c) => wallClock(c, timeZone) >= target).sort((a, b) => a - b);
-  return reached[0] ?? Math.max(...candidates);
+  // The offset a day before (or after) is the one in force just before (or after) any change that day,
+  // so one of the two always lands at or past the target: the earliest that does is the answer.
+  return Math.min(...candidates.filter((c) => wallClock(c, timeZone) >= target));
 }
 
 /** A store day as the instants [from, to) it covers. 23 or 25 hours long on the days the clocks change. */
@@ -163,7 +162,7 @@ export interface DailyBriefInput {
   day: BriefEvents;
   /** The same weekday a week earlier. */
   lastWeek: BriefEvents;
-  /** The latest sale event before the comparison day, so a quiet day can be told from an instance with no sales at all. */
+  /** The latest sale event before the day, so a quiet day can be told from an instance with no sales at all. */
   lastSaleBefore: StoredEvent | null;
   /** Recommendations raised in the lookback window, any order. */
   recommendations: readonly Recommendation[];
@@ -218,7 +217,7 @@ export type SalesSection =
       lastWeek: SalesDay;
       /** Day less last week, for each figure; cites both days' events. */
       change: { sales: number; grossCents: number; refunds: number; refundCents: number; netCents: number };
-      /** The latest sale before the comparison day, cited when a day had none. */
+      /** The latest sale before the day, cited when a day had none. */
       lastSaleBefore?: { eventId: string; system: string; occurredAt: string };
       notes: string[];
     };
@@ -393,7 +392,7 @@ function salesSection(input: DailyBriefInput): SalesSection {
   const last = input.lastSaleBefore;
   const lastSaleBefore = last && (!seen(day) || !seen(lastWeek)) ? { eventId: last.id, system: last.source, occurredAt: last.occurredAt } : undefined;
   for (const d of [day, lastWeek]) {
-    if (!seen(d)) notes.push(`No sales or refunds dated ${d.date} have synced.${lastSaleBefore ? ` The latest sale before ${lastWeek.date} is event ${lastSaleBefore.eventId} from ${lastSaleBefore.system} at ${lastSaleBefore.occurredAt}.` : ""}`);
+    if (!seen(d)) notes.push(`No sales or refunds dated ${d.date} have synced.${lastSaleBefore ? ` The latest sale before ${day.date} is event ${lastSaleBefore.eventId} from ${lastSaleBefore.system} at ${lastSaleBefore.occurredAt}.` : ""}`);
   }
   const partial = notes.length > 0 && [day, lastWeek].some((d) => d.truncated || d.uncounted.eventIds.length > 0);
   const t = day.totals;

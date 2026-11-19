@@ -131,12 +131,12 @@ export class PostgresMemoryStore implements MemoryStore, RawDataRetention, Brief
   }
 
   async eventsBetween(organizationId: string, types: readonly string[], from: string, to: string, limit: number): Promise<StoredEvent[]> {
-    if (types.length === 0 || limit < 1) return [];
+    if (types.length === 0) return [];
     const { rows } = await this.db.query<EventRow>(
       `select * from events
        where organization_id = $1 and type = any($2::text[]) and occurred_at >= $3::timestamptz and occurred_at < $4::timestamptz
        order by occurred_at, id limit $5`,
-      [organizationId, [...types], from, to, Math.floor(limit)],
+      [organizationId, [...types], from, to, Math.max(0, Math.floor(limit))],
     );
     return rows.map(toStoredEvent);
   }

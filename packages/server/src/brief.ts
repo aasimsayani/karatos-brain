@@ -63,7 +63,7 @@ export async function readDailyBrief(sources: BriefSources, date: string): Promi
   const [dayEvents, lastWeekEvents, lastSaleBefore, feedback] = await Promise.all([
     readDay(memory, organizationId, day),
     readDay(memory, organizationId, lastWeek),
-    memory.latestEventBefore(organizationId, BRIEF_SALE_TYPES, lastWeek.from),
+    memory.latestEventBefore(organizationId, BRIEF_SALE_TYPES, day.from),
     memory.listFeedback(organizationId, recommendations.map((r) => r.id)),
   ]);
   return buildDailyBrief({

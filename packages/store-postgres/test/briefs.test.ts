@@ -49,6 +49,8 @@ describe.each(stores)("event ranges and saved briefs (%s)", (_name, make) => {
     expect((await read()).map((e) => e.id)).toEqual(["e2", "e3", "e4"]);
     expect((await read(2)).map((e) => e.id)).toEqual(["e2", "e3"]);
     expect(await read(0)).toEqual([]);
+    expect(await read(-1)).toEqual([]);
+    expect((await read(1.9)).map((e) => e.id)).toEqual(["e2"]);
     expect(await store.eventsBetween(ORG, [], "2026-11-18T05:00:00.000Z", "2026-11-19T05:00:00.000Z", 10)).toEqual([]);
     const [first] = await read(1);
     expect(first).toMatchObject({ id: "e2", source: "shopify", occurredAt: "2026-11-18T05:00:00.000Z", payload: { totalCents: 100 }, sourceRef: { system: "shopify", recordId: "k_e2" }, payloadClearedAt: null });

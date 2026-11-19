@@ -104,6 +104,17 @@ describe("store days and time zones", () => {
     expect(new Date(zonedInstant("2026-10-31", 7, TZ)).toISOString()).toBe("2026-10-31T11:00:00.000Z");
   });
 
+  it("gets clock changes right east of UTC too, where the change falls before the naive hour", () => {
+    const berlin = "Europe/Berlin";
+    // Clocks jump from 02:00 to 03:00 CET at 01:00 UTC on Mar 29, 2026: 02:00 doesn't exist, the jump is the answer.
+    expect(new Date(zonedInstant("2026-03-29", 2, berlin)).toISOString()).toBe("2026-03-29T01:00:00.000Z");
+    expect(new Date(zonedInstant("2026-03-29", 7, berlin)).toISOString()).toBe("2026-03-29T05:00:00.000Z");
+    // Clocks go back from 03:00 to 02:00 at 01:00 UTC on Oct 25: 02:00 comes twice, the first is the answer.
+    expect(new Date(zonedInstant("2026-10-25", 2, berlin)).toISOString()).toBe("2026-10-25T00:00:00.000Z");
+    expect(dayBounds("2026-10-25", berlin)).toEqual({ from: "2026-10-24T22:00:00.000Z", to: "2026-10-25T23:00:00.000Z" });
+    expect(dayBounds("2026-03-29", berlin)).toEqual({ from: "2026-03-28T23:00:00.000Z", to: "2026-03-29T22:00:00.000Z" });
+  });
+
   it("reads the store's wall clock and day", () => {
     expect(wallClock(Date.parse("2026-11-19T04:30:00Z"), TZ)).toBe("2026-11-18T23:30:00");
     expect(wallClock(Date.parse("2026-11-19T00:00:00Z"), "UTC")).toBe("2026-11-19T00:00:00");
@@ -219,8 +230,8 @@ describe("buildDailyBrief: sales", () => {
     expect(s.day.totals.sales).toBe(0);
     expect(s.lastSaleBefore).toEqual({ eventId: "old1", system: "shopify", occurredAt: "2026-11-02T15:00:00Z" });
     expect(s.notes).toEqual([
-      "No sales or refunds dated 2026-11-18 have synced. The latest sale before 2026-11-11 is event old1 from shopify at 2026-11-02T15:00:00Z.",
-      "No sales or refunds dated 2026-11-11 have synced. The latest sale before 2026-11-11 is event old1 from shopify at 2026-11-02T15:00:00Z.",
+      "No sales or refunds dated 2026-11-18 have synced. The latest sale before 2026-11-18 is event old1 from shopify at 2026-11-02T15:00:00Z.",
+      "No sales or refunds dated 2026-11-11 have synced. The latest sale before 2026-11-18 is event old1 from shopify at 2026-11-02T15:00:00Z.",
     ]);
     expect(brief.text).toContain("2026-11-18: no sales; no refunds.");
   });
@@ -249,6 +260,29 @@ describe("buildDailyBrief: sales", () => {
       "2 sale events on 2026-11-11 could not be counted (raw data cleared or unreadable), so that day's figures are a floor: [events c1, c2; shopify, square].",
     ]);
     expect(s.day.truncated).toBe(true);
+  });
+
+  it("never counts an event marked cleared, even if its payload still reads, nor amounts that aren't whole cents", () => {
+    const marked = { ...sale("m1", "shopify", "2026-11-18T16:00:00Z", 5_000), payloadClearedAt: GENERATED };
+    const negative = sale("m2", "shopify", "2026-11-18T16:00:00Z", -100);
+    const fraction = sale("m3", "shopify", "2026-11-18T16:00:00Z", 10.5);
+    const text = stored("m4", "shopify", "sale.completed", "2026-11-18T16:00:00Z", { totalCents: "100" });
+    const badRefund = refund("m5", "square", "2026-11-18T16:00:00Z", 100, -5);
+    const good = sale("m6", "square", "2026-11-18T16:00:00Z", 700);
+    const d = salesDay(DATE, TZ, { events: [marked, negative, fraction, text, badRefund, good], truncated: false });
+    expect(d.uncounted).toEqual({ eventIds: ["m1", "m2", "m3", "m4", "m5"], systems: ["shopify", "square"] });
+    expect(d.totals).toMatchObject({ sales: 1, grossCents: 700, refunds: 0, refundCents: 0 });
+  });
+
+  it("cites the latest earlier sale when only last week was quiet", () => {
+    const before = sale("old1", "shopify", "2026-11-17T15:00:00Z", 9_000);
+    const brief = buildDailyBrief(input({ day: { events: [sale("e1", "square", "2026-11-18T16:00:00Z", 100)], truncated: false }, lastSaleBefore: before }));
+    if (brief.sales.status === "no_data") throw new Error("expected sales");
+    expect(brief.sales.lastSaleBefore).toEqual({ eventId: "old1", system: "shopify", occurredAt: "2026-11-17T15:00:00Z" });
+    expect(brief.sales.notes).toEqual(["No sales or refunds dated 2026-11-11 have synced. The latest sale before 2026-11-18 is event old1 from shopify at 2026-11-17T15:00:00Z."]);
+    const both = buildDailyBrief(input({ day: { events: [sale("e1", "square", "2026-11-18T16:00:00Z", 100)], truncated: false }, lastWeek: { events: [sale("w1", "square", "2026-11-11T16:00:00Z", 100)], truncated: false }, lastSaleBefore: before }));
+    if (both.sales.status === "no_data") throw new Error("expected sales");
+    expect(both.sales.lastSaleBefore).toBeUndefined();
   });
 
   it("counts a day of only uncountable events as seen, not as no data", () => {
