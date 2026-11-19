@@ -14,6 +14,8 @@ import {
   type NormalizedEntity,
   type PurgeResult,
   type RawDataRetention,
+  type BriefStore,
+  type SavedBrief,
   type ReasoningRun,
   type Recommendation,
   type Signal,
@@ -95,7 +97,7 @@ interface ValueResultRow {
 const iso = (value: Date | string) => (value instanceof Date ? value.toISOString() : new Date(value).toISOString());
 
 /** MemoryStore backed by the Brain A Postgres schema (supabase/migrations). */
-export class PostgresMemoryStore implements MemoryStore, RawDataRetention {
+export class PostgresMemoryStore implements MemoryStore, RawDataRetention, BriefStore {
   constructor(private readonly db: SqlClient) {}
 
   async appendEvent(event: EventEnvelope): Promise<{ inserted: boolean }> {
@@ -125,21 +127,29 @@ export class PostgresMemoryStore implements MemoryStore, RawDataRetention {
 
   async getEvent(organizationId: string, id: string): Promise<StoredEvent | null> {
     const { rows } = await this.db.query<EventRow>("select * from events where organization_id = $1 and id = $2", [organizationId, id]);
-    const r = rows[0];
-    if (!r) return null;
-    return {
-      id: r.id,
-      organizationId: r.organization_id,
-      source: r.source,
-      type: r.type,
-      occurredAt: iso(r.occurred_at),
-      receivedAt: iso(r.received_at),
-      idempotencyKey: r.idempotency_key,
-      payload: r.payload,
-      sourceRef: { system: r.source, recordId: r.source_record_id, ...(r.source_url ? { url: r.source_url } : {}) },
-      payloadSha256: r.payload_sha256,
-      payloadClearedAt: r.payload_cleared_at === null ? null : iso(r.payload_cleared_at),
-    };
+    return rows[0] ? toStoredEvent(rows[0]) : null;
+  }
+
+  async eventsBetween(organizationId: string, types: readonly string[], from: string, to: string, limit: number): Promise<StoredEvent[]> {
+    if (types.length === 0) return [];
+    const { rows } = await this.db.query<EventRow>(
+      `select * from events
+       where organization_id = $1 and type = any($2::text[]) and occurred_at >= $3::timestamptz and occurred_at < $4::timestamptz
+       order by occurred_at, id limit $5`,
+      [organizationId, [...types], from, to, Math.max(0, Math.floor(limit))],
+    );
+    return rows.map(toStoredEvent);
+  }
+
+  async latestEventBefore(organizationId: string, types: readonly string[], before: string): Promise<StoredEvent | null> {
+    if (types.length === 0) return null;
+    const { rows } = await this.db.query<EventRow>(
+      `select * from events
+       where organization_id = $1 and type = any($2::text[]) and occurred_at < $3::timestamptz
+       order by occurred_at desc, id desc limit 1`,
+      [organizationId, [...types], before],
+    );
+    return rows[0] ? toStoredEvent(rows[0]) : null;
   }
 
   /**
@@ -443,6 +453,25 @@ export class PostgresMemoryStore implements MemoryStore, RawDataRetention {
     );
     return rows[0]?.cursor ?? null;
   }
+
+  async saveBrief(brief: SavedBrief): Promise<boolean> {
+    const { rows } = await this.db.query(
+      `insert into daily_briefs (organization_id, day, generated_at, brief) values ($1, $2::date, $3, $4)
+       on conflict (organization_id, day) do nothing
+       returning day`,
+      [brief.organizationId, brief.date, brief.generatedAt, JSON.stringify(brief.brief)],
+    );
+    return rows.length > 0;
+  }
+
+  async getBrief(organizationId: string, date: string): Promise<SavedBrief | null> {
+    const { rows } = await this.db.query<{ organization_id: string; day: string; generated_at: Date | string; brief: Record<string, unknown> }>(
+      "select organization_id, to_char(day, 'YYYY-MM-DD') as day, generated_at, brief from daily_briefs where organization_id = $1 and day = $2::date",
+      [organizationId, date],
+    );
+    const r = rows[0];
+    return r ? { organizationId: r.organization_id, date: r.day, generatedAt: iso(r.generated_at), brief: r.brief } : null;
+  }
 }
 
 /** The idempotency key a rejected input named, if any, so its source record can still be found. */
@@ -450,6 +479,22 @@ function recordIdOf(raw: unknown): string | null {
   if (typeof raw !== "object" || raw === null) return null;
   const key = (raw as Record<string, unknown>).idempotencyKey;
   return typeof key === "string" && key ? key : null;
+}
+
+function toStoredEvent(r: EventRow): StoredEvent {
+  return {
+    id: r.id,
+    organizationId: r.organization_id,
+    source: r.source,
+    type: r.type,
+    occurredAt: iso(r.occurred_at),
+    receivedAt: iso(r.received_at),
+    idempotencyKey: r.idempotency_key,
+    payload: r.payload,
+    sourceRef: { system: r.source, recordId: r.source_record_id, ...(r.source_url ? { url: r.source_url } : {}) },
+    payloadSha256: r.payload_sha256,
+    payloadClearedAt: r.payload_cleared_at === null ? null : iso(r.payload_cleared_at),
+  };
 }
 
 function toRecommendation(row: RecommendationRow): Recommendation {

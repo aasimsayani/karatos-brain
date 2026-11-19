@@ -381,6 +381,7 @@ On the Core plan, the database, the container and every credential sit in accoun
 | `POST /v1/recommendations/:id/feedback` | Record an accept, reject or override |
 | `POST /v1/recommendations/:id/result` | Record what an acted-on recommendation returned, for the value ledger |
 | `GET /v1/value` | The value ledger: what acted-on recommendations returned, month by month |
+| `GET /v1/brief` | The daily brief: yesterday's sales against the same day last week, anything unusual and what is waiting, each figure citing its events. See [the daily brief](docs/daily-brief.md) |
 | `GET /v1/entities/:kind/:id` | One canonical entity |
 | `GET /v1/signals` | The latest signals, filtered by kind, such as each bank balance or open invoice |
 | `GET /v1/integrations` | Each catalog integration and whether this instance has its settings, by name only |

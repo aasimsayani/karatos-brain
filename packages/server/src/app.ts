@@ -2,6 +2,8 @@ import { timingSafeEqual } from "node:crypto";
 import type { IncomingMessage, RequestListener, ServerResponse } from "node:http";
 import { z } from "zod";
 import { DeadLetteredError, measureValue, monthOf, readValueReport, type BrainPipeline, type IntegrationStatus, type MemoryStore } from "@karatos/core";
+import { DEFAULT_BRIEF_TIME_ZONE, isDay, localDay, type BriefSyncInput } from "@karatos/retail";
+import { readDailyBrief, yesterdayIn } from "./brief.js";
 import { MAX_SUPPORT_EVENT_DAYS, SUPPORT_EVENT_DAYS, supportStatus, type SupportStatusOptions } from "./support.js";
 
 export interface BrainAppOptions {
@@ -21,6 +23,14 @@ export interface BrainAppOptions {
   /** Catalog integrations and whether this instance has their settings, worked out once at startup. */
   integrations?: IntegrationStatus[];
   maxBodyBytes?: number;
+  /** What GET /v1/brief needs beyond the store. Without it, days are America/New_York days and sync results are left out. */
+  brief?: BrainBriefOptions;
+}
+
+export interface BrainBriefOptions {
+  timeZone: string;
+  sync?: () => BriefSyncInput;
+  now?: () => Date;
 }
 
 class HttpError extends Error {
@@ -331,6 +341,22 @@ export function brainRoutes(options: BrainAppOptions): BrainRoute[] {
           throw new HttpError(400, "kind must be up to 10 comma-separated signal kinds, such as bank.balance");
         }
         return [200, { signals: await options.memory.recentSignals(options.organizationId, limit, kinds) }];
+      },
+    ],
+    [
+      "GET",
+      /^\/v1\/brief$/,
+      async (_req, _params, url) => {
+        const timeZone = options.brief?.timeZone ?? DEFAULT_BRIEF_TIME_ZONE;
+        const now = (options.brief?.now ?? (() => new Date()))();
+        const date = url.searchParams.get("date") ?? yesterdayIn(now, timeZone);
+        if (!isDay(date)) throw new HttpError(400, "date must be a day, such as 2026-11-18");
+        if (date > localDay(now.getTime(), timeZone)) throw new HttpError(400, "date can't be after today in the store's time zone");
+        const brief = await readDailyBrief(
+          { memory: options.memory, organizationId: options.organizationId, timeZone, now: () => now, ...(options.brief?.sync ? { sync: options.brief.sync } : {}) },
+          date,
+        );
+        return [200, { brief }];
       },
     ],
     ["GET", /^\/v1\/integrations$/, async () => [200, { integrations: options.integrations ?? [] }], "support"],
