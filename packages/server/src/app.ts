@@ -2,8 +2,9 @@ import { timingSafeEqual } from "node:crypto";
 import type { IncomingMessage, RequestListener, ServerResponse } from "node:http";
 import { z } from "zod";
 import { DeadLetteredError, measureValue, monthOf, readValueReport, type BrainPipeline, type IntegrationStatus, type MemoryStore } from "@karatos/core";
-import { DEFAULT_BRIEF_TIME_ZONE, isDay, localDay, type BriefSyncInput } from "@karatos/retail";
-import { readDailyBrief, yesterdayIn } from "./brief.js";
+import { ASK_MAX_QUESTION_CHARS, DEFAULT_BRIEF_TIME_ZONE, isDay, localDay, type BriefSyncInput } from "@karatos/retail";
+import { readAnswer } from "./ask.js";
+import { readDailyBrief, yesterdayIn, type BriefSources } from "./brief.js";
 import { MAX_SUPPORT_EVENT_DAYS, SUPPORT_EVENT_DAYS, supportStatus, type SupportStatusOptions } from "./support.js";
 
 export interface BrainAppOptions {
@@ -23,7 +24,7 @@ export interface BrainAppOptions {
   /** Catalog integrations and whether this instance has their settings, worked out once at startup. */
   integrations?: IntegrationStatus[];
   maxBodyBytes?: number;
-  /** What GET /v1/brief needs beyond the store. Without it, days are America/New_York days and sync results are left out. */
+  /** What GET /v1/brief and /v1/ask need beyond the store. Without it, days are America/New_York days and sync results are left out. */
   brief?: BrainBriefOptions;
 }
 
@@ -114,6 +115,20 @@ const ResultBody = z.object({
   actor: z.string().trim().min(1),
   note: z.string().max(2000).optional(),
 });
+
+/** The largest body POST /v1/ask reads: a question is at most ASK_MAX_QUESTION_CHARS characters. */
+export const ASK_MAX_BODY_BYTES = 8_192;
+
+const AskBody = z.object({ question: z.string() });
+
+/** A question as asked, trimmed, or a 400 saying what is wrong with it. */
+function questionFrom(value: unknown): string {
+  if (typeof value !== "string") throw new HttpError(400, "question must be a string, such as \"what sold this week?\"");
+  const question = value.trim();
+  if (!question) throw new HttpError(400, "question can't be empty");
+  if ([...question].length > ASK_MAX_QUESTION_CHARS) throw new HttpError(400, `question must be at most ${ASK_MAX_QUESTION_CHARS} characters`);
+  return question;
+}
 
 /** The longest period one value report covers. */
 const MAX_REPORT_DAYS = 366;
@@ -220,6 +235,13 @@ export function createBrainApp(options: BrainAppOptions): RequestListener {
  */
 export function brainRoutes(options: BrainAppOptions): BrainRoute[] {
   const limit = options.maxBodyBytes ?? 1_000_000;
+  const askSources = (): BriefSources => ({
+    memory: options.memory,
+    organizationId: options.organizationId,
+    timeZone: options.brief?.timeZone ?? DEFAULT_BRIEF_TIME_ZONE,
+    ...(options.brief?.now ? { now: options.brief.now } : {}),
+    ...(options.brief?.sync ? { sync: options.brief.sync } : {}),
+  });
 
   const table: [method: string, pattern: RegExp, handler: Handler, access?: RouteAccess][] = [
     [
@@ -357,6 +379,24 @@ export function brainRoutes(options: BrainAppOptions): BrainRoute[] {
           date,
         );
         return [200, { brief }];
+      },
+    ],
+    [
+      "GET",
+      /^\/v1\/ask$/,
+      async (_req, _params, url) => {
+        const q = url.searchParams.get("q");
+        if (q === null) throw new HttpError(400, "ask with ?q=, such as ?q=what+sold+this+week");
+        return [200, { answer: await readAnswer(askSources(), questionFrom(q)) }];
+      },
+    ],
+    [
+      "POST",
+      /^\/v1\/ask$/,
+      async (req) => {
+        const parsed = AskBody.safeParse(await readJson(req, Math.min(limit, ASK_MAX_BODY_BYTES)));
+        if (!parsed.success) throw new HttpError(400, "the body must be a JSON object with a question, such as {\"question\": \"what sold this week?\"}");
+        return [200, { answer: await readAnswer(askSources(), questionFrom(parsed.data.question)) }];
       },
     ],
     ["GET", /^\/v1\/integrations$/, async () => [200, { integrations: options.integrations ?? [] }], "support"],

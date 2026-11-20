@@ -56,6 +56,8 @@ The response is `{ "brief": { ... } }`. The brief has these fields:
 - `sync`. Either `{ known: false, note }`, or `{ known: true, checkedAt, problems, healthy }`. Each problem is `{ system, problem: "failed" | "stale" | "not_run" | "not_syncing", detail, at? }`.
 - `text`. The same brief as plain text. Each figure is followed by its citation in brackets, with the first three event ids and a count of the rest; the JSON always has every id.
 
+To ask for these figures for another period, or for one part of the brief, in plain words, see [asking the instance](ask.md).
+
 ## Sending it on
 
 The brief can be posted to one address an operator sets up. Delivery is off by default. Set `BRIEF_WEBHOOK_URL` to an https address, such as a chat tool's incoming webhook, and each newly built brief is posted there once:

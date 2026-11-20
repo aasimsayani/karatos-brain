@@ -196,6 +196,8 @@ What the records allow, and what they don't:
 
 Each morning the instance sums up the day before from the departments' own events and recommendations: sales and refunds from `sale.completed` and `sale.returned` against the same weekday last week, the open findings of the payout, stock-count, waiting-customer and return-rate rules, any connector that failed or went stale, and the other open recommendations with the highest impact first. Every figure cites the events it came from. See [the daily brief](../daily-brief.md).
 
+The same figures and findings can be asked for at any time in plain words, such as "what sold this week?" or "who is waiting on a reply?". See [asking the instance](../ask.md).
+
 ## Sending department events
 
 Every department event uses the standard envelope (see [architecture](../architecture/overview.md)) with the department's payload. For example, a completed sale:
