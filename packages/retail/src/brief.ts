@@ -430,7 +430,7 @@ export function byImpact(a: BriefFinding, b: BriefFinding): number {
 }
 
 /** The latest raising of each finding that nobody has answered yet. */
-function openFindings(recommendations: readonly Recommendation[], feedback: readonly Feedback[]): BriefFinding[] {
+export function openFindings(recommendations: readonly Recommendation[], feedback: readonly Feedback[]): BriefFinding[] {
   const answered = new Set(feedback.map((f) => f.recommendationId));
   const latest = new Map<string, Recommendation>();
   for (const r of recommendations) {
@@ -460,7 +460,8 @@ function openFindings(recommendations: readonly Recommendation[], feedback: read
 // ---------------------------------------------------------------------------
 // Sync
 
-function syncSection(sync: BriefSyncInput | undefined, generatedAt: string): SyncSection {
+/** What the sync results say: each scheduled connector that failed, went stale or hasn't run, and those turned on but not syncing. */
+export function syncSection(sync: BriefSyncInput | undefined, generatedAt: string): SyncSection {
   if (!sync) return { known: false, note: "Sync results aren't available to this brief." };
   const now = Date.parse(generatedAt);
   const problems: SyncProblem[] = [];
@@ -490,7 +491,8 @@ function ids(eventIds: readonly string[]): string {
   return `${eventIds.length === 1 ? "event" : "events"} ${eventIds.slice(0, TEXT_IDS_SHOWN).join(", ")}${more > 0 ? ` and ${more} more` : ""}`;
 }
 
-function cite(c: Citation): string {
+/** A citation in brackets for the plain text: the first few event ids, a count of the rest, and the systems. */
+export function cite(c: Citation): string {
   return `[${ids(c.eventIds)}; ${c.systems.join(", ")}]`;
 }
 
