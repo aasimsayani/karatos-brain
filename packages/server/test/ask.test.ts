@@ -98,6 +98,22 @@ describe("readAnswer", () => {
     }
   });
 
+  it("answers none open from the latest synced record, and leaves out a finding someone answered", async () => {
+    const b = brain();
+    await b.send("stripe", "payout.updated", { payoutId: "stripe:payout:po_ok", amountCents: 20_000, currency: "usd", status: "paid", arrivalDate: "2026-11-18" }, "2026-11-17T12:00:00Z");
+    await b.pipeline.reason(ORG);
+    const none = await b.ask("which payouts are late?");
+    expect(none.status).toBe("answered");
+    expect(none.text).toContain("the latest record it could use is event evt_stripe_1 from stripe at 2026-11-17T12:00:00Z");
+
+    const s = await stocked();
+    const [finding] = (await s.ask("which payouts are late?")).findings;
+    await s.memory.recordFeedback({ recommendationId: finding!.recommendationId, organizationId: ORG, outcome: "accepted", actor: "owner", recordedAt: NOW });
+    const after = await s.ask("which payouts are late?");
+    expect(after.findings).toEqual([]);
+    expect(after.status).toBe("answered");
+  });
+
   it("answers sync health from the sync runner's results", async () => {
     const b = brain();
     const a = await readAnswer({ ...b.sources, sync: () => ({ scheduled: ["shopify"], statuses: [{ id: "shopify", outcome: "failed", finishedAt: NOW, error: "timeout" }], skipped: [] }) }, "is everything syncing?");
@@ -223,9 +239,20 @@ describe("/v1/ask", () => {
     expect(status).toBe(403);
   });
 
-  it("only answers GET and POST", async () => {
+  it("only answers GET and POST, at exactly /v1/ask", async () => {
     const { call } = await start();
+    expect((await call("/v1/askme?q=sales")).status).toBe(404);
     for (const method of ["PUT", "DELETE", "PATCH"]) expect((await call("/v1/ask", { method }, INSTANCE_KEY)).status, method).toBe(405);
+  });
+
+  it("reads days in the instance's time zone", async () => {
+    const b = await stocked();
+    server = createServer(createBrainApp({ pipeline: b.pipeline, memory: b.memory, organizationId: ORG, apiKey: INSTANCE_KEY, brief: { timeZone: "Asia/Kolkata", now: () => new Date(NOW) } }));
+    await new Promise<void>((resolve) => server!.listen(0, resolve));
+    const res = await fetch(`http://127.0.0.1:${(server!.address() as AddressInfo).port}/v1/ask?q=sales+on+2026-11-19`, { headers: { authorization: `Bearer ${INSTANCE_KEY}` } });
+    const { answer } = (await res.json()) as { answer: AskAnswer };
+    expect(answer.timeZone).toBe("Asia/Kolkata");
+    expect(answer.sales!.totals.saleEvents.eventIds).toEqual(["evt_square_2"]);
   });
 
   it("uses New York days without brief options", async () => {

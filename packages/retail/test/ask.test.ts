@@ -139,10 +139,11 @@ describe("routeQuestion: what is asked", () => {
     expect(normalizeQuestion("from 2026-11-01 to 2026-11-15")).toBe("from 2026-11-01 to 2026-11-15");
     expect(normalizeQuestion("re-order 11/12 $1,200.50")).toBe("re-order 11/12 1,200.50");
     expect(normalizeQuestion("the store's sales")).toBe("the store is sales");
+    expect(normalizeQuestion("sales,2026-11-18 .5")).toBe("sales 2026-11-18 5");
   });
 
   it("throws on an unknown time zone", () => {
-    expect(() => routeQuestion("sales", { now: NOW, timeZone: "Mars/Olympus" })).toThrow(RangeError);
+    expect(() => routeQuestion("sales", { now: NOW, timeZone: "Mars/Olympus" })).toThrow("timeZone must be an IANA time zone, such as America/New_York");
     expect(() => answerQuestion("sales", { kind: "unsupported" }, data({ timeZone: "Nowhere" }))).toThrow(RangeError);
   });
 });
@@ -168,6 +169,8 @@ describe("routeQuestion: periods on the store's calendar", () => {
       ["sales ytd", "2026-01-01", "2026-11-20", "this year (2026-01-01 to 2026-11-20)"],
       ["sales in october", "2026-10-01", "2026-10-31", "October 2026 (2026-10-01 to 2026-10-31)"],
       ["sales in feb", "2026-02-01", "2026-02-28", "February 2026 (2026-02-01 to 2026-02-28)"],
+      ["sales in may", "2026-05-01", "2026-05-31", "May 2026 (2026-05-01 to 2026-05-31)"],
+      ["sales in jul", "2026-07-01", "2026-07-31", "July 2026 (2026-07-01 to 2026-07-31)"],
       ["sales during sept", "2026-09-01", "2026-09-30", "September 2026 (2026-09-01 to 2026-09-30)"],
       ["sales in december", "2025-12-01", "2025-12-31", "December 2025 (2025-12-01 to 2025-12-31)"],
       ["sales for february 2024", "2024-02-01", "2024-02-29", "February 2024 (2024-02-01 to 2024-02-29)"],
@@ -190,6 +193,8 @@ describe("routeQuestion: periods on the store's calendar", () => {
       // A day with no year still to come this year is last year's.
       ["sales december 25", "2025-12-25", "2025-12-25", 1],
       ["sales on 2026-11-20", "2026-11-20", "2026-11-20", 1],
+      // Today with no year is today, not a year ago.
+      ["sales november 20", "2026-11-20", "2026-11-20", 1],
     ];
     for (const [q, fromDay, toDay, days] of cases) expect(period(q), q).toMatchObject({ fromDay, toDay, days });
     expect(period("sales from 2026-11-01 to 2026-11-15").label).toBe("2026-11-01 to 2026-11-15");
@@ -206,6 +211,8 @@ describe("routeQuestion: periods on the store's calendar", () => {
     expect(problem("sales february 30")).toBe("february 30 isn't a day on the calendar");
     expect(problem("sales from 2026-11-15 to 2026-11-01")).toBe("2026-11-15 is after 2026-11-01; put the earlier day first");
     expect(problem("sales 2026-11-21")).toBe("2026-11-21 hasn't come yet in the store's time zone (today is 2026-11-20)");
+    // A day still to come with its year written is turned down, not moved to last year.
+    expect(problem("sales december 25 2026")).toBe("2026-12-25 hasn't come yet in the store's time zone (today is 2026-11-20)");
     expect(problem("sales since 2026-12-01")).toBe("2026-12-01 hasn't come yet in the store's time zone (today is 2026-11-20)");
     expect(problem("sales 11/12")).toMatch(/^write dates as 2026-11-18 or November 18/);
     expect(problem("sales 11/12/2026")).toMatch(/^write dates as/);
@@ -322,6 +329,15 @@ describe("answerQuestion: sales", () => {
     expect(a.facts.flatMap((f) => f.citation.eventIds)).not.toContain("c2");
   });
 
+  it("answers a period whose only sale couldn't be read, saying so, rather than nothing synced", () => {
+    const cleared = { ...sale("x1", "clover", "2026-11-19T16:00:00.000Z", 9_000), payloadClearedAt: NOW.toISOString(), payload: {} };
+    const a = ask("sales yesterday", { sales: { events: [cleared], truncated: false }, lastSaleBefore: null, latestSynced: cleared });
+    expect(a.status).toBe("answered");
+    expect(a.facts).toEqual([]);
+    expect(a.sales!.uncounted.eventIds).toEqual(["x1"]);
+    expect(a.text).toContain("could not be counted");
+  });
+
   it("tells a quiet period from one before anything synced, citing the record that shows sales were syncing", () => {
     const earlier = sale("old", "shopify", "2026-11-02T15:00:00.000Z", 1_000);
     const quiet = ask("sales yesterday", { sales: { events: [], truncated: false }, lastSaleBefore: earlier, latestSynced: earlier });
@@ -367,6 +383,8 @@ describe("answerQuestion: findings", () => {
     rec("rec_clienteling_awaiting_reply_others_2026-11-20", ["m1"], { summary: "1 customer has waited." }),
     rec("rec_clienteling_missed_calls_2026-11-20", ["m2"], { summary: "1 caller wasn't called back." }),
     rec("rec_sales_returns_x_2026-11-20", ["m1"], { impact: impact(99_000), summary: "Returns are high." }),
+    // Names a payout rule's key part, but isn't one of its findings.
+    rec("rec_repairs_finance_payout_late_note_2026-11-20", ["m1"], { summary: "A repair note." }),
   ];
   const full = (extra: Partial<AskData> = {}): Partial<AskData> => ({ recommendations, feedback: [], eventSources, latestSynced: events[0]!, ...extra });
 
@@ -426,7 +444,7 @@ describe("answerQuestion: findings", () => {
     expect(a.findings.map((f) => f.recommendationId)[0]).toBe("rec_sales_returns_x_2026-11-20");
     expect(a.findings).toHaveLength(recommendations.length);
     expect(a.findings.every((f) => f.kind === undefined)).toBe(true);
-    expect(a.text).toMatch(/^8 recommendations are open \[.*\], highest dollar impact first:/);
+    expect(a.text).toMatch(/^9 recommendations are open \[.*\], highest dollar impact first:/);
     expectCited(a, events);
 
     const many = Array.from({ length: ASK_FINDINGS_SHOWN + 3 }, (_, i) => rec(`rec_repairs_r${i}_2026-11-20`, ["m1"], { impact: impact(100 * (i + 1)) }));
@@ -513,6 +531,7 @@ describe("answerQuestion: sync health", () => {
 
   it("says when every connector is fine, when none is set up and when it can't tell", () => {
     expect(ask("sync health", { sync: { scheduled: ["shopify"], statuses: [ok("shopify")], skipped: [] } }).text).toBe("Every scheduled connector's last sync succeeded within the last day.");
+    expect(ask("sync health", { sync: { scheduled: ["stripe"], statuses: [], skipped: [] } }).text).toBe("These connectors have a problem:\n- stripe has not finished a sync since the instance started.");
     expect(ask("sync health", { sync: { scheduled: [], statuses: [], skipped: [] } })).toMatchObject({ status: "no_data", text: "Nothing has synced for that yet: no connectors are set up to sync on this instance." });
     expect(ask("sync health", {})).toMatchObject({ status: "no_data", text: "Sync results aren't available to this instance's answers, so I can't say how syncing is going." });
     expect(ask("did anything sync yesterday?", { sync: { scheduled: ["shopify"], statuses: [ok("shopify")], skipped: [] } }).notes).toEqual([

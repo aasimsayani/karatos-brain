@@ -127,7 +127,8 @@ export interface AskClock {
 
 const MONTHS = ["january", "february", "march", "april", "may", "june", "july", "august", "september", "october", "november", "december"];
 const MONTH = `(${MONTHS.map((m) => `${m.slice(0, 3)}(?:${m.slice(3)})?`).join("|")}|sept)\\.?`;
-const monthIndex = (name: string) => (name.startsWith("sept") ? 8 : MONTHS.findIndex((m) => m.startsWith(name.slice(0, 3))));
+/** "sept" and "september" both start with "sep", so every spelling is known by its first three letters. */
+const monthIndex = (name: string) => MONTHS.findIndex((m) => m.startsWith(name.slice(0, 3)));
 const pad = (n: number) => String(n).padStart(2, "0");
 const ISO = "(\\d{4}-\\d{2}-\\d{2})";
 
