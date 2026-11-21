@@ -1,10 +1,11 @@
 import { timingSafeEqual } from "node:crypto";
 import type { IncomingMessage, RequestListener, ServerResponse } from "node:http";
 import { z } from "zod";
-import { DeadLetteredError, measureValue, monthOf, readValueReport, type BrainPipeline, type IntegrationStatus, type MemoryStore } from "@karatos/core";
+import { DeadLetteredError, monthOf, readValueReport, type BrainPipeline, type IntegrationStatus, type MemoryStore } from "@karatos/core";
 import { ASK_MAX_QUESTION_CHARS, DEFAULT_BRIEF_TIME_ZONE, isDay, localDay, type BriefSyncInput } from "@karatos/retail";
 import { readAnswer } from "./ask.js";
 import { readDailyBrief, yesterdayIn, type BriefSources } from "./brief.js";
+import { reasonNow } from "./reasoning.js";
 import { MAX_SUPPORT_EVENT_DAYS, SUPPORT_EVENT_DAYS, supportStatus, type SupportStatusOptions } from "./support.js";
 
 export interface BrainAppOptions {
@@ -272,10 +273,8 @@ export function brainRoutes(options: BrainAppOptions): BrainRoute[] {
       "POST",
       /^\/v1\/reason$/,
       async () => {
-        const recommendations = await options.pipeline.reason(options.organizationId);
-        // Each run also records the results now due on approved recommendations.
-        const measured = await measureValue(options.memory, options.organizationId, new Date().toISOString());
-        return [200, { recommendations, measured: measured.length }];
+        const { recommendations, measured } = await reasonNow(options.pipeline, options.memory, options.organizationId);
+        return [200, { recommendations, measured }];
       },
     ],
     [

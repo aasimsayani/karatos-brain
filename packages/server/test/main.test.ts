@@ -84,6 +84,10 @@ describe("main: the running instance", () => {
     expect(first.retention).toEqual({ rawRetentionDays: 45 });
     expect([...first.departments].sort()).toEqual(["repairs", "sales"]);
     expect(first.migrations.count).toBeGreaterThan(0);
+    // Scheduled reasoning is on by default. The only connector brings nothing, so the one run there can be is the
+    // daily brief's own, when the instance starts after BRIEF_HOUR on the store's clock.
+    expect(first.reasoning).toMatchObject({ scheduled: true, intervalMinutes: 60, consecutiveFailures: 0 });
+    if (first.reasoning!.lastRun) expect(first.reasoning!.lastRun).toMatchObject({ trigger: "brief", outcome: "succeeded", error: null });
     expect(first.integrations.find((i) => i.id === "shopify")).toMatchObject({ syncing: false, notSyncingReason: "missing SHOPIFY_SHOP_DOMAIN" });
     await vi.waitFor(async () => {
       const stripe = (await status()).integrations.find((i) => i.id === "stripe");

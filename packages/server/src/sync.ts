@@ -82,6 +82,8 @@ export interface SyncRunnerOptions {
   organizationId: string;
   /** Pause between the end of one round and the start of the next. */
   intervalMs: number;
+  /** Told each round's outcomes once it ends, such as scheduled reasoning. Must not throw; a throw is logged and ignored. */
+  afterRound?: (outcomes: readonly SyncRunOutcome[]) => void;
   log?: (line: string) => void;
   now?: () => Date;
   /** Replaced in tests. */
@@ -144,6 +146,11 @@ export function createSyncRunner(options: SyncRunnerOptions) {
     running ??= (async () => {
       const outcomes: SyncRunOutcome[] = [];
       for (const scheduled of options.connectors) outcomes.push(await runOne(scheduled));
+      try {
+        options.afterRound?.(outcomes);
+      } catch (error) {
+        log(`sync round follow-up failed: ${describeError(error)}`);
+      }
       return outcomes;
     })().finally(() => {
       running = null;

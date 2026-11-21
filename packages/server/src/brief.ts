@@ -107,6 +107,12 @@ export interface BriefRunnerOptions {
   /** The store's local hour, 0 to 23, from which yesterday's brief is built. */
   hour: number;
   build: (date: string) => Promise<DailyBrief>;
+  /**
+   * Run just before a due brief is built, such as scheduled reasoning, so the
+   * brief reports fresh findings. Not run when the brief is not due or already
+   * built. A failure is logged and the brief is built anyway.
+   */
+  beforeBuild?: () => Promise<unknown>;
   /** Where a newly built brief is sent, when an operator set one up. */
   deliver?: (brief: DailyBrief) => Promise<void>;
   log?: (line: string) => void;
@@ -157,6 +163,13 @@ export function createBriefRunner(options: BriefRunnerOptions) {
     if (Number(wallClock(at.getTime(), timeZone).slice(11, 13)) < hour) return { outcome: "not_due", date };
     try {
       if (await options.store.getBrief(organizationId, date)) return { outcome: "already_built", date };
+      if (options.beforeBuild) {
+        try {
+          await options.beforeBuild();
+        } catch (error) {
+          log(`brief ${date} went ahead without its first step: ${describe(error)}`);
+        }
+      }
       const brief = await options.build(date);
       const saved = await options.store.saveBrief({ organizationId, date, generatedAt: brief.generatedAt, brief: brief as unknown as Record<string, unknown> });
       if (!saved) return { outcome: "already_built", date };

@@ -10,11 +10,13 @@ import {
   isTimeZone,
   localDay,
   openFindings,
+  reasoningNote,
   salesDay,
   syncSection,
   type BriefFinding,
   type BriefSyncInput,
   type Citation,
+  type ReasoningNote,
   type SalesDay,
   type SalesFigures,
   type SyncSection,
@@ -297,7 +299,7 @@ export interface AskData {
   feedback?: readonly Feedback[];
   /** The system (event source) of each event the findings cite, as far as the server could look them up. */
   eventSources?: Readonly<Record<string, string>>;
-  /** Sync results, for sync_health; absent when the caller doesn't know them. */
+  /** Sync results, for sync_health, and scheduled reasoning, for findings; absent when the caller doesn't know them. */
   sync?: BriefSyncInput;
 }
 
@@ -334,6 +336,8 @@ export interface AskAnswer {
   moreFindings: number;
   sales?: SalesDay;
   sync?: SyncSection;
+  /** For findings and sync health: when the findings were last refreshed, when the server knows. */
+  reasoning?: ReasoningNote;
   notes: string[];
   /** When the question wasn't understood: what can be asked. */
   canAnswer?: typeof ASK_QUESTIONS;
@@ -495,7 +499,10 @@ export function openFindingsFor(intent: AskIntent, recommendations: readonly Rec
 }
 
 function answerFindings(question: string, intent: AskIntent, data: AskData, period: AskPeriod | undefined): AskAnswer {
-  const answer = base(question, data, intent, "answered");
+  const refreshed = data.sync?.reasoning ? reasoningNote(data.sync.reasoning, data.generatedAt) : undefined;
+  const answer = { ...base(question, data, intent, "answered"), ...(refreshed ? { reasoning: refreshed } : {}) };
+  // Said after the answer, so it reads as when the findings were worked out.
+  const when = refreshed ? `\n${refreshed.detail}` : "";
   const recommendations = data.recommendations ?? [];
   const sources = data.eventSources ?? {};
   const kinds = ASK_FINDING_KINDS[intent];
@@ -505,12 +512,12 @@ function answerFindings(question: string, intent: AskIntent, data: AskData, peri
 
   if (!found.length) {
     if (!words) {
-      if (!recommendations.length) return { ...answer, status: "no_data", text: `Nothing has been raised for that yet: no recommendations in the last ${BRIEF_OPEN_LOOKBACK_DAYS} days.` };
-      return { ...answer, text: `Nothing is waiting on you: every recommendation raised in the last ${BRIEF_OPEN_LOOKBACK_DAYS} days has been answered.` };
+      if (!recommendations.length) return { ...answer, status: "no_data", text: `Nothing has been raised for that yet: no recommendations in the last ${BRIEF_OPEN_LOOKBACK_DAYS} days.${when}` };
+      return { ...answer, text: `Nothing is waiting on you: every recommendation raised in the last ${BRIEF_OPEN_LOOKBACK_DAYS} days has been answered.${when}` };
     }
     const latest = data.latestSynced ?? null;
     if (!latest) return { ...answer, status: "no_data", text: words.nothingSynced };
-    return { ...answer, text: `${words.none} This is as of the latest reasoning run over what has synced; the latest record it could use is ${record(latest)}.` };
+    return { ...answer, text: `${words.none} This is as of the latest reasoning run over what has synced; the latest record it could use is ${record(latest)}.${when}` };
   }
 
   const shown = found.slice(0, ASK_FINDINGS_SHOWN);
@@ -527,6 +534,7 @@ function answerFindings(question: string, intent: AskIntent, data: AskData, peri
   if (more > 0) lines.push(`and ${more} more.`);
   const unknown = shown.filter((f) => f.eventIds.some((id) => !sources[id])).length;
   if (unknown) answer.notes.push(`For ${plural(unknown, "finding")} the system behind some of its events couldn't be looked up; the event ids are still listed.`);
+  if (refreshed) answer.notes.push(refreshed.detail);
   return { ...answer, findings: shown, moreFindings: more, facts: findingFacts(found, words ? `${words.what} findings open` : "open recommendations"), text: [...lines, ...answer.notes].join("\n") };
 }
 
@@ -542,7 +550,8 @@ function answerSync(question: string, data: AskData, period: AskPeriod | undefin
     ? ["These connectors have a problem:", ...sync.problems.map((p) => `- ${p.system} ${p.detail}${p.at ? ` (${p.at})` : ""}.`)]
     : ["Every scheduled connector's last sync succeeded within the last day."];
   if (sync.problems.length && sync.healthy.length) lines.push(`Syncing normally: ${sync.healthy.join(", ")}.`);
-  return { ...answer, sync, text: [...lines, ...answer.notes].join("\n") };
+  if (sync.reasoning) lines.push(sync.reasoning.detail);
+  return { ...answer, sync, ...(sync.reasoning ? { reasoning: sync.reasoning } : {}), text: [...lines, ...answer.notes].join("\n") };
 }
 
 // ---------------------------------------------------------------------------

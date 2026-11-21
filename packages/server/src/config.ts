@@ -60,6 +60,17 @@ export const InstanceConfigSchema = z
   /** Minutes between the end of one sync round and the start of the next. */
   SYNC_INTERVAL_MINUTES: z.coerce.number().int().min(5).max(1440).default(60),
   /**
+   * Scheduled reasoning: the department rules run after each sync round that
+   * brings new events, before the daily brief and at least every
+   * REASON_INTERVAL_MINUTES. "off" leaves it to POST /v1/reason.
+   */
+  REASON_SCHEDULE: z
+    .enum(["on", "off"])
+    .default("on")
+    .transform((v) => v === "on"),
+  /** The longest gap, in minutes, between the end of one scheduled reasoning run and the start of the next. */
+  REASON_INTERVAL_MINUTES: z.coerce.number().int().min(5).max(1440).default(60),
+  /**
    * Days raw vendor data (event payloads, dead-letter input, uploaded file
    * contents) is kept before it is cleared. Facts, signals and source
    * references are kept. See docs/architecture/data-retention.md.

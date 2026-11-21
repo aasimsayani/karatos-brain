@@ -167,6 +167,32 @@ describe("createSyncRunner", () => {
     expect(logs.join("\n")).not.toContain("raw string with details");
   });
 
+  it("tells afterRound each round's outcomes, and a throwing afterRound never fails the round", async () => {
+    const calls: string[] = [];
+    const memory = new InMemoryStore();
+    const pipeline = new BrainPipeline({ memory, normalizers: [], extractors: [], reasoners: [], documentation: new StaticDocumentationSource([]) });
+    const logs: string[] = [];
+    const told: number[][] = [];
+    const runner = createSyncRunner({
+      connectors: [scheduled(fakeConnector("shopify", calls))],
+      pipeline,
+      memory,
+      organizationId: ORG,
+      intervalMs: 60_000,
+      log: (line) => logs.push(line),
+      sync: (options) => runSync({ ...options, sleep: async () => {} }),
+      afterRound: (outcomes) => {
+        told.push(outcomes.map((o) => o.report?.ingested ?? -1));
+        throw new Error("follow-up broke");
+      },
+    });
+    const first = await runner.runOnce();
+    expect(first).toHaveLength(1);
+    await runner.runOnce();
+    expect(told).toEqual([[2], [1]]);
+    expect(logs.filter((l) => l.startsWith("sync round follow-up failed"))).toEqual(["sync round follow-up failed: Error: follow-up broke", "sync round follow-up failed: Error: follow-up broke"]);
+  });
+
   it("joins a round already in progress instead of starting a second one", async () => {
     let release!: () => void;
     const gate = new Promise<void>((resolve) => (release = resolve));

@@ -44,6 +44,25 @@ Isolation is layered. A request needs the right API key. Every event is pinned t
 6. **Hand out the API key** only to that client's agents and connectors.
 7. **Set up support access, if the client wants it.** Generate a support key with `npm run secrets:setup -- --generate-only --purposes core,instance,migrations,support`, put `SUPPORT_API_KEY` in the host's secret store and restart. Give that key, never `INSTANCE_API_KEY`, to whoever supports the instance; it reaches only `GET /healthz`, `GET /v1/integrations` and `GET /v1/support/status`. For a client who wants their data kept from you, the client creates and owns the Supabase project and the host account in steps 1 and 5, and shares only the support key: anyone with database or host access can still read everything.
 
+## Scheduled reasoning
+
+The department rules (payout matching, stock agreement, customers awaiting a reply, return rates and the rest) run on their own, so the findings in the [daily brief](../daily-brief.md) and in [answers](../ask.md) stay fresh without anyone calling `POST /v1/reason`. Each run does what that route does: it reasons over recent signals, then records the results now due on approved recommendations.
+
+- **After a sync round that brought new events.** A round where every connector found nothing new, or failed, doesn't start a run.
+- **Before the daily brief.** The brief runner reasons first, so the 7:00 brief has fresh findings. If a run is in progress, the brief waits for it (and for one queued after it). If a run succeeded in the last 10 minutes, the brief uses it instead of reasoning again.
+- **At least every `REASON_INTERVAL_MINUTES`** (default 60, allowed 5 to 1440) otherwise. The interval counts from the end of the last run, whatever started it. The first run comes after the first sync round that brings events, the first brief, or one interval, whichever comes first.
+- **Never two at once.** A trigger while a run is in progress queues one more run after it. Every later trigger joins that queued run, so a burst of triggers costs one extra run at most.
+- **Failures are retried at the next trigger.** A failed run is logged with its error's class name and how many runs have failed in a row, such as `reasoning (sync) failed: TypeError, 2 failed in a row; tried again at the next trigger`. A run that succeeds logs its counts only, such as `reasoning (interval): 12 recommendations, 1 results measured`. Neither line has recommendation text or an error message.
+- **Stopped on shutdown.** On `SIGTERM` the interval is cleared, a queued run is dropped, and the instance waits for a run in progress to finish.
+- **Reported on support status.** `GET /v1/support/status` has `reasoning`: `{ scheduled, intervalMinutes, lastRun, lastSucceededAt, consecutiveFailures }`. `lastRun` is `{ trigger: "sync" | "interval" | "brief", outcome, startedAt, finishedAt, recommendations, measured, error }`, where `error` is the class name only. It holds times and counts, never business data.
+
+Set `REASON_SCHEDULE=off` to turn it off. Findings then refresh only when something calls `POST /v1/reason`, and the brief and answers say so. `POST /v1/reason` works as before either way. Its runs aren't counted on support status or in "findings were last refreshed".
+
+| Setting | Default | What it does |
+| --- | --- | --- |
+| `REASON_SCHEDULE` | `on` | `on` or `off`. Off leaves reasoning to `POST /v1/reason` |
+| `REASON_INTERVAL_MINUTES` | `60` | Longest gap, 5 to 1440 minutes, between the end of one scheduled run and the start of the next |
+
 ## Calling an instance
 
 ```bash
@@ -61,7 +80,7 @@ The support key gets 403 on every endpoint below except `/healthz`, `GET /v1/int
 | --- | --- | --- |
 | `GET /healthz` | None | Liveness check |
 | `POST /v1/events` | API key | Ingest one event. Returns 202, or 200 for a replay with the same idempotency key, or 403 if the event names another organization |
-| `POST /v1/reason` | API key | Run the reasoners and return recommendations |
+| `POST /v1/reason` | API key | Run the reasoners and return recommendations. The instance also runs them on its own; see [scheduled reasoning](#scheduled-reasoning) |
 | `GET /v1/recommendations` | API key | Latest recommendations, with provenance and the degraded flag (`?limit=`, up to 200) |
 | `POST /v1/recommendations/:id/feedback` | API key | Record `accepted`, `rejected` or `overridden`, with the actor and an optional note |
 | `POST /v1/recommendations/:id/result` | API key | Record what acting on it brought back: `cents` (whole, zero or more), the actor and an optional note. The kind comes from its estimate; one with no estimate needs `kind` (`makes`, `saves` or `protects`) |
@@ -71,7 +90,7 @@ The support key gets 403 on every endpoint below except `/healthz`, `GET /v1/int
 | `GET /v1/entities/:kind/:id` | API key | One canonical entity |
 | `GET /v1/signals` | API key | The latest signals, oldest first (`?kind=` up to 10 comma-separated kinds such as `bank.balance,receivable.invoice`; `?limit=`, 200 by default, up to 1,000). The console reads cash position and receivables this way |
 | `GET /v1/integrations` | API key or support key | Every catalog integration and whether this instance has all its settings (`configured`, `missingSettings`). Names settings, never their values |
-| `GET /v1/support/status` | API key or support key | Operational metadata only: instance name, organization id, version, uptime, applied migrations, retention days, enabled departments and integrations, each integration's missing setting names and last sync (times, mode, outcome, counts, scrubbed last error), dead-letter counts by source and reason, and event counts by day, source and type (`?days=`, 14 by default, up to 90). Never payloads, ids, names, amounts, recommendation text or signal values |
+| `GET /v1/support/status` | API key or support key | Operational metadata only: instance name, organization id, version, uptime, applied migrations, retention days, enabled departments and integrations, each integration's missing setting names and last sync (times, mode, outcome, counts, scrubbed last error), scheduled reasoning's last run (times, trigger, outcome, counts, error class name), dead-letter counts by source and reason, and event counts by day, source and type (`?days=`, 14 by default, up to 90). Never payloads, ids, names, amounts, recommendation text or signal values |
 
 ## Choosing a host
 
