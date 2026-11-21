@@ -69,5 +69,6 @@ export async function readAnswer(sources: BriefSources, question: string): Promi
     sources,
     openFindingsFor(intent, recommendations, feedback).flatMap(({ finding }) => finding.eventIds),
   );
-  return answerQuestion(question, route, { ...data, recommendations, feedback, latestSynced, eventSources });
+  // The sync input carries when scheduled reasoning last refreshed the findings.
+  return answerQuestion(question, route, { ...data, recommendations, feedback, latestSynced, eventSources, ...(sources.sync ? { sync: sources.sync() } : {}) });
 }

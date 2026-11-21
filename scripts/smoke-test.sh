@@ -52,7 +52,8 @@ ROWS=$(psql "$DB_URL" -tAc "select count(*) from events where organization_id = 
 expect 2 "$ROWS" "events stored in Postgres"
 expect 2 "$(psql "$DB_URL" -tAc "select count(*) from dead_letter_events where organization_id = 'smoke-test'")" "dead letters stored"
 expect t "$(psql "$DB_URL" -tAc "select count(*) > 0 from signals where organization_id = 'smoke-test' and kind like 'sale.%'")" "retail signals stored"
-expect 1 "$(psql "$DB_URL" -tAc "select count(*) from reasoning_runs where organization_id = 'smoke-test'")" "reasoning run stored"
+# The manual run above, plus any scheduled run (the daily brief reasons first when the instance starts after its hour).
+expect t "$(psql "$DB_URL" -tAc "select count(*) >= 1 from reasoning_runs where organization_id = 'smoke-test'")" "reasoning run stored"
 
 # Support access: the support key reaches the status (wired to Postgres) and nothing else.
 get() { curl -s -o /dev/null -w '%{http_code}' -H "authorization: Bearer $2" "http://127.0.0.1:8080$1"; }

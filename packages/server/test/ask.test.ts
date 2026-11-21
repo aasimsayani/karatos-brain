@@ -114,6 +114,17 @@ describe("readAnswer", () => {
     expect(after.status).toBe("answered");
   });
 
+  it("says when scheduled reasoning last refreshed the findings it lists", async () => {
+    const b = await stocked();
+    const refreshed = "2026-11-20T14:00:00.000Z";
+    const sync = () => ({ scheduled: [], statuses: [], skipped: [], reasoning: { scheduled: true, last: { outcome: "succeeded" as const, finishedAt: refreshed }, refreshedAt: refreshed } });
+    const a = await readAnswer({ ...b.sources, sync }, "which payouts are late?");
+    expect(a.findings.length).toBeGreaterThan(0);
+    expect(a.reasoning).toMatchObject({ status: "fresh", refreshedAt: refreshed });
+    expect(a.text.endsWith(`Findings were last refreshed at ${refreshed}.`)).toBe(true);
+    expect((await readAnswer(b.sources, "which payouts are late?")).reasoning).toBeUndefined();
+  });
+
   it("answers sync health from the sync runner's results", async () => {
     const b = brain();
     const a = await readAnswer({ ...b.sources, sync: () => ({ scheduled: ["shopify"], statuses: [{ id: "shopify", outcome: "failed", finishedAt: NOW, error: "timeout" }], skipped: [] }) }, "is everything syncing?");

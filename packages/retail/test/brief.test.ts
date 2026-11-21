@@ -13,6 +13,7 @@ import {
   isDay,
   isTimeZone,
   localDay,
+  reasoningNote,
   ruleOf,
   salesDay,
   wallClock,
@@ -438,5 +439,72 @@ describe("buildDailyBrief: sync", () => {
     expect(healthy.text).toContain("Unusual\nNothing unusual.\n");
     const none = buildDailyBrief(input({ sync: { scheduled: ["square"], statuses: [{ id: "square", outcome: "succeeded", finishedAt: at(1) }], skipped: [] } }));
     expect(none.text).toContain("Waiting on you\nNo open recommendations.");
+  });
+});
+
+describe("buildDailyBrief: when findings were last refreshed", () => {
+  const at = (hoursBefore: number) => new Date(Date.parse(GENERATED) - hoursBefore * 3_600_000).toISOString();
+  const sync = (reasoning: NonNullable<DailyBriefInput["sync"]>["reasoning"]) =>
+    input({ recommendations: [rec("rec_repairs_t1_2026-11-18")], sync: { scheduled: ["square"], statuses: [{ id: "square", outcome: "succeeded", finishedAt: at(1) }], skipped: [], ...(reasoning ? { reasoning } : {}) } });
+
+  it("says when the last scheduled run refreshed the findings, last in the brief", () => {
+    const brief = buildDailyBrief(sync({ scheduled: true, last: { outcome: "succeeded", finishedAt: at(2) }, refreshedAt: at(2) }));
+    expect(brief.sync).toMatchObject({ known: true, reasoning: { status: "fresh", refreshedAt: at(2), detail: `Findings were last refreshed at ${at(2)}.` } });
+    expect(brief.text.endsWith(`\n\nFindings were last refreshed at ${at(2)}.`)).toBe(true);
+    // Sync health is unchanged by it.
+    expect(brief.text).toContain("Unusual\nNothing unusual.\n");
+  });
+
+  it("rounds a stale refresh down to whole hours, and takes a successful last run as the latest refresh", () => {
+    const old = at(BRIEF_STALE_SYNC_HOURS + 3.5);
+    expect(reasoningNote({ scheduled: true, last: { outcome: "succeeded", finishedAt: old }, refreshedAt: null }, GENERATED)).toEqual({
+      status: "stale",
+      refreshedAt: old,
+      detail: `Findings were last refreshed ${BRIEF_STALE_SYNC_HOURS + 3} hours ago (${old}), so they may be out of date.`,
+    });
+    expect(reasoningNote({ scheduled: true, last: { outcome: "succeeded", finishedAt: at(1) }, refreshedAt: at(5) }, GENERATED)).toMatchObject({ status: "fresh", refreshedAt: at(1) });
+  });
+
+  it("calls findings refreshed more than a day ago stale, and exactly a day ago fresh", () => {
+    const stale = reasoningNote({ scheduled: true, last: { outcome: "succeeded", finishedAt: at(BRIEF_STALE_SYNC_HOURS + 3) }, refreshedAt: at(BRIEF_STALE_SYNC_HOURS + 3) }, GENERATED);
+    expect(stale).toEqual({
+      status: "stale",
+      refreshedAt: at(BRIEF_STALE_SYNC_HOURS + 3),
+      detail: `Findings were last refreshed ${BRIEF_STALE_SYNC_HOURS + 3} hours ago (${at(BRIEF_STALE_SYNC_HOURS + 3)}), so they may be out of date.`,
+    });
+    expect(reasoningNote({ scheduled: true, last: { outcome: "succeeded", finishedAt: at(BRIEF_STALE_SYNC_HOURS) }, refreshedAt: at(BRIEF_STALE_SYNC_HOURS) }, GENERATED).status).toBe("fresh");
+  });
+
+  it("names a failed last run, with the last refresh or none", () => {
+    expect(reasoningNote({ scheduled: true, last: { outcome: "failed", finishedAt: at(1) }, refreshedAt: at(3) }, GENERATED)).toEqual({
+      status: "failed",
+      refreshedAt: at(3),
+      detail: `The last reasoning run failed (${at(1)}); findings were last refreshed at ${at(3)}.`,
+    });
+    expect(reasoningNote({ scheduled: true, last: { outcome: "failed", finishedAt: at(1) }, refreshedAt: null }, GENERATED)).toEqual({
+      status: "failed",
+      refreshedAt: null,
+      detail: `The last reasoning run failed (${at(1)}); no reasoning run has succeeded since the instance started, so findings may be out of date.`,
+    });
+  });
+
+  it("says when reasoning hasn't run yet, and when scheduled reasoning is off", () => {
+    expect(reasoningNote({ scheduled: true, last: null, refreshedAt: null }, GENERATED)).toEqual({
+      status: "not_run",
+      refreshedAt: null,
+      detail: "Reasoning hasn't finished a run since the instance started, so findings may be out of date.",
+    });
+    const off = buildDailyBrief(sync({ scheduled: false, last: null, refreshedAt: null }));
+    expect(off.sync).toMatchObject({ reasoning: { status: "off", refreshedAt: null } });
+    expect(off.text).toContain("\n\nScheduled reasoning is off on this instance, so findings are only as fresh as the last POST /v1/reason call.");
+  });
+
+  it("leaves it out when the server doesn't report reasoning, and on an instance with nothing to report", () => {
+    const unknown = buildDailyBrief(sync(undefined));
+    expect(unknown.sync.known && "reasoning" in unknown.sync).toBe(false);
+    expect(unknown.text).not.toContain("Findings were");
+    const empty = buildDailyBrief(input({ sync: { scheduled: [], statuses: [], skipped: [], reasoning: { scheduled: true, last: null, refreshedAt: null } } }));
+    expect(empty.hasData).toBe(false);
+    expect(empty.text).not.toContain("Reasoning hasn't");
   });
 });

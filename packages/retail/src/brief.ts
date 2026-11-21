@@ -136,6 +136,22 @@ export interface BriefSyncStatus {
   error?: string;
 }
 
+/** The scheduled reasoning runner's last finished run, as the server reports it. */
+export interface BriefReasoningRun {
+  outcome: "succeeded" | "failed";
+  finishedAt: string;
+}
+
+/** What the server knows about scheduled reasoning: the department rules that raise findings. */
+export interface BriefReasoningInput {
+  /** False when scheduled reasoning is off, so findings refresh only when POST /v1/reason is called. */
+  scheduled: boolean;
+  /** The last finished scheduled run since the instance started, or null before the first. */
+  last: BriefReasoningRun | null;
+  /** When the latest successful scheduled run finished, or null when none has since the instance started. */
+  refreshedAt: string | null;
+}
+
 export interface BriefSyncInput {
   /** Connector ids the instance syncs on a schedule. */
   scheduled: readonly string[];
@@ -143,6 +159,8 @@ export interface BriefSyncInput {
   statuses: readonly BriefSyncStatus[];
   /** Connectors turned on but not syncing, with why. */
   skipped: readonly { id: string; reason: string }[];
+  /** Scheduled reasoning; absent when the caller doesn't know it. */
+  reasoning?: BriefReasoningInput;
 }
 
 export interface BriefEvents {
@@ -243,7 +261,18 @@ export interface SyncProblem {
   at?: string;
 }
 
-export type SyncSection = { known: false; note: string } | { known: true; checkedAt: string; problems: SyncProblem[]; healthy: string[] };
+/** How fresh the findings are: when the department rules last ran over what has synced. */
+export interface ReasoningNote {
+  status: "fresh" | "stale" | "failed" | "not_run" | "off";
+  /** One sentence saying so, with the times. */
+  detail: string;
+  /** When the findings were last refreshed by a scheduled run, or null when they haven't been since the instance started. */
+  refreshedAt: string | null;
+}
+
+export type SyncSection =
+  | { known: false; note: string }
+  | { known: true; checkedAt: string; problems: SyncProblem[]; healthy: string[]; reasoning?: ReasoningNote };
 
 export interface DailyBrief {
   organizationId: string;
@@ -480,7 +509,31 @@ export function syncSection(sync: BriefSyncInput | undefined, generatedAt: strin
     }
   }
   for (const s of sync.skipped) problems.push({ system: s.id, problem: "not_syncing", detail: `turned on but not syncing: ${s.reason}` });
-  return { known: true, checkedAt: generatedAt, problems, healthy: healthy.sort() };
+  return { known: true, checkedAt: generatedAt, problems, healthy: healthy.sort(), ...(sync.reasoning ? { reasoning: reasoningNote(sync.reasoning, generatedAt) } : {}) };
+}
+
+/**
+ * When the findings were last refreshed. A failed last run comes first, then
+ * a refresh older than BRIEF_STALE_SYNC_HOURS; scheduled runs are what count,
+ * since a POST /v1/reason call isn't reported here.
+ */
+export function reasoningNote(reasoning: BriefReasoningInput, generatedAt: string): ReasoningNote {
+  const { refreshedAt } = reasoning;
+  if (!reasoning.scheduled) {
+    return { status: "off", detail: "Scheduled reasoning is off on this instance, so findings are only as fresh as the last POST /v1/reason call.", refreshedAt };
+  }
+  const last = reasoning.last;
+  if (!last) return { status: "not_run", detail: "Reasoning hasn't finished a run since the instance started, so findings may be out of date.", refreshedAt };
+  if (last.outcome === "failed") {
+    const since = refreshedAt ? `findings were last refreshed at ${refreshedAt}` : "no reasoning run has succeeded since the instance started, so findings may be out of date";
+    return { status: "failed", detail: `The last reasoning run failed (${last.finishedAt}); ${since}.`, refreshedAt };
+  }
+  // A run that succeeded is the latest refresh.
+  const age = Date.parse(generatedAt) - Date.parse(last.finishedAt);
+  if (age > BRIEF_STALE_SYNC_HOURS * 3_600_000) {
+    return { status: "stale", detail: `Findings were last refreshed ${Math.floor(age / 3_600_000)} hours ago (${last.finishedAt}), so they may be out of date.`, refreshedAt: last.finishedAt };
+  }
+  return { status: "fresh", detail: `Findings were last refreshed at ${last.finishedAt}.`, refreshedAt: last.finishedAt };
 }
 
 // ---------------------------------------------------------------------------
@@ -544,6 +597,7 @@ function render(brief: Omit<DailyBrief, "text">): string {
   if (!brief.waiting.length) lines.push("No open recommendations.");
   lines.push(...brief.waiting.map(findingText));
   if (brief.moreWaiting) lines.push(`and ${brief.moreWaiting} more.`);
+  if (brief.sync.known && brief.sync.reasoning) lines.push("", brief.sync.reasoning.detail);
   return lines.join("\n");
 }
 

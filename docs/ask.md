@@ -13,7 +13,7 @@ You can ask an instance a question in plain words, such as "what sold this week?
 | What's waiting on you | "What's waiting on me?", "Open recommendations" | Every open recommendation, highest dollar impact first |
 | Sync health | "Is everything syncing?", "Which connectors failed?" | The sync runner's last result for each connector: failed, stale (more than 24 hours old), not run yet, or turned on but not syncing |
 
-A finding is open when nobody has accepted, rejected or overridden its latest raising in the last 14 days, as in the daily brief. Findings come from the latest reasoning run (`POST /v1/reason`), so a finding can only be as recent as that run.
+A finding is open when nobody has accepted, rejected or overridden its latest raising in the last 14 days, as in the daily brief. Findings come from the latest reasoning run, so a finding can only be as recent as that run. The instance reasons on its own after each sync round that brings new events, before the daily brief and at least hourly (see [scheduled reasoning](deployment/instances.md#scheduled-reasoning)), and `POST /v1/reason` still runs it on demand. Answers about findings, and the sync health answer, end by saying when the findings were last refreshed, or that the last run failed, that none has run since the instance started, or that scheduled reasoning is off.
 
 Any other question gets "I can't answer that yet", with the list above.
 
@@ -81,6 +81,7 @@ The response is `{ "answer": { ... } }`. The answer has these fields:
 - `sales`, for a sales question: `totals`, `byChannel`, `bySystem`, `uncounted` and `truncated`, in the same shape as a day in the daily brief.
 - `findings` and `moreFindings`. Each finding is `{ recommendationId, rule?, kind?, summary, confidence, impact?, createdAt, eventIds, signalIds, systems, degraded }`. `kind` says which kind of finding it is within the answer: `late`, `missing`, `short`, `pending`, `failed` or `unrecorded` for payouts; `low` or `disagree` for stock; `awaiting_reply` or `missed_calls` for customers. At most 10 are listed, and `moreFindings` counts the rest.
 - `sync`, for a sync question, in the same shape as the daily brief's.
+- `reasoning`, for findings and sync questions when the instance reports it: when the findings were last refreshed, in the same shape as the daily brief's `sync.reasoning`.
 - `notes`: anything that qualifies the answer, such as figures being a floor.
 - `canAnswer`, for an unsupported question: the list of what can be asked.
 

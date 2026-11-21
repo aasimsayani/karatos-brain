@@ -55,6 +55,13 @@ function appOptions(memory: InMemoryStore, overrides: Partial<BrainAppOptions> =
     enabledIntegrations: ["stripe", "shopify"],
     skipped: [{ id: "shopify", reason: "missing SHOPIFY_SHOP_DOMAIN, SHOPIFY_ADMIN_ACCESS_TOKEN" }],
     syncStatus: () => syncStatus,
+    reasoning: () => ({
+      scheduled: true,
+      intervalMinutes: 60,
+      lastRun: { trigger: "sync", outcome: "succeeded", startedAt: "2026-11-12T15:00:05.000Z", finishedAt: "2026-11-12T15:00:06.000Z", recommendations: 4, measured: 1, error: null },
+      lastSucceededAt: "2026-11-12T15:00:06.000Z",
+      consecutiveFailures: 0,
+    }),
     diagnostics: inMemoryDiagnostics(memory, ["0001_core_schema.sql", "0002_ingestion.sql"]),
     now: () => NOW,
   };
@@ -312,6 +319,13 @@ describe("GET /v1/support/status", () => {
           lastSync: null,
         },
       ],
+      reasoning: {
+        scheduled: true,
+        intervalMinutes: 60,
+        lastRun: { trigger: "sync", outcome: "succeeded", startedAt: "2026-11-12T15:00:05.000Z", finishedAt: "2026-11-12T15:00:06.000Z", recommendations: 4, measured: 1, error: null },
+        lastSucceededAt: "2026-11-12T15:00:06.000Z",
+        consecutiveFailures: 0,
+      },
       deadLetters: { total: 4, bySource: { shopify: 2, other: 1, unknown: 1 }, byReason: { validation_failed: 3, other: 1 } },
       events: {
         days: 14,

@@ -561,3 +561,47 @@ describe("answerQuestion: questions it can't answer", () => {
     expect(answerQuestion("anything", route, data()).intent).toBe("stock");
   });
 });
+
+describe("answerQuestion: when findings were last refreshed", () => {
+  const events = [stored("p1", "stripe", "payout.updated", "2026-11-10T12:00:00.000Z", {})];
+  const pending = rec("rec_finance_payout_pending_stripe:payout:po_1_2026-11-20", ["p1"], { summary: "Stripe payout po_1 is pending." });
+  const refreshed = "2026-11-20T14:30:00.000Z";
+  const sync = (reasoning: NonNullable<AskData["sync"]>["reasoning"]) => ({ scheduled: ["stripe"], statuses: [{ id: "stripe", outcome: "succeeded" as const, finishedAt: "2026-11-20T14:00:00.000Z" }], skipped: [], ...(reasoning ? { reasoning } : {}) });
+  const fresh = sync({ scheduled: true, last: { outcome: "succeeded", finishedAt: refreshed }, refreshedAt: refreshed });
+
+  it("says when the findings it lists were last refreshed", () => {
+    const a = ask("which payouts are late?", { recommendations: [pending], feedback: [], eventSources: { p1: "stripe" }, latestSynced: events[0]!, sync: fresh });
+    expect(a.reasoning).toEqual({ status: "fresh", refreshedAt: refreshed, detail: `Findings were last refreshed at ${refreshed}.` });
+    expect(a.notes).toEqual([`Findings were last refreshed at ${refreshed}.`]);
+    expect(a.text.split("\n").at(-1)).toBe(`Findings were last refreshed at ${refreshed}.`);
+  });
+
+  it("says so when nothing is open, too, and stays quiet when nothing has synced", () => {
+    const none = ask("which payouts are late?", { recommendations: [], feedback: [], latestSynced: events[0]!, sync: fresh });
+    expect(none.text).toMatch(/This is as of the latest reasoning run over what has synced; the latest record it could use is .*\.\nFindings were last refreshed at 2026-11-20T14:30:00.000Z\.$/);
+    const waiting = ask("what's waiting on me?", { recommendations: [], feedback: [], sync: fresh });
+    expect(waiting).toMatchObject({ status: "no_data" });
+    expect(waiting.text.endsWith(`\nFindings were last refreshed at ${refreshed}.`)).toBe(true);
+    const answered = ask("what's waiting on me?", { recommendations: [pending], feedback: [{ recommendationId: pending.id, organizationId: ORG, outcome: "accepted", actor: "owner", recordedAt: NOW.toISOString() }], sync: fresh });
+    expect(answered.text.endsWith(`answered.\nFindings were last refreshed at ${refreshed}.`)).toBe(true);
+    const nothing = ask("which payouts are late?", { recommendations: [], feedback: [], latestSynced: null, sync: fresh });
+    expect(nothing.text).not.toContain("refreshed");
+  });
+
+  it("names a failed run, and says nothing about it when the server doesn't report reasoning", () => {
+    const failed = ask("which payouts are late?", { recommendations: [pending], feedback: [], eventSources: { p1: "stripe" }, sync: sync({ scheduled: true, last: { outcome: "failed", finishedAt: refreshed }, refreshedAt: null }) });
+    expect(failed.reasoning?.status).toBe("failed");
+    expect(failed.text).toContain("The last reasoning run failed (2026-11-20T14:30:00.000Z)");
+    const unknown = ask("which payouts are late?", { recommendations: [pending], feedback: [], eventSources: { p1: "stripe" }, sync: sync(undefined) });
+    expect(unknown.reasoning).toBeUndefined();
+    expect(unknown.notes).toEqual([]);
+    expect("reasoning" in ask("which payouts are late?", { recommendations: [pending], feedback: [] })).toBe(false);
+  });
+
+  it("adds it to sync health", () => {
+    const a = ask("is everything syncing?", { sync: fresh });
+    expect(a.text.split("\n")).toEqual(["Every scheduled connector's last sync succeeded within the last day.", `Findings were last refreshed at ${refreshed}.`]);
+    expect(a.reasoning).toMatchObject({ status: "fresh" });
+    expect("reasoning" in ask("is everything syncing?", { sync: sync(undefined) })).toBe(false);
+  });
+});
