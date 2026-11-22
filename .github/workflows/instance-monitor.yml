@@ -1,0 +1,124 @@
+name: Instance monitor
+
+# Reusable: a private ops repo calls this on its own schedule, with its own
+# instance list and support keys, and the issues it files land in that repo.
+# This public repo never runs it on a schedule and lists no instance: a run
+# here would put instance names in public logs. See docs/monitoring.md.
+on:
+  workflow_call:
+    inputs:
+      config:
+        description: The monitor config as JSON (instances with name, baseUrl and supportKeyEnv). Use this or config-file.
+        type: string
+        required: false
+        default: ""
+      config-file:
+        description: Path to the config file in the calling repo. Use this or config.
+        type: string
+        required: false
+        default: ""
+      open-issues:
+        description: Keep one issue per instance in the calling repo, opened, commented on and closed as its health changes.
+        type: boolean
+        required: false
+        default: false
+      expected-migrations:
+        description: Also expect every migration in the checked-out release to be applied. Pin brain-ref to the release the instances run first.
+        type: boolean
+        required: false
+        default: false
+      brain-ref:
+        description: The release, tag or commit of the monitor to run. Pin it to what the instances run.
+        type: string
+        required: false
+        default: main
+    secrets:
+      SUPPORT_KEYS:
+        description: One NAME=key line per instance, NAME being the instance's supportKeyEnv.
+        required: true
+    outputs:
+      healthy:
+        description: "\"true\" when every instance is healthy."
+        value: ${{ jobs.check.outputs.healthy }}
+  # A manual run here uses this repo's SUPPORT_KEYS secret, and its logs are public:
+  # point it only at a demo or test instance.
+  workflow_dispatch:
+    inputs:
+      config:
+        description: The monitor config as JSON.
+        type: string
+        required: true
+      open-issues:
+        description: Keep one issue per instance.
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: instance-monitor-${{ github.repository }}
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      issues: write
+    outputs:
+      healthy: ${{ steps.monitor.outputs.healthy }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          repository: aasimsayani/karatos-brain
+          ref: ${{ inputs.brain-ref || 'main' }}
+          path: brain
+      # Only the config file from the calling repo.
+      - if: inputs.config-file != ''
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          path: ops
+          sparse-checkout: ${{ inputs.config-file }}
+          sparse-checkout-cone-mode: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: brain/package-lock.json
+      - run: npm ci
+        working-directory: brain
+      # Counts and times from the last run, for dead-letter growth. A miss takes a new baseline.
+      - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: brain/.instance-monitor/state.json
+          key: instance-monitor-${{ github.run_id }}
+          restore-keys: instance-monitor-
+      # Mask each key on its own, as well as the secret as a whole.
+      - name: Mask support keys
+        run: |
+          while IFS= read -r line; do
+            value="${line#*=}"
+            if [ -n "$value" ] && [ "$value" != "$line" ]; then echo "::add-mask::$value"; fi
+          done <<< "$MONITOR_SUPPORT_KEYS"
+        env:
+          MONITOR_SUPPORT_KEYS: ${{ secrets.SUPPORT_KEYS }}
+      - id: monitor
+        run: npm run -s monitor -- --state .instance-monitor/state.json --json-file .instance-monitor/report.json
+        working-directory: brain
+        env:
+          MONITOR_CONFIG: ${{ inputs.config }}
+          MONITOR_CONFIG_FILE: ${{ inputs.config-file != '' && format('{0}/ops/{1}', github.workspace, inputs.config-file) || '' }}
+          MONITOR_SUPPORT_KEYS: ${{ secrets.SUPPORT_KEYS }}
+          MONITOR_ISSUES: ${{ inputs.open-issues }}
+          MONITOR_MIGRATIONS_DIR: ${{ inputs.expected-migrations && 'supabase/migrations' || '' }}
+          GITHUB_TOKEN: ${{ github.token }}
+      # Saved whatever the check found, so the next run compares against this one.
+      - if: always()
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: brain/.instance-monitor/state.json
+          key: instance-monitor-${{ github.run_id }}

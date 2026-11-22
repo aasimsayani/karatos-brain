@@ -44,6 +44,10 @@ Isolation is layered. A request needs the right API key. Every event is pinned t
 6. **Hand out the API key** only to that client's agents and connectors.
 7. **Set up support access, if the client wants it.** Generate a support key with `npm run secrets:setup -- --generate-only --purposes core,instance,migrations,support`, put `SUPPORT_API_KEY` in the host's secret store and restart. Give that key, never `INSTANCE_API_KEY`, to whoever supports the instance; it reaches only `GET /healthz`, `GET /v1/integrations` and `GET /v1/support/status`. For a client who wants their data kept from you, the client creates and owns the Supabase project and the host account in steps 1 and 5, and shares only the support key: anyone with database or host access can still read everything.
 
+## Monitoring instances
+
+Run the [instance monitor](../monitoring.md) from a private ops repo to hear when an instance stops answering, a connector fails or falls behind, dead letters pile up, migrations are missing or scheduled reasoning keeps failing. It uses only each instance's support key, so it never sees business data, and it can keep one GitHub issue per instance in the ops repo, closing it when the instance is healthy again.
+
 ## Scheduled reasoning
 
 The department rules (payout matching, stock agreement, customers awaiting a reply, return rates and the rest) run on their own, so the findings in the [daily brief](../daily-brief.md) and in [answers](../ask.md) stay fresh without anyone calling `POST /v1/reason`. Each run does what that route does: it reasons over recent signals, then records the results now due on approved recommendations.
