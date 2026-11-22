@@ -368,7 +368,7 @@ Run `npm run secrets:plan` to see which settings are still missing, without prin
 <details>
 <summary><strong>One instance per client</strong></summary>
 
-Each business runs its own instance: its own Supabase project, container, API key and private deploy repo, all on the same public image. An instance serves exactly one organization and turns away events for any other. See [docs/deployment/instances.md](docs/deployment/instances.md).
+Each business runs its own instance: its own Supabase project, container, API key and private deploy repo, all on the same public image. An instance serves exactly one organization and turns away events for any other. See [docs/deployment/instances.md](docs/deployment/instances.md), and [monitoring instances](docs/monitoring.md) to hear when one needs attention.
 
 On the Core plan, the database, the container and every credential sit in accounts the business owns, so once setup is done we have no access to any of it. On the Managed plan we host the instance for the business, still isolated from every other client, and reach it only to keep it running and add integrations. See [docs/open-core.md](docs/open-core.md#your-instance-your-data).
 
@@ -464,6 +464,7 @@ This repository is public. Never commit a secret, customer data, a bank statemen
 - CI runs `npm run secrets:scan` on every push.
 - Raw vendor payloads are cleared after 30 days; the facts drawn from them, and the links back to their source, stay.
 - `SUPPORT_API_KEY` lets someone debug an instance without reaching its data: it opens only the health, integrations and support status routes. See [support access](docs/security.md#support-access-without-seeing-data).
+- The [instance monitor](docs/monitoring.md) checks each instance's health, syncs, dead letters, migrations and scheduled reasoning with the support key alone, from a private ops repo on a schedule, and can keep one GitHub issue per instance.
 - How the code, the instance API, the website and CI are protected is in [docs/security.md](docs/security.md).
 
 </details>
