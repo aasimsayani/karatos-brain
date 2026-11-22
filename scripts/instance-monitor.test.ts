@@ -659,7 +659,7 @@ describe("a run over every instance", () => {
     const fetch: Fetch = async (url, init) => {
       const auth = (init.headers as Record<string, string>).authorization;
       if (auth) seen.push(auth);
-      if (url.startsWith("https://beta.example.test")) networkError();
+      if (new URL(url).host === "beta.example.test") networkError();
       return url.includes("healthz") ? json({}) : json(body);
     };
     const config = parseConfig({
@@ -1033,7 +1033,12 @@ describe("the reusable workflow", () => {
   it("asks for read access and issues: write only, and takes the keys as a secret", async () => {
     const w = await text;
     expect([...w.matchAll(/^(\s*)permissions:\n((?:\1 {2}\S.*\n)+)/gm)].map((m) => m[2]!.trim().split(/\n\s*/))).toEqual([["contents: read"], ["contents: read", "issues: write"]]);
-    expect(w).toMatch(/secrets:\n\s+SUPPORT_KEYS:\n(\s+.*\n)*?\s+required: true/);
+    const lines = w.split("\n");
+    const keysAt = lines.findIndex((l, i) => /^\s+SUPPORT_KEYS:$/.test(l) && /^\s+secrets:$/.test(lines[i - 1] ?? ""));
+    expect(keysAt).toBeGreaterThan(0);
+    const indent = lines[keysAt]!.search(/\S/);
+    const block = lines.slice(keysAt + 1).filter((l, i, all) => all.slice(0, i + 1).every((x) => x.search(/\S/) > indent));
+    expect(block.map((l) => l.trim())).toContain("required: true");
     expect(w).toContain("MONITOR_SUPPORT_KEYS: ${{ secrets.SUPPORT_KEYS }}");
     expect(w).toContain("GITHUB_TOKEN: ${{ github.token }}");
     expect(w).not.toMatch(/secrets\.(?!SUPPORT_KEYS\b)/);
