@@ -10,6 +10,7 @@ import {
   type ShopifyOrder,
   type ShopifyProduct,
 } from "./normalize.js";
+import { shopifyVerify } from "./verify.js";
 import { shopifyWebhookEvents, type ShopifyWebhookDelivery } from "./webhooks.js";
 
 /**
@@ -207,5 +208,6 @@ export function shopifyConnector(options: ShopifyConnectorOptions): Connector {
     incrementalSync: (context) => pages("incremental", context),
     handleWebhook: (body) => shopifyWebhookEvents(body as ShopifyWebhookDelivery, now().toISOString(), customerKey),
     writes: SHOPIFY_WRITES,
+    verify: (period) => shopifyVerify(client, period),
   };
 }

@@ -1,6 +1,7 @@
 import type { Connector, SourceBatch, SyncContext, WriteAction } from "@karatos/core";
 import { stripeClient, type StripeClient, type StripeClientOptions } from "./client.js";
 import { stripeObjectEvents, type StripeBrainEvent } from "./normalize.js";
+import { stripeVerify } from "./verify.js";
 import { stripeWebhookEvents, STRIPE_EVENT_TYPES, type StripeEvent } from "./webhooks.js";
 
 /**
@@ -161,5 +162,6 @@ export function stripeConnector(options: StripeConnectorOptions): Connector {
     incrementalSync: (context) => pages("incremental", context),
     handleWebhook: (body) => stripeWebhookEvents(body as StripeEvent, now().toISOString()),
     writes: STRIPE_WRITES,
+    verify: (period) => stripeVerify(client, period),
   };
 }

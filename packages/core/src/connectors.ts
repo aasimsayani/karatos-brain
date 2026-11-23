@@ -1,5 +1,6 @@
 import type { MemoryStore } from "./layers.js";
 import type { WriteAction } from "./writes.js";
+import type { VerifyPeriod, VerifySource } from "./verify.js";
 import { DeadLetteredError, type BrainPipeline } from "./pipeline.js";
 
 /** A page of raw source records plus the cursor to resume after it. */
@@ -27,6 +28,12 @@ export interface Connector {
   handleWebhook?(body: unknown): unknown[];
   /** Write actions this connector can perform. Each runs only through a WriteGate, which is off by default. */
   readonly writes?: readonly WriteAction[];
+  /**
+   * Optional: what the source system itself reports for a period, to check
+   * the synced figures against. Read-only, with the scopes the connector
+   * already syncs with; never goes through a WriteGate. See docs/verify-sync.md.
+   */
+  verify?(period: VerifyPeriod): Promise<VerifySource[]>;
 }
 
 export interface RunSyncOptions {

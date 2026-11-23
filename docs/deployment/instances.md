@@ -48,6 +48,10 @@ Isolation is layered. A request needs the right API key. Every event is pinned t
 
 Run the [instance monitor](../monitoring.md) from a private ops repo to hear when an instance stops answering, a connector fails or falls behind, dead letters pile up, migrations are missing or scheduled reasoning keeps failing. It uses only each instance's support key, so it never sees business data, and it can keep one GitHub issue per instance in the ops repo, closing it when the instance is healthy again.
 
+## Verifying synced numbers
+
+Once a client's systems are connected and their history has imported, run `npm run verify-sync` against the instance to show that its numbers match the source systems' own. For a period of store days, it compares Shopify and Square sale counts and gross, Stripe charges and Klaviyo's new profiles with what synced, and lists the ids of any record on one side only. It needs the instance API key, because the ids are business records, and it makes no writes. See [verifying synced numbers](../verify-sync.md).
+
 ## Scheduled reasoning
 
 The department rules (payout matching, stock agreement, customers awaiting a reply, return rates and the rest) run on their own, so the findings in the [daily brief](../daily-brief.md) and in [answers](../ask.md) stay fresh without anyone calling `POST /v1/reason`. Each run does what that route does: it reasons over recent signals, then records the results now due on approved recommendations.
@@ -91,6 +95,7 @@ The support key gets 403 on every endpoint below except `/healthz`, `GET /v1/int
 | `GET /v1/value` | API key | The value ledger for the recommendations raised in a period: shown, approved, dismissed, overridden, returned and still to come, in cents by kind (`?from=2026-10-01&to=2026-11-01`, up to 366 days; this month by default). See [the value ledger](../value-ledger.md) |
 | `GET /v1/brief` | API key | The daily brief for a store day (`?date=2026-11-18`; yesterday in `STORE_TIME_ZONE` by default, up to today): sales, refunds and net by channel and system against the same weekday last week, open payout, stock, reply and return findings, sync problems, and the other open recommendations by impact, every figure citing its event ids and systems. Read-only. See [the daily brief](../daily-brief.md) |
 | `POST /v1/ask`, `GET /v1/ask?q=` | API key | Answer a plain-language question (`{"question": "..."}` or `?q=`, 1 to 500 characters) about sales for a period, late or short payouts, low or disagreeing stock, customers waiting on a reply, open recommendations or sync health, from synced data only, every number citing its event ids and systems. A question it can't answer gets "I can't answer that yet" with what it can. Read-only. See [asking the instance](../ask.md) |
+| `POST /v1/verify` | API key | Compare what has synced with each source system's own totals for whole store days (`{"from": "2026-11-01", "to": "2026-11-15"}`, both included, up to 92 days; optional `system` and `toleranceCents`): match, mismatch or unavailable for each metric, with source and synced totals, the difference and up to 20 ids missing or extra. Read-only, one run at a time (429 while one runs). `npm run verify-sync` calls it. See [verifying synced numbers](../verify-sync.md) |
 | `GET /v1/entities/:kind/:id` | API key | One canonical entity |
 | `GET /v1/signals` | API key | The latest signals, oldest first (`?kind=` up to 10 comma-separated kinds such as `bank.balance,receivable.invoice`; `?limit=`, 200 by default, up to 1,000). The console reads cash position and receivables this way |
 | `GET /v1/integrations` | API key or support key | Every catalog integration and whether this instance has all its settings (`configured`, `missingSettings`). Names settings, never their values |

@@ -108,8 +108,9 @@ export function toCents(amount: string | number | null | undefined): number | nu
   return match[1] ? -cents : cents;
 }
 
-/** Financial statuses at which the money has actually been taken. */
-const PAID = new Set(["PAID", "PARTIALLY_PAID", "PARTIALLY_REFUNDED", "REFUNDED"]);
+/** Financial statuses at which the money has actually been taken. A refunded order was still a sale on its day; its refund is counted on its own. */
+export const SHOPIFY_PAID_STATUSES: ReadonlySet<string> = new Set(["PAID", "PARTIALLY_PAID", "PARTIALLY_REFUNDED", "REFUNDED"]);
+const PAID = SHOPIFY_PAID_STATUSES;
 
 /** Shopify payment gateway names, lowercased, mapped to the sales department's payment methods. */
 export function paymentMethod(gateway: string | undefined): string {

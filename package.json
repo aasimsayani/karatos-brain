@@ -23,6 +23,7 @@
     "sandbox:run": "node --import tsx scripts/sandbox-run.ts",
     "site:freshness": "node --import tsx scripts/site-freshness.ts",
     "monitor": "node --import tsx scripts/instance-monitor-cli.ts",
+    "verify-sync": "node --import tsx scripts/verify-sync-cli.ts",
     "test:coverage": "vitest run --coverage",
     "secrets:plan": "node --import tsx scripts/secrets.ts plan",
     "secrets:setup": "node --import tsx scripts/secrets.ts setup",
