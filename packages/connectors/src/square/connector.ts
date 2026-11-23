@@ -16,6 +16,7 @@ import {
   type SquareContext,
   type SquareRecord,
 } from "./normalize.js";
+import { squareVerify } from "./verify.js";
 import { squareWebhookEvents } from "./webhooks.js";
 
 /**
@@ -278,5 +279,6 @@ export function squareConnector(options: SquareConnectorOptions): Connector {
     incrementalSync: (context) => pages("incremental", context),
     handleWebhook: (body) => squareWebhookEvents(body, { receivedAt: now().toISOString(), customerRef, sku: variationSku }, options.merchantId),
     writes: SQUARE_WRITES,
+    verify: (period) => squareVerify(client, period),
   };
 }

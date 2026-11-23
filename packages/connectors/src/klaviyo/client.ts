@@ -167,15 +167,18 @@ const SORTS: Partial<Record<KlaviyoRoute, readonly string[]>> = {
 };
 /** Each endpoint's largest page, from the docs. */
 export const KLAVIYO_PAGE_SIZES: Partial<Record<KlaviyoRoute, number>> = { profiles: 100, listProfiles: 100, segmentProfiles: 100, campaigns: 100, flows: 50 };
-/** Sparse fieldsets the client may ask for: nothing personal beyond the email and phone number it hashes. */
-const FIELDS: Record<string, string> = {
-  "fields[profile]": "email,phone_number,created,updated,subscriptions",
-  "additional-fields[profile]": "subscriptions",
-  "fields[list]": "name,opt_in_process,created,updated",
-  "fields[segment]": "name,is_active,created,updated",
-  "fields[campaign]": "definition.name,definition.archived,created_at,updated_at",
-  "fields[flow]": "name,status,archived,trigger_type,created,updated",
-  "fields[metric]": "name,integration,created,updated",
+/**
+ * Sparse fieldsets the client may ask for: nothing personal beyond the email and phone number it hashes.
+ * Sync verification asks for profiles' times alone, so it reads no email address or phone number at all.
+ */
+const FIELDS: Record<string, readonly string[]> = {
+  "fields[profile]": ["email,phone_number,created,updated,subscriptions", "created,updated"],
+  "additional-fields[profile]": ["subscriptions"],
+  "fields[list]": ["name,opt_in_process,created,updated"],
+  "fields[segment]": ["name,is_active,created,updated"],
+  "fields[campaign]": ["definition.name,definition.archived,created_at,updated_at"],
+  "fields[flow]": ["name,status,archived,trigger_type,created,updated"],
+  "fields[metric]": ["name,integration,created,updated"],
 };
 
 const MAX_RETRY_AFTER_S = 60;
@@ -205,7 +208,7 @@ function checkParam(route: KlaviyoRoute, key: string, value: string): void {
     if (!m || m[1] !== FILTER_FIELDS[route] || Number.isNaN(Date.parse(m[2]!))) throw new KlaviyoConfigError(`the Klaviyo connector only filters ${route} by a time`);
   } else if (key === "sort") {
     if (!(SORTS[route] ?? []).includes(value)) throw new KlaviyoConfigError(`the Klaviyo connector doesn't sort ${route} that way`);
-  } else if (FIELDS[key] !== value) {
+  } else if (!(Object.hasOwn(FIELDS, key) && FIELDS[key]!.includes(value))) {
     throw new KlaviyoConfigError(`the Klaviyo connector only asks for its listed ${key}`);
   }
 }

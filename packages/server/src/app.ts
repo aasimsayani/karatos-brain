@@ -1,11 +1,12 @@
 import { timingSafeEqual } from "node:crypto";
 import type { IncomingMessage, RequestListener, ServerResponse } from "node:http";
 import { z } from "zod";
-import { DeadLetteredError, monthOf, readValueReport, type BrainPipeline, type IntegrationStatus, type MemoryStore } from "@karatos/core";
-import { ASK_MAX_QUESTION_CHARS, DEFAULT_BRIEF_TIME_ZONE, isDay, localDay, type BriefSyncInput } from "@karatos/retail";
+import { DeadLetteredError, INTEGRATIONS, monthOf, readValueReport, type BrainPipeline, type IntegrationStatus, type MemoryStore } from "@karatos/core";
+import { addDays, ASK_MAX_QUESTION_CHARS, DEFAULT_BRIEF_TIME_ZONE, isDay, localDay, VERIFY_MAX_DAYS, verifyPeriod, type BriefSyncInput } from "@karatos/retail";
 import { readAnswer } from "./ask.js";
 import { readDailyBrief, yesterdayIn, type BriefSources } from "./brief.js";
 import { reasonNow } from "./reasoning.js";
+import { VerifyBusyError, type Verifier } from "./verify.js";
 import { MAX_SUPPORT_EVENT_DAYS, SUPPORT_EVENT_DAYS, supportStatus, type SupportStatusOptions } from "./support.js";
 
 export interface BrainAppOptions {
@@ -27,6 +28,8 @@ export interface BrainAppOptions {
   maxBodyBytes?: number;
   /** What GET /v1/brief and /v1/ask need beyond the store. Without it, days are America/New_York days and sync results are left out. */
   brief?: BrainBriefOptions;
+  /** What POST /v1/verify runs. Without it that route answers 503. Its periods are days in brief.timeZone. */
+  verify?: Verifier;
 }
 
 export interface BrainBriefOptions {
@@ -121,6 +124,22 @@ const ResultBody = z.object({
 export const ASK_MAX_BODY_BYTES = 8_192;
 
 const AskBody = z.object({ question: z.string() });
+
+/** The largest body POST /v1/verify reads. */
+export const VERIFY_MAX_BODY_BYTES = 1_024;
+
+/** The largest money tolerance a caller may set: one dollar. */
+export const VERIFY_MAX_TOLERANCE_CENTS = 100;
+
+const VerifyBody = z
+  .object({
+    system: z.string().regex(/^[a-z][a-z0-9_]{0,63}$/, "system must be an integration id, such as shopify").optional(),
+    from: z.string().refine(isDay, "from must be a day, such as 2026-11-01"),
+    to: z.string().refine(isDay, "to must be a day, such as 2026-11-15"),
+    /** The largest money difference that still matches, in whole cents. */
+    toleranceCents: z.number().int().min(0).max(VERIFY_MAX_TOLERANCE_CENTS).optional(),
+  })
+  .strict();
 
 /** A question as asked, trimmed, or a 400 saying what is wrong with it. */
 function questionFrom(value: unknown): string {
@@ -396,6 +415,30 @@ export function brainRoutes(options: BrainAppOptions): BrainRoute[] {
         const parsed = AskBody.safeParse(await readJson(req, Math.min(limit, ASK_MAX_BODY_BYTES)));
         if (!parsed.success) throw new HttpError(400, "the body must be a JSON object with a question, such as {\"question\": \"what sold this week?\"}");
         return [200, { answer: await readAnswer(askSources(), questionFrom(parsed.data.question)) }];
+      },
+    ],
+    [
+      "POST",
+      /^\/v1\/verify$/,
+      async (req) => {
+        if (!options.verify) throw new HttpError(503, "sync verification isn't set up on this instance");
+        const parsed = VerifyBody.safeParse(await readJson(req, Math.min(limit, VERIFY_MAX_BODY_BYTES)));
+        if (!parsed.success) {
+          throw new HttpError(400, "the body must be {\"from\": day, \"to\": day}, optionally with \"system\" and \"toleranceCents\"", parsed.error.issues.map((i) => ({ path: i.path.join("."), message: i.message })));
+        }
+        const { system, from, to, toleranceCents } = parsed.data;
+        const timeZone = options.brief?.timeZone ?? DEFAULT_BRIEF_TIME_ZONE;
+        const now = (options.brief?.now ?? (() => new Date()))();
+        if (from > to) throw new HttpError(400, "from must be on or before to; both days are included");
+        if (to > localDay(now.getTime(), timeZone)) throw new HttpError(400, "to can't be after today in the store's time zone");
+        if (addDays(from, VERIFY_MAX_DAYS - 1) < to) throw new HttpError(400, `a verification covers at most ${VERIFY_MAX_DAYS} days`);
+        if (system !== undefined && !INTEGRATIONS.some((i) => i.id === system)) throw new HttpError(400, `${system} isn't an integration KaratOS knows`);
+        try {
+          return [200, { verification: await options.verify.run(verifyPeriod(from, to, timeZone), { ...(system !== undefined ? { system } : {}), ...(toleranceCents !== undefined ? { toleranceCents } : {}) }) }];
+        } catch (error) {
+          if (error instanceof VerifyBusyError) throw new HttpError(429, error.message);
+          throw error;
+        }
       },
     ],
     ["GET", /^\/v1\/integrations$/, async () => [200, { integrations: options.integrations ?? [] }], "support"],

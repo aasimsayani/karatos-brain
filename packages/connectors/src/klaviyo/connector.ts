@@ -12,6 +12,7 @@ import {
   type KlaviyoContext,
   type KlaviyoReportWindow,
 } from "./normalize.js";
+import { klaviyoVerify } from "./verify.js";
 import { klaviyoWebhookEvents } from "./webhooks.js";
 
 /**
@@ -293,5 +294,6 @@ export function klaviyoConnector(options: KlaviyoConnectorOptions): Connector & 
     incrementalSync: (context) => pages("incremental", context),
     handleWebhook: (body) => klaviyoWebhookEvents(body, ctx()),
     writes: KLAVIYO_WRITES,
+    verify: (period) => klaviyoVerify(client, customerKey, period),
   };
 }

@@ -14,6 +14,7 @@ import { sales } from "./departments/sales.js";
 export * from "./department.js";
 export * from "./brief.js";
 export * from "./ask.js";
+export * from "./verify.js";
 export {
   DEFAULT_PAYOUT_SCHEDULE_DAYS,
   money,

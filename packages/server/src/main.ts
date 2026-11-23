@@ -14,6 +14,7 @@ import { createRetentionRunner } from "./retention.js";
 import { createReasoningRunner, REASONING_OFF, reasonNow } from "./reasoning.js";
 import { postgresDiagnostics } from "./support.js";
 import { createSyncRunner, scheduledConnectors } from "./sync.js";
+import { createVerifier } from "./verify.js";
 
 const startedAt = new Date();
 const { version } = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")) as { version: string };
@@ -83,6 +84,8 @@ const server = createServer(
     ...(config.SUPPORT_API_KEY ? { supportApiKey: config.SUPPORT_API_KEY } : {}),
     integrations: integrationStatuses(process.env),
     brief: { timeZone: config.STORE_TIME_ZONE, sync: briefSync },
+    // POST /v1/verify: the source systems' own totals beside what has synced, read-only. See docs/verify-sync.md.
+    verify: createVerifier({ memory, organizationId: config.ORGANIZATION_ID, connectors, skipped }),
     support: {
       instanceName: config.INSTANCE_NAME,
       version,
