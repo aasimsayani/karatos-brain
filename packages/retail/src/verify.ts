@@ -22,6 +22,12 @@ import { dayBounds } from "./brief.js";
  *   brief's gross is. A refunded or partly refunded sale still counts on its
  *   day; its refund is the brief's separate refund figure. A cancelled order
  *   that was never paid was never a sale and counts on neither side.
+ * - Refunds are their own records, on the day each was made, whatever day
+ *   the sale was. Each refund is matched by its own id, so several refunds
+ *   of one order are each a record. A store's refunds are counted as the
+ *   brief counts them: each `sale.returned` event once, at the sum of its
+ *   lines' refundCents. A payment processor's are its refunds that
+ *   succeeded, at their amount.
  */
 
 /** Ids listed for each kind of difference; the counts are always whole. */
@@ -38,9 +44,16 @@ export const VERIFY_EVENT_TYPES: Readonly<Record<VerifySubject, readonly string[
   sales: ["sale.completed"],
   charges: ["payment.charge_updated"],
   profiles: ["customer.profile_updated"],
+  refunds: ["sale.returned"],
+  payment_refunds: ["payment.refund_updated"],
 };
 
-export type VerifyMetricName = "sale_count" | "gross_sales" | "charge_count" | "charge_gross" | "profile_count";
+export type VerifyMetricName = "sale_count" | "gross_sales" | "charge_count" | "charge_gross" | "profile_count" | "refund_count" | "refund_total";
+
+const REFUND_METRICS = [
+  { metric: "refund_count", unit: "count" },
+  { metric: "refund_total", unit: "cents" },
+] as const;
 
 /** The metrics each subject is compared on: a count, and its money when it has some. */
 export const VERIFY_METRICS: Readonly<Record<VerifySubject, readonly { metric: VerifyMetricName; unit: "count" | "cents" }[]>> = {
@@ -53,6 +66,8 @@ export const VERIFY_METRICS: Readonly<Record<VerifySubject, readonly { metric: V
     { metric: "charge_gross", unit: "cents" },
   ],
   profiles: [{ metric: "profile_count", unit: "count" }],
+  refunds: REFUND_METRICS,
+  payment_refunds: REFUND_METRICS,
 };
 
 export type VerifyStatus = "match" | "mismatch" | "unavailable";
@@ -131,11 +146,43 @@ const inPeriod = (at: unknown, period: VerifyPeriod) => {
   return !Number.isNaN(t) && t >= Date.parse(period.from) && t < Date.parse(period.to);
 };
 
+/** A return's refund as the brief reads it: the sum of its lines' refundCents, or null when any line can't be read. */
+function returnCents(lines: unknown): number | null {
+  if (!Array.isArray(lines)) return null;
+  let cents = 0;
+  for (const line of lines as unknown[]) {
+    const c = intCents(typeof line === "object" && line !== null ? (line as Record<string, unknown>).refundCents : undefined);
+    if (c === null) return null;
+    cents += c;
+  }
+  return cents;
+}
+
+/** The latest received state of each record in the period, keyed by `refField`; events without the reference are counted as unreadable. */
+function latestStates(events: readonly StoredEvent[], refField: string, period: VerifyPeriod) {
+  const latest = new Map<string, { at: number; payload: Record<string, unknown> }>();
+  let uncounted = 0;
+  for (const e of events) {
+    const ref = e.payloadClearedAt === null ? text(e.payload[refField]) : null;
+    if (ref === null) {
+      uncounted++;
+      continue;
+    }
+    if (!inPeriod(e.occurredAt, period)) continue;
+    const at = Date.parse(e.receivedAt);
+    const seen = latest.get(ref);
+    if (!seen || at >= seen.at) latest.set(ref, { at, payload: e.payload });
+  }
+  return { latest, uncounted };
+}
+
+const positiveCents = (v: unknown): v is number => typeof v === "number" && Number.isSafeInteger(v) && v > 0;
+
 /**
  * What the instance has synced for a subject from one system. `events` are
  * the subject's event types read from the store (VERIFY_EVENT_TYPES), any
- * system; for sales and charges, those that occurred in the period, for
- * profiles those that occurred from the period's start on.
+ * system; for sales, charges and refunds, those that occurred in the
+ * period, for profiles those that occurred from the period's start on.
  */
 export function syncedRecords(subject: VerifySubject, system: string, events: readonly StoredEvent[], period: VerifyPeriod): SyncedRecords {
   const types = VERIFY_EVENT_TYPES[subject];
@@ -154,24 +201,30 @@ export function syncedRecords(subject: VerifySubject, system: string, events: re
     return { records, uncounted, basis: "sale.completed events from this system dated in the period, at their totalCents, as the daily brief counts gross sales" };
   }
 
-  if (subject === "charges") {
-    // A charge is stored once per state; its latest received state is the one compared.
-    const latest = new Map<string, { at: number; status: unknown; cents: unknown }>();
+  if (subject === "refunds") {
+    // Each return event counts once, at the sum of its lines, as the brief counts refunds.
+    const records: VerifySourceRecord[] = [];
     for (const e of mine) {
-      const ref = e.payloadClearedAt === null ? text(e.payload.chargeId) : null;
-      if (ref === null) {
-        uncounted++;
-        continue;
-      }
-      if (!inPeriod(e.occurredAt, period)) continue;
-      const at = Date.parse(e.receivedAt);
-      const seen = latest.get(ref);
-      if (!seen || at >= seen.at) latest.set(ref, { at, status: e.payload.status, cents: e.payload.capturedCents });
+      const ref = text(e.payload.returnId);
+      const cents = returnCents(e.payload.lines);
+      if (e.payloadClearedAt !== null || ref === null || cents === null) uncounted++;
+      else if (inPeriod(e.occurredAt, period)) records.push({ ref, cents });
     }
-    const records = [...latest.entries()].flatMap(([ref, s]) =>
-      s.status === "succeeded" && typeof s.cents === "number" && Number.isSafeInteger(s.cents) && s.cents > 0 ? [{ ref, cents: s.cents }] : [],
-    );
-    return { records, uncounted, basis: "each charge's latest synced state, counted when it succeeded with an amount captured, dated by when it was made" };
+    return { records, uncounted, basis: "sale.returned events from this system dated in the period, at the refundCents of their returned items, as the daily brief counts refunds" };
+  }
+
+  if (subject === "charges" || subject === "payment_refunds") {
+    // A charge or refund is stored once per state; its latest received state is the one compared.
+    const charges = subject === "charges";
+    const { latest, uncounted } = latestStates(mine, charges ? "chargeId" : "refundId", period);
+    const records = [...latest.entries()].flatMap(([ref, { payload }]) => {
+      const cents = charges ? payload.capturedCents : payload.amountCents;
+      return payload.status === "succeeded" && positiveCents(cents) ? [{ ref, cents }] : [];
+    });
+    const basis = charges
+      ? "each charge's latest synced state, counted when it succeeded with an amount captured, dated by when it was made"
+      : "each refund's latest synced state, counted when it succeeded with an amount, dated by when it was made";
+    return { records, uncounted, basis };
   }
 
   // Profiles: each one once, by the day it was created.

@@ -39,6 +39,8 @@ const SHOPIFY_PAGES: Record<string, Recording> = {
   "Customers:": shopifyRecordings[3]!,
   "VerifyOrders:": shopifyRecordings[0]!,
   "VerifyOrders:eyJsYXN0X2lkIjoxMDAyfQ": shopifyRecordings[1]!,
+  "VerifyRefunds:": shopifyRecordings[0]!,
+  "VerifyRefunds:eyJsYXN0X2lkIjoxMDAyfQ": shopifyRecordings[1]!,
 };
 const shopifyFetch: typeof globalThis.fetch = async (_input, init) => {
   const { query, variables } = JSON.parse(String(init?.body)) as { query: string; variables: { after: string | null } };
@@ -50,16 +52,17 @@ const shopify = () => shopifyConnector({ shopDomain: "example-store.myshopify.co
 
 const STRIPE_KEY = ["rk", "test", "0".repeat(24)].join("_");
 const stripePeriod = verifyPeriod("2026-01-03", "2026-01-06", TZ);
-const stripeVerifyUrl = (p: VerifyPeriod, after?: string) =>
-  `https://api.stripe.com/v1/charges?created[gte]=${Date.parse(p.from) / 1000}&created[lt]=${Date.parse(p.to) / 1000}&limit=100${after ? `&starting_after=${after}` : ""}`;
+const stripeVerifyUrl = (p: VerifyPeriod, after?: string, list = "charges") => `https://api.stripe.com/v1/${list}?created[gte]=${Date.parse(p.from) / 1000}&created[lt]=${Date.parse(p.to) / 1000}&limit=100${after ? `&starting_after=${after}` : ""}`;
 const stripeFetch = () =>
   replayFetch(
     [
       ...stripeRecordings,
       { request: { method: "GET", url: stripeVerifyUrl(stripePeriod) }, response: stripeRecordings[0]!.response },
       { request: { method: "GET", url: stripeVerifyUrl(stripePeriod, "ch_test_1003") }, response: stripeRecordings[1]!.response },
-      // No charge was made on January 2nd.
+      { request: { method: "GET", url: stripeVerifyUrl(stripePeriod, undefined, "refunds") }, response: stripeRecordings[2]!.response },
+      // No charge was made or refunded on January 2nd.
       { request: { method: "GET", url: stripeVerifyUrl(verifyPeriod("2026-01-02", "2026-01-02", TZ)) }, response: { status: 200, body: { object: "list", has_more: false, data: [] } } },
+      { request: { method: "GET", url: stripeVerifyUrl(verifyPeriod("2026-01-02", "2026-01-02", TZ), undefined, "refunds") }, response: { status: 200, body: { object: "list", has_more: false, data: [] } } },
     ],
     { reuse: true },
   );
@@ -83,6 +86,11 @@ const fake = (source: string, extra: Partial<Connector> = {}): Connector => ({
   ...extra,
 });
 const shopifyDay = verifyPeriod("2026-01-02", "2026-01-02", TZ);
+/** What a store connector with nothing in the period reports: its sales and its refunds. */
+const nothingSold = async () => [
+  { subject: "sales" as const, records: [], basis: "x" },
+  { subject: "refunds" as const, records: [], basis: "y" },
+];
 const sys = (report: VerifyReport, id: string) => report.systems.find((s) => s.system === id)!;
 
 describe("the verifier", () => {
@@ -97,16 +105,79 @@ describe("the verifier", () => {
     expect(sys(shop, "shopify").metrics.map((m) => [m.metric, m.status, m.sourceTotal, m.syncedTotal, m.difference])).toEqual([
       ["sale_count", "match", 3, 3, 0],
       ["gross_sales", "match", 393_000, 393_000, 0],
+      // 1001's refund was made on January 5th, so its sale day has none.
+      ["refund_count", "match", 0, 0, 0],
+      ["refund_total", "match", 0, 0, 0],
     ]);
     expect(sys(shop, "shopify").basis!.source).toContain("Shopify orders processed in the period");
-    expect(sys(shop, "shopify").basis!.synced).toContain("daily brief");
+    expect(sys(shop, "shopify").basis!.source).toContain("; Shopify refunds created in the period");
+    expect(sys(shop, "shopify").basis!.synced).toContain("as the daily brief counts refunds");
     expect(sys(shop, "shopify")).not.toHaveProperty("uncountedEvents");
+
+    // The refund's own day: no sale, one refund, matched by its id.
+    const refundDay = await v.run(verifyPeriod("2026-01-05", "2026-01-05", TZ), { system: "shopify" });
+    expect(sys(refundDay, "shopify").metrics.map((m) => [m.metric, m.status, m.sourceTotal, m.syncedTotal])).toEqual([
+      ["sale_count", "match", 0, 0],
+      ["gross_sales", "match", 0, 0],
+      ["refund_count", "match", 1, 1],
+      ["refund_total", "match", 15_000, 15_000],
+    ]);
 
     const pay = await v.run(stripePeriod, { system: "stripe" });
     expect(sys(pay, "stripe").metrics.map((m) => [m.metric, m.status, m.sourceTotal, m.syncedTotal])).toEqual([
       ["charge_count", "match", 3, 3],
       ["charge_gross", "match", 268_000, 268_000],
+      ["refund_count", "match", 1, 1],
+      ["refund_total", "match", 20_000, 20_000],
     ]);
+    expect(sys(pay, "stripe").basis!.source).toContain("Stripe refunds created in the period that succeeded");
+  });
+
+  it("names the refunds missing from the instance, those it has extra and those whose amount differs", async () => {
+    const { memory } = await synced();
+    const refundDay = verifyPeriod("2026-01-05", "2026-01-05", TZ);
+    const shopifyRefund = memory.events.find((e) => e.type === "sale.returned" && e.payload.returnId === "shopify:refund:3001")!;
+    shopifyRefund.payload = { ...shopifyRefund.payload, lines: [{ sku: "SKU-TEST-0002", quantity: 1, refundCents: 14_000 }] };
+    await memory.appendEvent({ ...shopifyRefund, id: "shopify_refund_9999", idempotencyKey: "shopify:refund:9999", payload: { saleId: "shopify:order:1004", returnId: "shopify:refund:9999", lines: [{ refundCents: 500 }] } });
+    const report = await verifier(memory).run(refundDay, { system: "shopify" });
+    const [, , count, total] = sys(report, "shopify").metrics;
+    expect(count).toMatchObject({ metric: "refund_count", status: "mismatch", sourceTotal: 1, syncedTotal: 2, difference: 1, missing: { count: 0 }, extra: { count: 1, sample: ["shopify:refund:9999"] } });
+    expect(total).toMatchObject({ metric: "refund_total", status: "mismatch", sourceTotal: 15_000, syncedTotal: 14_500, difference: -500, amountDiffers: { count: 1, sample: ["shopify:refund:3001"] } });
+
+    const stripeRefund = memory.events.findIndex((e) => e.type === "payment.refund_updated" && e.payload.refundId === "stripe:refund:re_test_1");
+    memory.events.splice(stripeRefund, 1);
+    const pay = sys(await verifier(memory).run(stripePeriod, { system: "stripe" }), "stripe");
+    expect(pay.status).toBe("mismatch");
+    expect(pay.metrics[2]).toMatchObject({ metric: "refund_count", status: "mismatch", sourceTotal: 1, syncedTotal: 0, missing: { count: 1, sample: ["stripe:refund:re_test_1"] } });
+    expect(pay.metrics.slice(0, 2).map((m) => m.status)).toEqual(["match", "match"]);
+  });
+
+  it("says why refunds are unavailable when the connector says so, and still checks the sales", async () => {
+    const memory = new InMemoryStore();
+    const v = createVerifier({
+      memory,
+      organizationId: ORG,
+      skipped: [],
+      connectors: [
+        scheduled("shopify", () =>
+          fake("shopify", {
+            verify: async () => [
+              { subject: "sales", records: [], basis: "x" },
+              { subject: "refunds", records: [{ ref: "shopify:refund:1", cents: 1 }], basis: "y", unavailable: "shopify:order:1 has more than 10 refunds" },
+            ],
+          }),
+        ),
+      ],
+    });
+    const report = sys(await v.run(shopifyDay, { system: "shopify" }), "shopify");
+    expect(report.status).toBe("unavailable");
+    expect(report.metrics.map((m) => [m.metric, m.status, m.reason])).toEqual([
+      ["sale_count", "match", undefined],
+      ["gross_sales", "match", undefined],
+      ["refund_count", "unavailable", "shopify:order:1 has more than 10 refunds"],
+      ["refund_total", "unavailable", "shopify:order:1 has more than 10 refunds"],
+    ]);
+    expect(report.basis).toEqual({ source: "x", synced: expect.stringContaining("sale.completed") });
   });
 
   it("names the sales missing from the instance and those it has extra", async () => {
@@ -161,7 +232,12 @@ describe("the verifier", () => {
     expect(sys(await v.run(shopifyDay, { system: "shopify" }), "shopify")).toMatchObject({ status: "unavailable", reason: "the shopify connector has no verify support" });
     const wrong = sys(await v.run(shopifyDay, { system: "stripe" }), "stripe");
     expect(wrong.status).toBe("unavailable");
-    expect(wrong.metrics.map((m) => m.reason)).toEqual(["the stripe connector didn't report charges", "the stripe connector didn't report charges"]);
+    expect(wrong.metrics.map((m) => m.reason)).toEqual([
+      "the stripe connector didn't report charges",
+      "the stripe connector didn't report charges",
+      "the stripe connector didn't report payment_refunds",
+      "the stripe connector didn't report payment_refunds",
+    ]);
     expect(wrong).not.toHaveProperty("basis");
   });
 
@@ -190,9 +266,9 @@ describe("the verifier", () => {
     const memory = new InMemoryStore();
     const one = { source: "shopify", type: "sale.completed" } as StoredEvent;
     vi.spyOn(memory, "eventsBetween").mockResolvedValue(Array.from({ length: VERIFY_MAX_SYNCED_EVENTS + 1 }, () => one));
-    const v = createVerifier({ memory, organizationId: ORG, skipped: [], connectors: [scheduled("shopify", () => fake("shopify", { verify: async () => [{ subject: "sales", records: [], basis: "x" }] }))] });
+    const v = createVerifier({ memory, organizationId: ORG, skipped: [], connectors: [scheduled("shopify", () => fake("shopify", { verify: nothingSold }))] });
     const report = await v.run(shopifyDay, { system: "shopify" });
-    expect(sys(report, "shopify").metrics.map((m) => m.reason)).toEqual([`more than ${VERIFY_MAX_SYNCED_EVENTS} synced events in the period; verify a shorter period`, `more than ${VERIFY_MAX_SYNCED_EVENTS} synced events in the period; verify a shorter period`]);
+    expect(sys(report, "shopify").metrics.map((m) => m.reason)).toEqual(Array.from({ length: 4 }, () => `more than ${VERIFY_MAX_SYNCED_EVENTS} synced events in the period; verify a shorter period`));
   });
 
   it("reads profile events from the period's start through now, and sales and charges in the period only", async () => {
@@ -212,7 +288,12 @@ describe("the verifier", () => {
     const report = await v.run(shopifyDay);
     expect(spy.mock.calls.map((c) => c.slice(1))).toEqual([[["customer.profile_updated"], shopifyDay.from, "2026-01-20T15:00:01.000Z", VERIFY_MAX_SYNCED_EVENTS + 1]]);
     expect(sys(report, "klaviyo").metrics[0]).toMatchObject({ metric: "profile_count", status: "mismatch", sourceTotal: 1, syncedTotal: 0, missing: { sample: ["klaviyo_profile:a"] } });
-    expect(sys(report, "square").metrics.map((m) => m.reason)).toEqual(["the square connector didn't report sales", "the square connector didn't report sales"]);
+    expect(sys(report, "square").metrics.map((m) => m.reason)).toEqual([
+      "the square connector didn't report sales",
+      "the square connector didn't report sales",
+      "the square connector didn't report refunds",
+      "the square connector didn't report refunds",
+    ]);
     // A period ending after now still reads through its end.
     spy.mockClear();
     const late = createVerifier({ memory, organizationId: ORG, skipped: [], now: () => new Date("2026-01-01T00:00:00Z"), connectors: [scheduled("klaviyo", () => fake("klaviyo", { verify: async () => [{ subject: "profiles", records: [], basis: "x" }] }))] });
@@ -231,7 +312,7 @@ describe("the verifier", () => {
     const memory = new InMemoryStore();
     let release!: () => void;
     const gate = new Promise<void>((resolve) => (release = resolve));
-    const v = createVerifier({ memory, organizationId: ORG, skipped: [], connectors: [scheduled("shopify", () => fake("shopify", { verify: async () => (await gate, [{ subject: "sales", records: [], basis: "x" }]) }))] });
+    const v = createVerifier({ memory, organizationId: ORG, skipped: [], connectors: [scheduled("shopify", () => fake("shopify", { verify: async () => (await gate, nothingSold()) }))] });
     expect(v.running()).toBe(false);
     const first = v.run(shopifyDay, { system: "shopify" });
     expect(v.running()).toBe(true);
@@ -258,7 +339,8 @@ describe("the verifier", () => {
     const before = memory.events.length;
     await createVerifier({ memory, organizationId: ORG, skipped: [], connectors: [scheduled("shopify", shopify), scheduled("stripe", () => stripe(fetch as never))] }).run(stripePeriod);
     for (const spy of spies) expect(spy).not.toHaveBeenCalled();
-    expect(methods).toEqual(["GET", "GET"]);
+    // Two pages of charges and one of refunds.
+    expect(methods).toEqual(["GET", "GET", "GET"]);
     // Nothing was stored either.
     expect(memory.events.length).toBe(before);
     for (const spy of spies) spy.mockRestore();
@@ -266,16 +348,21 @@ describe("the verifier", () => {
 
   it("puts no customer names, emails, phone numbers or payloads in the report", async () => {
     const { memory } = await synced();
-    const report = await verifier(memory).run(shopifyDay);
-    const text = JSON.stringify(report);
+    const v = verifier(memory);
+    // The sale day, the refund's day in Shopify and the days around Stripe's refund.
+    const reports = [await v.run(shopifyDay), await v.run(verifyPeriod("2026-01-05", "2026-01-05", TZ), { system: "shopify" }), await v.run(stripePeriod, { system: "stripe" })];
+    expect(reports.flatMap((r) => r.systems.flatMap((s) => s.metrics.filter((m) => m.metric === "refund_count").map((m) => m.sourceTotal)))).toEqual([0, null, 0, 1, 1]);
     expect(memory.events.some((e) => JSON.stringify(e.payload).includes("Test Customer"))).toBe(true);
-    expect(text).not.toMatch(/Test Customer|@|555[- ]?01|payload|lines|customerId|displayName/i);
-    // Only the fields the report is made of.
-    for (const s of report.systems) {
-      for (const key of Object.keys(s)) expect(["system", "status", "period", "metrics", "basis", "uncountedEvents", "reason"]).toContain(key);
-      for (const m of s.metrics) {
-        for (const key of Object.keys(m)) expect(["metric", "unit", "status", "sourceTotal", "syncedTotal", "difference", "toleranceCents", "missing", "extra", "amountDiffers", "reason"]).toContain(key);
-        for (const id of [...m.missing.sample, ...m.extra.sample]) expect(id).toMatch(/^[a-z_]+:[a-z_]+:[A-Za-z0-9_]+$/);
+    for (const report of reports) {
+      const text = JSON.stringify(report);
+      expect(text).not.toMatch(/Test Customer|@|555[- ]?01|payload|lines|customerId|displayName|SKU-TEST|requested_by_customer/i);
+      // Only the fields the report is made of.
+      for (const s of report.systems) {
+        for (const key of Object.keys(s)) expect(["system", "status", "period", "metrics", "basis", "uncountedEvents", "reason"]).toContain(key);
+        for (const m of s.metrics) {
+          for (const key of Object.keys(m)) expect(["metric", "unit", "status", "sourceTotal", "syncedTotal", "difference", "toleranceCents", "missing", "extra", "amountDiffers", "reason"]).toContain(key);
+          for (const id of [...m.missing.sample, ...m.extra.sample, ...(m.amountDiffers?.sample ?? [])]) expect(id).toMatch(/^[a-z_]+:[a-z_]+:[A-Za-z0-9_]+$/);
+        }
       }
     }
   });
@@ -313,8 +400,7 @@ async function start(options: { verify?: ReturnType<typeof createVerifier>; time
   };
 }
 
-const quiet = (memory = new InMemoryStore()) =>
-  createVerifier({ memory, organizationId: ORG, skipped: [], connectors: [scheduled("shopify", () => fake("shopify", { verify: async () => [{ subject: "sales", records: [], basis: "x" }] }))] });
+const quiet = (memory = new InMemoryStore()) => createVerifier({ memory, organizationId: ORG, skipped: [], connectors: [scheduled("shopify", () => fake("shopify", { verify: nothingSold }))] });
 
 describe("POST /v1/verify", () => {
   it("answers the instance key with the verification, and nobody else", async () => {
