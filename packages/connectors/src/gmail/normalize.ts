@@ -220,7 +220,10 @@ export function gmailNormalizer(options: GmailNormalizeOptions) {
     return { list: addresses.slice(0, MAX_ADDRESSES).map(correspondent), count: addresses.length, addresses: addresses.slice(0, MAX_ADDRESSES) };
   }
 
-  /** The other side's customer references: undefined without a CUSTOMER_REF_KEY. */
+  /**
+   * The other side's customer references: undefined without a CUSTOMER_REF_KEY. IMAP and Outlook use
+   * this too, so an address gives the same references from every mailbox.
+   */
   function customerRefs(addresses: string[]): string[] | undefined {
     if (customerKey === undefined) return undefined;
     return [...new Set(addresses.flatMap((email) => formCustomerRefs(customerKey, { email })))].sort();
@@ -228,6 +231,7 @@ export function gmailNormalizer(options: GmailNormalizeOptions) {
 
   return {
     correspondent,
+    customerRefs,
 
     /**
      * The event for one message's current labels, or none for a draft, spam

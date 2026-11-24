@@ -13,6 +13,7 @@ import {
   OUTLOOK_RENEW_MS,
   OUTLOOK_WRITES,
   OutlookResyncError,
+  formCustomerRefs,
   gmailNormalizer,
   outlookClient,
   outlookConnector,
@@ -566,6 +567,26 @@ describe("Outlook checkpoint", () => {
 });
 
 describe("Outlook connector", () => {
+  it("links each message's other side with CUSTOMER_REF_KEY, never the mailbox's own address, and adds nothing without it", async () => {
+    const CUSTOMER_KEY = "c".repeat(40);
+    const ref = (address: string) => formCustomerRefs(CUSTOMER_KEY, { email: address });
+    const data = account();
+    Object.assign(data.messages!.sentitems![0]!, { ccRecipients: [{ emailAddress: { address: MAILBOX.toUpperCase() } }, { emailAddress: { address: "Cara@Example.test" } }] });
+    const refsOf = (events: OutlookEvent[]) => events.filter((e) => e.type === OUTLOOK_EVENTS.message).map((e) => [e.payload.direction, e.payload.customerRefs]);
+    const linked = eventsOf(await drain(connector(outlookDocMock(data), { customerKey: CUSTOMER_KEY }).historicalImport({ cursor: null } as never)));
+    expect(refsOf(linked)).toEqual([
+      ["received", ref("customer1@example.test")],
+      ["received", ref("customer2@example.test")],
+      ["received", ref("customer3@example.test")],
+      ["sent", [...ref("buyer@vendor.test"), ...ref("cara@example.test")].sort()],
+    ]);
+    // Calendar events carry none.
+    expect(linked.filter((e) => e.type !== OUTLOOK_EVENTS.message).every((e) => !("customerRefs" in e.payload))).toBe(true);
+    const plain = eventsOf(await drain(connector(outlookDocMock(data)).historicalImport({ cursor: null } as never)));
+    expect(plain.every((e) => !("customerRefs" in e.payload))).toBe(true);
+    expect(() => connector(outlookDocMock(data), { customerKey: "short" })).toThrow("CUSTOMER_REF_KEY must be at least 32 characters");
+  });
+
   it("passes the shared connector checks", async () => {
     // Three received and one sent message, and two appointments.
     const result = await checkConnectorSync({ makeConnector: () => connector(outlookDocMock(account())), expected: { ingested: 6 } });

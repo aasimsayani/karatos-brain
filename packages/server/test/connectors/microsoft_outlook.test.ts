@@ -20,4 +20,11 @@ describe("the Microsoft 365 Outlook factory", () => {
     await expect(buildsFromSettings("microsoft_outlook", { ...settings, MICROSOFT_OUTLOOK_CLIENT_SECRET: "short" })).rejects.toThrow(/MICROSOFT_OUTLOOK_CLIENT_SECRET/);
     await expect(buildsFromSettings("microsoft_outlook", { ...settings, CORRESPONDENT_HASH_KEY: "short" })).rejects.toThrow(/CORRESPONDENT_HASH_KEY/);
   });
+
+  it("hands over CUSTOMER_REF_KEY when the instance has one, so a customer's email links with other systems", async () => {
+    expect(skipReason("microsoft_outlook", settings)).toBeNull();
+    await buildsFromSettings("microsoft_outlook", { ...settings, CUSTOMER_REF_KEY: "d".repeat(40) });
+    await expect(buildsFromSettings("microsoft_outlook", { ...settings, CUSTOMER_REF_KEY: "short" })).rejects.toThrow("CUSTOMER_REF_KEY must be at least 32 characters");
+    await buildsFromSettings("microsoft_outlook", { ...settings, CUSTOMER_REF_KEY: "" });
+  });
 });

@@ -164,7 +164,7 @@ Clienteling recognizes the same customer across channels without knowing who the
 
 | What it links on | Systems |
 | --- | --- |
-| Email address | Custom forms, Klaviyo, Mailchimp, Gorgias, Zendesk, Yotpo, Judge.me, Smile.io, AvaTax, Sola, Calendly, Acuity, Zoom, DocuSign; Gmail and Shopify when set up as below |
+| Email address | Custom forms, Klaviyo, Mailchimp, Gorgias, Zendesk, Yotpo, Judge.me, Smile.io, AvaTax, Sola, Calendly, Acuity, Zoom, DocuSign; Gmail, Outlook, IMAP mail and Shopify when set up as below |
 | Phone number | Custom forms, Klaviyo, Quo, RingCentral, WhatsApp, Zendesk, Yotpo, Judge.me, Sola, Calendly, Acuity; Twilio and Shopify when set up as below |
 | A record that names one person's references together | Profiles (`customer.profile_updated` from Klaviyo, Shopify, Zendesk and the others), form submissions, loyalty members, reviews, card payments and bookings |
 
@@ -179,7 +179,7 @@ Why this rule: an unanswered message is the one thing every channel's records sh
 Turning linking on for the systems that don't link by default:
 
 - **Twilio** adds `customerRefs` beside its own `contactRef` when the instance has a `CUSTOMER_REF_KEY`. Texts read before then keep only `contactRef`, which links through later records of the same number that carry both.
-- **Gmail** adds `customerRefs` for the other side of each message (who wrote a received one; who a sent one went to) when the instance has a `CUSTOMER_REF_KEY`. Its correspondent references stay as they were. IMAP and Outlook mail don't carry them yet.
+- **Gmail, Outlook and IMAP mail** add `customerRefs` for the other side of each message (who wrote a received one; who a sent one went to) when the instance has a `CUSTOMER_REF_KEY`, all from the same helper, so one address gives one reference from every mailbox. Their correspondent references stay as they were. Outlook and IMAP also leave out the mailbox's own address (`MICROSOFT_OUTLOOK_MAILBOX`, or `IMAP_USERNAME` when it is an address), so the store writing to itself is nobody waiting. Mail read before the key was set has no references; Outlook stores a message Graph lists again as a new version with them, while Gmail and IMAP keep the version they have.
 - **Shopify** reads a customer's email address and phone number only with `SHOPIFY_LINK_CUSTOMERS=on` and a `CUSTOMER_REF_KEY`, and only to hash them into `contactRefs`. The app needs Shopify's protected customer data access to those two fields. The first sync after it is turned on reads every customer again, so those read before get their references.
 
 Phone numbers are matched in their E.164 form. A number written the North American way without its country code, such as `(212) 555-0123` on a form or in Zendesk, also gets the reference of `+1 212 555 0123`, the form Quo, Twilio, WhatsApp and Klaviyo give. The digits-only reference it had before comes first and is unchanged, so customers already linked stay linked. An extension (`x12`, `ext. 12`, `#12`) and an international `00` are dropped.
@@ -190,6 +190,9 @@ What the records allow, and what they don't:
 - Two people sharing an email address or a phone number are one customer to these rules.
 - A ten-digit number from outside North America written without its `+` is read as North American.
 - Outgoing messages sent by automation in the store's phone system, such as appointment reminders, count as answers.
+- Gmail doesn't know its own address, so a sent message copied to the store's own address also gives the store a reference; it only ever answers. Outlook and IMAP know one address each, so mail from another of the store's addresses or an alias reads as a customer's, and is raised only if that address is also on a customer's record.
+- A sent message counts as an answer to everyone it went to, so a reply that copies another customer answers them too. One to more than 8 people (`MAX_REFS_PER_RECORD`) links nobody.
+- A plus-address (`ana+rings@...`) is its own reference, as on a form, so it links only to records with the same plus-address.
 - Like every rule, it sees the most recent signals in the reasoning window. A profile or an order that fell out of the window no longer links until it is read again, so in a busy store a waiting buyer can show up among everyone else.
 
 ## The daily brief

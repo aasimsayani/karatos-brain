@@ -61,6 +61,8 @@ export interface ImapCursor {
 export interface ImapEmailOptions extends ImapClientOptions {
   /** The instance's CORRESPONDENT_HASH_KEY. */
   correspondentKey: string;
+  /** The instance's CUSTOMER_REF_KEY, when it has one: each message then also carries `customerRefs` for the other side. */
+  customerKey?: string | undefined;
   /** Years of history the import reads. Defaults to 5. */
   historyYears?: number;
   /** How far back an incremental sync with no checkpoint reads. Defaults to 48. */
@@ -132,7 +134,8 @@ const chunk = <T>(list: readonly T[], size: number): T[][] => Array.from({ lengt
 
 export function imapEmailConnector(options: ImapEmailOptions): Connector {
   const settings = imapSettings(options);
-  const normalizer = imapNormalizer(options.correspondentKey);
+  // The sign-in name is usually the mailbox's address, which is never a customer.
+  const normalizer = imapNormalizer(options.correspondentKey, { customerKey: options.customerKey, ownAddress: settings.username });
   const historyYears = options.historyYears ?? 5;
   if (!Number.isInteger(historyYears) || historyYears < 1) throw new Error("historyYears must be a positive whole number");
   const lookbackHours = options.incrementalLookbackHours ?? 48;

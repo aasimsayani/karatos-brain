@@ -1,4 +1,5 @@
 import { createHash, createHmac } from "node:crypto";
+import { normalizeEmail } from "../custom_forms/customer.js";
 import { gmailNormalizer, type GmailCorrespondent } from "../gmail/normalize.js";
 import type { ImapFetched } from "./client.js";
 import { imapAddresses, messageIds, parseHeaderBlock } from "./headers.js";
@@ -21,6 +22,15 @@ import { ImapLiteralTooLarge, imapInternalDate } from "./protocol.js";
  * flag, display names and every raw address. Each address becomes the same
  * correspondent reference Gmail's does, from Gmail's own helper, under
  * CORRESPONDENT_HASH_KEY, with the domain kept only for businesses.
+ *
+ * When the instance has a CUSTOMER_REF_KEY, the other side of each message
+ * also becomes `customerRefs`, by Gmail's rule and from Gmail's helper:
+ * the sender of a received message (the Inbox), the To and Cc recipients of
+ * a sent one (the Sent folder). They are the references custom forms,
+ * Klaviyo, Gmail and the help desks make for the same address, so a reply
+ * from this mailbox answers a customer's text or form, and their email
+ * links with their orders. The mailbox's own address (IMAP_USERNAME, when
+ * it is one) is never a customer, so it gives none.
  *
  * IMAP has no message or thread ids of its own that last, so the message's
  * reference is a keyed digest of its Message-ID (or, without one, of its
@@ -70,15 +80,25 @@ export interface ImapMessagePlace {
   uidValidity: string;
 }
 
-export function imapNormalizer(correspondentKey: string) {
-  // Gmail's normalizer checks the key and makes the correspondent references.
-  const { correspondent } = gmailNormalizer({ correspondentKey });
+export interface ImapNormalizeOptions {
+  /** The instance's CUSTOMER_REF_KEY, when it has one: each message then also carries `customerRefs` for the other side. */
+  customerKey?: string | undefined;
+  /** The mailbox's own address, which is never a customer. Anything that isn't an address is ignored. */
+  ownAddress?: string | undefined;
+}
+
+export function imapNormalizer(correspondentKey: string, options: ImapNormalizeOptions = {}) {
+  // Gmail's normalizer checks both keys and makes the correspondent and customer references.
+  const { correspondent, customerRefs } = gmailNormalizer({ correspondentKey, customerKey: options.customerKey });
+  const own = normalizeEmail(options.ownAddress);
+  // The header parser gives addresses trimmed and lowercased, as normalizeEmail gives the mailbox's own.
+  const others = (addresses: string[]) => customerRefs(addresses.filter((a) => a !== own));
   const key = correspondentKey.trim();
   const keyed = (kind: string, text: string) => createHmac("sha256", key).update(`karatos:imap_email:${kind}:v1:${text}`, "utf8").digest("hex").slice(0, 32);
 
-  function people(values: readonly string[] | undefined): { list: GmailCorrespondent[]; count: number } {
+  function people(values: readonly string[] | undefined): { list: GmailCorrespondent[]; count: number; addresses: string[] } {
     const addresses = [...new Set(imapAddresses(values))];
-    return { list: addresses.slice(0, MAX_ADDRESSES).map(correspondent), count: addresses.length };
+    return { list: addresses.slice(0, MAX_ADDRESSES).map(correspondent), count: addresses.length, addresses: addresses.slice(0, MAX_ADDRESSES) };
   }
 
   return {
@@ -109,14 +129,16 @@ export function imapNormalizer(correspondentKey: string) {
       const from = people(fields.get("from"));
       const to = people(fields.get("to"));
       const cc = people(fields.get("cc"));
+      const sent = place.role === "sent";
       const labelIds = [IMAP_ROLE_LABELS[place.role], ...(flags.has("\\seen") ? [] : ["UNREAD"]), ...(flags.has("\\flagged") ? ["STARRED"] : [])].sort();
       return [
         event(`message:${id}:${short(labelIds)}`, IMAP_EMAIL_EVENTS.message, sentAt, receivedAt, defined({
           channel: "email",
           messageId: imapRef("message", id),
           threadId: root === undefined ? undefined : imapRef("thread", keyed("thread", root)),
-          direction: place.role === "sent" ? "sent" : "received",
+          direction: sent ? "sent" : "received",
           sentAt,
+          customerRefs: others(sent ? [...to.addresses, ...cc.addresses] : from.addresses.slice(0, 1)),
           from: from.list[0],
           to: to.list,
           cc: cc.list,
