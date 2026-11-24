@@ -50,7 +50,7 @@ Run the [instance monitor](../monitoring.md) from a private ops repo to hear whe
 
 ## Verifying synced numbers
 
-Once a client's systems are connected and their history has imported, run `npm run verify-sync` against the instance to show that its numbers match the source systems' own. For a period of store days, it compares Shopify and Square sale counts and gross, Stripe charges and Klaviyo's new profiles with what synced, and lists the ids of any record on one side only. It needs the instance API key, because the ids are business records, and it makes no writes. See [verifying synced numbers](../verify-sync.md).
+Once a client's systems are connected and their history has imported, run `npm run verify-sync` against the instance to show that its numbers match the source systems' own. For a period of store days, it compares Shopify and Square sale counts and gross, Stripe charges, refunds from all three and Klaviyo's new profiles with what synced, and lists the ids of any record on one side only. It needs the instance API key, because the ids are business records, and it makes no writes. See [verifying synced numbers](../verify-sync.md).
 
 ## Scheduled reasoning
 

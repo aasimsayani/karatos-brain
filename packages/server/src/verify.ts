@@ -22,12 +22,7 @@ import type { ScheduledConnector, SkippedIntegration } from "./sync.js";
  */
 
 /** The systems sync verification can check, and what it checks for each. */
-export const VERIFIABLE_SYSTEMS: Readonly<Record<string, readonly VerifySubject[]>> = {
-  shopify: ["sales"],
-  square: ["sales"],
-  stripe: ["charges"],
-  klaviyo: ["profiles"],
-};
+export const VERIFIABLE_SYSTEMS: Readonly<Record<string, readonly VerifySubject[]>> = { shopify: ["sales", "refunds"], square: ["sales", "refunds"], stripe: ["charges", "payment_refunds"], klaviyo: ["profiles"] };
 
 export interface VerifyReport {
   generatedAt: string;
@@ -113,6 +108,10 @@ export function createVerifier(options: VerifierOptions) {
       const source = sourceFor(sources, subject);
       if (!source) {
         metrics.push(...unavailableMetrics([subject], `the ${system} connector didn't report ${subject}`));
+        continue;
+      }
+      if (source.unavailable !== undefined) {
+        metrics.push(...unavailableMetrics([subject], source.unavailable.slice(0, 200)));
         continue;
       }
       // Profiles are dated by creation but stored by update, so every profile event from the period's start on is read.

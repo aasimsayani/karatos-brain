@@ -18,8 +18,10 @@ export interface VerifyPeriod {
  * - sales: paid sales by the day they were sold, as `sale.completed` events carry them
  * - charges: captured payments by the day they were made, as `payment.charge_updated` events carry them
  * - profiles: marketing profiles by the day they were created, as `customer.profile_updated` events carry them
+ * - refunds: refunds of sold items by the day they were made, as `sale.returned` events carry them and the daily brief counts them
+ * - payment_refunds: refunds of payments by the day they were made, as `payment.refund_updated` events carry them
  */
-export const VERIFY_SUBJECTS = ["sales", "charges", "profiles"] as const;
+export const VERIFY_SUBJECTS = ["sales", "charges", "profiles", "refunds", "payment_refunds"] as const;
 export type VerifySubject = (typeof VERIFY_SUBJECTS)[number];
 
 /** One record the source system reports in the period. */
@@ -37,6 +39,12 @@ export interface VerifySource {
   records: VerifySourceRecord[];
   /** One sentence on what the source side counts, for the report. */
   basis: string;
+  /**
+   * Set when the source system couldn't be read completely for this subject,
+   * saying why in words that quote nothing the vendor sent; `records` is then
+   * not compared and the subject's metrics are unavailable.
+   */
+  unavailable?: string;
 }
 
 /** The most records one verification reads from a source system before it stops and says so. */
