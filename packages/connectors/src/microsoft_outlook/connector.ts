@@ -60,6 +60,8 @@ export interface OutlookOptions extends Partial<Pick<OutlookClientOptions, "fetc
   mailbox: string;
   /** The instance's CORRESPONDENT_HASH_KEY. */
   correspondentKey: string;
+  /** The instance's CUSTOMER_REF_KEY, when it has one: each message then also carries `customerRefs` for the other side. */
+  customerKey?: string | undefined;
   /** Years of history the import reads. Defaults to 5. */
   historyYears?: number;
   now?: () => Date;
@@ -101,7 +103,7 @@ export function parseOutlookCursor(raw: string | null): OutlookCursor | null {
 export function outlookConnector(options: OutlookOptions): Connector {
   const mailbox = outlookMailbox(options.mailbox);
   if (!mailbox) throw new MicrosoftConfigError("MICROSOFT_OUTLOOK_MAILBOX is missing or not a mailbox address or object id");
-  const normalizer = outlookNormalizer(options.correspondentKey);
+  const normalizer = outlookNormalizer(options.correspondentKey, { customerKey: options.customerKey, mailbox });
   const historyYears = options.historyYears ?? 5;
   if (!Number.isInteger(historyYears) || historyYears < 1) throw new Error("historyYears must be a positive whole number");
   const client = options.client ?? outlookClient(options);

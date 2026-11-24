@@ -33,6 +33,7 @@ import {
   ImapProtocolError,
   ImapReader,
   decodeEncodedWords,
+  formCustomerRefs,
   gmailNormalizer,
   imapAccountLabel,
   imapAddresses,
@@ -1111,6 +1112,30 @@ function readOnly(server: ImapFakeServer, flagsBefore: string): void {
 const flagsOf = (box: ImapFakeMailbox) => JSON.stringify(box.folders.map((f) => f.messages.map((m) => m.flags)));
 
 describe("IMAP connector", () => {
+  it("links each message's other side with CUSTOMER_REF_KEY, never the mailbox's own address, and adds nothing without it", async () => {
+    const CUSTOMER_KEY = "c".repeat(40);
+    const ref = (address: string) => formCustomerRefs(CUSTOMER_KEY, { email: address });
+    const box = mailbox();
+    const sent = folder({ mailbox: box } as ImapFakeServer, "Sent").messages[0]!;
+    sent.header = sent.header.replace("\r\n\r\n", `\r\nCc: ${USER.toUpperCase()}, cara@example.test\r\n\r\n`);
+    const refsOf = (events: ImapEmailEvent[]) => events.filter((e) => e.type === "communication.message_logged").map((e) => [e.payload.direction, e.payload.customerRefs]);
+    const linked = eventsOf(await drain(connector(imapFakeServer(box), { customerKey: CUSTOMER_KEY }).historicalImport(ctx(null))));
+    expect(refsOf(linked)).toEqual([
+      ["received", ref("customer1@example.test")],
+      ["received", ref("customer2@example.test")],
+      ["received", ref("customer3@example.test")],
+      ["sent", [...ref("customer1@example.test"), ...ref("cara@example.test")].sort()],
+      ["sent", ref("customer2@example.test")],
+    ]);
+    const plain = eventsOf(await drain(connector(imapFakeServer(box)).historicalImport(ctx(null))));
+    expect(plain.every((e) => !("customerRefs" in e.payload))).toBe(true);
+    expect(plain.map((e) => e.idempotencyKey)).toEqual(linked.map((e) => e.idempotencyKey));
+    // The connector checks the key before it signs in.
+    expect(() => connector(imapFakeServer(box), { customerKey: "short" })).toThrow("CUSTOMER_REF_KEY must be at least 32 characters");
+    // The links pass the departments' payload checks.
+    await checkConnectorSync({ makeConnector: () => connector(imapFakeServer(mailbox()), { customerKey: CUSTOMER_KEY }), expected: { ingested: 7, deadLettered: 0 }, payloadSchemas: SCHEMAS });
+  });
+
   it("passes the shared sync checks", async () => {
     const box = mailbox();
     // SEARCH finds it by its day, but an hour of 25 doesn't read.

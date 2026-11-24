@@ -21,6 +21,14 @@ describe("the IMAP factory", () => {
     expect((await buildsFromSettings("imap_email", { ...SETTINGS, IMAP_PORT: "" })).source).toBe("imap_email");
   });
 
+  it("hands over CUSTOMER_REF_KEY when the instance has one, so a customer's email links with other systems", async () => {
+    expect(skipReason("imap_email", SETTINGS)).toBeNull();
+    expect((await buildsFromSettings("imap_email", { ...SETTINGS, CUSTOMER_REF_KEY: "d".repeat(40) })).source).toBe("imap_email");
+    await expect(buildsFromSettings("imap_email", { ...SETTINGS, CUSTOMER_REF_KEY: "short" })).rejects.toThrow("CUSTOMER_REF_KEY must be at least 32 characters");
+    // Empty is the same as unset.
+    expect((await buildsFromSettings("imap_email", { ...SETTINGS, CUSTOMER_REF_KEY: " " })).source).toBe("imap_email");
+  });
+
   it("won't build with a setting that doesn't read, and doesn't echo it", async () => {
     const wrong = fakeKey("sk", "live");
     const fail = (env: Record<string, string>) => buildsFromSettings("imap_email", env).then(() => null, (e: unknown) => e as Error);

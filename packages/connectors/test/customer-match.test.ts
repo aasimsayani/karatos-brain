@@ -3,20 +3,25 @@ import { BrainPipeline, InMemoryStore, type Connector, type SourceBatch } from "
 import { RETAIL_DEPARTMENTS, combineDepartments } from "@karatos/retail";
 import { describe, expect, it } from "vitest";
 import {
+  GENERIC_FORM_PROFILE,
   SHOPIFY_LINKED_CUSTOMERS_QUERY,
   SHOPIFY_QUERIES,
   canonicalPhone,
   customerEvents,
   formCustomerRef,
   formCustomerRefs,
+  formSubmissionEvent,
   gmailNormalizer,
   gorgiasMessageEvent,
+  imapNormalizer,
   klaviyoContactRefs,
   klaviyoProfileEvent,
   metaMessageEvent,
   metaRefs,
   normalizePhone,
   orderEvents,
+  outlookNormalizer,
+  parseFormProfile,
   phoneRefs,
   quoCustomerRefs,
   quoMessageEvent,
@@ -26,6 +31,8 @@ import {
   twilioNormalizer,
   whatsappMessageEvent,
   zendeskUserEvent,
+  type ImapFetched,
+  type ImapMessagePlace,
   type ShopifyClient,
   type ShopifyCustomer,
   type ShopifyOrder,
@@ -255,6 +262,111 @@ describe("connectors that now carry customer references", () => {
   });
 });
 
+describe("IMAP and Outlook mail carry the same customer references as Gmail", () => {
+  const STORE = "store@example.test";
+  const INBOX: ImapMessagePlace = { role: "inbox", mailbox: "INBOX", uidValidity: "7" };
+  const SENT: ImapMessagePlace = { role: "sent", mailbox: "Sent", uidValidity: "9" };
+  const imap = imapNormalizer(CORRESPONDENT_KEY, { customerKey: KEY, ownAddress: STORE });
+  const outlook = outlookNormalizer(CORRESPONDENT_KEY, { customerKey: KEY, mailbox: STORE });
+  const gmail = gmailNormalizer({ correspondentKey: CORRESPONDENT_KEY, customerKey: KEY });
+  const imapRefs = (place: ImapMessagePlace, headers: Record<string, string>, n = imapAddressBook.next++) => imap.message(place, imapMessage(n, headers), RECEIVED)[0]!.payload.customerRefs;
+  const outlookRefs = (folder: "inbox" | "sentitems", fields: Record<string, unknown>) => outlook.message(folder, outlookMessage(folder, fields), RECEIVED)[0]!.payload.customerRefs;
+
+  it("gives an address the reference Gmail, Klaviyo and a form give it, in any case, and a plus-address its own", () => {
+    for (const [i, written] of ["ana@example.test", "Ana@Example.TEST", "ANA@EXAMPLE.TEST"].entries()) {
+      const expected = formCustomerRefs(KEY, { email: written });
+      expect(expected).toEqual([emailRef("ana@example.test")]);
+      expect(imapRefs(INBOX, { From: `"Ana Synthetic" <${written}>`, To: STORE }), written).toEqual(expected);
+      expect(outlookRefs("inbox", { from: person(written) }), written).toEqual(expected);
+      expect(gmail.messageEvents(email(`g${i}`, "received", { From: written }), RECEIVED)[0]!.payload.customerRefs).toEqual(expected);
+      expect(klaviyoContactRefs(KEY, { email: written })).toEqual(expected);
+    }
+    // Forms keep a plus-address as it was typed, so every mailbox does too: it is a reference of its own.
+    const plus = formCustomerRefs(KEY, { email: "ana+rings@example.test" });
+    expect(plus).not.toEqual([emailRef("ana@example.test")]);
+    expect(imapRefs(INBOX, { From: "Ana+Rings@example.test" })).toEqual(plus);
+    expect(outlookRefs("inbox", { from: person("Ana+Rings@example.test") })).toEqual(plus);
+    expect(gmail.messageEvents(email("gplus", "received", { From: "Ana+Rings@example.test" }), RECEIVED)[0]!.payload.customerRefs).toEqual(plus);
+    expect(klaviyoContactRefs(KEY, { email: "Ana+Rings@example.test" })).toEqual(plus);
+    // Other instances' keys give other references.
+    const other = imapNormalizer(CORRESPONDENT_KEY, { customerKey: OTHER_KEY }).message(INBOX, imapMessage(90, { From: "ana@example.test" }), RECEIVED)[0]!.payload.customerRefs;
+    expect(other).toEqual([emailRef("ana@example.test", OTHER_KEY)]);
+  });
+
+  it("takes the other side by Gmail's rule: who wrote a received message, who a sent one went to, never the store", () => {
+    const received = { From: "Ana <ana@example.test>, other@example.test", To: `${STORE}, ben@example.test`, Cc: "cara@example.test" };
+    const sent = { From: `Store <${STORE}>`, To: "Ana <ana@example.test>, ben@example.test", Cc: `Ana@example.test, cara@example.test, ${STORE.toUpperCase()}` };
+    const customers = [emailRef("ana@example.test"), emailRef("ben@example.test"), emailRef("cara@example.test")].sort();
+    expect(imapRefs(INBOX, received)).toEqual([emailRef("ana@example.test")]);
+    expect(imapRefs(SENT, sent)).toEqual(customers);
+    const bare = (a: string) => a.replace(/.*</, "").replace(/>/g, "");
+    const graph = (h: Record<string, string>) => ({
+      from: person(bare(h.From!.split(",")[0]!)),
+      toRecipients: h.To!.split(",").map((a) => person(bare(a))),
+      ccRecipients: h.Cc!.split(",").map((a) => person(a)),
+    });
+    expect(outlookRefs("inbox", graph(received))).toEqual([emailRef("ana@example.test")]);
+    expect(outlookRefs("sentitems", graph(sent))).toEqual(customers);
+    // Gmail gives the same for the same message, except that it doesn't know which address is the store's.
+    expect(gmail.messageEvents(email("gin", "received", received), RECEIVED)[0]!.payload.customerRefs).toEqual([emailRef("ana@example.test")]);
+    expect(gmail.messageEvents(email("gout", "sent", sent), RECEIVED)[0]!.payload.customerRefs).toEqual([...customers, emailRef(STORE)].sort());
+    // The mailbox writing to itself, or a message from it in the inbox, is nobody waiting.
+    expect(imapRefs(INBOX, { From: `Store <${STORE}>`, To: "ana@example.test" })).toEqual([]);
+    expect(imapRefs(SENT, { From: STORE, To: ` ${STORE.toUpperCase()} ` })).toEqual([]);
+    expect(outlookRefs("inbox", { from: person(STORE), toRecipients: [person("ana@example.test")] })).toEqual([]);
+    expect(outlookRefs("sentitems", { toRecipients: [person("Store@Example.test")] })).toEqual([]);
+    // The mailbox's own address is read the way an address is, in any case or spacing.
+    const spaced = imapNormalizer(CORRESPONDENT_KEY, { customerKey: KEY, ownAddress: " Store@Example.TEST " });
+    expect(spaced.message(SENT, imapMessage(94, { To: `${STORE}, ana@example.test` }), RECEIVED)[0]!.payload.customerRefs).toEqual([emailRef("ana@example.test")]);
+    const spacedGraph = outlookNormalizer(CORRESPONDENT_KEY, { customerKey: KEY, mailbox: " Store@Example.TEST " });
+    expect(spacedGraph.message("sentitems", outlookMessage("sentitems", { toRecipients: [person(STORE), person("ana@example.test")] }), RECEIVED)[0]!.payload.customerRefs).toEqual([emailRef("ana@example.test")]);
+    // A message with nobody on the other side has none, as Gmail's has.
+    expect(imapRefs(INBOX, { To: STORE })).toEqual([]);
+    expect(outlookRefs("inbox", { toRecipients: [person(STORE)] })).toEqual([]);
+    expect(outlookRefs("inbox", { from: person("not an address") })).toEqual([]);
+    // An own address that isn't one (an IMAP sign-in name, an Outlook object id) excludes nobody.
+    const byName = imapNormalizer(CORRESPONDENT_KEY, { customerKey: KEY, ownAddress: "store-login" });
+    expect(byName.message(SENT, imapMessage(91, { To: STORE }), RECEIVED)[0]!.payload.customerRefs).toEqual([emailRef(STORE)]);
+    const byId = outlookNormalizer(CORRESPONDENT_KEY, { customerKey: KEY, mailbox: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa" });
+    expect(byId.message("sentitems", outlookMessage("sentitems", { toRecipients: [person(STORE)] }), RECEIVED)[0]!.payload.customerRefs).toEqual([emailRef(STORE)]);
+  });
+
+  it("keeps fifty people a side, as the correspondents are, and never a raw address", () => {
+    const many = Array.from({ length: 60 }, (_, i) => `c${i}@example.test`);
+    const refs = imapRefs(SENT, { To: many.join(", ") }) as string[];
+    expect(refs).toEqual(many.slice(0, 50).map((a) => emailRef(a)).sort());
+    const viaGraph = outlookRefs("sentitems", { toRecipients: many.map(person) }) as string[];
+    expect(viaGraph).toEqual(refs);
+    const flat = JSON.stringify([imap.message(SENT, imapMessage(92, { To: "Ana <ana@example.test>" }), RECEIVED), outlook.message("sentitems", outlookMessage("sentitems", { toRecipients: [person("ana@example.test")] }), RECEIVED)]);
+    // A business domain is kept beside the correspondent, as Gmail keeps it; the address itself never is.
+    for (const leaked of ["ana@", "ana", "Ana"]) expect(flat, leaked).not.toContain(leaked);
+  });
+
+  it("adds none without CUSTOMER_REF_KEY, and changes nothing else when it does", () => {
+    const fetched = imapMessage(93, { From: "ana@example.test", To: STORE });
+    const plainImap = imapNormalizer(CORRESPONDENT_KEY).message(INBOX, fetched, RECEIVED)[0]!;
+    expect(plainImap.payload).not.toHaveProperty("customerRefs");
+    expect(imapNormalizer(CORRESPONDENT_KEY, { ownAddress: STORE }).message(INBOX, fetched, RECEIVED)[0]).toEqual(plainImap);
+    const linkedImap = imap.message(INBOX, fetched, RECEIVED)[0]!;
+    expect(linkedImap.idempotencyKey).toBe(plainImap.idempotencyKey);
+    expect({ ...linkedImap.payload, customerRefs: undefined }).toEqual({ ...plainImap.payload, customerRefs: undefined });
+
+    const raw = outlookMessage("inbox", { from: person("ana@example.test") });
+    const plainOutlook = outlookNormalizer(CORRESPONDENT_KEY).message("inbox", raw, RECEIVED)[0]!;
+    expect(plainOutlook.payload).not.toHaveProperty("customerRefs");
+    expect(outlookNormalizer(CORRESPONDENT_KEY, { mailbox: STORE }).message("inbox", raw, RECEIVED)[0]).toEqual(plainOutlook);
+    const linkedOutlook = outlook.message("inbox", raw, RECEIVED)[0]!;
+    expect({ ...linkedOutlook.payload, customerRefs: undefined }).toEqual({ ...plainOutlook.payload, customerRefs: undefined });
+    // Outlook keys a message by its payload, so the linked one is a new version of it, stored beside the old.
+    expect(linkedOutlook.idempotencyKey).not.toBe(plainOutlook.idempotencyKey);
+    // Calendar invitations carry none: nobody waits on one.
+    expect(outlook.appointment({ id: "ev1", lastModifiedDateTime: OPEN, organizer: person("ana@example.test") }, RECEIVED).payload).not.toHaveProperty("customerRefs");
+    // A key too short to be a secret is turned down, as everywhere else.
+    expect(() => imapNormalizer(CORRESPONDENT_KEY, { customerKey: "short" })).toThrow("CUSTOMER_REF_KEY must be at least 32 characters");
+    expect(() => outlookNormalizer(CORRESPONDENT_KEY, { customerKey: "short" })).toThrow("CUSTOMER_REF_KEY must be at least 32 characters");
+  });
+});
+
 describe("customers waiting on a reply, from the connectors' own records", () => {
   it("links a customer's orders, texts, DMs and email across systems, and raises only the one still waiting", async () => {
     const b = brain();
@@ -332,6 +444,60 @@ describe("customers waiting on a reply, from the connectors' own records", () =>
     // The store calls back from Twilio, which knows her by number.
     const twilio = twilioNormalizer(CONTACT_KEY, KEY);
     await b.send("twilio", twilio.call({ sid: sid("CA", 2), direction: "outbound-api", status: "completed", from: "+12125550100", to: "+12125550123", duration: "120", price: null, price_unit: null, start_time: rfc2822(at(OPEN, 400)), end_time: rfc2822(at(OPEN, 402)), date_created: rfc2822(at(OPEN, 400)) }, RECEIVED));
+    expect((await b.reason()).filter((r) => r.id.startsWith("rec_clienteling_awaiting_reply_"))).toEqual([]);
+  });
+
+  it("counts a reply from an Outlook or IMAP mailbox as an answer to a WhatsApp message or a text", async () => {
+    const b = brain();
+    const wa = { phoneNumberId: "store-line-1", refs: metaRefs(KEY), receivedAt: RECEIVED };
+    const outlook = outlookNormalizer(CORRESPONDENT_KEY, { customerKey: KEY, mailbox: "store@example.test" });
+    const imap = imapNormalizer(CORRESPONDENT_KEY, { customerKey: KEY, ownAddress: "store@example.test" });
+    const form = (n: number, mail: string, phone: string) =>
+      formSubmissionEvent({ provider: "webhook", formId: "contact", responseId: `sub${n}`, submittedAt: at(OPEN, -60), answers: [{ names: ["email"], kind: "email", values: [mail] }, { names: ["phone"], kind: "phone", values: [phone] }] }, parseFormProfile(GENERIC_FORM_PROFILE), KEY, RECEIVED)!;
+
+    // Ben filled in the website's form with his email and number, then wrote on WhatsApp.
+    await b.send("forms", [form(1, "Ben@example.test", "(212) 555-0124")]);
+    const benWa = whatsappMessageEvent({ id: "wamid.ben1", from: "12125550124", timestamp: String(Date.parse(OPEN) / 1000), type: "text", text: { body: "Ring size?" } }, wa).event;
+    await b.send("meta", [benWa]);
+    // Cara: Klaviyo knows her email and number; she texted on Twilio.
+    await b.send("klaviyo", [klaviyoProfileEvent({ type: "profile", id: "01JTESTPROFILE000000000003", attributes: { email: "cara@example.test", phone_number: "+12125550125", updated: "2026-11-01T12:00:00+00:00" } }, { customerKey: KEY, receivedAt: RECEIVED })!]);
+    await b.send("twilio", twilioNormalizer(CONTACT_KEY, KEY).message(twilioMessage(5, "inbound", "+12125550125", OPEN), RECEIVED));
+
+    const waiting = (await b.reason()).filter((r) => r.id.startsWith("rec_clienteling_awaiting_reply_"));
+    expect(waiting.map((r) => r.id)).toEqual(["rec_clienteling_awaiting_reply_others_2026-11-18"]);
+    expect(waiting[0]!.summary).toContain("2 customers have waited");
+
+    // The store answers Ben from Outlook's Sent Items, and Cara from the IMAP mailbox's Sent folder, by email.
+    await b.send("microsoft_outlook", outlook.message("sentitems", outlookMessage("sentitems", { sentDateTime: at(OPEN, 30), from: person("store@example.test"), toRecipients: [person("BEN@example.test")] }), RECEIVED));
+    const afterBen = (await b.reason()).filter((r) => r.id.startsWith("rec_clienteling_awaiting_reply_"));
+    expect(afterBen.map((r) => r.summary)).toEqual([expect.stringContaining("1 customer has waited")]);
+    expect(afterBen[0]!.summary).toContain("1 on sms");
+    await b.send("imap_email", imap.message({ role: "sent", mailbox: "Sent", uidValidity: "9" }, imapMessage(7, { From: "store@example.test", To: "Cara <cara@example.test>" }, at(OPEN, 45)), RECEIVED));
+    expect((await b.reason()).filter((r) => r.id.startsWith("rec_clienteling_awaiting_reply_"))).toEqual([]);
+
+    // Nothing kept names anyone.
+    const flat = JSON.stringify(await b.memory.recentSignals(ORG, 1000));
+    for (const leaked of ["example.test", "5550124", "5550125", "Ring size"]) expect(flat, leaked).not.toContain(leaked);
+  });
+
+  it("raises a past buyer who wrote to an IMAP or Outlook inbox, and an email nobody else knows stays unraised", async () => {
+    const b = brain();
+    const outlook = outlookNormalizer(CORRESPONDENT_KEY, { customerKey: KEY, mailbox: "store@example.test" });
+    const imap = imapNormalizer(CORRESPONDENT_KEY, { customerKey: KEY, ownAddress: "store@example.test" });
+    await b.send("shopify", customerEvents(shopifyCustomer({ email: "ana@example.test" }), RECEIVED, KEY));
+    await b.send("shopify", orderEvents(shopifyOrder(1, 7001, "300.00"), RECEIVED));
+    const anaMail = outlook.message("inbox", outlookMessage("inbox", { receivedDateTime: OPEN, from: person("Ana@Example.test"), toRecipients: [person("store@example.test")] }), RECEIVED);
+    await b.send("microsoft_outlook", anaMail);
+    // A newsletter to the IMAP inbox, and the store's own mail to itself, are nobody waiting.
+    await b.send("imap_email", imap.message({ role: "inbox", mailbox: "INBOX", uidValidity: "7" }, imapMessage(8, { From: "news@example.test", To: "store@example.test" }, OPEN), RECEIVED));
+    await b.send("imap_email", imap.message({ role: "inbox", mailbox: "INBOX", uidValidity: "7" }, imapMessage(9, { From: "store@example.test", To: "store@example.test" }, OPEN), RECEIVED));
+    const recs = (await b.reason()).filter((r) => r.id.startsWith("rec_clienteling_awaiting_reply_"));
+    expect(recs.map((r) => r.id)).toEqual([`rec_clienteling_awaiting_reply_${anaMail[0]!.payload.messageId}_2026-11-18`]);
+    expect(recs[0]!.summary).toContain("A past customer, who has spent $300.00 over 1 order,");
+    expect(recs[0]!.summary).toContain("They wrote 1 message on Outlook");
+    expect(recs[0]!.provenance.eventIds).toEqual(expect.arrayContaining([anaMail[0]!.id, "shopify_sale:1"]));
+    // Answered from the other mailbox, she is no longer waiting.
+    await b.send("imap_email", imap.message({ role: "sent", mailbox: "Sent", uidValidity: "9" }, imapMessage(10, { From: "store@example.test", To: "ana@example.test" }, at(OPEN, 300)), RECEIVED));
     expect((await b.reason()).filter((r) => r.id.startsWith("rec_clienteling_awaiting_reply_"))).toEqual([]);
   });
 });
@@ -412,4 +578,23 @@ function twilioMessage(n: number, direction: string, customer: string, when = OP
 
 function email(id: string, way: "sent" | "received", headers: Record<string, string>, when = OPEN) {
   return { id, threadId: `t${id}`, labelIds: way === "sent" ? ["SENT"] : ["INBOX"], internalDate: String(Date.parse(when)), payload: { headers: Object.entries(headers).map(([name, value]) => ({ name, value })) } };
+}
+
+/** A message read over IMAP with these header fields, as the client hands it over. */
+const imapAddressBook = { next: 1 };
+function imapMessage(uid: number, headers: Record<string, string>, when = OPEN): ImapFetched {
+  const lines = [...Object.entries(headers).map(([name, value]) => `${name}: ${value}`), `Message-ID: <imap-${uid}@example.test>`];
+  const d = new Date(when);
+  const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const two = (n: number) => String(n).padStart(2, "0");
+  const internalDate = `${two(d.getUTCDate())}-${months[d.getUTCMonth()]}-${d.getUTCFullYear()} ${two(d.getUTCHours())}:${two(d.getUTCMinutes())}:${two(d.getUTCSeconds())} +0000`;
+  return { uid, flags: ["\\Seen"], internalDate, size: 500, header: new TextEncoder().encode(`${lines.join("\r\n")}\r\n\r\n`) };
+}
+
+const person = (address: string) => ({ emailAddress: { name: "Synthetic person", address } });
+let graphIds = 0;
+/** A message as Graph lists it in a folder, with these fields over a plain one. */
+function outlookMessage(folder: "inbox" | "sentitems", fields: Record<string, unknown>): Record<string, unknown> {
+  graphIds++;
+  return { id: `AAMkAG${graphIds}`, conversationId: `AAQkAG${graphIds}`, isDraft: false, sentDateTime: OPEN, receivedDateTime: folder === "inbox" ? (fields.receivedDateTime ?? OPEN) : (fields.sentDateTime ?? OPEN), ...fields };
 }

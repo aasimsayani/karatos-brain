@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { normalizeEmail } from "../custom_forms/customer.js";
 import { gmailNormalizer, type GmailCorrespondent } from "../gmail/normalize.js";
 import type { OutlookFolder } from "./client.js";
 
@@ -24,7 +25,16 @@ import type { OutlookFolder } from "./client.js";
  * customer or a ring), categories, display names and every raw address.
  * Addresses become the same correspondent references Gmail's do, under
  * CORRESPONDENT_HASH_KEY, with the domain kept only for businesses. Graph's
- * long ids are kept as short digests. Drafts are skipped. A message or
+ * long ids are kept as short digests. Drafts are skipped.
+ *
+ * When the instance has a CUSTOMER_REF_KEY, each message also carries
+ * `customerRefs` for the other side, by Gmail's rule and from Gmail's
+ * helper: the sender of a message in the Inbox, the To and Cc recipients of
+ * one in Sent Items. They are the references custom forms, Klaviyo, Gmail
+ * and the help desks make for the same address, so a reply from this
+ * mailbox answers a customer's text or form. The mailbox's own address is
+ * never a customer, so it gives none. Calendar events carry none: an
+ * invitation isn't a message a customer waits on. A message or
  * event without an id or a time that reads is dead-lettered listing why.
  */
 
@@ -85,18 +95,32 @@ export interface OutlookContext {
   correspondentKey: string;
 }
 
-export function outlookNormalizer(correspondentKey: string) {
-  const { correspondent } = gmailNormalizer({ correspondentKey });
-  const address = (v: unknown): GmailCorrespondent | undefined => {
+export interface OutlookNormalizeOptions {
+  /** The instance's CUSTOMER_REF_KEY, when it has one: each message then also carries `customerRefs` for the other side. */
+  customerKey?: string | undefined;
+  /** The mailbox read (MICROSOFT_OUTLOOK_MAILBOX), which is never a customer. An object id rather than an address is ignored. */
+  mailbox?: string | undefined;
+}
+
+export function outlookNormalizer(correspondentKey: string, options: OutlookNormalizeOptions = {}) {
+  // Gmail's normalizer checks both keys and makes the correspondent and customer references.
+  const { correspondent, customerRefs } = gmailNormalizer({ correspondentKey, customerKey: options.customerKey });
+  const own = normalizeEmail(options.mailbox);
+  const bareOf = (v: unknown): string | undefined => {
     const a = obj(obj(v).emailAddress).address;
     const bare = typeof a === "string" ? a.trim().toLowerCase() : "";
-    return ADDRESS.test(bare) ? correspondent(bare) : undefined;
+    return ADDRESS.test(bare) ? bare : undefined;
+  };
+  const address = (v: unknown): GmailCorrespondent | undefined => {
+    const bare = bareOf(v);
+    return bare === undefined ? undefined : correspondent(bare);
   };
   const people = (v: unknown) => {
-    const all = list(v).map(address).filter((c) => c !== undefined);
-    const unique = [...new Map(all.map((c) => [c.correspondentId, c])).values()];
-    return { list: unique.slice(0, MAX_PEOPLE), count: unique.length };
+    const unique = [...new Set(list(v).map(bareOf).filter((a) => a !== undefined))];
+    return { list: unique.slice(0, MAX_PEOPLE).map(correspondent), count: unique.length, addresses: unique.slice(0, MAX_PEOPLE) };
   };
+  /** The other side's customer references, never the mailbox's own: undefined without a CUSTOMER_REF_KEY. */
+  const others = (addresses: (string | undefined)[]) => customerRefs(addresses.filter((a): a is string => a !== undefined && a !== own));
 
   function make(kind: string, type: string, id: string | undefined, problems: string[], raw: unknown, occurredAt: string | undefined, payload: Record<string, unknown>, receivedAt: string): OutlookEvent {
     const ok = problems.length === 0;
@@ -130,6 +154,7 @@ export function outlookNormalizer(correspondentKey: string) {
         direction: sent ? "sent" : "received",
         sentAt,
         deliveredAt,
+        customerRefs: others(sent ? [...to.addresses, ...cc.addresses] : [bareOf(r.from)]),
         from: address(r.from),
         to: to.list,
         cc: cc.list,
