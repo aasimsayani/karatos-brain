@@ -299,9 +299,10 @@ describe("IMAP and Outlook mail carry the same customer references as Gmail", ()
     const customers = [emailRef("ana@example.test"), emailRef("ben@example.test"), emailRef("cara@example.test")].sort();
     expect(imapRefs(INBOX, received)).toEqual([emailRef("ana@example.test")]);
     expect(imapRefs(SENT, sent)).toEqual(customers);
+    const bare = (a: string) => a.replace(/.*</, "").replace(/>/g, "");
     const graph = (h: Record<string, string>) => ({
-      from: person(h.From!.split(",")[0]!.replace(/.*</, "").replace(">", "")),
-      toRecipients: h.To!.split(",").map((a) => person(a.replace(/.*</, "").replace(">", ""))),
+      from: person(bare(h.From!.split(",")[0]!)),
+      toRecipients: h.To!.split(",").map((a) => person(bare(a))),
       ccRecipients: h.Cc!.split(",").map((a) => person(a)),
     });
     expect(outlookRefs("inbox", graph(received))).toEqual([emailRef("ana@example.test")]);
