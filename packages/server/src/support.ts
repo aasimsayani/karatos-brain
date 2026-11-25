@@ -1,5 +1,6 @@
 import type { InMemoryStore, IntegrationStatus } from "@karatos/core";
 import type { SqlClient } from "@karatos/store-postgres";
+import { describeStoreHours, type StoreHours } from "@karatos/retail";
 import type { SupportReasoningStatus } from "./reasoning.js";
 import type { SkippedIntegration, SyncStatus } from "./sync.js";
 
@@ -154,6 +155,8 @@ export interface SupportStatusOptions {
   version: string;
   startedAt: Date;
   retentionDays: number;
+  /** Settings the rules read: the store's hours and the awaiting-reply wait. Absent: the status reports settings as null. */
+  settings?: { storeHours: StoreHours; awaitingReplyHours: number };
   /** Department ids the instance runs. */
   departments: readonly string[];
   /** ENABLED_INTEGRATIONS. */
@@ -191,10 +194,17 @@ export interface SupportIntegrationStatus {
   lastSync: SupportLastSync | null;
 }
 
+export interface SupportSettings {
+  storeHours: ReturnType<typeof describeStoreHours>;
+  awaitingReplyHours: number;
+}
+
 export interface SupportStatus {
   instance: { name: string; organizationId: string; version: string; startedAt: string; uptimeSeconds: number };
   migrations: { count: number; applied: string[] };
   retention: { rawRetentionDays: number };
+  /** The store's hours as the instance read them, and the awaiting-reply wait. Settings only, never business data. Null when not reported. */
+  settings: SupportSettings | null;
   departments: string[];
   integrations: SupportIntegrationStatus[];
   /** Scheduled reasoning: whether it is on, and its last run as times, outcome and counts. Null when not reported. */
@@ -256,6 +266,7 @@ export async function supportStatus(
     },
     migrations: { count: migrations.length, applied: migrations },
     retention: { rawRetentionDays: options.retentionDays },
+    settings: options.settings ? { storeHours: describeStoreHours(options.settings.storeHours), awaitingReplyHours: options.settings.awaitingReplyHours } : null,
     departments: [...options.departments],
     integrations: [...new Set(options.enabledIntegrations)].map((id) => {
       const run = runs.get(id);

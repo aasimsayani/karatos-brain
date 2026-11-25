@@ -3,6 +3,7 @@ import { createServer, request, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { afterEach, describe, expect, it } from "vitest";
 import { BrainPipeline, InMemoryStore, type IntegrationStatus, type Reasoner } from "@karatos/core";
+import { storeHours } from "@karatos/retail";
 import {
   brainRoutes,
   createBrainApp,
@@ -51,6 +52,7 @@ function appOptions(memory: InMemoryStore, overrides: Partial<BrainAppOptions> =
     version: "0.1.0",
     startedAt: STARTED,
     retentionDays: 30,
+    settings: { storeHours: storeHours("America/Chicago", "mon-fri 10:00-18:00; sat 10:00-17:00; sun closed", "2026-12-25"), awaitingReplyHours: 6 },
     departments: ["sales", "inventory"],
     enabledIntegrations: ["stripe", "shopify"],
     skipped: [{ id: "shopify", reason: "missing SHOPIFY_SHOP_DOMAIN, SHOPIFY_ADMIN_ACCESS_TOKEN" }],
@@ -290,6 +292,15 @@ describe("GET /v1/support/status", () => {
       instance: { name: "Example Jewelers", organizationId: ORG, version: "0.1.0", startedAt: "2026-11-12T13:00:00.000Z", uptimeSeconds: 9000 },
       migrations: { count: 2, applied: ["0001_core_schema.sql", "0002_ingestion.sql"] },
       retention: { rawRetentionDays: 30 },
+      settings: {
+        storeHours: {
+          timeZone: "America/Chicago",
+          hours: "mon-fri 10:00-18:00; sat 10:00-17:00; sun closed",
+          week: { mon: ["10:00-18:00"], tue: ["10:00-18:00"], wed: ["10:00-18:00"], thu: ["10:00-18:00"], fri: ["10:00-18:00"], sat: ["10:00-17:00"], sun: [] },
+          closedDates: ["2026-12-25"],
+        },
+        awaitingReplyHours: 6,
+      },
       departments: ["sales", "inventory"],
       integrations: [
         {

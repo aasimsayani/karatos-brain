@@ -52,6 +52,34 @@ Run the [instance monitor](../monitoring.md) from a private ops repo to hear whe
 
 Once a client's systems are connected and their history has imported, run `npm run verify-sync` against the instance to show that its numbers match the source systems' own. For a period of store days, it compares Shopify and Square sale counts and gross, Stripe charges, refunds from all three and Klaviyo's new profiles with what synced, and lists the ids of any record on one side only. It needs the instance API key, because the ids are business records, and it makes no writes. See [verifying synced numbers](../verify-sync.md).
 
+## Store hours
+
+Clienteling's [customers waiting on a reply](../departments/README.md#customers-waiting-on-a-reply) counts only the hours the store is open, so a text sent at closing time isn't four hours late by morning. Each instance sets its own hours. Left unset, they stay Monday to Saturday, 10:00 to 18:00, as before.
+
+`STORE_HOURS` is a list of entries separated by semicolons, each one days and then hours:
+
+```
+mon-fri 10:00-18:00; sat 10:00-17:00; sun closed
+tue-sat 10:00-13:00, 14:00-19:00
+```
+
+- **Days** are `mon`, `tue`, `wed`, `thu`, `fri`, `sat` and `sun`, or the full English names. A range runs forward through the week from Monday to Sunday (`mon-fri`, `fri-sun`), so a range across the end of the week is split: `sat-sun, mon`. Days and ranges are joined with commas (`mon, wed, fri-sat`). Naming a day twice is an error.
+- **Hours** are `closed`, or one or more 24-hour ranges joined with commas (`10:00-13:00, 14:00-18:00` for a store that closes for lunch). Times fall on the quarter hour (`:00`, `:15`, `:30` or `:45`), from `00:00` to `24:00`, and `24:00` closes at midnight. A day's ranges may touch but not overlap.
+- **Past midnight** is rejected rather than guessed at: write `fri 22:00-02:00` as `fri 22:00-24:00; sat 00:00-02:00`.
+- A day no entry names is closed, and a week that is never open is an error. Case and spacing don't matter, and a trailing semicolon is ignored.
+
+`STORE_CLOSED_DATES` lists days the store is shut whatever its week says, such as holidays, as `YYYY-MM-DD` separated by commas (`2026-11-26,2026-12-25`). Dates are on the store's calendar, so a holiday in Los Angeles runs from midnight to midnight there.
+
+Both are read on the clock of `STORE_TIME_ZONE`, so 10:00 stays 10:00 across a clock change and the 23- and 25-hour days count their real hours. `AWAITING_REPLY_HOURS` (default 4, allowed 1 to 72) is how many of those hours a customer waits before they are raised.
+
+The instance checks all three when it starts and won't start with one it can't read, naming the setting and the part that's wrong, such as `STORE_HOURS: "tues" in "tues 10:00-14:00" isn't a day; use mon, tue, wed, thu, fri, sat or sun`. `GET /v1/support/status` shows what it read under `settings`: `{ storeHours: { timeZone, hours, week, closedDates }, awaitingReplyHours }`, where `hours` is the week written back in the same form (`mon-sat 10:00-18:00; sun closed`) and `week` lists each day's ranges, Monday first. These are settings, never business data.
+
+| Setting | Default | What it does |
+| --- | --- | --- |
+| `STORE_HOURS` | `mon-sat 10:00-18:00; sun closed` | When the store is open, in the form above |
+| `STORE_CLOSED_DATES` | none | Comma-separated `YYYY-MM-DD` days the store is shut |
+| `AWAITING_REPLY_HOURS` | `4` | Open hours, 1 to 72, a message waits before clienteling raises it |
+
 ## Scheduled reasoning
 
 The department rules (payout matching, stock agreement, customers awaiting a reply, return rates and the rest) run on their own, so the findings in the [daily brief](../daily-brief.md) and in [answers](../ask.md) stay fresh without anyone calling `POST /v1/reason`. Each run does what that route does: it reasons over recent signals, then records the results now due on approved recommendations.
@@ -99,7 +127,7 @@ The support key gets 403 on every endpoint below except `/healthz`, `GET /v1/int
 | `GET /v1/entities/:kind/:id` | API key | One canonical entity |
 | `GET /v1/signals` | API key | The latest signals, oldest first (`?kind=` up to 10 comma-separated kinds such as `bank.balance,receivable.invoice`; `?limit=`, 200 by default, up to 1,000). The console reads cash position and receivables this way |
 | `GET /v1/integrations` | API key or support key | Every catalog integration and whether this instance has all its settings (`configured`, `missingSettings`). Names settings, never their values |
-| `GET /v1/support/status` | API key or support key | Operational metadata only: instance name, organization id, version, uptime, applied migrations, retention days, enabled departments and integrations, each integration's missing setting names and last sync (times, mode, outcome, counts, scrubbed last error), scheduled reasoning's last run (times, trigger, outcome, counts, error class name), dead-letter counts by source and reason, and event counts by day, source and type (`?days=`, 14 by default, up to 90). Never payloads, ids, names, amounts, recommendation text or signal values |
+| `GET /v1/support/status` | API key or support key | Operational metadata only: instance name, organization id, version, uptime, applied migrations, retention days, enabled departments and integrations, each integration's missing setting names and last sync (times, mode, outcome, counts, scrubbed last error), scheduled reasoning's last run (times, trigger, outcome, counts, error class name), the [store hours](#store-hours) it read, dead-letter counts by source and reason, and event counts by day, source and type (`?days=`, 14 by default, up to 90). Never payloads, ids, names, amounts, recommendation text or signal values |
 
 ## Choosing a host
 

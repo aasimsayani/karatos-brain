@@ -59,17 +59,23 @@ describe("main: the running instance", () => {
   it("serves its settings and the sync runner's latest runs on GET /v1/support/status", async () => {
     const port = await freePort();
     const supportKey = `s${randomBytes(32).toString("hex")}`;
+    const instanceKey = `i${randomBytes(32).toString("hex")}`;
     vi.spyOn(console, "log").mockImplementation(() => {});
     Object.assign(process.env, {
       INSTANCE_NAME: "Example Jewelers",
       ORGANIZATION_ID: "example-jewelers",
-      INSTANCE_API_KEY: `i${randomBytes(32).toString("hex")}`,
+      INSTANCE_API_KEY: instanceKey,
       SUPPORT_API_KEY: supportKey,
       SUPABASE_DB_URL: "postgresql://user:pass@db.example.test:5432/postgres",
       PORT: String(port),
       ENABLED_INTEGRATIONS: "stripe, shopify",
-      ENABLED_DEPARTMENTS: "repairs, sales",
+      ENABLED_DEPARTMENTS: "repairs, sales, clienteling",
       RAW_RETENTION_DAYS: "45",
+      STORE_TIME_ZONE: "America/Phoenix",
+      // Open around the clock, so the wait below is the same whenever the test runs.
+      STORE_HOURS: "mon-sun 00:00-12:00, 12:00-24:00",
+      STORE_CLOSED_DATES: "2026-01-01",
+      AWAITING_REPLY_HOURS: "3",
     });
     await import("../src/main.js");
 
@@ -82,13 +88,45 @@ describe("main: the running instance", () => {
     const first = await status();
     expect(first.instance).toMatchObject({ name: "Example Jewelers", organizationId: "example-jewelers", version });
     expect(first.retention).toEqual({ rawRetentionDays: 45 });
-    expect([...first.departments].sort()).toEqual(["repairs", "sales"]);
+    // The store hours as the instance read them from its settings.
+    expect(first.settings).toEqual({
+      storeHours: {
+        timeZone: "America/Phoenix",
+        hours: "mon-sun 00:00-12:00, 12:00-24:00",
+        week: Object.fromEntries(["mon", "tue", "wed", "thu", "fri", "sat", "sun"].map((d) => [d, ["00:00-12:00", "12:00-24:00"]])),
+        closedDates: ["2026-01-01"],
+      },
+      awaitingReplyHours: 3,
+    });
+    expect([...first.departments].sort()).toEqual(["clienteling", "repairs", "sales"]);
     expect(first.migrations.count).toBeGreaterThan(0);
     // Scheduled reasoning is on by default. The only connector brings nothing, so the one run there can be is the
     // daily brief's own, when the instance starts after BRIEF_HOUR on the store's clock.
     expect(first.reasoning).toMatchObject({ scheduled: true, intervalMinutes: 60, consecutiveFailures: 0 });
     if (first.reasoning!.lastRun) expect(first.reasoning!.lastRun).toMatchObject({ trigger: "brief", outcome: "succeeded", error: null });
     expect(first.integrations.find((i) => i.id === "shopify")).toMatchObject({ syncing: false, notSyncingReason: "missing SHOPIFY_SHOP_DOMAIN" });
+    // The pipeline counts those hours: a text 3.5 hours old is raised at AWAITING_REPLY_HOURS=3. The default hours and
+    // 4-hour wait never would, since no 3.5 hours hold 4 open ones.
+    const sentAt = new Date(Date.now() - 210 * 60_000).toISOString();
+    const instance = { authorization: `Bearer ${instanceKey}`, "content-type": "application/json" };
+    const ingested = await fetch(`http://127.0.0.1:${port}/v1/events`, {
+      method: "POST",
+      headers: instance,
+      body: JSON.stringify({
+        id: "evt_quo_main",
+        source: "quo",
+        type: "communication.message_logged",
+        occurredAt: sentAt,
+        receivedAt: sentAt,
+        idempotencyKey: "quo:main:1",
+        payload: { system: "Quo", channel: "sms", messageId: "quo:message:main", direction: "inbound", customerRefs: ["form_customer:mainphone"] },
+      }),
+    });
+    expect(ingested.status).toBe(202);
+    const reasoned = await fetch(`http://127.0.0.1:${port}/v1/reason`, { method: "POST", headers: instance });
+    const { recommendations } = (await reasoned.json()) as { recommendations: { id: string; summary: string }[] };
+    const waiting = recommendations.find((r) => r.id.startsWith("rec_clienteling_awaiting_reply_others_"));
+    expect(waiting?.summary).toContain("waited 3 or more business hours");
     await vi.waitFor(async () => {
       const stripe = (await status()).integrations.find((i) => i.id === "stripe");
       expect(stripe?.lastSync).toMatchObject({ mode: "historical", outcome: "failed", error: "Error: vendor unreachable" });

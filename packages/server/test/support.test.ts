@@ -275,6 +275,7 @@ describe("supportStatus", () => {
     expect(status.integrations).toEqual([{ id: "gia", configured: false, missingSettings: [], syncing: true, notSyncingReason: null, lastSync: null }]);
     expect(status.events).toEqual({ days: 14, since: "2026-10-30T00:00:00.000Z", total: 5, byDay: [{ day: "2026-11-12", source: "other", type: "order.created", count: 5 }] });
     expect(status.deadLetters).toEqual({ total: 0, bySource: {}, byReason: {} });
+    expect(status.settings).toBeNull();
   });
 
   it("never reports negative uptime and takes counts from a successful run", async () => {

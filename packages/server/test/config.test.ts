@@ -1,6 +1,7 @@
 import { randomBytes } from "node:crypto";
 import { describe, expect, it } from "vitest";
-import { loadInstanceConfig } from "../src/index.js";
+import { STORE_HOURS } from "@karatos/retail";
+import { instanceStoreHours, loadInstanceConfig } from "../src/index.js";
 
 const valid = {
   INSTANCE_NAME: "Fuse Jewelry",
@@ -136,5 +137,54 @@ describe("daily brief settings", () => {
     } catch (error) {
       expect(String(error)).not.toContain("secretpart");
     }
+  });
+});
+
+describe("store hours settings", () => {
+  const base = { INSTANCE_NAME: "Example Jewelers", ORGANIZATION_ID: "example-jewelers", INSTANCE_API_KEY: "b".repeat(64), SUPABASE_DB_URL: "postgresql://user:pass@db.example.test:5432/postgres" };
+  const ten = [{ open: 600, close: 1080 }];
+
+  it("defaults to Monday to Saturday, 10:00 to 18:00, no closed dates and a 4-hour wait", () => {
+    const config = loadInstanceConfig(base);
+    expect(config.STORE_HOURS).toEqual([[], ten, ten, ten, ten, ten, ten]);
+    expect(config.STORE_CLOSED_DATES).toEqual([]);
+    expect(config.AWAITING_REPLY_HOURS).toBe(4);
+    expect(instanceStoreHours(config)).toEqual(STORE_HOURS);
+    // Empty is the same as unset.
+    expect(instanceStoreHours(loadInstanceConfig({ ...base, STORE_HOURS: "", STORE_CLOSED_DATES: "", AWAITING_REPLY_HOURS: "" }))).toEqual(STORE_HOURS);
+  });
+
+  it("reads the store's own hours, closed dates and wait, on STORE_TIME_ZONE's clock", () => {
+    const config = loadInstanceConfig({
+      ...base,
+      STORE_TIME_ZONE: "America/Denver",
+      STORE_HOURS: "Mon-Fri 10:00-18:00; sat 10:00-13:00, 14:00-17:00; sun closed",
+      STORE_CLOSED_DATES: "2026-12-25, 2026-11-26",
+      AWAITING_REPLY_HOURS: "6",
+    });
+    expect(config.AWAITING_REPLY_HOURS).toBe(6);
+    expect(instanceStoreHours(config)).toEqual({
+      timeZone: "America/Denver",
+      week: [[], ten, ten, ten, ten, ten, [{ open: 600, close: 780 }, { open: 840, close: 1020 }]],
+      closedDates: ["2026-11-26", "2026-12-25"],
+    });
+    expect(loadInstanceConfig({ ...base, AWAITING_REPLY_HOURS: "1" }).AWAITING_REPLY_HOURS).toBe(1);
+    expect(loadInstanceConfig({ ...base, AWAITING_REPLY_HOURS: "72" }).AWAITING_REPLY_HOURS).toBe(72);
+  });
+
+  it("rejects hours it can't read, naming the setting and the bad part", () => {
+    expect(() => loadInstanceConfig({ ...base, STORE_HOURS: "mon-fri 10:00-18:00; tues 10:00-14:00" })).toThrow(
+      'Invalid instance configuration: STORE_HOURS: "tues" in "tues 10:00-14:00" isn\'t a day; use mon, tue, wed, thu, fri, sat or sun',
+    );
+    expect(() => loadInstanceConfig({ ...base, STORE_HOURS: "fri 22:00-02:00" })).toThrow(/STORE_HOURS: "22:00-02:00" in "fri 22:00-02:00" runs past midnight/);
+    expect(() => loadInstanceConfig({ ...base, STORE_HOURS: "sun closed" })).toThrow(/STORE_HOURS: the store is never open/);
+    expect(() => loadInstanceConfig({ ...base, STORE_CLOSED_DATES: "2026-12-25, 12/26/2026" })).toThrow(
+      'Invalid instance configuration: STORE_CLOSED_DATES: "12/26/2026" isn\'t a date; use YYYY-MM-DD, e.g. 2026-12-25',
+    );
+    for (const hours of ["0", "73", "1.5", "four"]) expect(() => loadInstanceConfig({ ...base, AWAITING_REPLY_HOURS: hours }), hours).toThrow(/AWAITING_REPLY_HOURS/);
+    // Every bad setting is named at once.
+    expect(() => loadInstanceConfig({ ...base, STORE_HOURS: "daily", STORE_CLOSED_DATES: "soon", STORE_TIME_ZONE: "Mountain" })).toThrow(
+      /STORE_TIME_ZONE: use an IANA time zone.*; STORE_HOURS: "daily" has no hours.*; STORE_CLOSED_DATES: "soon" isn't a date/,
+    );
   });
 });
