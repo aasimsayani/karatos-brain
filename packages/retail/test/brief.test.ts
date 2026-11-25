@@ -484,7 +484,7 @@ describe("buildDailyBrief: when findings were last refreshed", () => {
     expect(reasoningNote({ scheduled: true, last: { outcome: "failed", finishedAt: at(1) }, refreshedAt: null }, GENERATED)).toEqual({
       status: "failed",
       refreshedAt: null,
-      detail: `The last reasoning run failed (${at(1)}); no reasoning run has succeeded since the instance started, so findings may be out of date.`,
+      detail: `The last reasoning run failed (${at(1)}); no reasoning run has succeeded on this instance yet, so findings may be out of date.`,
     });
   });
 
@@ -492,11 +492,17 @@ describe("buildDailyBrief: when findings were last refreshed", () => {
     expect(reasoningNote({ scheduled: true, last: null, refreshedAt: null }, GENERATED)).toEqual({
       status: "not_run",
       refreshedAt: null,
-      detail: "Reasoning hasn't finished a run since the instance started, so findings may be out of date.",
+      detail: "Reasoning hasn't finished a run on this instance yet, so findings may be out of date.",
     });
     const off = buildDailyBrief(sync({ scheduled: false, last: null, refreshedAt: null }));
     expect(off.sync).toMatchObject({ reasoning: { status: "off", refreshedAt: null } });
     expect(off.text).toContain("\n\nScheduled reasoning is off on this instance, so findings are only as fresh as the last POST /v1/reason call.");
+    // A POST /v1/reason call that succeeded, when the server reports one.
+    expect(reasoningNote({ scheduled: false, last: { outcome: "failed", finishedAt: at(1) }, refreshedAt: at(2) }, GENERATED)).toEqual({
+      status: "off",
+      refreshedAt: at(2),
+      detail: `Scheduled reasoning is off on this instance, so findings are only as fresh as the last POST /v1/reason call; reasoning last succeeded at ${at(2)}.`,
+    });
   });
 
   it("leaves it out when the server doesn't report reasoning, and on an instance with nothing to report", () => {

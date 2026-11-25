@@ -73,6 +73,17 @@ interface RecommendationRow {
   created_at: Date | string;
 }
 
+interface ReasoningRunRow {
+  id: string;
+  organization_id: string;
+  started_at: Date | string;
+  finished_at: Date | string;
+  reasoners: string[];
+  documentation: ReasoningRun["documentation"];
+  degraded: boolean;
+  recommendation_ids: string[];
+}
+
 interface FeedbackRow {
   recommendation_id: string;
   organization_id: string;
@@ -366,6 +377,26 @@ export class PostgresMemoryStore implements MemoryStore, RawDataRetention, Brief
         run.recommendationIds,
       ],
     );
+  }
+
+  async latestReasoningRun(organizationId: string): Promise<ReasoningRun | null> {
+    // Read once at startup, so a scan of one organization's runs is fine without an index.
+    const { rows } = await this.db.query<ReasoningRunRow>(
+      "select * from reasoning_runs where organization_id = $1 order by finished_at desc, id desc limit 1",
+      [organizationId],
+    );
+    const row = rows[0];
+    if (!row) return null;
+    return {
+      id: row.id,
+      organizationId: row.organization_id,
+      startedAt: iso(row.started_at),
+      finishedAt: iso(row.finished_at),
+      reasoners: row.reasoners,
+      documentation: row.documentation,
+      degraded: row.degraded,
+      recommendationIds: row.recommendation_ids,
+    };
   }
 
   async recordFeedback(feedback: Feedback): Promise<void> {

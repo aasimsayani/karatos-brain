@@ -1,7 +1,7 @@
 import { timingSafeEqual } from "node:crypto";
 import type { IncomingMessage, RequestListener, ServerResponse } from "node:http";
 import { z } from "zod";
-import { DeadLetteredError, INTEGRATIONS, monthOf, readValueReport, type BrainPipeline, type IntegrationStatus, type MemoryStore } from "@karatos/core";
+import { DeadLetteredError, INTEGRATIONS, monthOf, readValueReport, type BrainPipeline, type IntegrationStatus, type MemoryStore, type Recommendation } from "@karatos/core";
 import { addDays, ASK_MAX_QUESTION_CHARS, DEFAULT_BRIEF_TIME_ZONE, isDay, localDay, VERIFY_MAX_DAYS, verifyPeriod, type BriefSyncInput } from "@karatos/retail";
 import { readAnswer } from "./ask.js";
 import { readDailyBrief, yesterdayIn, type BriefSources } from "./brief.js";
@@ -30,6 +30,12 @@ export interface BrainAppOptions {
   brief?: BrainBriefOptions;
   /** What POST /v1/verify runs. Without it that route answers 503. Its periods are days in brief.timeZone. */
   verify?: Verifier;
+  /**
+   * Runs POST /v1/reason's pass. An instance hands it to the reasoning runner,
+   * which records the run and keeps it from overlapping a scheduled one.
+   * Without it the route calls reasonNow directly.
+   */
+  reason?: (pass: () => Promise<{ recommendations: Recommendation[]; measured: number }>) => Promise<{ recommendations: Recommendation[]; measured: number }>;
 }
 
 export interface BrainBriefOptions {
@@ -292,7 +298,8 @@ export function brainRoutes(options: BrainAppOptions): BrainRoute[] {
       "POST",
       /^\/v1\/reason$/,
       async () => {
-        const { recommendations, measured } = await reasonNow(options.pipeline, options.memory, options.organizationId);
+        const pass = () => reasonNow(options.pipeline, options.memory, options.organizationId);
+        const { recommendations, measured } = await (options.reason ? options.reason(pass) : pass());
         return [200, { recommendations, measured }];
       },
     ],
