@@ -12,6 +12,7 @@ import {
   REPLY_HIGH_VALUE_CENTS,
   REPLY_LOOKBACK_DAYS,
   STORE_HOURS,
+  storeHours,
   waitingCustomers,
   type CustomerTouch,
   type StoreHours,
@@ -251,7 +252,8 @@ describe("what counts as asking and answering", () => {
 
 describe("business hours", () => {
   it("counts only the store's open hours, Monday to Saturday, 10 to 6 in New York", () => {
-    expect(STORE_HOURS).toEqual({ timeZone: "America/New_York", days: [1, 2, 3, 4, 5, 6], open: 10, close: 18 });
+    const day = [{ open: 600, close: 1080 }];
+    expect(STORE_HOURS).toEqual({ timeZone: "America/New_York", week: [[], day, day, day, day, day, day], closedDates: [] });
     expect(businessHoursBetween(OPEN, NOW)).toBe(8);
     expect(businessHoursBetween(OPEN, at(OPEN, 240))).toBe(4);
     expect(businessHoursBetween(at(OPEN, 7), at(OPEN, 37))).toBe(0.5);
@@ -273,17 +275,17 @@ describe("business hours", () => {
     // Saturday 2026-10-31 is still daylight time (10:00 is 14:00 UTC); Monday 2026-11-02 isn't (15:00 UTC).
     expect(businessHoursBetween("2026-10-31T14:00:00.000Z", "2026-11-02T15:00:00.000Z")).toBe(8);
     expect(businessHoursBetween("2026-11-02T14:00:00.000Z", "2026-11-02T15:00:00.000Z")).toBe(0);
-    const india: StoreHours = { timeZone: "Asia/Kolkata", days: [3], open: 10, close: 11 };
+    const india: StoreHours = storeHours("Asia/Kolkata", "wed 10:00-11:00");
     // 10:00 in Kolkata is 04:30 UTC.
     expect(businessHoursBetween("2026-11-18T04:00:00.000Z", "2026-11-18T05:00:00.000Z", india)).toBe(0.5);
     expect(businessHoursBetween("2026-11-18T05:00:00.000Z", "2026-11-18T06:00:00.000Z", india)).toBe(0.5);
     expect(businessHoursBetween("2026-11-19T04:30:00.000Z", "2026-11-19T05:30:00.000Z", india)).toBe(0);
     // Kathmandu is 5:45 ahead: 10:00 there is 04:15 UTC.
-    const nepal: StoreHours = { timeZone: "Asia/Kathmandu", days: [3], open: 10, close: 11 };
+    const nepal: StoreHours = storeHours("Asia/Kathmandu", "wed 10:00-11:00");
     expect(businessHoursBetween("2026-11-18T04:00:00.000Z", "2026-11-18T05:00:00.000Z", nepal)).toBe(0.75);
     // Opening on the half hour, and hours that start at midnight.
-    expect(businessHoursBetween(OPEN, at(OPEN, 60), { ...STORE_HOURS, open: 10.5 })).toBe(0.5);
-    expect(businessHoursBetween("2026-11-18T05:00:00.000Z", "2026-11-18T06:00:00.000Z", { ...STORE_HOURS, open: 0, close: 1 })).toBe(1);
+    expect(businessHoursBetween(OPEN, at(OPEN, 60), storeHours("America/New_York", "mon-sat 10:30-18:00"))).toBe(0.5);
+    expect(businessHoursBetween("2026-11-18T05:00:00.000Z", "2026-11-18T06:00:00.000Z", storeHours("America/New_York", "mon-sat 00:00-01:00"))).toBe(1);
     // Backwards within one quarter hour is still nothing.
     expect(businessHoursBetween(at(OPEN, 10), at(OPEN, 5))).toBe(0);
   });
@@ -546,6 +548,6 @@ describe("customers waiting on a reply", () => {
     await b.message("Quo", "inbound", { customerRefs: [ANA.phone] }, at(NOW, -300));
     const signals = await b.signals();
     expect(waitingCustomers(signals, NOW)).toHaveLength(1);
-    expect(waitingCustomers(signals, NOW, { ...STORE_HOURS, days: [0] })).toEqual([]);
+    expect(waitingCustomers(signals, NOW, storeHours("America/New_York", "sun 10:00-18:00"))).toEqual([]);
   });
 });

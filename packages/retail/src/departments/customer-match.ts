@@ -1,5 +1,6 @@
 import type { EventEnvelope, Reasoner, Recommendation, Signal } from "@karatos/core";
 import { ASSUMPTIONS, dollars, estimate, extractor, latestBySubject, measured, pct, recommend, signalFrom, value } from "../department.js";
+import { businessHoursBetween, STORE_HOURS, type StoreHours } from "../store-hours.js";
 
 /**
  * Recognizing the same customer across channels, and noticing when one is
@@ -24,13 +25,14 @@ import { ASSUMPTIONS, dollars, estimate, extractor, latestBySubject, measured, p
  * Clienteling's `clienteling.awaiting-reply` then links the references
  * into customers, follows each one's messages across every channel, and
  * raises a customer whose message has had no answer on any channel for
- * REPLY_BUSINESS_HOURS of the store's hours. A past buyer, found through
+ * REPLY_BUSINESS_HOURS (AWAITING_REPLY_HOURS on an instance) of the
+ * store's open hours, from STORE_HOURS and STORE_CLOSED_DATES. A past buyer, found through
  * the same links to their orders, is raised on their own with what they
  * have spent; everyone else waiting is raised together. See
  * docs/departments/README.md#customers-waiting-on-a-reply.
  */
 
-/** A message unanswered on every channel for this many of the store's open hours is raised. */
+/** A message unanswered on every channel for this many of the store's open hours is raised, unless AWAITING_REPLY_HOURS says otherwise. */
 export const REPLY_BUSINESS_HOURS = 4;
 /** Messages older than this are left alone: the conversation has moved on, or happened elsewhere. */
 export const REPLY_LOOKBACK_DAYS = 14;
@@ -38,17 +40,6 @@ export const REPLY_LOOKBACK_DAYS = 14;
 export const REPLY_HIGH_VALUE_CENTS = 500_000;
 /** At most this many references are read from one record, so a malformed one can't link a crowd. */
 export const MAX_REFS_PER_RECORD = 8;
-
-/** When the store is open: in its time zone, the days (0 Sunday to 6 Saturday) and the hours, open to close. */
-export interface StoreHours {
-  timeZone: string;
-  days: readonly number[];
-  open: number;
-  close: number;
-}
-
-/** Monday to Saturday, 10:00 to 18:00, Eastern time: a typical jeweler's week until the store's own hours are known. */
-export const STORE_HOURS: StoreHours = { timeZone: "America/New_York", days: [1, 2, 3, 4, 5, 6], open: 10, close: 18 };
 
 /**
  * A customer reference as the connectors write them: a lowercase prefix and
@@ -77,8 +68,6 @@ const FAILED = new Set(["failed", "undelivered", "canceled", "cancelled"]);
 /** An incoming call in one of these states was a conversation. */
 const ANSWERED_CALL = new Set(["completed", "answered", "in-progress"]);
 
-const HOUR_MS = 3_600_000;
-const SLOT_MS = 15 * 60_000;
 const DAY_MS = 86_400_000;
 
 /** What a `customer.touch` signal keeps. */
@@ -196,28 +185,6 @@ export function customerLinks(signals: readonly Signal[]): CustomerLinks {
   return links;
 }
 
-const WEEKDAYS: Readonly<Record<string, number>> = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
-
-/**
- * How many of the store's open hours fall between two times. Time is
- * counted in quarter hours, which every time zone's offset is a whole
- * number of, so each quarter is open or closed as a whole.
- */
-export function businessHoursBetween(fromIso: string, toIso: string, hours: StoreHours = STORE_HOURS): number {
-  const from = Date.parse(fromIso);
-  const to = Date.parse(toIso);
-  if (!(to > from)) return 0;
-  const format = new Intl.DateTimeFormat("en-US", { timeZone: hours.timeZone, weekday: "short", hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
-  let open = 0;
-  for (let slot = Math.floor(from / SLOT_MS) * SLOT_MS; slot < to; slot += SLOT_MS) {
-    const parts = Object.fromEntries(format.formatToParts(slot).map((p) => [p.type, p.value]));
-    const minute = Number(parts.hour) * 60 + Number(parts.minute);
-    if (!hours.days.includes(WEEKDAYS[parts.weekday!]!) || minute < hours.open * 60 || minute >= hours.close * 60) continue;
-    open += Math.min(to, slot + SLOT_MS) - Math.max(from, slot);
-  }
-  return open / HOUR_MS;
-}
-
 /** One customer still waiting: what they wrote, and what they have bought. */
 interface Waiting {
   asked: Signal[];
@@ -237,7 +204,7 @@ const where = (s: Signal) => {
 };
 
 /** Who is waiting, from the signals: every customer whose last message has had no answer on any channel. */
-export function waitingCustomers(signals: readonly Signal[], now: string, hours: StoreHours = STORE_HOURS): Waiting[] {
+export function waitingCustomers(signals: readonly Signal[], now: string, hours: StoreHours = STORE_HOURS, threshold: number = REPLY_BUSINESS_HOURS): Waiting[] {
   const nowMs = Date.parse(now);
   const links = customerLinks(signals);
   const recent = [...latestBySubject([...signals], ["customer.touch"]).values()].filter((s) => {
@@ -276,7 +243,7 @@ export function waitingCustomers(signals: readonly Signal[], now: string, hours:
     if (emailOnly && !known.has(customer) && bought.length === 0) continue;
     const since = asked[0]!.observedAt;
     const waited = businessHoursBetween(since, now, hours);
-    if (waited < REPLY_BUSINESS_HOURS) continue;
+    if (waited < threshold) continue;
     out.push({ asked, since, hours: waited, purchases: bought, lifetimeCents: bought.reduce((n, s) => n + value<{ totalCents: number }>(s).totalCents, 0) });
   }
   return out.sort((a, b) => b.lifetimeCents - a.lifetimeCents || a.since.localeCompare(b.since));
@@ -310,7 +277,7 @@ function buyerRecommendation(w: Waiting, organizationId: string, now: string): R
   });
 }
 
-function othersRecommendation(waiting: Waiting[], organizationId: string, now: string): Recommendation {
+function othersRecommendation(waiting: Waiting[], organizationId: string, now: string, threshold: number): Recommendation {
   const bySystem = new Map<string, number>();
   for (const w of waiting) {
     const s = where(w.asked.at(-1)!);
@@ -323,7 +290,7 @@ function othersRecommendation(waiting: Waiting[], organizationId: string, now: s
     department: "clienteling",
     key: "awaiting_reply_others",
     organizationId,
-    summary: `${people} waited ${REPLY_BUSINESS_HOURS} or more business hours for a reply, with no answer on any channel: ${list(counts)}. The longest has waited ${hoursText(longest)}. Answer them from each inbox, oldest first.`,
+    summary: `${people} waited ${threshold} or more business hours for a reply, with no answer on any channel: ${list(counts)}. The longest has waited ${hoursText(longest)}. Answer them from each inbox, oldest first.`,
     confidence: 0.65,
     expectedImpact: "Answers customers before they buy elsewhere",
     impact: estimate(
@@ -336,17 +303,23 @@ function othersRecommendation(waiting: Waiting[], organizationId: string, now: s
   });
 }
 
-/** Builds the awaiting-reply rule for a store's hours. */
-export function awaitingReplyReasoner(hours: StoreHours = STORE_HOURS): Reasoner {
+/** The awaiting-reply rule's name, which an instance's settings replace it by. */
+export const AWAITING_REPLY_RULE = "clienteling.awaiting-reply";
+
+/** Builds the awaiting-reply rule for a store's hours, raising a wait of `threshold` or more open hours. */
+export function awaitingReplyReasoner(hours: StoreHours = STORE_HOURS, threshold: number = REPLY_BUSINESS_HOURS): Reasoner {
+  if (!(threshold > 0)) throw new RangeError("the awaiting-reply threshold must be more than 0 hours");
   return {
-    name: "clienteling.awaiting-reply",
+    name: AWAITING_REPLY_RULE,
     reason: ({ organizationId, signals, now }) => {
-      const waiting = waitingCustomers(signals, now, hours);
+      const waiting = waitingCustomers(signals, now, hours, threshold);
       const buyers = waiting.filter((w) => w.purchases.length > 0);
       const others = waiting.filter((w) => w.purchases.length === 0);
-      return [...buyers.map((w) => buyerRecommendation(w, organizationId, now)), ...(others.length ? [othersRecommendation(others, organizationId, now)] : [])];
+      return [...buyers.map((w) => buyerRecommendation(w, organizationId, now)), ...(others.length ? [othersRecommendation(others, organizationId, now, threshold)] : [])];
     },
   };
 }
 
 export const awaitingReply = awaitingReplyReasoner();
+
+export { businessHoursBetween, STORE_HOURS, type StoreHours };

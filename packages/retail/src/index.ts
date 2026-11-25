@@ -1,4 +1,6 @@
 import type { DepartmentModule } from "./department.js";
+import { AWAITING_REPLY_RULE, awaitingReplyReasoner, REPLY_BUSINESS_HOURS } from "./departments/customer-match.js";
+import { STORE_HOURS, type StoreHours } from "./store-hours.js";
 import { appraisals } from "./departments/appraisals.js";
 import { buying } from "./departments/buying.js";
 import { clienteling } from "./departments/clienteling.js";
@@ -44,16 +46,29 @@ export {
   REPLY_BUSINESS_HOURS,
   REPLY_HIGH_VALUE_CENTS,
   REPLY_LOOKBACK_DAYS,
-  STORE_HOURS,
+  AWAITING_REPLY_RULE,
   awaitingReplyReasoner,
-  businessHoursBetween,
   customerLinks,
   customerRefsOf,
   waitingCustomers,
   CustomerLinks,
   type CustomerTouch,
-  type StoreHours,
 } from "./departments/customer-match.js";
+export {
+  DAY_NAMES,
+  DEFAULT_STORE_HOURS,
+  STORE_HOURS,
+  StoreHoursError,
+  businessHoursBetween,
+  describeStoreHours,
+  formatStoreHours,
+  parseClosedDates,
+  parseStoreHours,
+  storeHours,
+  type DayName,
+  type OpenRange,
+  type StoreHours,
+} from "./store-hours.js";
 export { appraisals, buying, clienteling, compliance, customOrders, finance, inventory, marketing, metals, repairs, sales };
 
 /** Every retail jewelry department, in the order a store usually adopts them. */
@@ -91,10 +106,26 @@ export function combineDepartments(departments: DepartmentModule[]) {
   };
 }
 
-/** Picks departments by id, e.g. from ENABLED_DEPARTMENTS. An empty list means all. */
-export function selectDepartments(ids: string[]): DepartmentModule[] {
-  if (ids.length === 0) return RETAIL_DEPARTMENTS;
+/** An instance's own settings the department rules read. Each one left out keeps the rules' default. */
+export interface RetailSettings {
+  /** From STORE_TIME_ZONE, STORE_HOURS and STORE_CLOSED_DATES: the hours clienteling's awaiting-reply rule counts. */
+  storeHours?: StoreHours;
+  /** AWAITING_REPLY_HOURS: how many open hours a customer waits before awaiting-reply raises them. */
+  awaitingReplyHours?: number;
+}
+
+/** The departments with the instance's settings applied: clienteling's awaiting-reply rule is rebuilt for the store's hours. */
+export function configureDepartments(departments: DepartmentModule[], settings: RetailSettings = {}): DepartmentModule[] {
+  if (settings.storeHours === undefined && settings.awaitingReplyHours === undefined) return departments;
+  const rule = awaitingReplyReasoner(settings.storeHours ?? STORE_HOURS, settings.awaitingReplyHours ?? REPLY_BUSINESS_HOURS);
+  return departments.map((d) =>
+    d.reasoners.some((r) => r.name === AWAITING_REPLY_RULE) ? { ...d, reasoners: d.reasoners.map((r) => (r.name === AWAITING_REPLY_RULE ? rule : r)) } : d,
+  );
+}
+
+/** Picks departments by id, e.g. from ENABLED_DEPARTMENTS, with the instance's settings applied. An empty list means all. */
+export function selectDepartments(ids: string[], settings: RetailSettings = {}): DepartmentModule[] {
   const unknown = ids.filter((id) => !RETAIL_DEPARTMENTS.some((d) => d.id === id));
   if (unknown.length) throw new Error(`unknown departments: ${unknown.join(", ")}`);
-  return RETAIL_DEPARTMENTS.filter((d) => ids.includes(d.id));
+  return configureDepartments(ids.length === 0 ? RETAIL_DEPARTMENTS : RETAIL_DEPARTMENTS.filter((d) => ids.includes(d.id)), settings);
 }

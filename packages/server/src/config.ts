@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { DEFAULT_RAW_RETENTION_DAYS, INTEGRATIONS, invalidWriteEntries, MAX_RAW_RETENTION_DAYS, MIN_RAW_RETENTION_DAYS } from "@karatos/core";
-import { DEFAULT_BRIEF_TIME_ZONE, isTimeZone, RETAIL_DEPARTMENTS } from "@karatos/retail";
+import { DEFAULT_BRIEF_TIME_ZONE, DEFAULT_STORE_HOURS, isTimeZone, parseClosedDates, parseStoreHours, REPLY_BUSINESS_HOURS, RETAIL_DEPARTMENTS, type StoreHours } from "@karatos/retail";
 
 const DEPARTMENT_IDS = RETAIL_DEPARTMENTS.map((d) => d.id);
 const INTEGRATION_IDS = INTEGRATIONS.map((i) => i.id);
@@ -14,6 +14,18 @@ const commaList = z
       .map((s) => s.trim())
       .filter(Boolean),
   );
+
+/** A setting read by `parse`, whose error message, naming the bad part, becomes the setting's. */
+function readWith<T>(parse: (value: string) => T) {
+  return (value: string, ctx: z.RefinementCtx): T => {
+    try {
+      return parse(value);
+    } catch (error) {
+      ctx.addIssue({ code: "custom", message: error instanceof Error ? error.message : String(error) });
+      return z.NEVER;
+    }
+  };
+}
 
 /**
  * Settings for one deployed instance. An instance belongs to exactly one
@@ -80,6 +92,16 @@ export const InstanceConfigSchema = z
   STORE_TIME_ZONE: z.string().default(DEFAULT_BRIEF_TIME_ZONE).refine(isTimeZone, { message: "use an IANA time zone, e.g. America/New_York" }),
   /** The hour on the store's clock from which yesterday's daily brief is built. See docs/daily-brief.md. */
   BRIEF_HOUR: z.coerce.number().int().min(0).max(23).default(7),
+  /**
+   * When the store is open, on STORE_TIME_ZONE's clock, e.g.
+   * "mon-fri 10:00-18:00; sat 10:00-17:00; sun closed". Clienteling's
+   * awaiting-reply rule counts only these hours. See docs/deployment/instances.md#store-hours.
+   */
+  STORE_HOURS: z.string().default(DEFAULT_STORE_HOURS).transform(readWith(parseStoreHours)),
+  /** Comma-separated YYYY-MM-DD days the store is shut whatever STORE_HOURS says, such as holidays. */
+  STORE_CLOSED_DATES: z.string().default("").transform(readWith(parseClosedDates)),
+  /** Open hours a customer's message waits for an answer before clienteling's awaiting-reply rule raises it. */
+  AWAITING_REPLY_HOURS: z.coerce.number().int().min(1).max(72).default(REPLY_BUSINESS_HOURS),
   /** Optional https address the daily brief is posted to. Off when unset. A secret: such addresses carry tokens. */
   BRIEF_WEBHOOK_URL: z.url({ protocol: /^https$/ }).optional(),
   })
@@ -90,6 +112,11 @@ export const InstanceConfigSchema = z
   });
 
 export type InstanceConfig = z.infer<typeof InstanceConfigSchema>;
+
+/** The store's hours from STORE_TIME_ZONE, STORE_HOURS and STORE_CLOSED_DATES. */
+export function instanceStoreHours(config: Pick<InstanceConfig, "STORE_TIME_ZONE" | "STORE_HOURS" | "STORE_CLOSED_DATES">): StoreHours {
+  return { timeZone: config.STORE_TIME_ZONE, week: config.STORE_HOURS, closedDates: config.STORE_CLOSED_DATES };
+}
 
 export function loadInstanceConfig(env: Record<string, string | undefined>): InstanceConfig {
   const cleaned = Object.fromEntries(Object.entries(env).filter(([, v]) => v !== undefined && v !== ""));

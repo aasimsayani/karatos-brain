@@ -8,7 +8,7 @@ import { loadMigrations, migrate, PostgresMemoryStore } from "@karatos/store-pos
 import { createBrainApp } from "./app.js";
 import { createInstancePipeline } from "./brain.js";
 import { createBriefRunner, readDailyBrief, webhookDelivery } from "./brief.js";
-import { loadInstanceConfig } from "./config.js";
+import { instanceStoreHours, loadInstanceConfig } from "./config.js";
 import { StaticDocumentationSource } from "./documentation.js";
 import { createRetentionRunner } from "./retention.js";
 import { createReasoningRunner, readLastRun, reasonNow } from "./reasoning.js";
@@ -38,12 +38,17 @@ try {
   await setup.end();
 }
 
+// When the store is open, on its own clock: clienteling's awaiting-reply rule counts only these hours.
+const storeHours = instanceStoreHours(config);
+
 const pool = new pg.Pool({ connectionString: config.SUPABASE_DB_URL, max: 10 });
 const memory = new PostgresMemoryStore(pool);
 const pipeline = createInstancePipeline({
   memory,
   documentation: new StaticDocumentationSource(config.DOC_REGISTRY_IDS),
   departments: config.ENABLED_DEPARTMENTS,
+  storeHours,
+  awaitingReplyHours: config.AWAITING_REPLY_HOURS,
 });
 
 // Scheduled reasoning keeps findings fresh on its own: after each sync round that brings new events, before the
@@ -95,6 +100,7 @@ const server = createServer(
       version,
       startedAt,
       retentionDays: config.RAW_RETENTION_DAYS,
+      settings: { storeHours, awaitingReplyHours: config.AWAITING_REPLY_HOURS },
       departments: selectDepartments(config.ENABLED_DEPARTMENTS).map((d) => d.id),
       enabledIntegrations: config.ENABLED_INTEGRATIONS,
       skipped,
