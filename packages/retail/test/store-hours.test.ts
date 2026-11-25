@@ -103,6 +103,14 @@ describe("STORE_HOURS", () => {
     expect(() => parseStoreHours(text)).toThrow(message);
   });
 
+  it("reads very long input quickly, whether it is all spaces or all zeros", () => {
+    const start = Date.now();
+    expect(() => parseStoreHours("mon" + " ".repeat(50_000) + "x")).toThrow(StoreHoursError);
+    expect(() => parseStoreHours("mon 0" + "0".repeat(50_000))).toThrow(StoreHoursError);
+    expect(parseStoreHours("mon" + " ".repeat(50_000) + "10:00-18:00")[1]).toEqual([{ open: 600, close: 1080 }]);
+    expect(Date.now() - start).toBeLessThan(1000);
+  });
+
   it("writes a week back in the same form, Monday first, with matching days run together", () => {
     expect(formatStoreHours(STORE_HOURS.week)).toBe("mon-sat 10:00-18:00; sun closed");
     for (const text of ["mon-fri 10:00-18:00; sat 10:00-17:00; sun closed", "mon-sun 00:00-24:00", "mon closed; tue-sat 09:15-13:00, 14:00-19:45; sun closed"]) {

@@ -108,6 +108,19 @@ function rangesOf(part: string, entry: string): OpenRange[] {
 }
 
 /**
+ * Splits one entry into its days and its hours at the first digit, or at a
+ * closing "closed". Done by index rather than a regex so long input stays linear.
+ */
+function splitEntry(entry: string): [string, string, string] | undefined {
+  let at = entry.search(/\d/);
+  if (at < 0) {
+    if (!entry.endsWith("closed")) return undefined;
+    at = entry.length - "closed".length;
+  }
+  return [entry, entry.slice(0, at).trimEnd(), entry.slice(at)];
+}
+
+/**
  * Reads STORE_HOURS into each day's open ranges, 0 Sunday to 6 Saturday.
  * Throws a StoreHoursError naming the part that is wrong.
  */
@@ -120,7 +133,7 @@ export function parseStoreHours(text: string): OpenRange[][] {
     .filter(Boolean);
   if (entries.length === 0) throw new StoreHoursError(`give days and hours, e.g. ${DEFAULT_STORE_HOURS}`);
   for (const entry of entries) {
-    const m = /^(.*?)\s*(closed|\d.*)$/.exec(entry);
+    const m = splitEntry(entry);
     if (!m) throw new StoreHoursError(`"${entry}" has no hours; give days then hours, e.g. mon-fri 10:00-18:00, or sun closed`);
     if (m[1] === "") throw new StoreHoursError(`"${entry}" has no days; give days then hours, e.g. mon-fri 10:00-18:00`);
     const ranges = rangesOf(m[2]!, entry);
