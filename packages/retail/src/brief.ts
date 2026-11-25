@@ -136,7 +136,7 @@ export interface BriefSyncStatus {
   error?: string;
 }
 
-/** The scheduled reasoning runner's last finished run, as the server reports it. */
+/** The reasoning runner's last finished run, scheduled or a POST /v1/reason call, as the server reports it. */
 export interface BriefReasoningRun {
   outcome: "succeeded" | "failed";
   finishedAt: string;
@@ -146,9 +146,9 @@ export interface BriefReasoningRun {
 export interface BriefReasoningInput {
   /** False when scheduled reasoning is off, so findings refresh only when POST /v1/reason is called. */
   scheduled: boolean;
-  /** The last finished scheduled run since the instance started, or null before the first. */
+  /** The last finished run, scheduled or manual; after a restart, the last one in the database. Null when there is none. */
   last: BriefReasoningRun | null;
-  /** When the latest successful scheduled run finished, or null when none has since the instance started. */
+  /** When the latest successful run finished, or null when none is on record. */
   refreshedAt: string | null;
 }
 
@@ -266,7 +266,7 @@ export interface ReasoningNote {
   status: "fresh" | "stale" | "failed" | "not_run" | "off";
   /** One sentence saying so, with the times. */
   detail: string;
-  /** When the findings were last refreshed by a scheduled run, or null when they haven't been since the instance started. */
+  /** When the findings were last refreshed by a run, scheduled or manual, or null when none is on record. */
   refreshedAt: string | null;
 }
 
@@ -514,18 +514,20 @@ export function syncSection(sync: BriefSyncInput | undefined, generatedAt: strin
 
 /**
  * When the findings were last refreshed. A failed last run comes first, then
- * a refresh older than BRIEF_STALE_SYNC_HOURS; scheduled runs are what count,
- * since a POST /v1/reason call isn't reported here.
+ * a refresh older than BRIEF_STALE_SYNC_HOURS. Scheduled runs and POST
+ * /v1/reason calls both count, and after a restart the last run in the
+ * database does.
  */
 export function reasoningNote(reasoning: BriefReasoningInput, generatedAt: string): ReasoningNote {
   const { refreshedAt } = reasoning;
   if (!reasoning.scheduled) {
-    return { status: "off", detail: "Scheduled reasoning is off on this instance, so findings are only as fresh as the last POST /v1/reason call.", refreshedAt };
+    const lastCall = refreshedAt ? `; reasoning last succeeded at ${refreshedAt}` : "";
+    return { status: "off", detail: `Scheduled reasoning is off on this instance, so findings are only as fresh as the last POST /v1/reason call${lastCall}.`, refreshedAt };
   }
   const last = reasoning.last;
-  if (!last) return { status: "not_run", detail: "Reasoning hasn't finished a run since the instance started, so findings may be out of date.", refreshedAt };
+  if (!last) return { status: "not_run", detail: "Reasoning hasn't finished a run on this instance yet, so findings may be out of date.", refreshedAt };
   if (last.outcome === "failed") {
-    const since = refreshedAt ? `findings were last refreshed at ${refreshedAt}` : "no reasoning run has succeeded since the instance started, so findings may be out of date";
+    const since = refreshedAt ? `findings were last refreshed at ${refreshedAt}` : "no reasoning run has succeeded on this instance yet, so findings may be out of date";
     return { status: "failed", detail: `The last reasoning run failed (${last.finishedAt}); ${since}.`, refreshedAt };
   }
   // A run that succeeded is the latest refresh.

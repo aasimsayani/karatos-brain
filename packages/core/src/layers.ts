@@ -44,6 +44,8 @@ export interface MemoryStore {
   listRecommendations(organizationId: string, limit: number): Promise<Recommendation[]>;
   getRecommendation(organizationId: string, id: string): Promise<Recommendation | null>;
   recordReasoningRun(run: ReasoningRun): Promise<void>;
+  /** The run that finished last (latest finishedAt, then highest id), or null when none is recorded. */
+  latestReasoningRun(organizationId: string): Promise<ReasoningRun | null>;
   recordFeedback(feedback: Feedback): Promise<void>;
   /** Recommendations raised in [from, to), oldest first. */
   recommendationsBetween(organizationId: string, from: string, to: string): Promise<Recommendation[]>;

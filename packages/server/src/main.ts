@@ -11,7 +11,7 @@ import { createBriefRunner, readDailyBrief, webhookDelivery } from "./brief.js";
 import { loadInstanceConfig } from "./config.js";
 import { StaticDocumentationSource } from "./documentation.js";
 import { createRetentionRunner } from "./retention.js";
-import { createReasoningRunner, REASONING_OFF, reasonNow } from "./reasoning.js";
+import { createReasoningRunner, readLastRun, reasonNow } from "./reasoning.js";
 import { postgresDiagnostics } from "./support.js";
 import { createSyncRunner, scheduledConnectors } from "./sync.js";
 import { createVerifier } from "./verify.js";
@@ -48,15 +48,17 @@ const pipeline = createInstancePipeline({
 
 // Scheduled reasoning keeps findings fresh on its own: after each sync round that brings new events, before the
 // daily brief, and at least every REASON_INTERVAL_MINUTES. Off with REASON_SCHEDULE=off, leaving it to POST /v1/reason.
-const reasoning = config.REASON_SCHEDULE
-  ? createReasoningRunner({
-      reason: async () => {
-        const run = await reasonNow(pipeline, memory, config.ORGANIZATION_ID);
-        return { recommendations: run.recommendations.length, measured: run.measured };
-      },
-      intervalMs: config.REASON_INTERVAL_MINUTES * 60_000,
-    })
-  : null;
+// Either way the runner records every run, POST /v1/reason's included, and starts from the last run in the database.
+const reasoning = createReasoningRunner({
+  reason: async () => {
+    const run = await reasonNow(pipeline, memory, config.ORGANIZATION_ID);
+    return { recommendations: run.recommendations.length, measured: run.measured };
+  },
+  intervalMs: config.REASON_INTERVAL_MINUTES * 60_000,
+  scheduled: config.REASON_SCHEDULE,
+  lastRun: await readLastRun(memory, config.ORGANIZATION_ID),
+});
+const scheduledReasoning = config.REASON_SCHEDULE ? reasoning : null;
 
 // Each turned-on connector that has its settings syncs on a schedule. Skipped ones are named with what they're missing, never with values.
 const { connectors, skipped } = scheduledConnectors(config.ENABLED_INTEGRATIONS, process.env, { memory, organizationId: config.ORGANIZATION_ID });
@@ -67,12 +69,12 @@ const sync = createSyncRunner({
   memory,
   organizationId: config.ORGANIZATION_ID,
   intervalMs: config.SYNC_INTERVAL_MINUTES * 60_000,
-  ...(reasoning ? { afterRound: (outcomes) => void reasoning.afterSync(outcomes) } : {}),
+  ...(scheduledReasoning ? { afterRound: (outcomes) => void scheduledReasoning.afterSync(outcomes) } : {}),
 });
 
 // What the daily brief knows about syncing: which connectors run, how each last went, which are turned on but not
-// syncing, and when scheduled reasoning last refreshed the findings.
-const briefSync = () => ({ scheduled: connectors.map((c) => c.id), statuses: sync.latest(), skipped, reasoning: reasoning?.status() ?? REASONING_OFF.brief });
+// syncing, and when reasoning last refreshed the findings.
+const briefSync = () => ({ scheduled: connectors.map((c) => c.id), statuses: sync.latest(), skipped, reasoning: reasoning.status() });
 
 const server = createServer(
   createBrainApp({
@@ -86,6 +88,8 @@ const server = createServer(
     brief: { timeZone: config.STORE_TIME_ZONE, sync: briefSync },
     // POST /v1/verify: the source systems' own totals beside what has synced, read-only. See docs/verify-sync.md.
     verify: createVerifier({ memory, organizationId: config.ORGANIZATION_ID, connectors, skipped }),
+    // POST /v1/reason runs in line with scheduled runs, never beside one, and is recorded like them.
+    reason: (pass) => reasoning.manual(pass),
     support: {
       instanceName: config.INSTANCE_NAME,
       version,
@@ -95,7 +99,7 @@ const server = createServer(
       enabledIntegrations: config.ENABLED_INTEGRATIONS,
       skipped,
       syncStatus: () => sync.latest(),
-      reasoning: () => reasoning?.supportStatus() ?? REASONING_OFF.support,
+      reasoning: () => reasoning.supportStatus(),
       diagnostics: postgresDiagnostics(pool),
     },
   }),
@@ -104,7 +108,7 @@ server.listen(config.PORT, () => {
   console.log(`${config.INSTANCE_NAME} (${config.ORGANIZATION_ID}) listening on :${config.PORT}${config.SUPPORT_API_KEY ? ", support access on" : ""}`);
 });
 sync.start();
-reasoning?.start();
+reasoning.start();
 
 // Slim copy: raw vendor data older than RAW_RETENTION_DAYS is cleared once a day. Facts, signals and source references stay.
 const retention = createRetentionRunner({ store: memory, organizationId: config.ORGANIZATION_ID, retentionDays: config.RAW_RETENTION_DAYS });
@@ -118,12 +122,12 @@ const brief = createBriefRunner({
   hour: config.BRIEF_HOUR,
   build: (date) => readDailyBrief({ memory, organizationId: config.ORGANIZATION_ID, timeZone: config.STORE_TIME_ZONE, sync: briefSync }, date),
   // Findings are refreshed first, unless a run has just done it, so the morning brief never reports stale reasoning.
-  ...(reasoning ? { beforeBuild: () => reasoning.beforeBrief() } : {}),
+  ...(scheduledReasoning ? { beforeBuild: () => scheduledReasoning.beforeBrief() } : {}),
   ...(config.BRIEF_WEBHOOK_URL ? { deliver: webhookDelivery(config.BRIEF_WEBHOOK_URL) } : {}),
 });
 brief.start();
 
 const shutdown = () =>
-  server.close(() => void Promise.all([sync.stop(), reasoning?.stop(), retention.stop(), brief.stop()]).then(() => pool.end()).then(() => process.exit(0)));
+  server.close(() => void Promise.all([sync.stop(), reasoning.stop(), retention.stop(), brief.stop()]).then(() => pool.end()).then(() => process.exit(0)));
 process.on("SIGTERM", shutdown);
 process.on("SIGINT", shutdown);

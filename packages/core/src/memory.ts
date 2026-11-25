@@ -171,6 +171,16 @@ export class InMemoryStore implements MemoryStore, RawDataRetention, BriefStore 
     this.reasoningRuns.push(run);
   }
 
+  async latestReasoningRun(organizationId: string): Promise<ReasoningRun | null> {
+    let latest: ReasoningRun | null = null;
+    for (const run of this.reasoningRuns) {
+      if (run.organizationId !== organizationId) continue;
+      const order = latest ? Date.parse(run.finishedAt) - Date.parse(latest.finishedAt) : 1;
+      if (order > 0 || (order === 0 && run.id > latest!.id)) latest = run;
+    }
+    return latest ? structuredClone(latest) : null;
+  }
+
   async recordFeedback(feedback: Feedback): Promise<void> {
     this.feedback.push(feedback);
   }
