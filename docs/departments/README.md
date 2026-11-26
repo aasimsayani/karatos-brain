@@ -7,14 +7,14 @@ Brain A covers a jewelry business one department at a time. Each department is a
 3. **Extractors** that turn events into signals in shared memory.
 4. **Reasoners** that read signals from any department and raise recommendations with confidence, expected impact and provenance.
 
-Retail comes first. Manufacturing (bench work, casting, stone setting, production planning) is next and will be its own package built on the same contract.
+Retail comes first. Manufacturing is its own package, [`@karatos/manufacturing`](../../packages/manufacturing), built on the same contract; its first department is [bench jobs](bench.md), and production planning and labor cost come later.
 
 ## Turning departments on
 
 Set `ENABLED_DEPARTMENTS` on the instance to a comma-separated list of ids. Leave it empty to run all of them. An unknown id stops the instance at startup with the list of valid ids.
 
 ```
-ENABLED_DEPARTMENTS=sales,inventory,clienteling,repairs
+ENABLED_DEPARTMENTS=sales,inventory,clienteling,repairs,bench
 ```
 
 A department's events are only validated when it is enabled, and departments that read other departments' signals (compliance, finance) need those departments enabled to have anything to read.
@@ -35,6 +35,12 @@ A department's events are only validated when it is enabled, and departments tha
 | `finance` | Finance | `bank.transaction_imported`, `bank.account_updated`, `accounting.invoice_updated`, `accounting.record_deleted` | Cash sales over 30 days that are more than 5% (and $200) above cash deposits; $500 or more in US dollar invoices more than 30 days past due. Keeps each bank account's balance (`bank.balance`) and each invoice with what is still owed (`receivable.invoice`, or `receivable.removed` once deleted) as signals for the console. Matches payment processors' payouts to the sales they pay for and raises payouts that are short, missing or late (see [matching payouts to sales](#matching-payouts-to-sales)) |
 | `compliance` | Compliance | none, it reads other departments | IRS Form 8300 for cash over $10,000 in 24 hours, with the 15-day deadline; possible structuring across 30 days; gold bought from the public without seller ID |
 
+## Manufacturing departments
+
+| Id | Department | Events it owns | What it raises |
+| --- | --- | --- | --- |
+| `bench` | Bench Jobs | `bench_job.opened`, `bench_job.stage_recorded` | Jobs in one stage past its limit (`BENCH_STAGE_LIMIT_DAYS`); jobs the store's own stage times say will miss their promised date; stages and jewelers whose work quality control sends back 20% of the time or more; jobs that lost more metal than the tolerance (`BENCH_METAL_LOSS_PERCENT`), valued at spot. Reads repair tickets' and custom orders' promised dates, and custom orders' own stages (see [bench jobs](bench.md)) |
+
 Compliance recommendations are reminders for the owner, not legal advice. State rules for secondhand dealers and unclaimed property differ, so those recommendations say to follow the state's rules rather than naming a period.
 
 ## How departments feed each other
@@ -50,16 +56,18 @@ These links already exist, and each one makes both departments more useful than 
 - **Clienteling → sales:** wish lists appear in occasion reminders.
 - **Every channel → clienteling:** texts, calls, DMs and email from the same customer are linked by their references, and to their orders, so an answer on any channel counts and a waiting buyer is raised first.
 - **Payments → finance:** each processor's payouts are matched to the sales, refunds and fees they cover.
+- **Repairs and custom orders → bench:** a bench job takes its promised date from the ticket or order it is for, and custom orders' stages teach the store's typical bench times.
+- **Metals → bench:** spot prices value metal lost at the bench.
 
 See [compounding value](../vision/compounding-value.md) for why these links matter more as departments are added.
 
 ## Adding a department
 
-1. Create `packages/retail/src/departments/<name>.ts` exporting a `DepartmentModule`.
+1. Create `packages/retail/src/departments/<name>.ts` exporting a `DepartmentModule` (or, for a manufacturing department, a file in `packages/manufacturing/src`).
 2. Give every event a zod schema. Event types must be unique across departments; `combineDepartments` refuses duplicates.
 3. Use the helpers in `department.ts` (`entityFrom`, `signalFrom`, `latestBySubject`, `recommend`) so recommendation ids are stable per day and confidence stays explicit.
    Give each recommendation a dollar `impact` with `estimate` when its number can be worked out from the store's data and `ASSUMPTIONS`; leave it out when it can't.
-4. Add it to `RETAIL_DEPARTMENTS` in `src/index.ts`.
+4. Add it to `RETAIL_DEPARTMENTS` in `src/index.ts` (`MANUFACTURING_DEPARTMENTS` in manufacturing's).
 5. Write tests in `packages/retail/test/departments.test.ts` for each rule: the case that fires, the case that doesn't, and its edges. Coverage must stay above the thresholds in `vitest.config.ts`.
 6. Add a row to the table above.
 
@@ -75,7 +83,7 @@ Each has a likely amount and a low to high range, and a `basis` that says how it
 
 The likely values in `ASSUMPTIONS` are the same as the defaults of the payback estimate on the website. They are starting points; as KaratOS learns how each business works, its own figures replace them.
 
-A recommendation with no honest number carries no `impact`: compliance reminders, late purchase orders, stalled custom work, late or unclaimed repairs, and metal price falls. The pipeline drops an `impact` that doesn't add up (amounts out of order, not whole cents, or no basis) and keeps the recommendation. Postgres keeps it in `recommendations.impact`.
+A recommendation with no honest number carries no `impact`: compliance reminders, late purchase orders, stalled custom work, late or unclaimed repairs, metal price falls, and stuck, late or reworked bench jobs. The pipeline drops an `impact` that doesn't add up (amounts out of order, not whole cents, or no basis) and keeps the recommendation. Postgres keeps it in `recommendations.impact`.
 
 | Reasoner | Kind | Worked out as |
 | --- | --- | --- |
@@ -98,6 +106,7 @@ A recommendation with no honest number carries no `impact`: compliance reminders
 | `buying.watch-wanted` | makes | Dealer margin on the lowest US dollar ask |
 | `metals.price-move` (rise) | makes | Added metal value of pieces with a weight |
 | `metals.buy-margin` | saves | Paid above 85% of melt |
+| `bench.metal-loss` | protects | Metal lost above the tolerance, at its melt value at the latest spot |
 | `metals.refiner-assay` | protects | Short fine metal at the settlement's own rate |
 | `metals.refiner-payable` | makes | The lot at a fair share of spot, less what it paid |
 | `marketing.campaign-return` | makes or saves | One more run of a winner, or the loss of a loser not repeated |

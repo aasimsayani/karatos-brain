@@ -118,9 +118,9 @@ Every piece of data passes through the same seven layers, in order, and none is 
 </details>
 
 <details>
-<summary><strong>The eleven departments, with an example from each</strong></summary>
+<summary><strong>The twelve departments, with an example from each</strong></summary>
 
-Retail jewelry departments are built today. Manufacturing is next.
+Retail jewelry departments are built today, and the first manufacturing department, bench jobs.
 
 | Department | What it watches | Example recommendation |
 | --- | --- | --- |
@@ -135,7 +135,8 @@ Retail jewelry departments are built today. Manufacturing is next.
 | Marketing | Campaigns measured by the sales they bring | "The Mother's Day email returned 7x. Repeat it." |
 | Finance | Bank activity against what the store took in | "Cash sales exceed cash deposits by $1,200 this month. Reconcile the drawer." |
 | Compliance | Cash reporting, anti-money-laundering checks, secondhand-dealer rules | "$11,000 in cash came in for one sale. File IRS Form 8300 within 15 days." |
-| *Manufacturing (next)* | *Bench jobs, casting, setting, metal loss, labor cost* | *"Casting loss on 14k yellow is 4% this month, double the usual."* |
+| Bench jobs | Design, casting, stone setting, finishing and quality control, with metal in and out | "Job J-1 has been in casting for 6 days with Ana, past the 4-day limit." |
+| *Production (next)* | *Production planning, labor cost per piece* | *"Casting loss on 14k yellow is 4% this month, double the usual."* |
 
 Check the linked records before acting. Compliance items are reminders for the owner, not legal advice.
 
@@ -173,7 +174,7 @@ The table is generated from the [integration catalog](docs/integrations.md), so 
 | System | What the business gets | Feeds |
 | --- | --- | --- |
 | Shopify | Imports five years of orders, refunds and fulfillments, then keeps them current as orders change | Sales, Inventory, Clienteling, Marketing |
-| Inventory and POS systems | Imports item lists, stock counts, customer lists and sales from any POS that exports CSV | Sales, Inventory, Clienteling, Marketing, Repairs |
+| Inventory and POS systems | Imports item lists, stock counts, customer lists and sales from any POS that exports CSV | Sales, Inventory, Clienteling, Marketing, Repairs, Bench |
 | Stripe | Imports five years of charges, refunds, disputes and payouts, then keeps them current from Stripe's events | Sales, Finance, Clienteling |
 | Chase business bank accounts and credit cards | Imports six years of Chase business checking, savings and credit card activity from CSV downloads, PDF statements or both | Finance, Compliance |
 | Bank and credit card statements (any bank) | Imports six years of bank and credit card transactions from any bank's CSV exports or PDF statements | Finance, Compliance |
@@ -293,7 +294,7 @@ This section updates itself from [docs/milestones.json](docs/milestones.json) an
 <!-- progress:start -->
 <!-- Generated from docs/milestones.json and the integration catalog by npm run progress:write. Edit those, not this block. -->
 
-**Roadmap:** 20 of 81 items done. An integration counts as done once it has run against a real or sandbox account, not when its tests pass.
+**Roadmap:** 21 of 81 items done. An integration counts as done once it has run against a real or sandbox account, not when its tests pass.
 
 **Integrations:** 103 of the 253 systems in the catalog are built and tested against mocks made from each vendor's docs. 0 have been checked live so far.
 
@@ -310,7 +311,7 @@ This section updates itself from [docs/milestones.json](docs/milestones.json) an
 | Integrations, next wave | Jewelry POS, CRM, messaging, marketing and diamond feeds join the catalog. | ░░░░░░░░░░ 0% (19 of 19 built, 0 checked live) | Dec 2026 |
 | Marketplaces, ads and office tools | Sales channels, ad spend and the files and tasks a team already keeps, in one place. | ░░░░░░░░░░ 0% (17 of 17 built, 0 checked live) | Dec 2026 |
 | Shipping, payables and insurance | Packages, bills and care plans tracked next to the sale they belong to. | ░░░░░░░░░░ 0% (4 of 6 built, 0 checked live) | Jan 2027 |
-| Manufacturing departments | Bench, casting and setting work tracked with metal loss and labor cost per piece. | ░░░░░░░░░░ 0% | Jun 2027 |
+| Manufacturing departments | Bench, casting and setting work tracked with metal loss and labor cost per piece. | █████░░░░░ 50% | Jun 2027 |
 
 ### Up next
 

@@ -23,6 +23,7 @@
   "dependencies": {
     "@karatos/connectors": "0.1.0",
     "@karatos/core": "0.1.0",
+    "@karatos/manufacturing": "0.1.0",
     "@karatos/retail": "0.1.0",
     "@karatos/store-postgres": "0.1.0",
     "pg": "^8.23.1",

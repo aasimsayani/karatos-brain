@@ -1,0 +1,27 @@
+{
+  "name": "@karatos/manufacturing",
+  "version": "0.1.0",
+  "description": "Manufacturing department modules for Brain A: bench jobs through casting, stone setting, finishing and quality control.",
+  "license": "MIT",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@karatos/core": "0.1.0",
+    "@karatos/retail": "0.1.0",
+    "zod": "^4.6.7"
+  }
+}

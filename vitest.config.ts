@@ -21,6 +21,7 @@ export default defineConfig({
       "@karatos/core": src("./packages/core/src/index.ts"),
       "@karatos/store-postgres": src("./packages/store-postgres/src/index.ts"),
       "@karatos/retail": src("./packages/retail/src/index.ts"),
+      "@karatos/manufacturing": src("./packages/manufacturing/src/index.ts"),
       "@karatos/connector-testkit": src("./packages/testkit/src/index.ts"),
       "@karatos/connectors": src("./packages/connectors/src/index.ts"),
       "@karatos/server": src("./packages/server/src/index.ts"),

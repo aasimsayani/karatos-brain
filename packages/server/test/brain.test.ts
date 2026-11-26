@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { DeadLetteredError, InMemoryStore } from "@karatos/core";
 import { storeHours } from "@karatos/retail";
-import { createInstancePipeline, StaticDocumentationSource, type InstancePipelineOptions } from "../src/index.js";
+import { createInstancePipeline, INSTANCE_DEPARTMENTS, instanceDepartments, StaticDocumentationSource, type InstancePipelineOptions } from "../src/index.js";
 
 const ORG = "fuse-jewelry";
 
@@ -51,6 +51,37 @@ describe("createInstancePipeline", () => {
     const { pipeline: brain } = pipeline(["repairs"]);
     const result = await brain.ingest(saleEvent({ anything: true }));
     expect(result.signals).toEqual([]);
+  });
+
+  it("runs the bench department beside retail's, with the instance's own bench settings", async () => {
+    expect(INSTANCE_DEPARTMENTS.map((d) => d.id).slice(-2)).toEqual(["compliance", "bench"]);
+    expect(instanceDepartments([]).map((d) => d.id)).toEqual(INSTANCE_DEPARTMENTS.map((d) => d.id));
+    expect(instanceDepartments(["bench", "repairs"]).map((d) => d.id)).toEqual(["repairs", "bench"]);
+    const stage = (jobId: string) => ({
+      id: `evt_${jobId}`,
+      organizationId: ORG,
+      source: "inventory_pos",
+      type: "bench_job.stage_recorded",
+      occurredAt: "2026-09-28T12:00:00Z",
+      receivedAt: "2026-09-28T12:00:00Z",
+      idempotencyKey: jobId,
+      payload: { jobId, stage: "setting", metalInGrams: 10, metalOutGrams: 9.75 },
+    });
+    const run = async (options: Partial<InstancePipelineOptions>) => {
+      const memory = new InMemoryStore();
+      const brain = createInstancePipeline({ memory, documentation: new StaticDocumentationSource([]), departments: ["bench"], ...options });
+      vi.useFakeTimers({ now: new Date("2026-10-02T15:00:00Z"), toFake: ["Date"] });
+      try {
+        await brain.ingest(stage("J-1"));
+        return (await brain.reason(ORG)).map((r) => r.id.replace(/_2026-10-02$/, "")).sort();
+      } finally {
+        vi.useRealTimers();
+      }
+    };
+    expect(await run({})).toEqual([]);
+    expect(await run({ bench: { stageLimitDays: { setting: 3 }, metalLossShare: 0.02 } })).toEqual(["rec_bench_metal_loss_J-1", "rec_bench_stuck_J-1"]);
+    await expect(createInstancePipeline({ memory: new InMemoryStore(), documentation: new StaticDocumentationSource([]), departments: ["bench"] }).ingest(stage("")))
+      .rejects.toBeInstanceOf(DeadLetteredError);
   });
 
   it("refuses unknown departments", () => {

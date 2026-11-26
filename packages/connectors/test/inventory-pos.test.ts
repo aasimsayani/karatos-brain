@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { BrainPipeline, InMemoryStore, runSync, type SourceBatch } from "@karatos/core";
+import { MANUFACTURING_DEPARTMENTS } from "@karatos/manufacturing";
 import { RETAIL_DEPARTMENTS, combineDepartments } from "@karatos/retail";
 import { TEST_ORG, assertSynthetic, checkConnectorSync, testPipeline } from "@karatos/connector-testkit";
 import {
@@ -25,7 +26,9 @@ import {
   parsePosProfile,
   posCategory,
   posMetal,
+  posBenchStage,
   posPaymentMethod,
+  posQcResult,
   posRepairStatus,
   resolvePosProfile,
   sha256,
@@ -681,5 +684,116 @@ describe("repair tickets from the POS", () => {
     const profile = parsePosProfile({ ...GENERIC_POS_PROFILE, id: "test_east", utcOffset: "+10:00" });
     const events = await eventsOf(repairsConnector({ "repairs.csv": REPAIRS }, profile));
     expect(events.find((e) => e.idempotencyKey === "pos:test_east:repair:T-1")!.payload.promisedBy).toBe("2026-01-06");
+  });
+});
+
+describe("bench jobs from the CSV export", () => {
+  const BENCH = [
+    "Job,Stage,Date,Jeweler,Metal In (g),Metal Out (g),QC Result,Sent Back To,Description,Promised,Repair Ticket,Custom Order,Metal",
+    "B-1,Casting,01/02/2026 9:00 AM,Ana,10.00,9.40,,,Test halo ring 1,01/20/2026,,,14K Yellow Gold",
+    "B-1,Stone setting,01/04/2026 10:00 AM,Ben,6.00,5.98,,,,01/25/2026,,,",
+    'B-2,CAD,01/08/2026,Cy,,,,," Test band 1 ",,,CO-7,Unobtainium',
+    "B-2,QC,01/09/2026 2:00 PM,,,,Rejected,Setting,,,,,",
+    "B-3,Lunch,01/09/2026,,,,,,,,,,",
+    "B-4,Casting,01/09/2026,Ana,ten,9,,,,,T-9,,",
+    "B-5,Casting,01/09/2026,Ana,,,Pass,,,,,,",
+    "B-6,Finishing,01/09/2026,Ana,,,,Lunch,,,,,",
+    "B-7,Casting,01/02/2019,Ana,,,,,,,,,",
+  ].join("\n");
+  const benchConnector = (files: Record<string, string>) => inventoryPosConnector({ source: memoryFileSource(files, FILE_TIME), now: NOW });
+
+  it("uses only synthetic data in its fixtures", () => {
+    assertSynthetic({ BENCH });
+  });
+
+  it("takes bench, job bag, work order and production exports as bench jobs, and leaves job envelopes to repairs", () => {
+    expect(["bench-jobs.csv", "Job Bags.csv", "work_orders.csv", "Production 2026.csv", "Job Envelopes 2026.csv", "bench-repairs.csv"].map((n) => fileKind(n, GENERIC_POS_PROFILE))).toEqual([
+      "bench",
+      "bench",
+      "bench",
+      "bench",
+      "repairs",
+      "repairs",
+    ]);
+  });
+
+  it("stops on a bench export without a job, stage or date column, naming the file", async () => {
+    for (const header of ["Stage,Date", "Job,Date", "Job,Stage"]) {
+      await expect(eventsOf(benchConnector({ "bench-jobs.csv": `${header}\nx,y` }))).rejects.toThrow(PosFileError);
+    }
+    await expect(eventsOf(benchConnector({ "bench-jobs.csv": "Job,Stage\nB-1,Casting" }))).rejects.toThrow("bench-jobs.csv has no column for Date or Time or Stage Date or Timestamp");
+  });
+
+  it("maps a workshop's stage and result words to the bench department's", () => {
+    expect(
+      ["CAD", "Design", "Wax", "3D print", "Casting", "Stone setting", "Mounting", "Polish", "Finishing", "Rhodium plate", "Engraving", "QC", "Quality check", "Inspection", "Ready", "Complete", "Waiting on customer", "On hold", "Approval", "Cancelled", "Scrapped", "Lunch"].map(posBenchStage),
+    ).toEqual(["design", "design", "casting", "casting", "casting", "setting", "setting", "finishing", "finishing", "finishing", "finishing", "qc", "qc", "qc", "ready", "ready", "on_hold", "on_hold", "on_hold", "cancelled", "cancelled", null]);
+    expect(["Pass", "OK", "Approved", "Good", "Accepted", "Fail", "Rejected", "Rework", "Redo", "Sent back", "Maybe"].map(posQcResult)).toEqual([
+      "pass",
+      "pass",
+      "pass",
+      "pass",
+      "pass",
+      "fail",
+      "fail",
+      "fail",
+      "fail",
+      "fail",
+      null,
+    ]);
+  });
+
+  it("records each stage a job enters once, and each job with what its rows say about it", async () => {
+    const events = byKey(await eventsOf(benchConnector({ "bench-jobs.csv": BENCH })));
+    expect(events.get("pos:generic:bench:B-1:casting:2026-01-02T09:00:00.000Z")).toEqual({
+      id: "pos_generic:bench:B-1:casting:2026-01-02T09:00:00.000Z",
+      type: "bench_job.stage_recorded",
+      occurredAt: "2026-01-02T09:00:00.000Z",
+      receivedAt: RECEIVED,
+      idempotencyKey: "pos:generic:bench:B-1:casting:2026-01-02T09:00:00.000Z",
+      payload: { jobId: "B-1", stage: "casting", jeweler: "Ana", metalInGrams: 10, metalOutGrams: 9.4, sourceRow: "bench-jobs.csv:2" },
+    });
+    const opened = [...events.values()].filter((e) => e.type === "bench_job.opened");
+    expect(opened.map((e) => e.payload.jobId)).toEqual(["B-1", "B-2", "B-3", "B-4", "B-5", "B-6"]);
+    // The latest row's time, and the last filled value of each column.
+    expect(opened[0]).toMatchObject({
+      occurredAt: "2026-01-04T10:00:00.000Z",
+      payload: { jobId: "B-1", description: "Test halo ring 1", promisedBy: "2026-01-25", metal: "gold", karat: 14, sourceRow: "bench-jobs.csv:3" },
+    });
+    expect(opened[0]!.idempotencyKey).toMatch(/^pos:generic:bench_job:B-1:[0-9a-f]{12}$/);
+    // An unknown metal is left out; the custom order is named.
+    expect(opened[1]!.payload).toEqual({ jobId: "B-2", description: "Test band 1", customOrderId: "CO-7", sourceRow: "bench-jobs.csv:5" });
+    expect(opened[3]!.payload).toEqual({ jobId: "B-4", repairTicketId: "T-9", sourceRow: "bench-jobs.csv:7" });
+    expect(events.get("pos:generic:bench:B-2:qc:2026-01-09T14:00:00.000Z")!.payload).toEqual({ jobId: "B-2", stage: "qc", qcResult: "fail", failedStage: "setting", sourceRow: "bench-jobs.csv:5" });
+    // Rows more than five years old are skipped.
+    expect([...events.keys()].some((k) => k.includes("B-7"))).toBe(false);
+  });
+
+  it("feeds the bench department, dead-letters what it can't read, and reads a re-export as only what changed", async () => {
+    const memory = new InMemoryStore();
+    const pipeline = new BrainPipeline({
+      memory,
+      ...combineDepartments([...RETAIL_DEPARTMENTS, ...MANUFACTURING_DEPARTMENTS]),
+      now: NOW,
+      documentation: { current: () => ({ documentIds: [], stale: false }) },
+    });
+    const run = (files: Record<string, string>) => runSync({ connector: benchConnector(files), mode: "historical", pipeline, memory, organizationId: TEST_ORG });
+    expect(await run({ "bench-jobs.csv": BENCH })).toMatchObject({ ingested: 10, deadLettered: 4 });
+    expect(memory.deadLetters.map((d) => ({ row: (d.raw as PosEvent).payload.sourceRow, paths: d.issues.map((i) => i.path) }))).toEqual([
+      { row: "bench-jobs.csv:6", paths: ["payload.stage"] },
+      { row: "bench-jobs.csv:7", paths: ["payload.metalInGrams"] },
+      { row: "bench-jobs.csv:8", paths: ["payload.qcResult"] },
+      { row: "bench-jobs.csv:9", paths: ["payload.failedStage"] },
+    ]);
+    const summaries = (await pipeline.reason(TEST_ORG)).filter((r) => r.id.startsWith("rec_bench_")).map((r) => r.summary);
+    expect(summaries).toEqual([
+      "Bench job B-1 (Test halo ring 1) has been in stone setting for 5 days with Ben, past the 4-day limit. Find out what's holding it up.",
+      "Bench job B-1 (Test halo ring 1) lost 0.62 g of metal (6.2% of the 10.00 g issued), past the 3% tolerance; most in casting (0.60 g, Ana). Weigh the sweeps and filings before scrap goes to the refiner.",
+    ]);
+    // The next export: B-1 moved on to finishing and its promise moved. Only the new stage and the job's new details are new.
+    const next = `${BENCH}\nB-1,Polish,01/09/2026 4:00 PM,Cy,,,,,,01/30/2026,,,`;
+    expect(await run({ "bench-jobs.csv": next })).toMatchObject({ ingested: 2, duplicates: 9, deadLettered: 4 });
+    const after = (await pipeline.reason(TEST_ORG)).filter((r) => r.id.startsWith("rec_bench_")).map((r) => r.id.replace(/_2026-01-10$/, ""));
+    expect(after).toEqual(["rec_bench_metal_loss_B-1"]);
   });
 });

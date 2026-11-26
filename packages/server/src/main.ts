@@ -3,12 +3,11 @@ import { createServer } from "node:http";
 import { fileURLToPath } from "node:url";
 import pg from "pg";
 import { integrationStatuses } from "@karatos/core";
-import { selectDepartments } from "@karatos/retail";
 import { loadMigrations, migrate, PostgresMemoryStore } from "@karatos/store-postgres";
 import { createBrainApp } from "./app.js";
-import { createInstancePipeline } from "./brain.js";
+import { createInstancePipeline, instanceDepartments } from "./brain.js";
 import { createBriefRunner, readDailyBrief, webhookDelivery } from "./brief.js";
-import { instanceStoreHours, loadInstanceConfig } from "./config.js";
+import { instanceBenchSettings, instanceStoreHours, loadInstanceConfig } from "./config.js";
 import { StaticDocumentationSource } from "./documentation.js";
 import { createRetentionRunner } from "./retention.js";
 import { createReasoningRunner, readLastRun, reasonNow } from "./reasoning.js";
@@ -49,6 +48,7 @@ const pipeline = createInstancePipeline({
   departments: config.ENABLED_DEPARTMENTS,
   storeHours,
   awaitingReplyHours: config.AWAITING_REPLY_HOURS,
+  bench: instanceBenchSettings(config),
 });
 
 // Scheduled reasoning keeps findings fresh on its own: after each sync round that brings new events, before the
@@ -101,7 +101,7 @@ const server = createServer(
       startedAt,
       retentionDays: config.RAW_RETENTION_DAYS,
       settings: { storeHours, awaitingReplyHours: config.AWAITING_REPLY_HOURS },
-      departments: selectDepartments(config.ENABLED_DEPARTMENTS).map((d) => d.id),
+      departments: instanceDepartments(config.ENABLED_DEPARTMENTS).map((d) => d.id),
       enabledIntegrations: config.ENABLED_INTEGRATIONS,
       skipped,
       syncStatus: () => sync.latest(),

@@ -2,15 +2,16 @@ import { createHash } from "node:crypto";
 import { squash, type ColumnGetter } from "../files/columns.js";
 import type { CsvRow } from "../files/csv.js";
 import type { SourceFile } from "../files/source.js";
-import { parseDate, parseDecimal, parseFlag, parseInteger, parseMoney } from "../files/values.js";
+import { parseDate, parseDecimal, parseFlag, parseInteger, parseMoney, parseWeightGrams } from "../files/values.js";
 import type { FileKind, PosProfile } from "./profile.js";
 
 /**
  * Turns rows of POS exports into Brain A events, following the retail
  * departments' schemas: sale.completed and sale.returned (sales),
  * inventory.received and inventory.counted (inventory),
- * customer.profile_updated (clienteling) and repair.received and
- * repair.status_changed (repairs). A row that can't be read becomes
+ * customer.profile_updated (clienteling), repair.received and
+ * repair.status_changed (repairs), and bench_job.opened and
+ * bench_job.stage_recorded (bench). A row that can't be read becomes
  * an event with the bad value left null, so the department schema
  * dead-letters it with the row kept. Only the mapped columns are read: no
  * email addresses, phone numbers or street addresses.
@@ -339,12 +340,109 @@ export function posRepairEvents(rows: CsvRow[], get: Getter, ctx: RowContext): P
   return events;
 }
 
+/** A bench export's stage words, in the order they are tried, to the bench department's stages. */
+const BENCH_STAGE_WORDS: [RegExp, string][] = [
+  [/cancel|void|scrap/, "cancelled"],
+  [/hold|wait|approv/, "on_hold"],
+  [/\bqc\b|quality|inspect/, "qc"],
+  [/ready|complete|done|pick/, "ready"],
+  [/polish|finish|clean|rhodium|plat(e|ing)\b|engrav/, "finishing"],
+  [/set|stone|mount/, "setting"],
+  [/cast|wax|print|mold|mould/, "casting"],
+  [/cad|design|sketch|render|model/, "design"],
+];
+
+/** The bench department's stage for an export's label, or null when it says none of them. */
+export function posBenchStage(label: string): string | null {
+  const t = label.trim().toLowerCase();
+  return BENCH_STAGE_WORDS.find(([pattern]) => pattern.test(t))?.[1] ?? null;
+}
+
+/** A quality control result: pass or fail, or null when the label says neither. */
+export function posQcResult(label: string): "pass" | "fail" | null {
+  const t = label.trim().toLowerCase();
+  if (/fail|reject|rework|redo|back/.test(t)) return "fail";
+  if (/pass|ok|approved|good|accept/.test(t)) return "pass";
+  return null;
+}
+
+
+/**
+ * A bench export has a row for each stage a job enters. Each row gives
+ * bench_job.stage_recorded once, keyed by job, stage and time, and each job
+ * in the file gives bench_job.opened with its description, promised day,
+ * metal and the repair ticket or custom order it is for, read from its rows
+ * (the last filled value of each wins). That event is keyed by a hash of
+ * those values, so a changed promise date is a new event and the same
+ * export read again is not.
+ */
+export function posBenchEvents(rows: CsvRow[], get: Getter, ctx: RowContext): PosEvent[] {
+  const events: PosEvent[] = [];
+  const jobs = new Map<string, { at: string | undefined; row: CsvRow; fields: Record<string, unknown> }>();
+  for (const row of rows) {
+    const jobId = get(row, "jobId")?.trim() ?? "";
+    const at = parseDate(get(row, "date"), ctx.profile.dateOrder, ctx.profile.utcOffset) ?? undefined;
+    if (tooOld(ctx, at)) continue;
+    const label = get(row, "stage") ?? "";
+    const stage = posBenchStage(label);
+    const jeweler = get(row, "jeweler")?.trim();
+    const metalIn = get(row, "metalIn");
+    const metalOut = get(row, "metalOut");
+    const qc = get(row, "qcResult");
+    // Absent when empty; the department's schema turns down a word that isn't a work stage.
+    const failedText = get(row, "failedStage");
+    const failed = present(failedText) ? posBenchStage(failedText) : undefined;
+    events.push(
+      event(ctx, `bench:${jobId}:${stage ?? short(label)}:${at ?? where(ctx, row)}`, "bench_job.stage_recorded", at, {
+        jobId,
+        stage,
+        ...(jeweler ? { jeweler } : {}),
+        ...(present(metalIn) ? { metalInGrams: parseWeightGrams(metalIn, "grams") } : {}),
+        ...(present(metalOut) ? { metalOutGrams: parseWeightGrams(metalOut, "grams") } : {}),
+        ...(present(qc) ? { qcResult: posQcResult(qc) } : {}),
+        ...(failed !== undefined ? { failedStage: failed } : {}),
+        sourceRow: where(ctx, row),
+      }),
+    );
+
+    const job = jobs.get(jobId) ?? { at, row, fields: {} };
+    if (at !== undefined && (job.at === undefined || at > job.at)) [job.at, job.row] = [at, row];
+    const description = get(row, "description");
+    if (present(description)) job.fields.description = description.trim();
+    const promised = get(row, "promisedDate");
+    if (present(promised)) job.fields.promisedBy = storeDay(ctx, promised);
+    const ticket = get(row, "repairTicket");
+    if (present(ticket)) job.fields.repairTicketId = ticket.trim();
+    const order = get(row, "customOrder");
+    if (present(order)) job.fields.customOrderId = order.trim();
+    const metalText = get(row, "metal");
+    if (present(metalText)) {
+      const { metal, karat } = posMetal(metalText);
+      // An unknown metal is left out rather than guessed; the loss is still raised, without a dollar figure.
+      if (metal) job.fields.metal = metal;
+      if (karat !== undefined) job.fields.karat = karat;
+    }
+    jobs.set(jobId, job);
+  }
+  for (const [jobId, job] of jobs) {
+    events.push(
+      event(ctx, `bench_job:${jobId}:${short(JSON.stringify(job.fields))}`, "bench_job.opened", job.at, {
+        jobId,
+        ...job.fields,
+        sourceRow: where(ctx, job.row),
+      }),
+    );
+  }
+  return events;
+}
+
 export const REQUIRED_COLUMNS: Record<FileKind, string[]> = {
   items: ["sku", "title", "cost", "retailPrice"],
   stock: ["sku", "onHand"],
   customers: ["customerId", "name"],
   sales: ["saleId", "date", "sku", "quantity", "unitPrice"],
   repairs: ["ticketId", "customerId", "item", "work", "promisedDate", "estimate"],
+  bench: ["jobId", "stage", "date"],
 };
 
 export const ROW_EVENTS: Record<FileKind, (rows: CsvRow[], get: Getter, ctx: RowContext) => PosEvent[]> = {
@@ -353,4 +451,5 @@ export const ROW_EVENTS: Record<FileKind, (rows: CsvRow[], get: Getter, ctx: Row
   customers: posCustomerEvents,
   sales: posSalesEvents,
   repairs: posRepairEvents,
+  bench: posBenchEvents,
 };

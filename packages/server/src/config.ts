@@ -1,8 +1,10 @@
 import { z } from "zod";
 import { DEFAULT_RAW_RETENTION_DAYS, INTEGRATIONS, invalidWriteEntries, MAX_RAW_RETENTION_DAYS, MIN_RAW_RETENTION_DAYS } from "@karatos/core";
-import { DEFAULT_BRIEF_TIME_ZONE, DEFAULT_STORE_HOURS, isTimeZone, parseClosedDates, parseStoreHours, REPLY_BUSINESS_HOURS, RETAIL_DEPARTMENTS, type StoreHours } from "@karatos/retail";
+import { BENCH_METAL_LOSS_SHARE, parseStageLimits, type BenchSettings } from "@karatos/manufacturing";
+import { DEFAULT_BRIEF_TIME_ZONE, DEFAULT_STORE_HOURS, isTimeZone, parseClosedDates, parseStoreHours, REPLY_BUSINESS_HOURS, type StoreHours } from "@karatos/retail";
+import { INSTANCE_DEPARTMENTS } from "./brain.js";
 
-const DEPARTMENT_IDS = RETAIL_DEPARTMENTS.map((d) => d.id);
+const DEPARTMENT_IDS = INSTANCE_DEPARTMENTS.map((d) => d.id);
 const INTEGRATION_IDS = INTEGRATIONS.map((i) => i.id);
 
 const commaList = z
@@ -54,7 +56,7 @@ export const InstanceConfigSchema = z
     .transform((v) => v === "true"),
   /** Comma-separated ids of the source-of-truth docs reasoning must consult. */
   DOC_REGISTRY_IDS: commaList,
-  /** Comma-separated retail departments to run, e.g. sales,inventory,repairs. Empty runs all of them. */
+  /** Comma-separated departments to run, e.g. sales,inventory,repairs,bench. Empty runs all of them. */
   ENABLED_DEPARTMENTS: commaList.refine((ids) => ids.every((id) => DEPARTMENT_IDS.includes(id)), {
     message: `use any of: ${DEPARTMENT_IDS.join(", ")}`,
   }),
@@ -102,6 +104,13 @@ export const InstanceConfigSchema = z
   STORE_CLOSED_DATES: z.string().default("").transform(readWith(parseClosedDates)),
   /** Open hours a customer's message waits for an answer before clienteling's awaiting-reply rule raises it. */
   AWAITING_REPLY_HOURS: z.coerce.number().int().min(1).max(72).default(REPLY_BUSINESS_HOURS),
+  /**
+   * Whole days a bench job can sit in a stage before it is raised as stuck: one number for every stage,
+   * stages of their own ("casting=5, setting=3"), or both. See docs/departments/bench.md.
+   */
+  BENCH_STAGE_LIMIT_DAYS: z.string().default("").transform(readWith(parseStageLimits)),
+  /** The metal a bench job may lose across its stages, as a percent of the most issued to it, above 0 and up to 50. */
+  BENCH_METAL_LOSS_PERCENT: z.coerce.number().gt(0).max(50).default(BENCH_METAL_LOSS_SHARE * 100),
   /** Optional https address the daily brief is posted to. Off when unset. A secret: such addresses carry tokens. */
   BRIEF_WEBHOOK_URL: z.url({ protocol: /^https$/ }).optional(),
   })
@@ -116,6 +125,11 @@ export type InstanceConfig = z.infer<typeof InstanceConfigSchema>;
 /** The store's hours from STORE_TIME_ZONE, STORE_HOURS and STORE_CLOSED_DATES. */
 export function instanceStoreHours(config: Pick<InstanceConfig, "STORE_TIME_ZONE" | "STORE_HOURS" | "STORE_CLOSED_DATES">): StoreHours {
   return { timeZone: config.STORE_TIME_ZONE, week: config.STORE_HOURS, closedDates: config.STORE_CLOSED_DATES };
+}
+
+/** The bench rules' settings from BENCH_STAGE_LIMIT_DAYS and BENCH_METAL_LOSS_PERCENT. */
+export function instanceBenchSettings(config: Pick<InstanceConfig, "BENCH_STAGE_LIMIT_DAYS" | "BENCH_METAL_LOSS_PERCENT">): BenchSettings {
+  return { stageLimitDays: config.BENCH_STAGE_LIMIT_DAYS, metalLossShare: config.BENCH_METAL_LOSS_PERCENT / 100 };
 }
 
 export function loadInstanceConfig(env: Record<string, string | undefined>): InstanceConfig {
