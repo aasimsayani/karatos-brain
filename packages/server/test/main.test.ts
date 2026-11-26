@@ -69,13 +69,15 @@ describe("main: the running instance", () => {
       SUPABASE_DB_URL: "postgresql://user:pass@db.example.test:5432/postgres",
       PORT: String(port),
       ENABLED_INTEGRATIONS: "stripe, shopify",
-      ENABLED_DEPARTMENTS: "repairs, sales, clienteling",
+      ENABLED_DEPARTMENTS: "repairs, sales, clienteling, bench",
       RAW_RETENTION_DAYS: "45",
       STORE_TIME_ZONE: "America/Phoenix",
       // Open around the clock, so the wait below is the same whenever the test runs.
       STORE_HOURS: "mon-sun 00:00-12:00, 12:00-24:00",
       STORE_CLOSED_DATES: "2026-01-01",
       AWAITING_REPLY_HOURS: "3",
+      BENCH_STAGE_LIMIT_DAYS: "casting=1",
+      BENCH_METAL_LOSS_PERCENT: "5",
     });
     await import("../src/main.js");
 
@@ -98,7 +100,7 @@ describe("main: the running instance", () => {
       },
       awaitingReplyHours: 3,
     });
-    expect([...first.departments].sort()).toEqual(["clienteling", "repairs", "sales"]);
+    expect([...first.departments].sort()).toEqual(["bench", "clienteling", "repairs", "sales"]);
     expect(first.migrations.count).toBeGreaterThan(0);
     // Scheduled reasoning is on by default. The only connector brings nothing, so the one run there can be is the
     // daily brief's own, when the instance starts after BRIEF_HOUR on the store's clock.
@@ -127,6 +129,26 @@ describe("main: the running instance", () => {
     const { recommendations } = (await reasoned.json()) as { recommendations: { id: string; summary: string }[] };
     const waiting = recommendations.find((r) => r.id.startsWith("rec_clienteling_awaiting_reply_others_"));
     expect(waiting?.summary).toContain("waited 3 or more business hours");
+    // The bench rules read the instance's own limits: a job two days in casting is past BENCH_STAGE_LIMIT_DAYS=casting=1,
+    // and 0.40 g lost of 10 g is inside BENCH_METAL_LOSS_PERCENT=5 though past the default 3%.
+    const castAt = new Date(Date.now() - 2.5 * 86_400_000).toISOString();
+    const staged = await fetch(`http://127.0.0.1:${port}/v1/events`, {
+      method: "POST",
+      headers: instance,
+      body: JSON.stringify({
+        id: "evt_bench_main",
+        source: "inventory_pos",
+        type: "bench_job.stage_recorded",
+        occurredAt: castAt,
+        receivedAt: castAt,
+        idempotencyKey: "pos:main:bench:1",
+        payload: { jobId: "J-MAIN", stage: "casting", jeweler: "Ana", metalInGrams: 10, metalOutGrams: 9.6 },
+      }),
+    });
+    expect(staged.status).toBe(202);
+    const benchRun = (await (await fetch(`http://127.0.0.1:${port}/v1/reason`, { method: "POST", headers: instance })).json()) as { recommendations: { id: string; summary: string }[] };
+    const benchRecs = benchRun.recommendations.filter((r) => r.id.startsWith("rec_bench_"));
+    expect(benchRecs.map((r) => r.summary)).toEqual(["Bench job J-MAIN has been in casting for 2 days with Ana, past the 1-day limit. Find out what's holding it up."]);
     await vi.waitFor(async () => {
       const stripe = (await status()).integrations.find((i) => i.id === "stripe");
       expect(stripe?.lastSync).toMatchObject({ mode: "historical", outcome: "failed", error: "Error: vendor unreachable" });

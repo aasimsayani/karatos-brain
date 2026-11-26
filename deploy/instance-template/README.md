@@ -8,7 +8,7 @@ This repo holds the client's **non-secret** settings and deploy notes. Secret va
 
 | File | Purpose |
 | --- | --- |
-| `instance.env` | Non-secret settings: `INSTANCE_NAME`, `ORGANIZATION_ID`, `ENABLED_INTEGRATIONS`, `ENABLED_DEPARTMENTS`, `DOC_REGISTRY_IDS`, `RAW_RETENTION_DAYS`, and the store's clock and hours: `STORE_TIME_ZONE`, `STORE_HOURS`, `STORE_CLOSED_DATES`, `AWAITING_REPLY_HOURS` (see [store hours](https://github.com/aasimsayani/karatos-brain/blob/main/docs/deployment/instances.md#store-hours)). Write `STORE_HOURS` without quotes; most hosts keep quotes as part of the value |
+| `instance.env` | Non-secret settings: `INSTANCE_NAME`, `ORGANIZATION_ID`, `ENABLED_INTEGRATIONS`, `ENABLED_DEPARTMENTS`, `DOC_REGISTRY_IDS`, `RAW_RETENTION_DAYS`, and the store's clock and hours: `STORE_TIME_ZONE`, `STORE_HOURS`, `STORE_CLOSED_DATES`, `AWAITING_REPLY_HOURS` (see [store hours](https://github.com/aasimsayani/karatos-brain/blob/main/docs/deployment/instances.md#store-hours)), and the bench limits `BENCH_STAGE_LIMIT_DAYS` and `BENCH_METAL_LOSS_PERCENT` (see [bench limits](https://github.com/aasimsayani/karatos-brain/blob/main/docs/deployment/instances.md#bench-limits)). Write `STORE_HOURS` without quotes; most hosts keep quotes as part of the value |
 | `IMAGE` | The exact `ghcr.io/aasimsayani/karatos-brain` tag this client runs. Bump it to upgrade. |
 
 ## Upgrading

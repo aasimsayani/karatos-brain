@@ -123,9 +123,12 @@ export function configureDepartments(departments: DepartmentModule[], settings: 
   );
 }
 
-/** Picks departments by id, e.g. from ENABLED_DEPARTMENTS, with the instance's settings applied. An empty list means all. */
-export function selectDepartments(ids: string[], settings: RetailSettings = {}): DepartmentModule[] {
-  const unknown = ids.filter((id) => !RETAIL_DEPARTMENTS.some((d) => d.id === id));
+/**
+ * Picks departments by id, e.g. from ENABLED_DEPARTMENTS, with the instance's settings applied. An empty list means all.
+ * `available` is the departments to pick from: the retail ones unless an instance adds others, such as manufacturing's.
+ */
+export function selectDepartments(ids: string[], settings: RetailSettings = {}, available: DepartmentModule[] = RETAIL_DEPARTMENTS): DepartmentModule[] {
+  const unknown = ids.filter((id) => !available.some((d) => d.id === id));
   if (unknown.length) throw new Error(`unknown departments: ${unknown.join(", ")}`);
-  return configureDepartments(ids.length === 0 ? RETAIL_DEPARTMENTS : RETAIL_DEPARTMENTS.filter((d) => ids.includes(d.id)), settings);
+  return configureDepartments(ids.length === 0 ? available : available.filter((d) => ids.includes(d.id)), settings);
 }

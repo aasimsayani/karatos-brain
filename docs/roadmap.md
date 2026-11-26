@@ -40,8 +40,8 @@ This is a rebuild of the original Brain A work (v0.1.0 to v0.1.9, April 2026). T
 - [ ] Tune thresholds with Fuse Jewelry's real data once connectors are live
 
 ## Phase 2.8: Manufacturing departments
-- [ ] Bench jobs, casting, stone setting, finishing and quality control
-- [ ] Production planning, metal loss and labor cost per piece
+- [x] Bench jobs, casting, stone setting, finishing and quality control (see [bench jobs](departments/bench.md))
+- [ ] Production planning, metal loss and labor cost per piece (metal loss per job against a tolerance is in bench jobs; shop-wide loss trends, planning and labor cost are not)
 
 ## Phase 3: First connectors
 - [x] CSV import from any POS (items, stock counts, customers, sales)

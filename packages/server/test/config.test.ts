@@ -1,7 +1,7 @@
 import { randomBytes } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import { STORE_HOURS } from "@karatos/retail";
-import { instanceStoreHours, loadInstanceConfig } from "../src/index.js";
+import { instanceBenchSettings, instanceStoreHours, loadInstanceConfig } from "../src/index.js";
 
 const valid = {
   INSTANCE_NAME: "Fuse Jewelry",
@@ -40,7 +40,8 @@ describe("loadInstanceConfig", () => {
 
   it("reads the enabled departments and rejects unknown ones without echoing values", () => {
     expect(loadInstanceConfig({ ...valid, ENABLED_DEPARTMENTS: "sales, repairs" }).ENABLED_DEPARTMENTS).toEqual(["sales", "repairs"]);
-    expect(() => loadInstanceConfig({ ...valid, ENABLED_DEPARTMENTS: "sales,manufacturing" })).toThrow(/ENABLED_DEPARTMENTS: use any of: sales/);
+    expect(() => loadInstanceConfig({ ...valid, ENABLED_DEPARTMENTS: "sales,manufacturing" })).toThrow(/ENABLED_DEPARTMENTS: use any of: sales.*, compliance, bench/);
+    expect(loadInstanceConfig({ ...valid, ENABLED_DEPARTMENTS: "bench, repairs" }).ENABLED_DEPARTMENTS).toEqual(["bench", "repairs"]);
   });
 
   it("keeps every integration read-only unless writes are listed", () => {
@@ -186,5 +187,32 @@ describe("store hours settings", () => {
     expect(() => loadInstanceConfig({ ...base, STORE_HOURS: "daily", STORE_CLOSED_DATES: "soon", STORE_TIME_ZONE: "Mountain" })).toThrow(
       /STORE_TIME_ZONE: use an IANA time zone.*; STORE_HOURS: "daily" has no hours.*; STORE_CLOSED_DATES: "soon" isn't a date/,
     );
+  });
+});
+
+describe("bench settings", () => {
+  const base = { INSTANCE_NAME: "Example Jewelers", ORGANIZATION_ID: "example-jewelers", INSTANCE_API_KEY: "b".repeat(64), SUPABASE_DB_URL: "postgresql://user:pass@db.example.test:5432/postgres" };
+
+  it("keeps the bench rules' defaults when unset or empty", () => {
+    for (const env of [base, { ...base, BENCH_STAGE_LIMIT_DAYS: "", BENCH_METAL_LOSS_PERCENT: "" }]) {
+      const config = loadInstanceConfig(env);
+      expect(config.BENCH_STAGE_LIMIT_DAYS).toEqual({});
+      expect(config.BENCH_METAL_LOSS_PERCENT).toBe(3);
+      expect(instanceBenchSettings(config)).toEqual({ stageLimitDays: {}, metalLossShare: 0.03 });
+    }
+  });
+
+  it("reads the workshop's own stage limits and metal loss tolerance", () => {
+    const config = loadInstanceConfig({ ...base, BENCH_STAGE_LIMIT_DAYS: "5, casting=2", BENCH_METAL_LOSS_PERCENT: "2.5" });
+    expect(instanceBenchSettings(config)).toEqual({ stageLimitDays: { design: 5, casting: 2, setting: 5, finishing: 5, qc: 5, on_hold: 5 }, metalLossShare: 0.025 });
+    expect(loadInstanceConfig({ ...base, BENCH_METAL_LOSS_PERCENT: "50" }).BENCH_METAL_LOSS_PERCENT).toBe(50);
+  });
+
+  it("rejects settings it can't read, naming the setting and the bad part", () => {
+    expect(() => loadInstanceConfig({ ...base, BENCH_STAGE_LIMIT_DAYS: "polish=3" })).toThrow(
+      `Invalid instance configuration: BENCH_STAGE_LIMIT_DAYS: "polish" in "polish=3" isn't a stage; use design, casting, setting, finishing, qc, on_hold`,
+    );
+    expect(() => loadInstanceConfig({ ...base, BENCH_STAGE_LIMIT_DAYS: "casting=0" })).toThrow(/BENCH_STAGE_LIMIT_DAYS: "casting=0" needs whole days from 1 to 365/);
+    for (const percent of ["0", "-1", "50.5", "three"]) expect(() => loadInstanceConfig({ ...base, BENCH_METAL_LOSS_PERCENT: percent }), percent).toThrow(/BENCH_METAL_LOSS_PERCENT/);
   });
 });

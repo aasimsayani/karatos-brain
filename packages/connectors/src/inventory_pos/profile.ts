@@ -64,7 +64,25 @@ const RepairColumns = z.object({
   statusDate: optional,
 });
 
-export const FILE_KINDS = ["items", "stock", "customers", "sales", "repairs"] as const;
+/** One row per stage a bench job enters: the job's own columns may repeat on every row or appear on some. */
+const BenchColumns = z.object({
+  jobId: Column,
+  stage: Column,
+  /** When the job entered the stage, with its time when the export gives one. */
+  date: Column,
+  jeweler: optional,
+  metalIn: optional,
+  metalOut: optional,
+  qcResult: optional,
+  failedStage: optional,
+  description: optional,
+  promisedDate: optional,
+  repairTicket: optional,
+  customOrder: optional,
+  metal: optional,
+});
+
+export const FILE_KINDS = ["items", "stock", "customers", "sales", "repairs", "bench"] as const;
 export type FileKind = (typeof FILE_KINDS)[number];
 
 const PAYMENT_METHODS = ["card", "cash", "check", "financing", "trade_in", "gift_card", "wire", "other"] as const;
@@ -85,6 +103,7 @@ export const PosProfileSchema = z.object({
     customers: z.string().optional(),
     sales: z.string().optional(),
     repairs: z.string().optional(),
+    bench: z.string().optional(),
   }),
   columns: z.object({
     sales: SalesColumns.optional(),
@@ -92,6 +111,7 @@ export const PosProfileSchema = z.object({
     stock: StockColumns.optional(),
     customers: CustomerColumns.optional(),
     repairs: RepairColumns.optional(),
+    bench: BenchColumns.optional(),
   }),
   /** The system's payment labels, lowercased, mapped to the sales department's methods. Checked before the built-in guesses. */
   payments: z.record(z.string(), z.enum(PAYMENT_METHODS)).default({}),
@@ -106,6 +126,7 @@ export type ItemColumnMap = z.output<typeof ItemColumns>;
 export type StockColumnMap = z.output<typeof StockColumns>;
 export type CustomerColumnMap = z.output<typeof CustomerColumns>;
 export type RepairColumnMap = z.output<typeof RepairColumns>;
+export type BenchColumnMap = z.output<typeof BenchColumns>;
 
 export class PosProfileError extends Error {
   constructor(message: string) {
@@ -140,7 +161,7 @@ export const GENERIC_POS_PROFILE: PosProfile = parsePosProfile({
   id: "generic",
   name: "Generic CSV",
   dateOrder: "mdy",
-  files: { items: "item|inventory", stock: "stock|on.?hand", customers: "customer|client", sales: "sale|transaction|receipt", repairs: "repair|service.?ticket|job.?envelope" },
+  files: { items: "item|inventory", stock: "stock|on.?hand", customers: "customer|client", sales: "sale|transaction|receipt", repairs: "repair|service.?ticket|job.?envelope", bench: "bench|job.?bag|work.?order|production" },
   columns: {
     sales: {
       saleId: ["Sale ID", "Receipt", "Ticket"],
@@ -189,6 +210,21 @@ export const GENERIC_POS_PROFILE: PosProfile = parsePosProfile({
       receivedDate: ["Received", "Taken In", "Date In"],
       status: "Status",
       statusDate: ["Status Date", "Last Updated", "Updated"],
+    },
+    bench: {
+      jobId: ["Job", "Job Number", "Job ID", "Job Bag", "Work Order"],
+      stage: ["Stage", "Step", "Process"],
+      date: ["Date", "Time", "Stage Date", "Timestamp"],
+      jeweler: ["Jeweler", "Bench Jeweler", "Worker"],
+      metalIn: ["Metal In (g)", "Metal In", "Weight In", "Issued (g)"],
+      metalOut: ["Metal Out (g)", "Metal Out", "Weight Out", "Returned (g)"],
+      qcResult: ["QC Result", "QC", "Inspection"],
+      failedStage: ["Sent Back To", "Failed Stage", "Rework Stage"],
+      description: ["Description", "Item", "Piece"],
+      promisedDate: ["Promised", "Promise Date", "Due Date", "Due"],
+      repairTicket: ["Repair Ticket", "Repair ID"],
+      customOrder: ["Custom Order", "Custom Order ID"],
+      metal: "Metal",
     },
   },
 });
