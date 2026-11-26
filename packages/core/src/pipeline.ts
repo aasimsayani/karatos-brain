@@ -5,6 +5,7 @@ import type { NormalizedEntity } from "./entities.js";
 import type { Signal } from "./signals.js";
 import { impactProblem, type Recommendation } from "./reasoning.js";
 import type { DocumentationSource, MemoryStore, Normalizer, Reasoner, SignalExtractor } from "./layers.js";
+import { applyFeedback, DEFAULT_FEEDBACK_POLICY, feedbackPolicyProblem, readFeedbackHistory, type FeedbackPolicy, type HeldBack } from "./feedback.js";
 
 export interface BrainPipelineOptions {
   memory: MemoryStore;
@@ -19,6 +20,13 @@ export interface BrainPipelineOptions {
   payloadSchemas?: Record<string, ZodType>;
   /** How many recent signals the reasoners see. */
   reasoningWindow?: number;
+  /**
+   * How feedback on earlier recommendations shapes each run: the cooldown
+   * for dismissed subjects and how rules are ranked. Defaults to
+   * DEFAULT_FEEDBACK_POLICY; false turns the loop off, leaving
+   * recommendations as the rules wrote them apart from recording their rule.
+   */
+  feedback?: Partial<FeedbackPolicy> | false;
   now?: () => Date;
   newId?: () => string;
 }
@@ -56,9 +64,13 @@ export class BrainPipeline {
   private readonly window: number;
   private readonly now: () => Date;
   private readonly newId: () => string;
+  private readonly feedback: FeedbackPolicy | null;
 
   constructor(private readonly options: BrainPipelineOptions) {
     this.window = options.reasoningWindow ?? 200;
+    this.feedback = options.feedback === false ? null : { ...DEFAULT_FEEDBACK_POLICY, ...options.feedback };
+    const problem = this.feedback && feedbackPolicyProblem(this.feedback);
+    if (problem) throw new RangeError(problem);
     this.now = options.now ?? (() => new Date());
     this.newId = options.newId ?? randomUUID;
   }
@@ -116,16 +128,31 @@ export class BrainPipeline {
   }
 
   async reason(organizationId: string): Promise<Recommendation[]> {
+    return (await this.reasonWithFeedback(organizationId)).recommendations;
+  }
+
+  /** The policy the feedback loop runs with, or null when it is off. */
+  get feedbackPolicy(): FeedbackPolicy | null {
+    return this.feedback ? { ...this.feedback } : null;
+  }
+
+  /**
+   * One reasoning run, with what feedback held back. Recommendations held
+   * back by the cooldown are neither stored nor returned.
+   */
+  async reasonWithFeedback(organizationId: string): Promise<{ recommendations: Recommendation[]; heldBack: HeldBack[] }> {
     const startedAt = this.now().toISOString();
     const documentation = await this.options.documentation.current();
     const signals = await this.options.memory.recentSignals(organizationId, this.window);
 
-    const recommendations: Recommendation[] = [];
+    const fresh: Recommendation[] = [];
     for (const reasoner of this.options.reasoners) {
       const produced = await reasoner.reason({ organizationId, signals, documentation, now: startedAt });
-      recommendations.push(
-        ...produced.map(({ impact, ...r }) => ({
+      fresh.push(
+        ...produced.map(({ impact, ranking: _ranking, ...r }) => ({
           ...r,
+          // The rule is the reasoner that raised it, whatever the reasoner wrote.
+          rule: reasoner.name,
           // A dollar figure that doesn't add up is dropped rather than shown; the recommendation stands.
           ...(impact && !impactProblem(impact) ? { impact } : {}),
           // A reasoner cannot claim fresh docs when the documentation layer says otherwise.
@@ -136,6 +163,12 @@ export class BrainPipeline {
           },
         })),
       );
+    }
+    let recommendations = fresh;
+    let heldBack: HeldBack[] = [];
+    if (this.feedback) {
+      const history = await readFeedbackHistory(this.options.memory, organizationId, startedAt, this.feedback);
+      ({ recommendations, heldBack } = applyFeedback({ ...history, organizationId, now: startedAt, fresh, policy: this.feedback }));
     }
     await this.options.memory.saveRecommendations(recommendations);
     await this.options.memory.recordReasoningRun({
@@ -148,6 +181,6 @@ export class BrainPipeline {
       degraded: documentation.stale,
       recommendationIds: recommendations.map((r) => r.id),
     });
-    return recommendations;
+    return { recommendations, heldBack };
   }
 }

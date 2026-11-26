@@ -294,7 +294,7 @@ This section updates itself from [docs/milestones.json](docs/milestones.json) an
 <!-- progress:start -->
 <!-- Generated from docs/milestones.json and the integration catalog by npm run progress:write. Edit those, not this block. -->
 
-**Roadmap:** 21 of 81 items done. An integration counts as done once it has run against a real or sandbox account, not when its tests pass.
+**Roadmap:** 22 of 81 items done. An integration counts as done once it has run against a real or sandbox account, not when its tests pass.
 
 **Integrations:** 103 of the 253 systems in the catalog are built and tested against mocks made from each vendor's docs. 0 have been checked live so far.
 
@@ -305,7 +305,7 @@ This section updates itself from [docs/milestones.json](docs/milestones.json) an
 | Core integrations | Connects what most jewelers already run: online store, POS, payments, bank and books. | █░░░░░░░░░ 14% (6 of 6 built, 0 checked live) | Nov 2026 |
 | Client instances | Each business gets its own isolated instance, in accounts it owns. | █████████░ 86% | Dec 2026 |
 | Website and demo | Jewelers can see what KaratOS does for their business before they talk to us. | ██████░░░░ 60% | Nov 2026 |
-| AI reasoning | Claude explains each recommendation in plain language and learns from the owner's decisions. | ░░░░░░░░░░ 0% | Jan 2027 |
+| AI reasoning | Claude explains each recommendation in plain language and learns from the owner's decisions. | ███░░░░░░░ 33% | Jan 2027 |
 | Self-serve AI dashboards | Owners ask a question and get a dashboard, without a developer. | ███░░░░░░░ 33% | Mar 2027 |
 | Self-hosted and managed plans | Run it in your own accounts on Core, or let us host it on Managed. | ███░░░░░░░ 33% | Mar 2027 |
 | Integrations, next wave | Jewelry POS, CRM, messaging, marketing and diamond feeds join the catalog. | ░░░░░░░░░░ 0% (19 of 19 built, 0 checked live) | Dec 2026 |
@@ -377,11 +377,12 @@ On the Core plan, the database, the container and every credential sit in accoun
 | --- | --- |
 | `GET /healthz` | Liveness check, no key needed |
 | `POST /v1/events` | Ingest one event; a replay with the same idempotency key is never stored twice |
-| `POST /v1/reason` | Run the reasoners and return recommendations |
+| `POST /v1/reason` | Run the reasoners and return recommendations, shaped by what the owner did with earlier ones, and what was held back. See [the feedback loop](docs/feedback-loop.md) |
 | `GET /v1/recommendations` | Latest recommendations, with provenance |
 | `POST /v1/recommendations/:id/feedback` | Record an accept, reject or override |
 | `POST /v1/recommendations/:id/result` | Record what an acted-on recommendation returned, for the value ledger |
 | `GET /v1/value` | The value ledger: what acted-on recommendations returned, month by month |
+| `GET /v1/feedback` | How the owner has treated each rule's recommendations, and how that ranks the next run. See [the feedback loop](docs/feedback-loop.md) |
 | `GET /v1/brief` | The daily brief: yesterday's sales against the same day last week, anything unusual and what is waiting, each figure citing its events. See [the daily brief](docs/daily-brief.md) |
 | `POST /v1/ask`, `GET /v1/ask?q=` | Ask a question in plain words, such as "what sold this week?" or "which payouts are late?", and get an answer from synced data only, each number citing its events. See [asking the instance](docs/ask.md) |
 | `POST /v1/verify` | Check what has synced against each source system's own totals for a period: sale counts and gross for Shopify and Square, charges for Stripe, refunds for all three, new profiles for Klaviyo, with the ids of any record on one side only. See [verifying synced numbers](docs/verify-sync.md) |

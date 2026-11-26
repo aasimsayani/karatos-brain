@@ -91,7 +91,7 @@ The [bench department](../departments/bench.md) raises a job that sits in one st
 
 ## Scheduled reasoning
 
-The department rules (payout matching, stock agreement, customers awaiting a reply, return rates and the rest) run on their own, so the findings in the [daily brief](../daily-brief.md) and in [answers](../ask.md) stay fresh without anyone calling `POST /v1/reason`. Each run does what that route does: it reasons over recent signals, then records the results now due on approved recommendations.
+The department rules (payout matching, stock agreement, customers awaiting a reply, return rates and the rest) run on their own, so the findings in the [daily brief](../daily-brief.md) and in [answers](../ask.md) stay fresh without anyone calling `POST /v1/reason`. Each run does what that route does: it reasons over recent signals, shaped by what the owner did with earlier recommendations (see [the feedback loop](../feedback-loop.md)), then records the results now due on approved recommendations.
 
 - **After a sync round that brought new events.** A round where every connector found nothing new, or failed, doesn't start a run.
 - **Before the daily brief.** The brief runner reasons first, so the 7:00 brief has fresh findings. If a run is in progress, the brief waits for it (and for one queued after it). If a run succeeded in the last 10 minutes, the brief uses it instead of reasoning again.
@@ -109,6 +109,7 @@ Set `REASON_SCHEDULE=off` to turn it off. Findings then refresh only when someth
 | --- | --- | --- |
 | `REASON_SCHEDULE` | `on` | `on` or `off`. Off leaves reasoning to `POST /v1/reason` |
 | `REASON_INTERVAL_MINUTES` | `60` | Longest gap, 5 to 1440 minutes, between the end of one scheduled run and the start of the next |
+| `FEEDBACK_COOLDOWN_DAYS` | `14` | Days, 0 to 90, a dismissed recommendation's rule and subject is held back unless it grew materially; 0 turns the cooldown off. See [the feedback loop](../feedback-loop.md) |
 
 ## Calling an instance
 
@@ -132,6 +133,7 @@ The support key gets 403 on every endpoint below except `/healthz`, `GET /v1/int
 | `POST /v1/recommendations/:id/feedback` | API key | Record `accepted`, `rejected` or `overridden`, with the actor and an optional note |
 | `POST /v1/recommendations/:id/result` | API key | Record what acting on it brought back: `cents` (whole, zero or more), the actor and an optional note. The kind comes from its estimate; one with no estimate needs `kind` (`makes`, `saves` or `protects`) |
 | `GET /v1/value` | API key | The value ledger for the recommendations raised in a period: shown, approved, dismissed, overridden, returned and still to come, in cents by kind (`?from=2026-10-01&to=2026-11-01`, up to 366 days; this month by default). See [the value ledger](../value-ledger.md) |
+| `GET /v1/feedback` | API key | Each rule's accepts, dismissals, overrides and returned cents over the last 180 days, how many of its subjects are cooling down, and the factor and note the next run ranks it by. See [the feedback loop](../feedback-loop.md) |
 | `GET /v1/brief` | API key | The daily brief for a store day (`?date=2026-11-18`; yesterday in `STORE_TIME_ZONE` by default, up to today): sales, refunds and net by channel and system against the same weekday last week, open payout, stock, reply and return findings, sync problems, and the other open recommendations by impact, every figure citing its event ids and systems. Read-only. See [the daily brief](../daily-brief.md) |
 | `POST /v1/ask`, `GET /v1/ask?q=` | API key | Answer a plain-language question (`{"question": "..."}` or `?q=`, 1 to 500 characters) about sales for a period, late or short payouts, low or disagreeing stock, customers waiting on a reply, open recommendations or sync health, from synced data only, every number citing its event ids and systems. A question it can't answer gets "I can't answer that yet" with what it can. Read-only. See [asking the instance](../ask.md) |
 | `POST /v1/verify` | API key | Compare what has synced with each source system's own totals for whole store days (`{"from": "2026-11-01", "to": "2026-11-15"}`, both included, up to 92 days; optional `system` and `toleranceCents`): match, mismatch or unavailable for each metric, with source and synced totals, the difference and up to 20 ids missing or extra. Read-only, one run at a time (429 while one runs). `npm run verify-sync` calls it. See [verifying synced numbers](../verify-sync.md) |

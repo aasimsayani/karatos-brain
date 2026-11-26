@@ -10,6 +10,8 @@ export interface InstanceDepartmentSettings {
   storeHours?: StoreHours;
   /** AWAITING_REPLY_HOURS. Absent: 4. */
   awaitingReplyHours?: number;
+  /** FEEDBACK_COOLDOWN_DAYS: days a dismissed recommendation's rule and subject is held back. Absent: 14. 0 turns the cooldown off. */
+  feedbackCooldownDays?: number;
   /** BENCH_STAGE_LIMIT_DAYS and BENCH_METAL_LOSS_PERCENT. Absent: the bench rules' defaults. */
   bench?: BenchSettings;
 }
@@ -36,10 +38,11 @@ export function instanceDepartments(ids: string[], settings: InstanceDepartmentS
 
 /** Builds the pipeline for one instance with the departments that client uses. */
 export function createInstancePipeline(options: InstancePipelineOptions): BrainPipeline {
-  const { memory, documentation, departments, ...settings } = options;
+  const { memory, documentation, departments, feedbackCooldownDays, ...settings } = options;
   return new BrainPipeline({
     memory,
     documentation,
+    ...(feedbackCooldownDays !== undefined ? { feedback: { cooldownDays: feedbackCooldownDays } } : {}),
     ...combineDepartments(instanceDepartments(departments, settings)),
   });
 }

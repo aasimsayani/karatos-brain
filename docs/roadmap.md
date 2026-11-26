@@ -64,7 +64,7 @@ This is a rebuild of the original Brain A work (v0.1.0 to v0.1.9, April 2026). T
 
 ## Phase 4: First reasoners
 - [ ] Claude-powered reasoner with provenance and confidence
-- [ ] Feedback loop into future reasoning
+- [x] Feedback loop into future reasoning
 
 ## Later
 - Self-serve AI dashboards in the Brain Console

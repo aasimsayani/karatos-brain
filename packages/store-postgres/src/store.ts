@@ -71,6 +71,8 @@ interface RecommendationRow {
   provenance: Recommendation["provenance"];
   degraded: boolean;
   created_at: Date | string;
+  rule: string | null;
+  ranking: Recommendation["ranking"] | null;
 }
 
 interface ReasoningRunRow {
@@ -328,8 +330,8 @@ export class PostgresMemoryStore implements MemoryStore, RawDataRetention, Brief
   async saveRecommendations(recommendations: Recommendation[]): Promise<void> {
     for (const r of recommendations) {
       await this.db.query(
-        `insert into recommendations (id, organization_id, summary, confidence, expected_impact, impact, provenance, degraded, created_at)
-         values ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+        `insert into recommendations (id, organization_id, summary, confidence, expected_impact, impact, provenance, degraded, created_at, rule, ranking)
+         values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
          on conflict (id) do nothing`,
         [
           r.id,
@@ -341,6 +343,8 @@ export class PostgresMemoryStore implements MemoryStore, RawDataRetention, Brief
           JSON.stringify(r.provenance),
           r.degraded,
           r.createdAt,
+          r.rule ?? null,
+          r.ranking ? JSON.stringify(r.ranking) : null,
         ],
       );
     }
@@ -539,5 +543,7 @@ function toRecommendation(row: RecommendationRow): Recommendation {
     provenance: row.provenance,
     degraded: row.degraded,
     createdAt: iso(row.created_at),
+    ...(row.rule !== null ? { rule: row.rule } : {}),
+    ...(row.ranking ? { ranking: row.ranking } : {}),
   };
 }
