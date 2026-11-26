@@ -10,6 +10,8 @@ export interface InstancePipelineOptions {
   storeHours?: StoreHours;
   /** AWAITING_REPLY_HOURS. Absent: 4. */
   awaitingReplyHours?: number;
+  /** FEEDBACK_COOLDOWN_DAYS: days a dismissed recommendation's rule and subject is held back. Absent: 14. 0 turns the cooldown off. */
+  feedbackCooldownDays?: number;
 }
 
 /** Builds the pipeline for one instance with the departments that client uses. */
@@ -21,6 +23,7 @@ export function createInstancePipeline(options: InstancePipelineOptions): BrainP
   return new BrainPipeline({
     memory: options.memory,
     documentation: options.documentation,
+    ...(options.feedbackCooldownDays !== undefined ? { feedback: { cooldownDays: options.feedbackCooldownDays } } : {}),
     ...combineDepartments(departments),
   });
 }

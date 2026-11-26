@@ -48,9 +48,13 @@ const EXPECTED_BODY = {
       provenance: { eventIds: [], signalIds: [], documentIds: ["doc_a"] },
       degraded: false,
       createdAt: "2026-11-20T10:00:00.000Z",
+      // Since the feedback loop: the rule that raised it, and why it ranks as it does.
+      rule: "one",
+      ranking: { baseConfidence: 0.5, factor: 1, note: "No decisions on this rule in the last 180 days." },
     },
   ],
   measured: 0,
+  heldBack: [],
 };
 
 let server: Server | undefined;

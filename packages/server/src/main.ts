@@ -49,6 +49,8 @@ const pipeline = createInstancePipeline({
   departments: config.ENABLED_DEPARTMENTS,
   storeHours,
   awaitingReplyHours: config.AWAITING_REPLY_HOURS,
+  // What the store did with earlier recommendations shapes the next run: dismissed subjects wait out this cooldown.
+  feedbackCooldownDays: config.FEEDBACK_COOLDOWN_DAYS,
 });
 
 // Scheduled reasoning keeps findings fresh on its own: after each sync round that brings new events, before the

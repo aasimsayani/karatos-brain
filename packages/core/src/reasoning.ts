@@ -22,6 +22,20 @@ export interface Recommendation {
   /** True when reasoning ran against stale or mismatched documentation. */
   degraded: boolean;
   createdAt: string;
+  /** The rule (reasoner) that raised it. Set by the pipeline; absent on recommendations stored before rules were recorded. */
+  rule?: string;
+  /** How feedback on earlier recommendations set its confidence and rank. Absent when the feedback loop is off. */
+  ranking?: Ranking;
+}
+
+/** How a recommendation's rank was set from feedback. See feedback.ts. */
+export interface Ranking {
+  /** The confidence the rule wrote, before feedback. */
+  baseConfidence: number;
+  /** What feedback multiplied it by: below 1 lowers it, above 1 raises it. */
+  factor: number;
+  /** Why, in a sentence or two the owner can check. */
+  note: string;
 }
 
 /**

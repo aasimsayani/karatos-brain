@@ -44,4 +44,8 @@ Only approved recommendations are measured. A customer who would have come back 
 | `clienteling.lapsed-vip` | The margin on what that customer buys | 90 days |
 | `custom-orders.progress` (balance) | Payments on that order | 30 days |
 
-Other rules are recorded by hand for now. Rules whose outcome lives in data KaratOS reads (an invoice paid, a memo returned, a piece sold) are next.
+Other rules are recorded by hand for now.
+
+## Feeding back
+
+What comes back also changes what KaratOS recommends next: a rule whose accepted recommendations brought money back ranks higher, one the owner mostly dismisses ranks lower, and a dismissed subject waits out a cooldown. See [the feedback loop](feedback-loop.md). Rules whose outcome lives in data KaratOS reads (an invoice paid, a memo returned, a piece sold) are next.

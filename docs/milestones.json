@@ -76,7 +76,7 @@
       "target": "2027-01",
       "items": [
         { "name": "Claude-powered reasoner with provenance and confidence", "done": false },
-        { "name": "Owner feedback tunes future recommendations", "done": false },
+        { "name": "Owner feedback tunes future recommendations", "done": true },
         { "name": "Semantic search over the business's documents", "done": false }
       ]
     },
