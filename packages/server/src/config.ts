@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { DEFAULT_RAW_RETENTION_DAYS, INTEGRATIONS, invalidWriteEntries, MAX_RAW_RETENTION_DAYS, MIN_RAW_RETENTION_DAYS } from "@karatos/core";
+import { DEFAULT_FEEDBACK_POLICY, DEFAULT_RAW_RETENTION_DAYS, INTEGRATIONS, MAX_FEEDBACK_COOLDOWN_DAYS, invalidWriteEntries, MAX_RAW_RETENTION_DAYS, MIN_RAW_RETENTION_DAYS } from "@karatos/core";
 import { DEFAULT_BRIEF_TIME_ZONE, DEFAULT_STORE_HOURS, isTimeZone, parseClosedDates, parseStoreHours, REPLY_BUSINESS_HOURS, RETAIL_DEPARTMENTS, type StoreHours } from "@karatos/retail";
 
 const DEPARTMENT_IDS = RETAIL_DEPARTMENTS.map((d) => d.id);
@@ -82,6 +82,12 @@ export const InstanceConfigSchema = z
     .transform((v) => v === "on"),
   /** The longest gap, in minutes, between the end of one scheduled reasoning run and the start of the next. */
   REASON_INTERVAL_MINUTES: z.coerce.number().int().min(5).max(1440).default(60),
+  /**
+   * Days a recommendation that was dismissed is held back before the same
+   * rule raises the same subject again, unless its dollar estimate or
+   * confidence grew. 0 turns the cooldown off. See docs/feedback-loop.md.
+   */
+  FEEDBACK_COOLDOWN_DAYS: z.coerce.number().int().min(0).max(MAX_FEEDBACK_COOLDOWN_DAYS).default(DEFAULT_FEEDBACK_POLICY.cooldownDays),
   /**
    * Days raw vendor data (event payloads, dead-letter input, uploaded file
    * contents) is kept before it is cleared. Facts, signals and source

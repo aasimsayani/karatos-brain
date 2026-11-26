@@ -1,11 +1,11 @@
 import { timingSafeEqual } from "node:crypto";
 import type { IncomingMessage, RequestListener, ServerResponse } from "node:http";
 import { z } from "zod";
-import { DeadLetteredError, INTEGRATIONS, monthOf, readValueReport, type BrainPipeline, type IntegrationStatus, type MemoryStore, type Recommendation } from "@karatos/core";
+import { DeadLetteredError, DEFAULT_FEEDBACK_POLICY, INTEGRATIONS, monthOf, readFeedbackSummary, readValueReport, type BrainPipeline, type IntegrationStatus, type MemoryStore } from "@karatos/core";
 import { addDays, ASK_MAX_QUESTION_CHARS, DEFAULT_BRIEF_TIME_ZONE, isDay, localDay, VERIFY_MAX_DAYS, verifyPeriod, type BriefSyncInput } from "@karatos/retail";
 import { readAnswer } from "./ask.js";
 import { readDailyBrief, yesterdayIn, type BriefSources } from "./brief.js";
-import { reasonNow } from "./reasoning.js";
+import { reasonNow, type ReasonPass } from "./reasoning.js";
 import { VerifyBusyError, type Verifier } from "./verify.js";
 import { MAX_SUPPORT_EVENT_DAYS, SUPPORT_EVENT_DAYS, supportStatus, type SupportStatusOptions } from "./support.js";
 
@@ -35,7 +35,7 @@ export interface BrainAppOptions {
    * which records the run and keeps it from overlapping a scheduled one.
    * Without it the route calls reasonNow directly.
    */
-  reason?: (pass: () => Promise<{ recommendations: Recommendation[]; measured: number }>) => Promise<{ recommendations: Recommendation[]; measured: number }>;
+  reason?: (pass: () => Promise<ReasonPass>) => Promise<ReasonPass>;
 }
 
 export interface BrainBriefOptions {
@@ -299,8 +299,8 @@ export function brainRoutes(options: BrainAppOptions): BrainRoute[] {
       /^\/v1\/reason$/,
       async () => {
         const pass = () => reasonNow(options.pipeline, options.memory, options.organizationId);
-        const { recommendations, measured } = await (options.reason ? options.reason(pass) : pass());
-        return [200, { recommendations, measured }];
+        const { recommendations, measured, heldBack } = await (options.reason ? options.reason(pass) : pass());
+        return [200, { recommendations, measured, heldBack: heldBack ?? [] }];
       },
     ],
     [
@@ -375,6 +375,16 @@ export function brainRoutes(options: BrainAppOptions): BrainRoute[] {
         if (to - from > MAX_REPORT_DAYS * 86_400_000) throw new HttpError(400, `a report covers at most ${MAX_REPORT_DAYS} days`);
         const period = { from: new Date(from).toISOString(), to: new Date(to).toISOString() };
         return [200, { report: await readValueReport(options.memory, options.organizationId, period) }];
+      },
+    ],
+    [
+      "GET",
+      /^\/v1\/feedback$/,
+      async () => {
+        const policy = options.pipeline.feedbackPolicy;
+        // With the loop off, the summary still shows how each rule was treated, by the default policy, and says it's off.
+        const feedback = await readFeedbackSummary(options.memory, options.organizationId, new Date().toISOString(), policy ?? DEFAULT_FEEDBACK_POLICY);
+        return [200, { feedback: { ...feedback, on: policy !== null } }];
       },
     ],
     [

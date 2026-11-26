@@ -1,4 +1,4 @@
-import { measureValue, type BrainPipeline, type MemoryStore, type ReasoningRun as StoredReasoningRun, type Recommendation } from "@karatos/core";
+import { measureValue, type BrainPipeline, type HeldBack, type MemoryStore, type ReasoningRun as StoredReasoningRun, type Recommendation } from "@karatos/core";
 import type { BriefReasoningInput } from "@karatos/retail";
 import type { SyncRunOutcome } from "./sync.js";
 
@@ -16,20 +16,28 @@ export const DEFAULT_REASON_INTERVAL_MINUTES = 60;
 /** A brief built this soon after a successful run uses that run's findings instead of reasoning again. */
 export const REASON_BRIEF_REUSE_MS = 10 * 60_000;
 
+/** What one reasoning pass returns. heldBack lists what the feedback loop's cooldown kept back; absent counts as none. */
+export interface ReasonPass {
+  recommendations: Recommendation[];
+  measured: number;
+  heldBack?: HeldBack[];
+}
+
 /**
  * One reasoning pass, as POST /v1/reason does it: the department rules over
- * recent signals, then the results now due on approved recommendations.
+ * recent signals, shaped by feedback on earlier recommendations, then the
+ * results now due on approved recommendations.
  */
 export async function reasonNow(
   pipeline: BrainPipeline,
   memory: MemoryStore,
   organizationId: string,
   now: () => Date = () => new Date(),
-): Promise<{ recommendations: Recommendation[]; measured: number }> {
-  const recommendations = await pipeline.reason(organizationId);
+): Promise<Required<ReasonPass>> {
+  const { recommendations, heldBack } = await pipeline.reasonWithFeedback(organizationId);
   // Each run also records the results now due on approved recommendations.
   const measured = await measureValue(memory, organizationId, now().toISOString());
-  return { recommendations, measured: measured.length };
+  return { recommendations, measured: measured.length, heldBack };
 }
 
 /** What the runner starts on its own: after a sync round that brought new events, on the interval, or before the daily brief. */
