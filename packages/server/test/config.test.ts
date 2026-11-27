@@ -1,7 +1,7 @@
 import { randomBytes } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import { STORE_HOURS } from "@karatos/retail";
-import { instanceBenchSettings, instanceStoreHours, loadInstanceConfig } from "../src/index.js";
+import { instanceBenchSettings, instanceProductionSettings, instanceStoreHours, loadInstanceConfig } from "../src/index.js";
 
 const valid = {
   INSTANCE_NAME: "Fuse Jewelry",
@@ -214,5 +214,25 @@ describe("bench settings", () => {
     );
     expect(() => loadInstanceConfig({ ...base, BENCH_STAGE_LIMIT_DAYS: "casting=0" })).toThrow(/BENCH_STAGE_LIMIT_DAYS: "casting=0" needs whole days from 1 to 365/);
     for (const percent of ["0", "-1", "50.5", "three"]) expect(() => loadInstanceConfig({ ...base, BENCH_METAL_LOSS_PERCENT: percent }), percent).toThrow(/BENCH_METAL_LOSS_PERCENT/);
+  });
+});
+
+describe("production planning settings", () => {
+  const base = { INSTANCE_NAME: "Example Jewelers", ORGANIZATION_ID: "example-jewelers", INSTANCE_API_KEY: "b".repeat(64), SUPABASE_DB_URL: "postgresql://user:pass@db.example.test:5432/postgres" };
+
+  it("keeps the defaults when unset or empty", () => {
+    for (const env of [base, { ...base, BENCH_LABOR_RATE: "", BENCH_DAILY_HOURS: "" }]) {
+      expect(instanceProductionSettings(loadInstanceConfig(env))).toEqual({ laborRateCents: {}, dailyHours: {} });
+    }
+  });
+
+  it("reads the bench's own rates and hours, for everyone and for each jeweler", () => {
+    const config = loadInstanceConfig({ ...base, BENCH_LABOR_RATE: "42.50, Ana=55", BENCH_DAILY_HOURS: "Ben=4, 6.5" });
+    expect(instanceProductionSettings(config)).toEqual({ laborRateCents: { all: 4_250, jewelers: { Ana: 5_500 } }, dailyHours: { all: 6.5, jewelers: { Ben: 4 } } });
+  });
+
+  it("rejects figures it can't read, naming the setting and the bad part", () => {
+    expect(() => loadInstanceConfig({ ...base, BENCH_LABOR_RATE: "Ana=0" })).toThrow(`Invalid instance configuration: BENCH_LABOR_RATE: "Ana=0" needs dollars an hour from 1 to 1000, with up to two decimals`);
+    expect(() => loadInstanceConfig({ ...base, BENCH_DAILY_HOURS: "6, 8" })).toThrow(/BENCH_DAILY_HOURS: "8" is a second figure for everyone/);
   });
 });

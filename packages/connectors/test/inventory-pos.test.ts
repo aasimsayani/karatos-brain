@@ -27,6 +27,7 @@ import {
   posCategory,
   posMetal,
   posBenchStage,
+  posLaborMinutes,
   posPaymentMethod,
   posQcResult,
   posRepairStatus,
@@ -767,6 +768,21 @@ describe("bench jobs from the CSV export", () => {
     expect(events.get("pos:generic:bench:B-2:qc:2026-01-09T14:00:00.000Z")!.payload).toEqual({ jobId: "B-2", stage: "qc", qcResult: "fail", failedStage: "setting", sourceRow: "bench-jobs.csv:5" });
     // Rows more than five years old are skipped.
     expect([...events.keys()].some((k) => k.includes("B-7"))).toBe(false);
+  });
+
+  it("reads bench minutes, or bench hours as minutes, and dead-letters time that isn't a positive number", async () => {
+    expect([posLaborMinutes("45", undefined), posLaborMinutes(" 12.5 ", "3"), posLaborMinutes(undefined, "1.25"), posLaborMinutes("", "0.333"), posLaborMinutes(" ", " ")]).toEqual([45, 12.5, 75, 19.98, undefined]);
+    expect([posLaborMinutes("0", undefined), posLaborMinutes("ten", undefined), posLaborMinutes(undefined, "0"), posLaborMinutes(undefined, "-1"), posLaborMinutes("-5", "2")]).toEqual([null, null, null, null, null]);
+    const csv = ["Job,Stage,Date,Jeweler,Labor Minutes,Labor Hours", "L-1,Setting,01/04/2026,Ana,90,", "L-1,Polish,01/05/2026,Ben,,0.5", "L-1,QC,01/06/2026,Ben,,", "L-2,Setting,01/04/2026,Ana,lots,"].join("\n");
+    const events = byKey(await eventsOf(benchConnector({ "bench-jobs.csv": csv })));
+    expect(events.get("pos:generic:bench:L-1:setting:2026-01-04T00:00:00.000Z")!.payload).toMatchObject({ laborMinutes: 90 });
+    expect(events.get("pos:generic:bench:L-1:finishing:2026-01-05T00:00:00.000Z")!.payload).toMatchObject({ laborMinutes: 30 });
+    expect(events.get("pos:generic:bench:L-1:qc:2026-01-06T00:00:00.000Z")!.payload).not.toHaveProperty("laborMinutes");
+    expect(events.get("pos:generic:bench:L-2:setting:2026-01-04T00:00:00.000Z")!.payload).toMatchObject({ laborMinutes: null });
+    const memory = new InMemoryStore();
+    const pipeline = new BrainPipeline({ memory, ...combineDepartments([...RETAIL_DEPARTMENTS, ...MANUFACTURING_DEPARTMENTS]), now: NOW, documentation: { current: () => ({ documentIds: [], stale: false }) } });
+    await runSync({ connector: benchConnector({ "bench-jobs.csv": csv }), mode: "historical", pipeline, memory, organizationId: TEST_ORG });
+    expect(memory.deadLetters.map((d) => d.issues.map((i) => i.path))).toEqual([["payload.laborMinutes"]]);
   });
 
   it("feeds the bench department, dead-letters what it can't read, and reads a re-export as only what changed", async () => {

@@ -54,7 +54,7 @@ describe("createInstancePipeline", () => {
   });
 
   it("runs the bench department beside retail's, with the instance's own bench settings", async () => {
-    expect(INSTANCE_DEPARTMENTS.map((d) => d.id).slice(-2)).toEqual(["compliance", "bench"]);
+    expect(INSTANCE_DEPARTMENTS.map((d) => d.id).slice(-3)).toEqual(["compliance", "bench", "production"]);
     expect(instanceDepartments([]).map((d) => d.id)).toEqual(INSTANCE_DEPARTMENTS.map((d) => d.id));
     expect(instanceDepartments(["bench", "repairs"]).map((d) => d.id)).toEqual(["repairs", "bench"]);
     const stage = (jobId: string) => ({
@@ -82,6 +82,42 @@ describe("createInstancePipeline", () => {
     expect(await run({ bench: { stageLimitDays: { setting: 3 }, metalLossShare: 0.02 } })).toEqual(["rec_bench_metal_loss_J-1", "rec_bench_stuck_J-1"]);
     await expect(createInstancePipeline({ memory: new InMemoryStore(), documentation: new StaticDocumentationSource([]), departments: ["bench"] }).ingest(stage("")))
       .rejects.toBeInstanceOf(DeadLetteredError);
+  });
+
+  it("runs production planning with the instance's rates and hours, on the store's own working days", async () => {
+    const stage = (jobId: string, n: number, payload: Record<string, unknown>, occurredAt: string) => ({
+      id: `evt_${jobId}_${n}`,
+      organizationId: ORG,
+      source: "inventory_pos",
+      type: "bench_job.stage_recorded",
+      occurredAt,
+      receivedAt: occurredAt,
+      idempotencyKey: `${jobId}_${n}`,
+      payload: { jobId, ...payload },
+    });
+    const run = async (options: Partial<InstancePipelineOptions>) => {
+      const memory = new InMemoryStore();
+      const brain = createInstancePipeline({ memory, documentation: new StaticDocumentationSource([]), departments: ["bench", "production"], ...options });
+      vi.useFakeTimers({ now: new Date("2026-10-02T15:00:00Z"), toFake: ["Date"] });
+      try {
+        // Three finished jobs set in 8 hours each, and one open job in setting with Ana.
+        for (const id of ["H-1", "H-2", "H-3"]) {
+          await brain.ingest(stage(id, 1, { stage: "setting", jeweler: "Ana", laborMinutes: 480 }, "2026-09-20T12:00:00Z"));
+          await brain.ingest(stage(id, 2, { stage: "ready" }, "2026-09-21T12:00:00Z"));
+        }
+        await brain.ingest(stage("J-1", 1, { stage: "setting", jeweler: "Ana" }, "2026-10-01T12:00:00Z"));
+        return (await brain.reason(ORG)).map((r) => r.id.replace(/_2026-10-02$/, "")).sort();
+      } finally {
+        vi.useRealTimers();
+      }
+    };
+    // 8 hours against Ana's 6 hours a day on 6 working days: room.
+    expect(await run({})).toEqual([]);
+    // One working day in the week at an hour a day: over.
+    const oneDay = storeHours("America/New_York", "fri 10:00-18:00", "");
+    expect(await run({ storeHours: oneDay, production: { dailyHours: { all: 1 } } })).toEqual(["rec_production_capacity_shop"]);
+    expect(await run({ production: { dailyHours: { all: 1 } } })).toEqual(["rec_production_capacity_shop"]);
+    expect(await run({ storeHours: oneDay })).toEqual(["rec_production_capacity_shop"]);
   });
 
   it("refuses unknown departments", () => {

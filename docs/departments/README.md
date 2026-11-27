@@ -7,7 +7,7 @@ Brain A covers a jewelry business one department at a time. Each department is a
 3. **Extractors** that turn events into signals in shared memory.
 4. **Reasoners** that read signals from any department and raise recommendations with confidence, expected impact and provenance.
 
-Retail comes first. Manufacturing is its own package, [`@karatos/manufacturing`](../../packages/manufacturing), built on the same contract; its first department is [bench jobs](bench.md), and production planning and labor cost come later.
+Retail comes first. Manufacturing is its own package, [`@karatos/manufacturing`](../../packages/manufacturing), built on the same contract; its departments are [bench jobs](bench.md) and [production planning](production.md), which costs each piece and plans the bench from what bench jobs records.
 
 ## Turning departments on
 
@@ -40,6 +40,7 @@ A department's events are only validated when it is enabled, and departments tha
 | Id | Department | Events it owns | What it raises |
 | --- | --- | --- | --- |
 | `bench` | Bench Jobs | `bench_job.opened`, `bench_job.stage_recorded` | Jobs in one stage past its limit (`BENCH_STAGE_LIMIT_DAYS`); jobs the store's own stage times say will miss their promised date; stages and jewelers whose work quality control sends back 20% of the time or more; jobs that lost more metal than the tolerance (`BENCH_METAL_LOSS_PERCENT`), valued at spot. Reads repair tickets' and custom orders' promised dates, and custom orders' own stages (see [bench jobs](bench.md)) |
+| `production` | Production Planning | none, it reads bench jobs | Pieces whose labor (`BENCH_LABOR_RATE`) and metal come to more than 60% of their repair estimate or custom order quote; an alloy or jeweler whose metal loss rate over the last 30 days is a point or more above the 90 days before, valued at melt; jewelers, or the whole bench, with more work queued than their hours (`BENCH_DAILY_HOURS`) over the next 7 days, and the promises it pushes late (see [production planning](production.md)) |
 
 Compliance recommendations are reminders for the owner, not legal advice. State rules for secondhand dealers and unclaimed property differ, so those recommendations say to follow the state's rules rather than naming a period.
 
@@ -58,6 +59,7 @@ These links already exist, and each one makes both departments more useful than 
 - **Payments → finance:** each processor's payouts are matched to the sales, refunds and fees they cover.
 - **Repairs and custom orders → bench:** a bench job takes its promised date from the ticket or order it is for, and custom orders' stages teach the store's typical bench times.
 - **Metals → bench:** spot prices value metal lost at the bench.
+- **Bench, repairs and custom orders → production:** bench minutes and weighings cost each piece against its repair estimate or custom order quote, show the shop's loss trends, and plan open work against the bench's hours on the store's working days.
 
 See [compounding value](../vision/compounding-value.md) for why these links matter more as departments are added.
 
@@ -83,7 +85,7 @@ Each has a likely amount and a low to high range, and a `basis` that says how it
 
 The likely values in `ASSUMPTIONS` are the same as the defaults of the payback estimate on the website. They are starting points; as KaratOS learns how each business works, its own figures replace them.
 
-A recommendation with no honest number carries no `impact`: compliance reminders, late purchase orders, stalled custom work, late or unclaimed repairs, metal price falls, and stuck, late or reworked bench jobs. The pipeline drops an `impact` that doesn't add up (amounts out of order, not whole cents, or no basis) and keeps the recommendation. Postgres keeps it in `recommendations.impact`.
+A recommendation with no honest number carries no `impact`: compliance reminders, late purchase orders, stalled custom work, late or unclaimed repairs, metal price falls, stuck, late or reworked bench jobs, and an overloaded bench (whose summary says what the hours over cost, which is what acting costs, not what it brings back). The pipeline drops an `impact` that doesn't add up (amounts out of order, not whole cents, or no basis) and keeps the recommendation. Postgres keeps it in `recommendations.impact`.
 
 | Reasoner | Kind | Worked out as |
 | --- | --- | --- |
@@ -107,6 +109,8 @@ A recommendation with no honest number carries no `impact`: compliance reminders
 | `metals.price-move` (rise) | makes | Added metal value of pieces with a weight |
 | `metals.buy-margin` | saves | Paid above 85% of melt |
 | `bench.metal-loss` | protects | Metal lost above the tolerance, at its melt value at the latest spot |
+| `production.labor-cost` | saves | Labor and metal above 60% of the repair estimate or custom order quote |
+| `production.loss-trend` | protects | The rise in loss rate times the last 30 days' metal issued, at melt value at the latest spot |
 | `metals.refiner-assay` | protects | Short fine metal at the settlement's own rate |
 | `metals.refiner-payable` | makes | The lot at a fair share of spot, less what it paid |
 | `marketing.campaign-return` | makes or saves | One more run of a winner, or the loss of a loser not repeated |

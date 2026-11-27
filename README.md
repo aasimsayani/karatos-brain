@@ -118,9 +118,9 @@ Every piece of data passes through the same seven layers, in order, and none is 
 </details>
 
 <details>
-<summary><strong>The twelve departments, with an example from each</strong></summary>
+<summary><strong>The thirteen departments, with an example from each</strong></summary>
 
-Retail jewelry departments are built today, and the first manufacturing department, bench jobs.
+Retail jewelry departments are built today, and two manufacturing departments: bench jobs and production planning.
 
 | Department | What it watches | Example recommendation |
 | --- | --- | --- |
@@ -136,7 +136,7 @@ Retail jewelry departments are built today, and the first manufacturing departme
 | Finance | Bank activity against what the store took in | "Cash sales exceed cash deposits by $1,200 this month. Reconcile the drawer." |
 | Compliance | Cash reporting, anti-money-laundering checks, secondhand-dealer rules | "$11,000 in cash came in for one sale. File IRS Form 8300 within 15 days." |
 | Bench jobs | Design, casting, stone setting, finishing and quality control, with metal in and out | "Job J-1 has been in casting for 6 days with Ana, past the 4-day limit." |
-| *Production (next)* | *Production planning, labor cost per piece* | *"Casting loss on 14k yellow is 4% this month, double the usual."* |
+| Production planning | Labor and metal cost per piece, shop-wide metal loss trends, and open work against the bench's hours | "Metal loss on 14K gold is rising: 3% of the 50.00 g issued in the last 30 days didn't come back, up from 1%." |
 
 Check the linked records before acting. Compliance items are reminders for the owner, not legal advice.
 
@@ -294,7 +294,7 @@ This section updates itself from [docs/milestones.json](docs/milestones.json) an
 <!-- progress:start -->
 <!-- Generated from docs/milestones.json and the integration catalog by npm run progress:write. Edit those, not this block. -->
 
-**Roadmap:** 22 of 81 items done. An integration counts as done once it has run against a real or sandbox account, not when its tests pass.
+**Roadmap:** 23 of 81 items done. An integration counts as done once it has run against a real or sandbox account, not when its tests pass.
 
 **Integrations:** 103 of the 253 systems in the catalog are built and tested against mocks made from each vendor's docs. 0 have been checked live so far.
 
@@ -311,7 +311,7 @@ This section updates itself from [docs/milestones.json](docs/milestones.json) an
 | Integrations, next wave | Jewelry POS, CRM, messaging, marketing and diamond feeds join the catalog. | ░░░░░░░░░░ 0% (19 of 19 built, 0 checked live) | Dec 2026 |
 | Marketplaces, ads and office tools | Sales channels, ad spend and the files and tasks a team already keeps, in one place. | ░░░░░░░░░░ 0% (17 of 17 built, 0 checked live) | Dec 2026 |
 | Shipping, payables and insurance | Packages, bills and care plans tracked next to the sale they belong to. | ░░░░░░░░░░ 0% (4 of 6 built, 0 checked live) | Jan 2027 |
-| Manufacturing departments | Bench, casting and setting work tracked with metal loss and labor cost per piece. | █████░░░░░ 50% | Jun 2027 |
+| Manufacturing departments | Bench, casting and setting work tracked with metal loss and labor cost per piece. | ██████████ 100% | Done |
 
 ### Up next
 
@@ -418,6 +418,7 @@ The Shopify connector was the first one built. See [docs/integrations.md](docs/i
 | --- | --- |
 | `@karatos/core` | Event envelope, layer contracts, pipeline, connector contract and `runSync`, write gate, integration catalog, in-memory store, jewelry math (karat purity, melt value), config validation |
 | `@karatos/retail` | Retail jewelry departments: sales, inventory, clienteling, repairs, custom orders, appraisals, buying, metals, marketing, finance, compliance. See [departments](docs/departments/README.md) |
+| `@karatos/manufacturing` | Manufacturing departments: bench jobs and production planning. See [bench jobs](docs/departments/bench.md) and [production planning](docs/departments/production.md) |
 | `@karatos/store-postgres` | Postgres/Supabase `MemoryStore`, ingestion log and write audit, migration runner |
 | `@karatos/connectors` | Every built connector, one folder each, from Shopify and QuickBooks to IDEX, Nivoda and Stuller |
 | `@karatos/connector-testkit` | Shared connector test helpers: fixtures, replay, the `runSync` harness, webhook signing, doc mocks |
