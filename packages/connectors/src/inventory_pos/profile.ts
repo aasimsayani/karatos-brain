@@ -75,6 +75,10 @@ const BenchColumns = z.object({
   metalOut: optional,
   qcResult: optional,
   failedStage: optional,
+  /** Bench minutes worked on the stage. */
+  laborMinutes: optional,
+  /** Or bench hours, for an export that keeps time in hours. */
+  laborHours: optional,
   description: optional,
   promisedDate: optional,
   repairTicket: optional,
@@ -220,6 +224,8 @@ export const GENERIC_POS_PROFILE: PosProfile = parsePosProfile({
       metalOut: ["Metal Out (g)", "Metal Out", "Weight Out", "Returned (g)"],
       qcResult: ["QC Result", "QC", "Inspection"],
       failedStage: ["Sent Back To", "Failed Stage", "Rework Stage"],
+      laborMinutes: ["Labor Minutes", "Labor (min)", "Bench Minutes", "Minutes"],
+      laborHours: ["Labor Hours", "Labor (h)", "Bench Hours", "Hours"],
       description: ["Description", "Item", "Piece"],
       promisedDate: ["Promised", "Promise Date", "Due Date", "Due"],
       repairTicket: ["Repair Ticket", "Repair ID"],

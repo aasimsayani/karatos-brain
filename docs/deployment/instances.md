@@ -89,6 +89,15 @@ The [bench department](../departments/bench.md) raises a job that sits in one st
 | `BENCH_STAGE_LIMIT_DAYS` | design 7, casting 4, setting 4, finishing 3, qc 2, on_hold 14 | Whole days, 1 to 365, a job can be in a stage before it is raised: one number for every stage (`5`), stages of their own (`casting=5, setting=3`), or both (`5, qc=1`) |
 | `BENCH_METAL_LOSS_PERCENT` | `3` | The metal a job may lose across its stages, as a percent of the most issued to it, above 0 and up to 50 |
 
+## Bench labor and hours
+
+[Production planning](../departments/production.md) prices each piece's bench minutes and plans open work against the bench's hours on the store's working days (from [store hours](#store-hours)). Both are plain settings checked when the instance starts; one it can't read stops it, naming the part that's wrong.
+
+| Setting | Default | What it does |
+| --- | --- | --- |
+| `BENCH_LABOR_RATE` | `45` | What an hour of bench time costs, in dollars from 1 to 1000 with up to two decimals: one figure for everyone (`45`), jewelers' own (`Ana=55`), or both (`45, Ana=55`) |
+| `BENCH_DAILY_HOURS` | `6` | Hours of bench work a jeweler does in a working day, 0.5 to 24, written the same way (`6, Ben=4`) |
+
 ## Scheduled reasoning
 
 The department rules (payout matching, stock agreement, customers awaiting a reply, return rates and the rest) run on their own, so the findings in the [daily brief](../daily-brief.md) and in [answers](../ask.md) stay fresh without anyone calling `POST /v1/reason`. Each run does what that route does: it reasons over recent signals, shaped by what the owner did with earlier recommendations (see [the feedback loop](../feedback-loop.md)), then records the results now due on approved recommendations.

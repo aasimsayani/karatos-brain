@@ -366,6 +366,20 @@ export function posQcResult(label: string): "pass" | "fail" | null {
   return null;
 }
 
+/**
+ * Bench minutes from a minutes column, else an hours column: absent when
+ * both are empty, null for a value that isn't a positive number, so the
+ * department's schema dead-letters the row. Minutes win when both are filled.
+ */
+export function posLaborMinutes(minutes: string | undefined, hoursText: string | undefined): number | null | undefined {
+  if (present(minutes)) {
+    const n = parseDecimal(minutes);
+    return n !== null && n > 0 ? n : null;
+  }
+  if (!present(hoursText)) return undefined;
+  const n = parseDecimal(hoursText);
+  return n !== null && n > 0 ? Math.round(n * 60 * 100) / 100 : null;
+}
 
 /**
  * A bench export has a row for each stage a job enters. Each row gives
@@ -392,6 +406,7 @@ export function posBenchEvents(rows: CsvRow[], get: Getter, ctx: RowContext): Po
     // Absent when empty; the department's schema turns down a word that isn't a work stage.
     const failedText = get(row, "failedStage");
     const failed = present(failedText) ? posBenchStage(failedText) : undefined;
+    const laborMinutes = posLaborMinutes(get(row, "laborMinutes"), get(row, "laborHours"));
     events.push(
       event(ctx, `bench:${jobId}:${stage ?? short(label)}:${at ?? where(ctx, row)}`, "bench_job.stage_recorded", at, {
         jobId,
@@ -401,6 +416,7 @@ export function posBenchEvents(rows: CsvRow[], get: Getter, ctx: RowContext): Po
         ...(present(metalOut) ? { metalOutGrams: parseWeightGrams(metalOut, "grams") } : {}),
         ...(present(qc) ? { qcResult: posQcResult(qc) } : {}),
         ...(failed !== undefined ? { failedStage: failed } : {}),
+        ...(laborMinutes !== undefined ? { laborMinutes } : {}),
         sourceRow: where(ctx, row),
       }),
     );

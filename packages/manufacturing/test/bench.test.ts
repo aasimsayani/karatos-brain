@@ -69,7 +69,7 @@ async function history(s: Shop, days: number[]) {
 
 describe("the bench department", () => {
   it("is the first manufacturing department and can be picked by id beside retail's", () => {
-    expect(MANUFACTURING_DEPARTMENTS.map((d) => d.id)).toEqual(["bench"]);
+    expect(MANUFACTURING_DEPARTMENTS.map((d) => d.id)).toEqual(["bench", "production"]);
     expect(manufacturingDepartments()).toBe(MANUFACTURING_DEPARTMENTS);
     expect(manufacturingDepartments({ bench: {} })[0]!.id).toBe("bench");
     const all = [...RETAIL_DEPARTMENTS, ...MANUFACTURING_DEPARTMENTS];

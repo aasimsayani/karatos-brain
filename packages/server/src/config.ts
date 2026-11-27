@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { DEFAULT_FEEDBACK_POLICY, DEFAULT_RAW_RETENTION_DAYS, INTEGRATIONS, MAX_FEEDBACK_COOLDOWN_DAYS, invalidWriteEntries, MAX_RAW_RETENTION_DAYS, MIN_RAW_RETENTION_DAYS } from "@karatos/core";
-import { BENCH_METAL_LOSS_SHARE, parseStageLimits, type BenchSettings } from "@karatos/manufacturing";
+import { BENCH_METAL_LOSS_SHARE, parseDailyHours, parseLaborRates, parseStageLimits, type BenchSettings, type ProductionSettings } from "@karatos/manufacturing";
 import { DEFAULT_BRIEF_TIME_ZONE, DEFAULT_STORE_HOURS, isTimeZone, parseClosedDates, parseStoreHours, REPLY_BUSINESS_HOURS, type StoreHours } from "@karatos/retail";
 import { INSTANCE_DEPARTMENTS } from "./brain.js";
 
@@ -117,6 +117,13 @@ export const InstanceConfigSchema = z
   BENCH_STAGE_LIMIT_DAYS: z.string().default("").transform(readWith(parseStageLimits)),
   /** The metal a bench job may lose across its stages, as a percent of the most issued to it, above 0 and up to 50. */
   BENCH_METAL_LOSS_PERCENT: z.coerce.number().gt(0).max(50).default(BENCH_METAL_LOSS_SHARE * 100),
+  /**
+   * What an hour of bench time costs, in dollars from 1 to 1000: one figure for everyone, jewelers' own
+   * ("Ana=55"), or both ("45, Ana=55"). Empty is $45. See docs/departments/production.md.
+   */
+  BENCH_LABOR_RATE: z.string().default("").transform(readWith(parseLaborRates)),
+  /** Hours of bench work a jeweler does in a working day, 0.5 to 24, written the same way. Empty is 6. */
+  BENCH_DAILY_HOURS: z.string().default("").transform(readWith(parseDailyHours)),
   /** Optional https address the daily brief is posted to. Off when unset. A secret: such addresses carry tokens. */
   BRIEF_WEBHOOK_URL: z.url({ protocol: /^https$/ }).optional(),
   })
@@ -136,6 +143,11 @@ export function instanceStoreHours(config: Pick<InstanceConfig, "STORE_TIME_ZONE
 /** The bench rules' settings from BENCH_STAGE_LIMIT_DAYS and BENCH_METAL_LOSS_PERCENT. */
 export function instanceBenchSettings(config: Pick<InstanceConfig, "BENCH_STAGE_LIMIT_DAYS" | "BENCH_METAL_LOSS_PERCENT">): BenchSettings {
   return { stageLimitDays: config.BENCH_STAGE_LIMIT_DAYS, metalLossShare: config.BENCH_METAL_LOSS_PERCENT / 100 };
+}
+
+/** Production planning's settings from BENCH_LABOR_RATE and BENCH_DAILY_HOURS. */
+export function instanceProductionSettings(config: Pick<InstanceConfig, "BENCH_LABOR_RATE" | "BENCH_DAILY_HOURS">): Omit<ProductionSettings, "storeHours"> {
+  return { laborRateCents: config.BENCH_LABOR_RATE, dailyHours: config.BENCH_DAILY_HOURS };
 }
 
 export function loadInstanceConfig(env: Record<string, string | undefined>): InstanceConfig {
