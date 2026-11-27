@@ -21,3 +21,5 @@ export * from "./vendor-docs.js";
 export * from "./sandbox-run.js";
 export * from "./retention.js";
 export * from "./briefs.js";
+export * from "./work.js";
+export * from "./work-memory.js";

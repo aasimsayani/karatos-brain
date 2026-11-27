@@ -4,9 +4,14 @@ import { z } from "zod";
 import { DeadLetteredError, DEFAULT_FEEDBACK_POLICY, INTEGRATIONS, monthOf, readFeedbackSummary, readValueReport, type BrainPipeline, type IntegrationStatus, type MemoryStore } from "@karatos/core";
 import { addDays, ASK_MAX_QUESTION_CHARS, DEFAULT_BRIEF_TIME_ZONE, isDay, localDay, VERIFY_MAX_DAYS, verifyPeriod, type BriefSyncInput } from "@karatos/retail";
 import { readAnswer } from "./ask.js";
+import { HttpError, idFrom, readJson } from "./http.js";
+import { SIGNAL_KIND, VerifyBody } from "./inputs.js";
+
+export { VERIFY_MAX_TOLERANCE_CENTS } from "./inputs.js";
 import { readDailyBrief, yesterdayIn, type BriefSources } from "./brief.js";
 import { reasonNow, type ReasonPass } from "./reasoning.js";
 import { VerifyBusyError, type Verifier } from "./verify.js";
+import { workRoutes, type BrainWorkOptions } from "./tasks.js";
 import { MAX_SUPPORT_EVENT_DAYS, SUPPORT_EVENT_DAYS, supportStatus, type SupportStatusOptions } from "./support.js";
 
 export interface BrainAppOptions {
@@ -36,22 +41,14 @@ export interface BrainAppOptions {
    * Without it the route calls reasonNow directly.
    */
   reason?: (pass: () => Promise<ReasonPass>) => Promise<ReasonPass>;
+  /** Reasoning sessions and agent tasks at /v1/sessions and /v1/tasks. Without it those routes answer 503. */
+  work?: BrainWorkOptions;
 }
 
 export interface BrainBriefOptions {
   timeZone: string;
   sync?: () => BriefSyncInput;
   now?: () => Date;
-}
-
-class HttpError extends Error {
-  constructor(
-    readonly status: number,
-    message: string,
-    readonly details?: unknown,
-  ) {
-    super(message);
-  }
 }
 
 /**
@@ -95,22 +92,6 @@ function authorized(req: IncomingMessage, apiKey: string): boolean {
   return same && given.length === expected.length;
 }
 
-async function readJson(req: IncomingMessage, limit: number): Promise<unknown> {
-  const chunks: Buffer[] = [];
-  let size = 0;
-  for await (const chunk of req) {
-    size += (chunk as Buffer).length;
-    if (size > limit) throw new HttpError(413, "request body too large");
-    chunks.push(chunk as Buffer);
-  }
-  if (size === 0) throw new HttpError(400, "request body must be JSON");
-  try {
-    return JSON.parse(Buffer.concat(chunks).toString("utf8"));
-  } catch {
-    throw new HttpError(400, "request body must be JSON");
-  }
-}
-
 const FeedbackBody = z.object({
   outcome: z.enum(["accepted", "rejected", "overridden"]),
   actor: z.string().min(1),
@@ -134,19 +115,6 @@ const AskBody = z.object({ question: z.string() });
 /** The largest body POST /v1/verify reads. */
 export const VERIFY_MAX_BODY_BYTES = 1_024;
 
-/** The largest money tolerance a caller may set: one dollar. */
-export const VERIFY_MAX_TOLERANCE_CENTS = 100;
-
-const VerifyBody = z
-  .object({
-    system: z.string().regex(/^[a-z][a-z0-9_]{0,63}$/, "system must be an integration id, such as shopify").optional(),
-    from: z.string().refine(isDay, "from must be a day, such as 2026-11-01"),
-    to: z.string().refine(isDay, "to must be a day, such as 2026-11-15"),
-    /** The largest money difference that still matches, in whole cents. */
-    toleranceCents: z.number().int().min(0).max(VERIFY_MAX_TOLERANCE_CENTS).optional(),
-  })
-  .strict();
-
 /** A question as asked, trimmed, or a 400 saying what is wrong with it. */
 function questionFrom(value: unknown): string {
   if (typeof value !== "string") throw new HttpError(400, "question must be a string, such as \"what sold this week?\"");
@@ -165,23 +133,7 @@ function dayStart(value: string): number {
   return !Number.isNaN(ms) && new Date(ms).toISOString().slice(0, 10) === value ? ms : Number.NaN;
 }
 
-/** Signal kinds are lowercase dotted names, such as bank.balance or receivable.invoice. */
-/**
- * A path segment as the id it encodes. Clients encode ids (recommendation
- * ids carry colons, entity ids spaces), so the route has to decode them
- * before looking anything up; a malformed escape is the caller's mistake.
- */
-function idFrom(segment: string): string {
-  try {
-    return decodeURIComponent(segment);
-  } catch {
-    throw new HttpError(400, "the id in the path isn't validly encoded");
-  }
-}
-
-const SIGNAL_KIND = /^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*){0,3}$/;
-
-type Handler = (req: IncomingMessage, params: string[], url: URL) => Promise<[number, unknown]>;
+export type Handler = (req: IncomingMessage, params: string[], url: URL) => Promise<[number, unknown]>;
 
 /** Who a route admits: only the instance key, or the support key too. */
 export type RouteAccess = "instance" | "support";
@@ -261,13 +213,8 @@ export function createBrainApp(options: BrainAppOptions): RequestListener {
  */
 export function brainRoutes(options: BrainAppOptions): BrainRoute[] {
   const limit = options.maxBodyBytes ?? 1_000_000;
-  const askSources = (): BriefSources => ({
-    memory: options.memory,
-    organizationId: options.organizationId,
-    timeZone: options.brief?.timeZone ?? DEFAULT_BRIEF_TIME_ZONE,
-    ...(options.brief?.now ? { now: options.brief.now } : {}),
-    ...(options.brief?.sync ? { sync: options.brief.sync } : {}),
-  });
+
+  const ops = brainOperations(options);
 
   const table: [method: string, pattern: RegExp, handler: Handler, access?: RouteAccess][] = [
     [
@@ -297,18 +244,14 @@ export function brainRoutes(options: BrainAppOptions): BrainRoute[] {
     [
       "POST",
       /^\/v1\/reason$/,
-      async () => {
-        const pass = () => reasonNow(options.pipeline, options.memory, options.organizationId);
-        const { recommendations, measured, heldBack } = await (options.reason ? options.reason(pass) : pass());
-        return [200, { recommendations, measured, heldBack: heldBack ?? [] }];
-      },
+      async () => [200, await ops.reason()],
     ],
     [
       "GET",
       /^\/v1\/recommendations$/,
       async (_req, _params, url) => {
         const limit = Math.min(Math.max(Number(url.searchParams.get("limit") ?? 50) || 50, 1), 200);
-        return [200, { recommendations: await options.memory.listRecommendations(options.organizationId, limit) }];
+        return [200, await ops.recommendations(limit)];
       },
     ],
     [
@@ -363,29 +306,12 @@ export function brainRoutes(options: BrainAppOptions): BrainRoute[] {
     [
       "GET",
       /^\/v1\/value$/,
-      async (_req, _params, url) => {
-        const fromDay = url.searchParams.get("from");
-        const toDay = url.searchParams.get("to");
-        // With no period, the month so far.
-        if (fromDay === null && toDay === null) return [200, { report: await readValueReport(options.memory, options.organizationId, monthOf(new Date().toISOString())) }];
-        const from = dayStart(fromDay ?? "");
-        const to = dayStart(toDay ?? "");
-        if (Number.isNaN(from) || Number.isNaN(to)) throw new HttpError(400, "from and to must both be days, such as 2026-10-01 and 2026-11-01");
-        if (from >= to) throw new HttpError(400, "from must be before to; to is the day after the period");
-        if (to - from > MAX_REPORT_DAYS * 86_400_000) throw new HttpError(400, `a report covers at most ${MAX_REPORT_DAYS} days`);
-        const period = { from: new Date(from).toISOString(), to: new Date(to).toISOString() };
-        return [200, { report: await readValueReport(options.memory, options.organizationId, period) }];
-      },
+      async (_req, _params, url) => [200, await ops.value(url.searchParams.get("from"), url.searchParams.get("to"))],
     ],
     [
       "GET",
       /^\/v1\/feedback$/,
-      async () => {
-        const policy = options.pipeline.feedbackPolicy;
-        // With the loop off, the summary still shows how each rule was treated, by the default policy, and says it's off.
-        const feedback = await readFeedbackSummary(options.memory, options.organizationId, new Date().toISOString(), policy ?? DEFAULT_FEEDBACK_POLICY);
-        return [200, { feedback: { ...feedback, on: policy !== null } }];
-      },
+      async () => [200, await ops.feedback()],
     ],
     [
       "GET",
@@ -394,27 +320,13 @@ export function brainRoutes(options: BrainAppOptions): BrainRoute[] {
         const limit = Math.min(Math.max(Number(url.searchParams.get("limit") ?? 200) || 200, 1), 1000);
         const raw = url.searchParams.get("kind");
         const kinds = raw === null ? undefined : raw.split(",").map((k) => k.trim());
-        if (kinds && (kinds.length > 10 || kinds.some((k) => !SIGNAL_KIND.test(k)))) {
-          throw new HttpError(400, "kind must be up to 10 comma-separated signal kinds, such as bank.balance");
-        }
-        return [200, { signals: await options.memory.recentSignals(options.organizationId, limit, kinds) }];
+        return [200, await ops.signals(kinds, limit)];
       },
     ],
     [
       "GET",
       /^\/v1\/brief$/,
-      async (_req, _params, url) => {
-        const timeZone = options.brief?.timeZone ?? DEFAULT_BRIEF_TIME_ZONE;
-        const now = (options.brief?.now ?? (() => new Date()))();
-        const date = url.searchParams.get("date") ?? yesterdayIn(now, timeZone);
-        if (!isDay(date)) throw new HttpError(400, "date must be a day, such as 2026-11-18");
-        if (date > localDay(now.getTime(), timeZone)) throw new HttpError(400, "date can't be after today in the store's time zone");
-        const brief = await readDailyBrief(
-          { memory: options.memory, organizationId: options.organizationId, timeZone, now: () => now, ...(options.brief?.sync ? { sync: options.brief.sync } : {}) },
-          date,
-        );
-        return [200, { brief }];
-      },
+      async (_req, _params, url) => [200, await ops.brief(url.searchParams.get("date"))],
     ],
     [
       "GET",
@@ -422,7 +334,7 @@ export function brainRoutes(options: BrainAppOptions): BrainRoute[] {
       async (_req, _params, url) => {
         const q = url.searchParams.get("q");
         if (q === null) throw new HttpError(400, "ask with ?q=, such as ?q=what+sold+this+week");
-        return [200, { answer: await readAnswer(askSources(), questionFrom(q)) }];
+        return [200, await ops.ask(q)];
       },
     ],
     [
@@ -431,7 +343,7 @@ export function brainRoutes(options: BrainAppOptions): BrainRoute[] {
       async (req) => {
         const parsed = AskBody.safeParse(await readJson(req, Math.min(limit, ASK_MAX_BODY_BYTES)));
         if (!parsed.success) throw new HttpError(400, "the body must be a JSON object with a question, such as {\"question\": \"what sold this week?\"}");
-        return [200, { answer: await readAnswer(askSources(), questionFrom(parsed.data.question)) }];
+        return [200, await ops.ask(parsed.data.question)];
       },
     ],
     [
@@ -443,19 +355,7 @@ export function brainRoutes(options: BrainAppOptions): BrainRoute[] {
         if (!parsed.success) {
           throw new HttpError(400, "the body must be {\"from\": day, \"to\": day}, optionally with \"system\" and \"toleranceCents\"", parsed.error.issues.map((i) => ({ path: i.path.join("."), message: i.message })));
         }
-        const { system, from, to, toleranceCents } = parsed.data;
-        const timeZone = options.brief?.timeZone ?? DEFAULT_BRIEF_TIME_ZONE;
-        const now = (options.brief?.now ?? (() => new Date()))();
-        if (from > to) throw new HttpError(400, "from must be on or before to; both days are included");
-        if (to > localDay(now.getTime(), timeZone)) throw new HttpError(400, "to can't be after today in the store's time zone");
-        if (addDays(from, VERIFY_MAX_DAYS - 1) < to) throw new HttpError(400, `a verification covers at most ${VERIFY_MAX_DAYS} days`);
-        if (system !== undefined && !INTEGRATIONS.some((i) => i.id === system)) throw new HttpError(400, `${system} isn't an integration KaratOS knows`);
-        try {
-          return [200, { verification: await options.verify.run(verifyPeriod(from, to, timeZone), { ...(system !== undefined ? { system } : {}), ...(toleranceCents !== undefined ? { toleranceCents } : {}) }) }];
-        } catch (error) {
-          if (error instanceof VerifyBusyError) throw new HttpError(429, error.message);
-          throw error;
-        }
+        return [200, await ops.verify(parsed.data)];
       },
     ],
     ["GET", /^\/v1\/integrations$/, async () => [200, { integrations: options.integrations ?? [] }], "support"],
@@ -482,7 +382,84 @@ export function brainRoutes(options: BrainAppOptions): BrainRoute[] {
         return [200, { entity }];
       },
     ],
+    ...workRoutes(options, ops, limit),
   ];
 
   return table.map(([method, pattern, handler, access]) => ({ method, pattern, handler, access: access ?? "instance" }));
 }
+
+/**
+ * The read-only operations behind the routes, each with its own checks, so a
+ * route and an agent task that runs the same operation answer the same way.
+ * None writes to a vendor's system; reason records recommendations in the
+ * instance's own store, as POST /v1/reason always has.
+ */
+export function brainOperations(options: BrainAppOptions) {
+  const timeZone = () => options.brief?.timeZone ?? DEFAULT_BRIEF_TIME_ZONE;
+  const now = () => (options.brief?.now ?? (() => new Date()))();
+  const askSources = (): BriefSources => ({
+    memory: options.memory,
+    organizationId: options.organizationId,
+    timeZone: timeZone(),
+    ...(options.brief?.now ? { now: options.brief.now } : {}),
+    ...(options.brief?.sync ? { sync: options.brief.sync } : {}),
+  });
+  return {
+    async reason(): Promise<Required<ReasonPass>> {
+      const pass = () => reasonNow(options.pipeline, options.memory, options.organizationId);
+      const { recommendations, measured, heldBack } = await (options.reason ? options.reason(pass) : pass());
+      return { recommendations, measured, heldBack: heldBack ?? [] };
+    },
+    recommendations: async (limit: number) => ({ recommendations: await options.memory.listRecommendations(options.organizationId, limit) }),
+    async value(fromDay: string | null, toDay: string | null) {
+      // With no period, the month so far.
+      if (fromDay === null && toDay === null) return { report: await readValueReport(options.memory, options.organizationId, monthOf(new Date().toISOString())) };
+      const from = dayStart(fromDay ?? "");
+      const to = dayStart(toDay ?? "");
+      if (Number.isNaN(from) || Number.isNaN(to)) throw new HttpError(400, "from and to must both be days, such as 2026-10-01 and 2026-11-01");
+      if (from >= to) throw new HttpError(400, "from must be before to; to is the day after the period");
+      if (to - from > MAX_REPORT_DAYS * 86_400_000) throw new HttpError(400, `a report covers at most ${MAX_REPORT_DAYS} days`);
+      const period = { from: new Date(from).toISOString(), to: new Date(to).toISOString() };
+      return { report: await readValueReport(options.memory, options.organizationId, period) };
+    },
+    async feedback() {
+      const policy = options.pipeline.feedbackPolicy;
+      // With the loop off, the summary still shows how each rule was treated, by the default policy, and says it's off.
+      const feedback = await readFeedbackSummary(options.memory, options.organizationId, new Date().toISOString(), policy ?? DEFAULT_FEEDBACK_POLICY);
+      return { feedback: { ...feedback, on: policy !== null } };
+    },
+    async signals(kinds: string[] | undefined, limit: number) {
+      if (kinds && (kinds.length > 10 || kinds.some((k) => !SIGNAL_KIND.test(k)))) {
+        throw new HttpError(400, "kind must be up to 10 comma-separated signal kinds, such as bank.balance");
+      }
+      return { signals: await options.memory.recentSignals(options.organizationId, limit, kinds) };
+    },
+    async brief(day: string | null) {
+      const at = now();
+      const date = day ?? yesterdayIn(at, timeZone());
+      if (!isDay(date)) throw new HttpError(400, "date must be a day, such as 2026-11-18");
+      if (date > localDay(at.getTime(), timeZone())) throw new HttpError(400, "date can't be after today in the store's time zone");
+      const brief = await readDailyBrief(
+        { memory: options.memory, organizationId: options.organizationId, timeZone: timeZone(), now: () => at, ...(options.brief?.sync ? { sync: options.brief.sync } : {}) },
+        date,
+      );
+      return { brief };
+    },
+    ask: async (question: unknown) => ({ answer: await readAnswer(askSources(), questionFrom(question)) }),
+    async verify({ system, from, to, toleranceCents }: z.infer<typeof VerifyBody>) {
+      if (!options.verify) throw new HttpError(503, "sync verification isn't set up on this instance");
+      if (from > to) throw new HttpError(400, "from must be on or before to; both days are included");
+      if (to > localDay(now().getTime(), timeZone())) throw new HttpError(400, "to can't be after today in the store's time zone");
+      if (addDays(from, VERIFY_MAX_DAYS - 1) < to) throw new HttpError(400, `a verification covers at most ${VERIFY_MAX_DAYS} days`);
+      if (system !== undefined && !INTEGRATIONS.some((i) => i.id === system)) throw new HttpError(400, `${system} isn't an integration KaratOS knows`);
+      try {
+        return { verification: await options.verify.run(verifyPeriod(from, to, timeZone()), { ...(system !== undefined ? { system } : {}), ...(toleranceCents !== undefined ? { toleranceCents } : {}) }) };
+      } catch (error) {
+        if (error instanceof VerifyBusyError) throw new HttpError(429, error.message);
+        throw error;
+      }
+    },
+  };
+}
+
+export type BrainOperations = ReturnType<typeof brainOperations>;

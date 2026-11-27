@@ -31,7 +31,7 @@ This is a rebuild of the original Brain A work (v0.1.0 to v0.1.9, April 2026). T
 - [x] Identity resolution with collision detection
 - [x] Documentation drift detection
 - [ ] Documentation embeddings for semantic search (pgvector)
-- [ ] Reasoning sessions and agent task API
+- [x] Reasoning sessions and agent task API ([sessions and tasks](sessions-and-tasks.md))
 
 ## Phase 2.7: Retail departments
 - [x] Department contract with payload schemas, normalizers, extractors and reasoners

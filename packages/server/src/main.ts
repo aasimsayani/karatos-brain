@@ -3,7 +3,7 @@ import { createServer } from "node:http";
 import { fileURLToPath } from "node:url";
 import pg from "pg";
 import { integrationStatuses } from "@karatos/core";
-import { loadMigrations, migrate, PostgresMemoryStore } from "@karatos/store-postgres";
+import { loadMigrations, migrate, PostgresMemoryStore, PostgresWorkStore } from "@karatos/store-postgres";
 import { createBrainApp } from "./app.js";
 import { createInstancePipeline, instanceDepartments } from "./brain.js";
 import { createBriefRunner, readDailyBrief, webhookDelivery } from "./brief.js";
@@ -98,6 +98,8 @@ const server = createServer(
     verify: createVerifier({ memory, organizationId: config.ORGANIZATION_ID, connectors, skipped }),
     // POST /v1/reason runs in line with scheduled runs, never beside one, and is recorded like them.
     reason: (pass) => reasoning.manual(pass),
+    // Reasoning sessions and agent tasks, kept in Postgres so work resumes after a restart. Read-only task kinds only.
+    work: { store: new PostgresWorkStore(pool) },
     support: {
       instanceName: config.INSTANCE_NAME,
       version,
