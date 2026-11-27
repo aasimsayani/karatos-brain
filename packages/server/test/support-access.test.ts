@@ -2,7 +2,7 @@ import { randomBytes } from "node:crypto";
 import { createServer, request, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { afterEach, describe, expect, it } from "vitest";
-import { BrainPipeline, InMemoryStore, type IntegrationStatus, type Reasoner } from "@karatos/core";
+import { BrainPipeline, InMemoryStore, InMemoryWorkStore, type IntegrationStatus, type Reasoner } from "@karatos/core";
 import { storeHours } from "@karatos/retail";
 import {
   brainRoutes,
@@ -74,7 +74,9 @@ function appOptions(memory: InMemoryStore, overrides: Partial<BrainAppOptions> =
 
 async function start(overrides: Partial<BrainAppOptions> = {}, syncStatus: SyncStatus[] = [], omit: Omitted[] = []) {
   const memory = new InMemoryStore();
-  server = createServer(createBrainApp(appOptions(memory, overrides, syncStatus, omit)));
+  // Sessions and tasks are set up, so a route the support key reached would have something to change.
+  const work = new InMemoryWorkStore();
+  server = createServer(createBrainApp(appOptions(memory, { work: { store: work }, ...overrides }, syncStatus, omit)));
   await new Promise<void>((resolve) => server!.listen(0, resolve));
   const base = `http://127.0.0.1:${(server!.address() as AddressInfo).port}`;
   const call = (path: string, init: RequestInit & { auth?: string | false } = {}) => {
@@ -82,7 +84,7 @@ async function start(overrides: Partial<BrainAppOptions> = {}, syncStatus: SyncS
     if (init.auth !== false) headers.authorization = `Bearer ${init.auth ?? INSTANCE_KEY}`;
     return fetch(base + path, { ...init, headers });
   };
-  return { memory, call, base };
+  return { memory, work, call, base };
 }
 
 /** A concrete path for a route's pattern: each captured segment becomes "abc". */
@@ -119,7 +121,7 @@ describe("support access: which routes the support key reaches", () => {
   });
 
   it("is turned down with 403 on every other route in the table, before the route does anything", async () => {
-    const { call, memory } = await start();
+    const { call, memory, work } = await start();
     const others = table().filter((r) => r.access !== "support");
     for (const route of others) {
       const res = await call(route.path, { method: route.method, auth: SUPPORT_KEY, ...(route.method === "POST" ? { body: JSON.stringify(validEvent) } : {}) });
@@ -132,6 +134,9 @@ describe("support access: which routes the support key reaches", () => {
     expect(memory.reasoningRuns).toEqual([]);
     expect(memory.feedback).toEqual([]);
     expect(memory.valueResults).toEqual([]);
+    // No session or task was made, claimed or changed, and nothing reached their audit trail.
+    expect(others.some((r) => r.name === "POST /v1/sessions") && others.some((r) => r.name === "POST /v1/tasks/claim")).toBe(true);
+    expect([work.sessions.size, work.tasks.size, work.audit.length]).toEqual([0, 0, 0]);
   });
 
   it("turns the support key down without waiting for the request body", async () => {

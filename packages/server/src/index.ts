@@ -10,3 +10,5 @@ export * from "./ask.js";
 export * from "./brief.js";
 export * from "./reasoning.js";
 export * from "./verify.js";
+export * from "./tasks.js";
+export { VerifyBody, SIGNAL_KIND } from "./inputs.js";
