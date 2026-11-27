@@ -2,16 +2,16 @@
 
 The first manufacturing department follows every piece at the bench, from design and CAD through casting, stone setting, finishing and quality control to ready. It lives in [`@karatos/manufacturing`](../../packages/manufacturing) and uses the same department contract as retail: payload schemas, normalizers, extractors and reasoners. Turn it on with the id `bench` in `ENABLED_DEPARTMENTS` (an empty list runs it with every other department).
 
-Production planning and labor cost per piece are a later step on the [roadmap](../roadmap.md#phase-28-manufacturing-departments). This department doesn't schedule the bench or put a labor cost on a job.
+[Production planning](production.md) reads what this department records to put a labor and metal cost on each piece, follow the shop's metal loss over time, and plan open work against the bench's hours. This department doesn't schedule the bench or cost a job itself.
 
 ## Events it owns
 
 | Event | What it is | Kept as |
 | --- | --- | --- |
 | `bench_job.opened` | A job and what it is for: `jobId`, and optionally `description`, `promisedBy` (YYYY-MM-DD), `repairTicketId`, `customOrderId`, `metal` (gold, silver, platinum, palladium) and `karat` | A `bench_job` entity and a `bench.job` signal. A later event for the same job replaces it |
-| `bench_job.stage_recorded` | The job entered a stage at the event's `occurredAt`: `jobId`, `stage`, and optionally `jeweler`, `metalInGrams`, `metalOutGrams`, `qcResult` (pass or fail) and `failedStage` | A `bench.stage` signal per record |
+| `bench_job.stage_recorded` | The job entered a stage at the event's `occurredAt`: `jobId`, `stage`, and optionally `jeweler`, `metalInGrams`, `metalOutGrams`, `laborMinutes`, `qcResult` (pass or fail) and `failedStage` | A `bench.stage` signal per record |
 
-The stages are `design` (design and CAD), `casting`, `setting` (stone setting), `finishing` (finishing and polish), `qc` (quality control), `ready`, `on_hold` and `cancelled`. Only a `qc` record has a `qcResult`, and only a failed one names the `failedStage` it sends the work back to (design, casting, setting or finishing). A record that breaks these rules, names an unknown stage or has a weight of zero or less is dead-lettered with the reason.
+The stages are `design` (design and CAD), `casting`, `setting` (stone setting), `finishing` (finishing and polish), `qc` (quality control), `ready`, `on_hold` and `cancelled`. Only a `qc` record has a `qcResult`, and only a failed one names the `failedStage` it sends the work back to (design, casting, setting or finishing). A record that breaks these rules, names an unknown stage or has a weight or `laborMinutes` of zero or less is dead-lettered with the reason. `laborMinutes` is the bench minutes worked on the stage, which [production planning](production.md) costs and plans with; this department doesn't read it.
 
 `metalInGrams` is the metal issued to the bench for the stage; `metalOutGrams` is what came back from it, the piece and any filings, sprue or scrap returned. Weigh metal only: weigh a piece before its stones go in, or take their weight off.
 
@@ -51,7 +51,7 @@ A job's loss is the sum of metal in less metal out over its records that have bo
 
 The dollar figure is the metal lost above the tolerance at its melt value: grams, times the alloy's purity (karat over 24 for gold, 92.5% for silver, 95% for platinum and palladium), times the latest spot price of that metal from the last 30 days. A job with no metal, gold with no karat, or no recent spot price is raised without one.
 
-Why only metal loss has a dollar figure: a stuck or late job isn't money lost, and what rework costs is bench time, which needs the labor cost that is a later step. Like late repairs and stalled custom work, these carry no `impact`.
+Why only metal loss has a dollar figure: a stuck or late job isn't money lost, and what rework costs is bench time, which [production planning](production.md) costs from the minutes recorded. Like late repairs and stalled custom work, these carry no `impact`.
 
 ## Settings
 
@@ -73,11 +73,12 @@ The [POS CSV import](../integrations/inventory_pos.md) reads bench exports: file
 | Date (or Time, Stage Date, Timestamp) | yes | When the job entered the stage, with its time when the export has one |
 | Jeweler (or Bench Jeweler, Worker) | | Who worked it |
 | Metal In (g), Metal Out (g) (or Weight In, Weight Out, Issued (g), Returned (g)) | | Grams issued and returned |
+| Labor Minutes (or Labor (min), Bench Minutes, Minutes), Labor Hours (or Labor (h), Bench Hours, Hours) | | Bench time worked on the stage, for [production planning](production.md). Minutes win when a row has both |
 | QC Result (or QC, Inspection) | | Pass, OK or approved; fail, rejected, rework or sent back |
 | Sent Back To (or Failed Stage, Rework Stage) | | On a failed check, the stage the work goes back to |
 | Description (or Item, Piece), Promised (or Due Date), Repair Ticket, Custom Order, Metal | | The job's own details. They may repeat on every row or appear on some; the last filled value wins |
 
-Each row is one `bench_job.stage_recorded`, keyed by job, stage and time, so a nightly export of every job's history stores each step once. Each job in a file is one `bench_job.opened`, keyed by a hash of its details, so a changed promise date is a new event and the same export again is not. A word that names no stage or result, or a weight that isn't a number of grams, is dead-lettered with the row kept.
+Each row is one `bench_job.stage_recorded`, keyed by job, stage and time, so a nightly export of every job's history stores each step once. Each job in a file is one `bench_job.opened`, keyed by a hash of its details, so a changed promise date is a new event and the same export again is not. A word that names no stage or result, a weight that isn't a number of grams, or bench time that isn't a number above 0 is dead-lettered with the row kept.
 
 ## What the records allow, and what they don't
 

@@ -175,7 +175,7 @@
       "target": "2027-06",
       "items": [
         { "name": "Bench jobs, casting, stone setting, finishing and quality control", "done": true },
-        { "name": "Production planning, metal loss and labor cost per piece", "done": false }
+        { "name": "Production planning, metal loss and labor cost per piece", "done": true }
       ]
     }
   ]

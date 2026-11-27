@@ -41,7 +41,7 @@ This is a rebuild of the original Brain A work (v0.1.0 to v0.1.9, April 2026). T
 
 ## Phase 2.8: Manufacturing departments
 - [x] Bench jobs, casting, stone setting, finishing and quality control (see [bench jobs](departments/bench.md))
-- [ ] Production planning, metal loss and labor cost per piece (metal loss per job against a tolerance is in bench jobs; shop-wide loss trends, planning and labor cost are not)
+- [x] Production planning, metal loss and labor cost per piece (see [production planning](departments/production.md); metal loss per job against a tolerance is in [bench jobs](departments/bench.md))
 
 ## Phase 3: First connectors
 - [x] CSV import from any POS (items, stock counts, customers, sales)

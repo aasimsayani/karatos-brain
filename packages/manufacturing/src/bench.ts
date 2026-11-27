@@ -60,7 +60,8 @@ const CUSTOM_ORDER_STALLED_DAYS = 14;
 const CUSTOM_ORDER_AT_RISK_DAYS = 7;
 
 const METALS = ["gold", "silver", "platinum", "palladium"] as const satisfies readonly Metal[];
-const PROJECT_STAGES: readonly BenchStage[] = ["design", "casting", "setting", "finishing", "qc"];
+/** The stages work moves through toward ready, in order. */
+export const PROJECT_STAGES: readonly BenchStage[] = ["design", "casting", "setting", "finishing", "qc"];
 const DONE: readonly BenchStage[] = ["ready", "cancelled"];
 const DAY_MS = 86_400_000;
 
@@ -88,6 +89,8 @@ const BenchStageRecorded = z
     metalInGrams: z.number().positive().max(100_000).optional(),
     /** Metal back from this stage, piece and returned scrap together, in grams. */
     metalOutGrams: z.number().positive().max(100_000).optional(),
+    /** Bench minutes worked on this stage, for labor cost and planning. A stage worked over several records adds them up. */
+    laborMinutes: z.number().positive().max(10_000).optional(),
     qcResult: z.enum(["pass", "fail"]).optional(),
     /** On a failed check, the stage the work goes back to. */
     failedStage: z.enum(WORK_STAGES).optional(),
@@ -117,7 +120,7 @@ const CUSTOM_STAGES: Readonly<Record<string, BenchStage>> = {
 const REPAIR_CLOSED = ["ready", "picked_up", "cancelled"];
 const CUSTOM_CLOSED = ["ready", "delivered", "cancelled"];
 
-const STAGE_NAMES: Readonly<Record<BenchStage, string>> = {
+export const STAGE_NAMES: Readonly<Record<BenchStage, string>> = {
   design: "design and CAD",
   casting: "casting",
   setting: "stone setting",
@@ -137,6 +140,7 @@ export interface StageRecord {
   jeweler?: string;
   metalIn?: number;
   metalOut?: number;
+  laborMinutes?: number;
   qcResult?: "pass" | "fail";
   failedStage?: WorkStage;
   signal: Signal;
@@ -153,7 +157,11 @@ export interface BenchJob {
   fromCustomOrder: boolean;
   /** For a repair ticket or custom order, whose own department raises it once past due. */
   linked: boolean;
+  /** For a repair ticket: the piece is the customer's, so only metal lost or added is the shop's. */
+  forRepair: boolean;
   promisedBy?: string;
+  /** What the customer is paying: the repair's estimate or the custom order's quote. */
+  price?: { cents: number; source: "repair estimate" | "custom order quote" };
   metal?: Metal;
   karat?: number;
   /** Oldest first. */
@@ -174,6 +182,7 @@ function record(signal: Signal): StageRecord {
     ...(v.jeweler !== undefined ? { jeweler: v.jeweler } : {}),
     ...(v.metalInGrams !== undefined ? { metalIn: v.metalInGrams } : {}),
     ...(v.metalOutGrams !== undefined ? { metalOut: v.metalOutGrams } : {}),
+    ...(v.laborMinutes !== undefined ? { laborMinutes: v.laborMinutes } : {}),
     ...(v.qcResult !== undefined ? { qcResult: v.qcResult } : {}),
     ...(v.failedStage !== undefined ? { failedStage: v.failedStage } : {}),
     signal,
@@ -212,8 +221,14 @@ export function benchJobs(signals: Signal[]): BenchJob[] {
     const customOrder = orderKey ? orders.get(orderKey) : undefined;
     const customStage = orderKey ? orderStage.get(orderKey) : undefined;
     const records = (stages.get(jobId) ?? []).map(record).sort(order);
-    const ticketValue = ticket ? value<{ promisedBy?: string; itemDescription?: string }>(ticket) : {};
-    const orderValue = customOrder ? value<{ dueBy?: string; description?: string }>(customOrder) : {};
+    const ticketValue = ticket ? value<{ promisedBy?: string; itemDescription?: string; estimateCents?: number }>(ticket) : {};
+    const orderValue = customOrder ? value<{ dueBy?: string; description?: string; quotedCents?: number }>(customOrder) : {};
+    const price =
+      orderValue.quotedCents !== undefined
+        ? { cents: orderValue.quotedCents, source: "custom order quote" as const }
+        : ticketValue.estimateCents !== undefined
+          ? { cents: ticketValue.estimateCents, source: "repair estimate" as const }
+          : undefined;
     const promisedBy = job.promisedBy ?? orderValue.dueBy ?? ticketValue.promisedBy;
     const last = records.at(-1);
     jobs.push({
@@ -222,7 +237,9 @@ export function benchJobs(signals: Signal[]): BenchJob[] {
       label: labelOf(`Bench job ${jobId}`, job.description ?? orderValue.description ?? ticketValue.itemDescription),
       fromCustomOrder: false,
       linked: repairKey !== undefined || orderKey !== undefined,
+      forRepair: repairKey !== undefined,
       ...(promisedBy !== undefined ? { promisedBy } : {}),
+      ...(price !== undefined ? { price } : {}),
       ...(job.metal !== undefined ? { metal: job.metal } : {}),
       ...(job.karat !== undefined ? { karat: job.karat } : {}),
       records,
@@ -237,7 +254,7 @@ export function benchJobs(signals: Signal[]): BenchJob[] {
   for (const [orderId, list] of customStages) {
     if (named.has(orderId)) continue;
     const customOrder = orders.get(`custom_order:${orderId}`);
-    const o = customOrder ? value<{ dueBy?: string; description?: string }>(customOrder) : {};
+    const o = customOrder ? value<{ dueBy?: string; description?: string; quotedCents?: number }>(customOrder) : {};
     const records = list
       .filter((s) => CUSTOM_STAGES[value<{ stage: string }>(s).stage] !== undefined)
       .map((s) => ({ stage: CUSTOM_STAGES[value<{ stage: string }>(s).stage]!, at: s.observedAt, signal: s }))
@@ -249,7 +266,9 @@ export function benchJobs(signals: Signal[]): BenchJob[] {
       label: labelOf(`Custom order ${orderId}`, o.description),
       fromCustomOrder: true,
       linked: true,
+      forRepair: false,
       ...(o.dueBy !== undefined ? { promisedBy: o.dueBy } : {}),
+      ...(o.quotedCents !== undefined ? { price: { cents: o.quotedCents, source: "custom order quote" as const } } : {}),
       records,
       closed: last !== undefined && DONE.includes(last.stage),
       about: customOrder ? [customOrder] : [],
@@ -259,14 +278,14 @@ export function benchJobs(signals: Signal[]): BenchJob[] {
 }
 
 /** The record that started the job's current stage: the first of its latest records in a row with that stage. */
-function currentStage(records: StageRecord[]): { since: StageRecord; last: StageRecord } | undefined {
+export function currentStage(records: StageRecord[]): { since: StageRecord; last: StageRecord } | undefined {
   if (records.length === 0) return undefined;
   let i = records.length - 1;
   while (i > 0 && records[i - 1]!.stage === records[i]!.stage) i--;
   return { since: records[i]!, last: records.at(-1)! };
 }
 
-function median(values: number[]): number {
+export function median(values: number[]): number {
   const sorted = [...values].sort((a, b) => a - b);
   const mid = Math.floor(sorted.length / 2);
   return sorted.length % 2 ? sorted[mid]! : (sorted[mid - 1]! + sorted[mid]!) / 2;
@@ -374,7 +393,7 @@ export function reworkTallies(jobs: BenchJob[], now: string): { stages: Map<stri
 
 const most = (by: Map<string, number>) => [...by.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0];
 
-const slug = (text: string) => text.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "unnamed";
+export const slug = (text: string) => text.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "unnamed";
 
 /** The instance's own figures for the bench rules. Each one left out keeps the default. */
 export interface BenchSettings {

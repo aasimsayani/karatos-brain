@@ -7,7 +7,7 @@ import { loadMigrations, migrate, PostgresMemoryStore } from "@karatos/store-pos
 import { createBrainApp } from "./app.js";
 import { createInstancePipeline, instanceDepartments } from "./brain.js";
 import { createBriefRunner, readDailyBrief, webhookDelivery } from "./brief.js";
-import { instanceBenchSettings, instanceStoreHours, loadInstanceConfig } from "./config.js";
+import { instanceBenchSettings, instanceProductionSettings, instanceStoreHours, loadInstanceConfig } from "./config.js";
 import { StaticDocumentationSource } from "./documentation.js";
 import { createRetentionRunner } from "./retention.js";
 import { createReasoningRunner, readLastRun, reasonNow } from "./reasoning.js";
@@ -49,6 +49,7 @@ const pipeline = createInstancePipeline({
   storeHours,
   awaitingReplyHours: config.AWAITING_REPLY_HOURS,
   bench: instanceBenchSettings(config),
+  production: instanceProductionSettings(config),
   // What the store did with earlier recommendations shapes the next run: dismissed subjects wait out this cooldown.
   feedbackCooldownDays: config.FEEDBACK_COOLDOWN_DAYS,
 });
