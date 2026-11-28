@@ -50,6 +50,7 @@ async function start(options: { memory?: MemoryStore; work?: WorkStore | false; 
   const memory = options.memory ?? new InMemoryStore();
   const work = options.work === false ? undefined : (options.work ?? new InMemoryWorkStore());
   const clock = options.clock ?? { now: new Date("2026-11-27T15:00:00.000Z") };
+  // The pipeline reads the same clock, so the ids it writes carry the test day rather than today.
   const pipeline = new BrainPipeline({ memory, normalizers: [], extractors: [], reasoners: options.reasoners ?? reasoners, documentation: new StaticDocumentationSource(["doc_arch"]), now: () => clock.now });
   const app = createBrainApp({
     pipeline,

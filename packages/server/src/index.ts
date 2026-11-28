@@ -3,6 +3,7 @@ export * from "./config.js";
 export * from "./documentation.js";
 export * from "./doc-search.js";
 export * from "./brain.js";
+export * from "./claude.js";
 export * from "./sync.js";
 export * from "./support.js";
 export * from "./token-store.js";

@@ -63,7 +63,7 @@ This is a rebuild of the original Brain A work (v0.1.0 to v0.1.9, April 2026). T
 - [ ] Homepage video of the live dashboard
 
 ## Phase 4: First reasoners
-- [ ] Claude-powered reasoner with provenance and confidence
+- [x] Claude-powered reasoner with provenance and confidence
 - [x] Feedback loop into future reasoning
 
 ## Later

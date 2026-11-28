@@ -6,6 +6,7 @@ import { DocumentIndex, integrationStatuses } from "@karatos/core";
 import { loadMigrations, migrate, PostgresDocChunkStore, PostgresMemoryStore, PostgresWorkStore } from "@karatos/store-postgres";
 import { createBrainApp } from "./app.js";
 import { createInstancePipeline, instanceDepartments } from "./brain.js";
+import { instanceClaudeReasoner } from "./claude.js";
 import { createBriefRunner, readDailyBrief, webhookDelivery } from "./brief.js";
 import { instanceBenchSettings, instanceProductionSettings, instanceStoreHours, loadInstanceConfig } from "./config.js";
 import { createDocSearch, instanceDocuments } from "./doc-search.js";
@@ -43,6 +44,11 @@ try {
 // When the store is open, on its own clock: clienteling's awaiting-reply rule counts only these hours.
 const storeHours = instanceStoreHours(config);
 
+// The Claude reasoner runs after the rules only with CLAUDE_REASONER=on and ANTHROPIC_API_KEY set. It only reads a
+// redacted summary; a time-out or error is recorded on the run and the rules' findings stand.
+const claude = instanceClaudeReasoner(config, process.env);
+console.log(claude.status);
+
 const pool = new pg.Pool({ connectionString: config.SUPABASE_DB_URL, max: 10 });
 const memory = new PostgresMemoryStore(pool);
 const pipeline = createInstancePipeline({
@@ -55,6 +61,7 @@ const pipeline = createInstancePipeline({
   production: instanceProductionSettings(config),
   // What the store did with earlier recommendations shapes the next run: dismissed subjects wait out this cooldown.
   feedbackCooldownDays: config.FEEDBACK_COOLDOWN_DAYS,
+  modelReasoner: claude.reasoner,
 });
 
 // Scheduled reasoning keeps findings fresh on its own: after each sync round that brings new events, before the

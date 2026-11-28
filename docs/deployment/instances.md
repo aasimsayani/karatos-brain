@@ -119,6 +119,9 @@ Set `REASON_SCHEDULE=off` to turn it off. Findings then refresh only when someth
 | `REASON_SCHEDULE` | `on` | `on` or `off`. Off leaves reasoning to `POST /v1/reason` |
 | `REASON_INTERVAL_MINUTES` | `60` | Longest gap, 5 to 1440 minutes, between the end of one scheduled run and the start of the next |
 | `FEEDBACK_COOLDOWN_DAYS` | `14` | Days, 0 to 90, a dismissed recommendation's rule and subject is held back unless it grew materially; 0 turns the cooldown off. See [the feedback loop](../feedback-loop.md) |
+| `CLAUDE_REASONER` | `off` | `on` runs the Claude reasoner after the rules on every run, when `ANTHROPIC_API_KEY` is also set. See [the Claude reasoner](../claude-reasoner.md) |
+| `CLAUDE_REASONER_MAX_TOKENS` | `40000` | The most tokens, in and out, 8000 to 200000, the Claude reasoner may spend on one run |
+| `CLAUDE_REASONER_TIMEOUT_SECONDS` | `90` | Seconds, 5 to 300, the Claude reasoner waits before the run goes on with the rules' findings alone |
 
 ## Calling an instance
 
