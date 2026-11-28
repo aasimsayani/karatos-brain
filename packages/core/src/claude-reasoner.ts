@@ -311,13 +311,17 @@ export function estimateTokens(text: string): number {
 
 /** The id part a topic gives a finding: lowercase letters, digits and underscores, at most 40 characters. */
 export function topicSlug(topic: string): string {
-  const slug = topic
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "_")
-    .replace(/^_+|_+$/g, "")
-    .slice(0, 40)
-    .replace(/_+$/, "");
+  const slug = trimUnderscores(trimUnderscores(topic.toLowerCase().replace(/[^a-z0-9]+/g, "_")).slice(0, 40));
   return slug || "finding";
+}
+
+/** Drops leading and trailing underscores by index, so long runs stay linear. */
+function trimUnderscores(text: string): string {
+  let start = 0;
+  let end = text.length;
+  while (start < end && text[start] === "_") start++;
+  while (end > start && text[end - 1] === "_") end--;
+  return text.slice(start, end);
 }
 
 const round2 = (n: number) => Math.round(n * 100) / 100;

@@ -229,6 +229,10 @@ describe("the summary", () => {
     expect(topicSlug("***")).toBe("finding");
     expect(topicSlug(`${"a".repeat(39)} b`)).toBe("a".repeat(39));
     expect(topicSlug("x".repeat(50))).toHaveLength(40);
+    const start = Date.now();
+    expect(topicSlug("_".repeat(100_000) + "ok" + "_".repeat(100_000))).toBe("ok");
+    expect(topicSlug("-".repeat(100_000))).toBe("finding");
+    expect(Date.now() - start).toBeLessThan(1000);
   });
 });
 
