@@ -385,13 +385,14 @@ On the Core plan, the database, the container and every credential sit in accoun
 | `GET /v1/feedback` | How the owner has treated each rule's recommendations, and how that ranks the next run. See [the feedback loop](docs/feedback-loop.md) |
 | `GET /v1/brief` | The daily brief: yesterday's sales against the same day last week, anything unusual and what is waiting, each figure citing its events. See [the daily brief](docs/daily-brief.md) |
 | `POST /v1/ask`, `GET /v1/ask?q=` | Ask a question in plain words, such as "what sold this week?" or "which payouts are late?", and get an answer from synced data only, each number citing its events. See [asking the instance](docs/ask.md) |
+| `GET /v1/docs/search?q=` | Search the docs and the integration catalog by meaning, such as "where is the UPS tracking numbers file set", and get the closest passages with their source, heading, version and score. "How do I" and "where is" questions to `/v1/ask` use it too. See [documentation search](docs/doc-search.md) |
 | `POST /v1/verify` | Check what has synced against each source system's own totals for a period: sale counts and gross for Shopify and Square, charges for Stripe, refunds for all three, new profiles for Klaviyo, with the ids of any record on one side only. See [verifying synced numbers](docs/verify-sync.md) |
 | `POST /v1/sessions`, `GET /v1/sessions/:id` | Reasoning sessions: the notes, linked recommendations and evidence, and tasks around one question, kept across restarts. See [sessions and tasks](docs/sessions-and-tasks.md) |
 | `POST /v1/tasks`, `POST /v1/tasks/claim`, `POST /v1/tasks/:id/run` | Agent tasks: an outside agent queues, claims under a lease that runs out, and runs or reports one of the instance's read-only operations, never a vendor write. See [sessions and tasks](docs/sessions-and-tasks.md) |
 | `GET /v1/entities/:kind/:id` | One canonical entity |
 | `GET /v1/signals` | The latest signals, filtered by kind, such as each bank balance or open invoice |
 | `GET /v1/integrations` | Each catalog integration and whether this instance has its settings, by name only |
-| `GET /v1/support/status` | Health, sync status and record counts for whoever supports the instance, with no business records |
+| `GET /v1/support/status` | Health, sync status, the documentation index's last sync and record counts for whoever supports the instance, with no business records |
 
 </details>
 

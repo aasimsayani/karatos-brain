@@ -1,4 +1,4 @@
-import type { Feedback, Recommendation, StoredEvent } from "@karatos/core";
+import type { DocSearchHit, Feedback, Recommendation, StoredEvent } from "@karatos/core";
 import { dollars } from "./department.js";
 import {
   addDays,
@@ -40,7 +40,7 @@ import {
  * server reads it, and `answerQuestion` turns it into the answer.
  */
 
-export type AskIntent = "sales" | "payouts" | "stock" | "awaiting_reply" | "open_recommendations" | "sync_health";
+export type AskIntent = "sales" | "payouts" | "stock" | "awaiting_reply" | "open_recommendations" | "sync_health" | "docs";
 
 /** The longest question taken, in characters. */
 export const ASK_MAX_QUESTION_CHARS = 500;
@@ -62,6 +62,7 @@ export const ASK_QUESTIONS: readonly { intent: AskIntent; example: string; answe
   { intent: "awaiting_reply", example: "Who is waiting on a reply?", answers: "customers who wrote or called and haven't heard back" },
   { intent: "open_recommendations", example: "What's waiting on me?", answers: "open recommendations, highest dollar impact first" },
   { intent: "sync_health", example: "Is everything syncing?", answers: "connectors that failed, went stale, haven't run or aren't syncing" },
+  { intent: "docs", example: "How do I connect Shopify?", answers: "how to set up and use KaratOS and the systems it connects, from the documentation this instance has" },
 ];
 
 /**
@@ -76,6 +77,7 @@ export const ASK_EVENT_TYPES: Readonly<Record<AskIntent, readonly string[]>> = {
   awaiting_reply: ["communication.message_logged", "communication.call_logged"],
   open_recommendations: [],
   sync_health: [],
+  docs: [],
 };
 
 /**
@@ -146,6 +148,16 @@ const INTENT_WORDS: readonly [AskIntent, RegExp][] = [
   ["open_recommendations", /\b(recommendations?|recs|to-?dos?|tasks?|findings?|action items?|open items?|needs? (my |our )?attention|should (i|we) do|waiting on (me|us))\b/],
   ["sales", /\b(sold|sell|sells|selling|sales?|revenue|takings|gross|net|refunds?|refunded|returns?|returned|orders?|made|make|earn(ed|ings)?|turnover|bring in|brought in)\b/],
 ];
+
+/**
+ * "How do I…" and "where is…" ask how to do or find something, which the
+ * documentation answers, unless they name a period: "how do I see what sold
+ * yesterday" is about yesterday's sales.
+ */
+const HOW_TO = /^(?:(?:hi|hey|ok|okay|so|please) )?(?:how (?:do|can|should|would|could) (?:i|we|you)\b|how to\b|where (?:is|are|do|does|can|should|would|did)\b|which settings?\b|what settings?\b)/;
+
+/** True when a question asks how to do or find something. */
+export const isHowTo = (normalized: string) => HOW_TO.test(normalized);
 
 function intentOf(text: string): AskIntent | null {
   return INTENT_WORDS.find(([, words]) => words.test(text))?.[0] ?? null;
@@ -267,9 +279,10 @@ export function normalizeQuestion(question: string): string {
 export function routeQuestion(question: string, clock: AskClock): AskRoute {
   if (!isTimeZone(clock.timeZone)) throw new RangeError("timeZone must be an IANA time zone, such as America/New_York");
   const text = normalizeQuestion(question.slice(0, ASK_MAX_QUESTION_CHARS));
+  const period = periodOf(text, clock);
+  if (period === null && isHowTo(text)) return { kind: "intent", intent: "docs" };
   const intent = intentOf(text);
   if (!intent) return { kind: "unsupported" };
-  const period = periodOf(text, clock);
   if (period && "problem" in period) return { kind: "unclear_period", problem: period.problem };
   if (period) return { kind: "intent", intent, period };
   if (intent !== "sales") return { kind: "intent", intent };
@@ -301,6 +314,8 @@ export interface AskData {
   eventSources?: Readonly<Record<string, string>>;
   /** Sync results, for sync_health, and scheduled reasoning, for findings; absent when the caller doesn't know them. */
   sync?: BriefSyncInput;
+  /** For docs: the passages documentation search found, closest first. Absent when the instance has no documentation search. */
+  docs?: { passages: readonly DocSearchHit[] };
 }
 
 /** One number in an answer, with the events and systems it was counted from. */
@@ -336,6 +351,8 @@ export interface AskAnswer {
   moreFindings: number;
   sales?: SalesDay;
   sync?: SyncSection;
+  /** For docs: the passages the answer quotes, each with where it came from and how close it is. */
+  passages?: DocSearchHit[];
   /** For findings and sync health: when the findings were last refreshed, when the server knows. */
   reasoning?: ReasoningNote;
   notes: string[];
@@ -554,6 +571,33 @@ function answerSync(question: string, data: AskData, period: AskPeriod | undefin
   return { ...answer, sync, ...(sync.reasoning ? { reasoning: sync.reasoning } : {}), text: [...lines, ...answer.notes].join("\n") };
 }
 
+// Documentation ---------------------------------------------------------------
+
+/** How many passages a docs answer quotes. */
+export const ASK_DOC_PASSAGES = 3;
+/** The longest quote from one passage, in characters. */
+export const ASK_DOC_QUOTE_CHARS = 400;
+
+/** A passage's text on one line, cut at a word near the limit. */
+function quote(text: string): string {
+  const flat = text.replace(/\s+/g, " ").trim();
+  if (flat.length <= ASK_DOC_QUOTE_CHARS) return flat;
+  const cut = flat.slice(0, ASK_DOC_QUOTE_CHARS);
+  const space = cut.lastIndexOf(" ");
+  return `${space > ASK_DOC_QUOTE_CHARS / 2 ? cut.slice(0, space) : cut}…`;
+}
+
+function answerDocs(question: string, data: AskData): AskAnswer {
+  const answer = base(question, data, "docs", "answered");
+  if (!data.docs) return { ...answer, status: "no_data", text: "Documentation search isn't set up on this instance, so I can't look that up." };
+  const passages = data.docs.passages.slice(0, ASK_DOC_PASSAGES);
+  if (!passages.length) {
+    return { ...answer, status: "no_data", passages: [], text: 'I couldn\'t find that in the documentation this instance has. Try naming the system or the setting, such as "How do I connect Shopify?" or "Where is the UPS tracking numbers file set?"' };
+  }
+  const lines = passages.map((p) => `- ${p.heading || p.title}: ${quote(p.text)} [${p.source}${p.version ? `, ${p.version}` : ""}]`);
+  return { ...answer, passages: [...passages], text: ["From the documentation this instance has, closest first:", ...lines].join("\n") };
+}
+
 // ---------------------------------------------------------------------------
 
 /** Answers a routed question from the data the server read for it. Pure: the same input always gives the same answer. */
@@ -566,6 +610,7 @@ export function answerQuestion(question: string, route: AskRoute, data: AskData)
   const { intent, period } = route;
   if (intent === "sales") return answerSales(question, period!, data);
   if (intent === "sync_health") return answerSync(question, data, period);
+  if (intent === "docs") return answerDocs(question, data);
   const answer = answerFindings(question, intent, data, period);
   return period ? { ...answer, period } : answer;
 }

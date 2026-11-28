@@ -12,6 +12,7 @@ You can ask an instance a question in plain words, such as "what sold this week?
 | Customers waiting | "Who is waiting on a reply?", "Any missed calls?" | Open findings of `clienteling.awaiting-reply` and the missed-call rule |
 | What's waiting on you | "What's waiting on me?", "Open recommendations" | Every open recommendation, highest dollar impact first |
 | Sync health | "Is everything syncing?", "Which connectors failed?" | The sync runner's last result for each connector: failed, stale (more than 24 hours old), not run yet, or turned on but not syncing |
+| How to do or find something | "How do I connect Shopify?", "Where is the UPS tracking numbers file set?" | [Documentation search](doc-search.md): the three passages of the docs and the integration catalog closest to the question, each naming the document, heading and version it came from |
 
 A finding is open when nobody has accepted, rejected or overridden its latest raising in the last 14 days, as in the daily brief. Findings come from the latest reasoning run, so a finding can only be as recent as that run. The instance reasons on its own after each sync round that brings new events, before the daily brief and at least hourly (see [scheduled reasoning](deployment/instances.md#scheduled-reasoning)), and `POST /v1/reason` still runs it on demand. Answers about findings, and the sync health answer, end by saying when the findings were last refreshed, or that the last run failed, that none has run yet, or that scheduled reasoning is off. A `POST /v1/reason` call counts as a refresh like a scheduled run, and after a restart the last run in the database does.
 
@@ -20,6 +21,8 @@ Any other question gets "I can't answer that yet", with the list above.
 ## How a question is understood
 
 The instance matches a question to one of the answers above by its words. No language model is involved: the repository has no model client, so none was added. The words are tried in this order, and the first match wins: sync, payouts, replies, stock, recommendations, sales. So "how are sales and payouts?" is answered as a payouts question. Ask about one thing at a time.
+
+A question that starts "how do I", "how can we", "how to", "where is", "where do I", "which setting" or the like asks how to do or find something, so it is answered from the documentation, whatever else it mentions, unless it names a period: "how do I see what sold yesterday?" is still a sales question. The answer quotes the closest passages with their sources. When nothing in the docs is close, it says so and suggests naming the system or the setting; on an instance without documentation search it says that search isn't set up.
 
 A sales question can name a period. Periods are whole days on the store's calendar, in `STORE_TIME_ZONE` (America/New_York by default):
 

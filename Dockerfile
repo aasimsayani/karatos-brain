@@ -35,6 +35,8 @@ COPY --from=build /app/packages/connectors/dist packages/connectors/dist
 COPY --from=build /app/packages/server/package.json packages/server/
 COPY --from=build /app/packages/server/dist packages/server/dist
 COPY supabase/migrations supabase/migrations
+# The docs, for documentation search (GET /v1/docs/search). Plans and research under docs/ are left out when indexing.
+COPY docs docs
 USER node
 EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=3s CMD wget -qO- http://127.0.0.1:${PORT:-8080}/healthz || exit 1
