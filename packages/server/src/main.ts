@@ -2,13 +2,14 @@ import { readFileSync } from "node:fs";
 import { createServer } from "node:http";
 import { fileURLToPath } from "node:url";
 import pg from "pg";
-import { integrationStatuses } from "@karatos/core";
-import { loadMigrations, migrate, PostgresMemoryStore, PostgresWorkStore } from "@karatos/store-postgres";
+import { DocumentIndex, integrationStatuses } from "@karatos/core";
+import { loadMigrations, migrate, PostgresDocChunkStore, PostgresMemoryStore, PostgresWorkStore } from "@karatos/store-postgres";
 import { createBrainApp } from "./app.js";
 import { createInstancePipeline, instanceDepartments } from "./brain.js";
 import { instanceClaudeReasoner } from "./claude.js";
 import { createBriefRunner, readDailyBrief, webhookDelivery } from "./brief.js";
 import { instanceBenchSettings, instanceProductionSettings, instanceStoreHours, loadInstanceConfig } from "./config.js";
+import { createDocSearch, instanceDocuments } from "./doc-search.js";
 import { StaticDocumentationSource } from "./documentation.js";
 import { createRetentionRunner } from "./retention.js";
 import { createReasoningRunner, readLastRun, reasonNow } from "./reasoning.js";
@@ -21,6 +22,8 @@ const { version } = JSON.parse(readFileSync(new URL("../package.json", import.me
 
 const config = loadInstanceConfig(process.env);
 const migrationsDir = process.env.MIGRATIONS_DIR ?? fileURLToPath(new URL("../../../supabase/migrations", import.meta.url));
+// The repository's docs, shipped in the image beside the migrations, for documentation search.
+const docsDir = process.env.DOCS_DIR ?? fileURLToPath(new URL("../../../docs", import.meta.url));
 
 // Migrations run on one dedicated connection so begin/commit stay together.
 const setup = new pg.Client({ connectionString: config.SUPABASE_DB_URL });
@@ -75,6 +78,13 @@ const reasoning = createReasoningRunner({
 });
 const scheduledReasoning = config.REASON_SCHEDULE ? reasoning : null;
 
+// Documentation search: the docs and the integration catalog, cut into passages with a vector each, kept in Postgres.
+// Synced once at startup; only passages whose text changed since the last run are embedded again. See docs/doc-search.md.
+const docSearch = createDocSearch({
+  index: new DocumentIndex({ store: new PostgresDocChunkStore(pool), organizationId: config.ORGANIZATION_ID }),
+  documents: () => instanceDocuments(docsDir),
+});
+
 // Each turned-on connector that has its settings syncs on a schedule. Skipped ones are named with what they're missing, never with values.
 const { connectors, skipped } = scheduledConnectors(config.ENABLED_INTEGRATIONS, process.env, { memory, organizationId: config.ORGANIZATION_ID });
 for (const { id, reason } of skipped) console.log(`sync ${id} skipped: ${reason}`);
@@ -107,6 +117,8 @@ const server = createServer(
     reason: (pass) => reasoning.manual(pass),
     // Reasoning sessions and agent tasks, kept in Postgres so work resumes after a restart. Read-only task kinds only.
     work: { store: new PostgresWorkStore(pool) },
+    // GET /v1/docs/search, and "how do I" questions to /v1/ask. Searches what is indexed, even while a sync runs.
+    docs: docSearch,
     support: {
       instanceName: config.INSTANCE_NAME,
       version,
@@ -118,6 +130,7 @@ const server = createServer(
       skipped,
       syncStatus: () => sync.latest(),
       reasoning: () => reasoning.supportStatus(),
+      docSearch: () => docSearch.status(),
       diagnostics: postgresDiagnostics(pool),
     },
   }),
@@ -127,6 +140,10 @@ server.listen(config.PORT, () => {
 });
 sync.start();
 reasoning.start();
+void docSearch.sync().then(
+  (r) => console.log(`documentation index: ${r.documents} documents, ${r.chunks} passages, ${r.embedded} embedded, ${r.removed} removed`),
+  (error: unknown) => console.error(`documentation index sync failed: ${(error as Error).message}`),
+);
 
 // Slim copy: raw vendor data older than RAW_RETENTION_DAYS is cleared once a day. Facts, signals and source references stay.
 const retention = createRetentionRunner({ store: memory, organizationId: config.ORGANIZATION_ID, retentionDays: config.RAW_RETENTION_DAYS });

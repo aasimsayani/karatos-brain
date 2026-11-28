@@ -30,7 +30,7 @@ This is a rebuild of the original Brain A work (v0.1.0 to v0.1.9, April 2026). T
 - [x] Connector contract with checkpoints and retries
 - [x] Identity resolution with collision detection
 - [x] Documentation drift detection
-- [ ] Documentation embeddings for semantic search (pgvector)
+- [x] Documentation embeddings for semantic search (pgvector) ([documentation search](doc-search.md))
 - [x] Reasoning sessions and agent task API ([sessions and tasks](sessions-and-tasks.md))
 
 ## Phase 2.7: Retail departments

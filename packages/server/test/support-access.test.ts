@@ -11,6 +11,7 @@ import {
   StaticDocumentationSource,
   SUPPORT_KEY_REFUSAL,
   type BrainAppOptions,
+  type DocSearchStatus,
   type SupportStatusOptions,
   type SyncStatus,
 } from "../src/index.js";
@@ -25,6 +26,11 @@ const SUPPORT_KEY = newKey("s");
 const SUPPORT_ROUTES = ["GET /v1/integrations", "GET /v1/support/status"];
 
 const NOW = new Date("2026-11-12T15:30:00Z");
+const DOC_SEARCH_STATUS: DocSearchStatus = {
+  embedder: "local-hash-v1",
+  syncing: false,
+  lastSync: { outcome: "succeeded", startedAt: "2026-11-12T13:00:01.000Z", finishedAt: "2026-11-12T13:00:02.000Z", result: { documents: 3, unchanged: 1, saved: 2, removed: 0, chunks: 9, embedded: 4, reused: 5 }, error: null },
+};
 const STARTED = new Date("2026-11-12T13:00:00Z");
 
 const reasoner: Reasoner = {
@@ -64,6 +70,7 @@ function appOptions(memory: InMemoryStore, overrides: Partial<BrainAppOptions> =
       lastSucceededAt: "2026-11-12T15:00:06.000Z",
       consecutiveFailures: 0,
     }),
+    docSearch: () => (DOC_SEARCH_STATUS),
     diagnostics: inMemoryDiagnostics(memory, ["0001_core_schema.sql", "0002_ingestion.sql"]),
     now: () => NOW,
   };
@@ -110,6 +117,8 @@ describe("support access: which routes the support key reaches", () => {
   it("marks exactly the diagnostic routes as open to the support key", () => {
     expect(table().filter((r) => r.access === "support").map((r) => r.name).sort()).toEqual(SUPPORT_ROUTES);
     expect(table().length).toBeGreaterThan(SUPPORT_ROUTES.length);
+    // Documentation search reads docs, not business data, but stays with the instance key like every route that isn't diagnostic.
+    expect(table().find((r) => r.name === "GET /v1/docs/search")).toMatchObject({ access: "instance" });
   });
 
   it("reaches /healthz and each diagnostic route", async () => {
@@ -342,6 +351,7 @@ describe("GET /v1/support/status", () => {
         lastSucceededAt: "2026-11-12T15:00:06.000Z",
         consecutiveFailures: 0,
       },
+      docSearch: DOC_SEARCH_STATUS,
       deadLetters: { total: 4, bySource: { shopify: 2, other: 1, unknown: 1 }, byReason: { validation_failed: 3, other: 1 } },
       events: {
         days: 14,

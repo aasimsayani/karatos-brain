@@ -1,14 +1,15 @@
 import { timingSafeEqual } from "node:crypto";
 import type { IncomingMessage, RequestListener, ServerResponse } from "node:http";
 import { z } from "zod";
-import { DeadLetteredError, DEFAULT_FEEDBACK_POLICY, INTEGRATIONS, monthOf, readFeedbackSummary, readValueReport, type BrainPipeline, type IntegrationStatus, type MemoryStore } from "@karatos/core";
+import { DeadLetteredError, DEFAULT_FEEDBACK_POLICY, DOC_SEARCH_MAX_QUERY_CHARS, DOC_SEARCH_MAX_RESULTS, INTEGRATIONS, monthOf, readFeedbackSummary, readValueReport, type BrainPipeline, type IntegrationStatus, type MemoryStore } from "@karatos/core";
 import { addDays, ASK_MAX_QUESTION_CHARS, DEFAULT_BRIEF_TIME_ZONE, isDay, localDay, VERIFY_MAX_DAYS, verifyPeriod, type BriefSyncInput } from "@karatos/retail";
-import { readAnswer } from "./ask.js";
+import { readAnswer, type AskSources } from "./ask.js";
+import type { DocSearch } from "./doc-search.js";
 import { HttpError, idFrom, readJson } from "./http.js";
 import { SIGNAL_KIND, VerifyBody } from "./inputs.js";
 
 export { VERIFY_MAX_TOLERANCE_CENTS } from "./inputs.js";
-import { readDailyBrief, yesterdayIn, type BriefSources } from "./brief.js";
+import { readDailyBrief, yesterdayIn } from "./brief.js";
 import { reasonNow, type ReasonPass } from "./reasoning.js";
 import { VerifyBusyError, type Verifier } from "./verify.js";
 import { workRoutes, type BrainWorkOptions } from "./tasks.js";
@@ -43,6 +44,12 @@ export interface BrainAppOptions {
   reason?: (pass: () => Promise<ReasonPass>) => Promise<ReasonPass>;
   /** Reasoning sessions and agent tasks at /v1/sessions and /v1/tasks. Without it those routes answer 503. */
   work?: BrainWorkOptions;
+  /**
+   * Documentation search, for GET /v1/docs/search and for "how do I" and
+   * "where is" questions to /v1/ask. Without it the route answers 503 and
+   * ask says documentation search isn't set up.
+   */
+  docs?: Pick<DocSearch, "search" | "embedder">;
 }
 
 export interface BrainBriefOptions {
@@ -347,6 +354,11 @@ export function brainRoutes(options: BrainAppOptions): BrainRoute[] {
       },
     ],
     [
+      "GET",
+      /^\/v1\/docs\/search$/,
+      async (_req, _params, url) => [200, await ops.searchDocs(url.searchParams.get("q"), url.searchParams.get("limit"))],
+    ],
+    [
       "POST",
       /^\/v1\/verify$/,
       async (req) => {
@@ -397,12 +409,13 @@ export function brainRoutes(options: BrainAppOptions): BrainRoute[] {
 export function brainOperations(options: BrainAppOptions) {
   const timeZone = () => options.brief?.timeZone ?? DEFAULT_BRIEF_TIME_ZONE;
   const now = () => (options.brief?.now ?? (() => new Date()))();
-  const askSources = (): BriefSources => ({
+  const askSources = (): AskSources => ({
     memory: options.memory,
     organizationId: options.organizationId,
     timeZone: timeZone(),
     ...(options.brief?.now ? { now: options.brief.now } : {}),
     ...(options.brief?.sync ? { sync: options.brief.sync } : {}),
+    ...(options.docs ? { docs: options.docs } : {}),
   });
   return {
     async reason(): Promise<Required<ReasonPass>> {
@@ -446,6 +459,19 @@ export function brainOperations(options: BrainAppOptions) {
       return { brief };
     },
     ask: async (question: unknown) => ({ answer: await readAnswer(askSources(), questionFrom(question)) }),
+    /** The passages closest to a query, with where each came from and its score. Read-only. */
+    async searchDocs(q: string | null, rawLimit: string | null) {
+      if (!options.docs) throw new HttpError(503, "documentation search isn't set up on this instance");
+      if (q === null) throw new HttpError(400, "search with ?q=, such as ?q=where+is+the+ups+tracking+file+set");
+      const query = q.trim();
+      if (!query) throw new HttpError(400, "q can't be empty");
+      if ([...query].length > DOC_SEARCH_MAX_QUERY_CHARS) throw new HttpError(400, `q must be at most ${DOC_SEARCH_MAX_QUERY_CHARS} characters`);
+      const limit = rawLimit === null ? 5 : Number(rawLimit);
+      if (!/^\d+$/.test(rawLimit ?? "5") || limit < 1 || limit > DOC_SEARCH_MAX_RESULTS) {
+        throw new HttpError(400, `limit must be a whole number from 1 to ${DOC_SEARCH_MAX_RESULTS}`);
+      }
+      return { query, embedder: options.docs.embedder, results: await options.docs.search(query, limit) };
+    },
     async verify({ system, from, to, toleranceCents }: z.infer<typeof VerifyBody>) {
       if (!options.verify) throw new HttpError(503, "sync verification isn't set up on this instance");
       if (from > to) throw new HttpError(400, "from must be on or before to; both days are included");

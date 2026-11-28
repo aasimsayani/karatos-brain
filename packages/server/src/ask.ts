@@ -1,6 +1,7 @@
-import type { StoredEvent } from "@karatos/core";
+import type { DocSearchHit, StoredEvent } from "@karatos/core";
 import {
   answerQuestion,
+  ASK_DOC_PASSAGES,
   ASK_EVENT_TYPES,
   ASK_MAX_EVENTS,
   BRIEF_OPEN_LOOKBACK_DAYS,
@@ -18,6 +19,11 @@ import type { BriefSources } from "./brief.js";
  * reasoned, saved or sent. See docs/ask.md.
  */
 
+/** What answering needs: the brief's sources, and documentation search when the instance has it. */
+export interface AskSources extends BriefSources {
+  docs?: { search(query: string, limit?: number): Promise<DocSearchHit[]> };
+}
+
 /** Most events whose system is looked up to cite the findings in one answer. */
 export const ASK_MAX_SOURCE_LOOKUPS = 500;
 
@@ -32,7 +38,7 @@ async function sourcesOf(sources: BriefSources, ids: readonly string[]): Promise
   return out;
 }
 
-export async function readAnswer(sources: BriefSources, question: string): Promise<AskAnswer> {
+export async function readAnswer(sources: AskSources, question: string): Promise<AskAnswer> {
   const { memory, organizationId, timeZone } = sources;
   const now = (sources.now ?? (() => new Date()))();
   const route = routeQuestion(question, { now, timeZone });
@@ -40,6 +46,8 @@ export async function readAnswer(sources: BriefSources, question: string): Promi
   if (route.kind !== "intent") return answerQuestion(question, route, data);
 
   const { intent, period } = route;
+  // "How do I…" and "where is…" are answered from the documentation, when the instance can search it.
+  if (intent === "docs") return answerQuestion(question, route, { ...data, ...(sources.docs ? { docs: { passages: await sources.docs.search(question, ASK_DOC_PASSAGES) } } : {}) });
   // Anything up to the end of the day under way counts as synced; an event dated later than that is left out.
   const end = new Date(now.getTime() + 86_400_000).toISOString();
   const types = ASK_EVENT_TYPES[intent];

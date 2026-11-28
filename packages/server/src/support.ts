@@ -1,6 +1,7 @@
 import type { InMemoryStore, IntegrationStatus } from "@karatos/core";
 import type { SqlClient } from "@karatos/store-postgres";
 import { describeStoreHours, type StoreHours } from "@karatos/retail";
+import type { DocSearchStatus } from "./doc-search.js";
 import type { SupportReasoningStatus } from "./reasoning.js";
 import type { SkippedIntegration, SyncStatus } from "./sync.js";
 
@@ -167,6 +168,8 @@ export interface SupportStatusOptions {
   syncStatus?: () => readonly SyncStatus[];
   /** Scheduled reasoning's last run. Absent: the status reports reasoning as null. */
   reasoning?: () => SupportReasoningStatus;
+  /** Documentation search: its embedder and last index sync. Absent: the status reports docSearch as null. */
+  docSearch?: () => DocSearchStatus;
   diagnostics: SupportDiagnostics;
   now?: () => Date;
 }
@@ -209,6 +212,8 @@ export interface SupportStatus {
   integrations: SupportIntegrationStatus[];
   /** Scheduled reasoning: whether it is on, and its last run as times, outcome and counts. Null when not reported. */
   reasoning: SupportReasoningStatus | null;
+  /** Documentation search: the embedder, whether the index is syncing, and the last sync's times, outcome and counts. Null when not reported. */
+  docSearch: DocSearchStatus | null;
   deadLetters: { total: number; bySource: Record<string, number>; byReason: Record<string, number> };
   events: { days: number; since: string; total: number; byDay: EventDayCount[] };
 }
@@ -293,6 +298,7 @@ export async function supportStatus(
       };
     }),
     reasoning: options.reasoning?.() ?? null,
+    docSearch: options.docSearch?.() ?? null,
     deadLetters: { total: deadLetters.reduce((n, d) => n + d.count, 0), bySource, byReason },
     events: { days, since: since.toISOString(), total: byDay.reduce((n, e) => n + e.count, 0), byDay },
   };

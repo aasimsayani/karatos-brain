@@ -12,6 +12,7 @@ export * from "./memory.js";
 export * from "./connectors.js";
 export * from "./verify.js";
 export * from "./documentation.js";
+export * from "./doc-search.js";
 export * from "./jewelry.js";
 export * from "./config.js";
 export * from "./secrets.js";

@@ -42,9 +42,9 @@ A client may want help running their instance without showing the person helping
 
 | The support key reaches | The support key never reaches |
 | --- | --- |
-| `GET /healthz` | Events, entities, signals or recommendations, or anything else that reads business data |
+| `GET /healthz` | Events, entities, signals or recommendations, or anything else that reads business data, and documentation search (`GET /v1/docs/search`), which stays with the instance key like every other route that isn't diagnostic |
 | `GET /v1/integrations`: which integrations have their settings, by setting name, never value | Writing anything: ingesting events, running reasoning, recording feedback or results, or making, claiming or running reasoning sessions and agent tasks |
-| `GET /v1/support/status`: instance name and organization id, version, uptime, applied migrations, retention days, enabled departments and integrations, each integration's missing setting names and last sync (when, mode, outcome, counts and the last error message), scheduled reasoning's last run (when, trigger, outcome, counts and the error's class name only), the store hours, closed dates and awaiting-reply wait the instance read, dead-letter counts by source and reason, and event counts by day, source and type | Payloads, entity ids, customer references, amounts, names, recommendation text or signal values |
+| `GET /v1/support/status`: instance name and organization id, version, uptime, applied migrations, retention days, enabled departments and integrations, each integration's missing setting names and last sync (when, mode, outcome, counts and the last error message), scheduled reasoning's last run (when, trigger, outcome, counts and the error's class name only), the documentation index's last sync (when, outcome, document and passage counts, scrubbed error), the store hours, closed dates and awaiting-reply wait the instance read, dead-letter counts by source and reason, and event counts by day, source and type | Payloads, entity ids, customer references, amounts, names, recommendation text or signal values |
 
 Every other route answers 403 with a message naming the routes the support key can reach, before the route reads the body or touches the database. A test walks the route table, so a new route is turned down for the support key unless it is marked diagnostic on purpose.
 
