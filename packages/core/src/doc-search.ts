@@ -453,7 +453,8 @@ export class DocumentIndex {
     const hits = await this.options.store.search(this.options.organizationId, { embedder: this.embedder.id, vector: vector!, limit: n * 2 });
     const seen = new Set<string>();
     return hits
-      .filter((h) => Number.isFinite(h.score) && h.score >= DOC_SEARCH_MIN_SCORE && !seen.has(h.text) && seen.add(h.text))
+      // NaN, from a passage with no direction, is never at least the minimum, so it is left out too.
+      .filter((h) => h.score >= DOC_SEARCH_MIN_SCORE && !seen.has(h.text) && seen.add(h.text))
       .slice(0, n)
       .map((h) => ({ ...h, score: Math.round(h.score * 10_000) / 10_000 }));
   }

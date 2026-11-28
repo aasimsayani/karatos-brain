@@ -76,6 +76,16 @@ describe("chunkDocument", () => {
     expect(chunks[0]!.text).toBe("````\n```\n# inside\n````");
   });
 
+  it("closes a fence only on a bare line of the same character", () => {
+    // A tilde run inside a backtick fence, and a fence line with an info string, both leave it open.
+    expect(chunkDocument(doc("```\n~~~\n# inside\n```\n\n# Out\n\nText.")).map((c) => c.heading)).toEqual(["", "Out"]);
+    expect(chunkDocument(doc("```\n```js\n# inside\n```\n\n# Out\n\nText.")).map((c) => c.heading)).toEqual(["", "Out"]);
+  });
+
+  it("reads a line of only spaces as blank, and trims each paragraph", () => {
+    expect(chunkDocument(doc("  One.\n   \nTwo.  ")).map((c) => c.text)).toEqual(["One.\n\nTwo."]);
+  });
+
   it("reads Windows line endings", () => {
     expect(chunkDocument(doc("# A\r\n\r\nOne.\r\n\r\n# B\r\n\r\nTwo.")).map((c) => [c.heading, c.text])).toEqual([
       ["A", "One."],
@@ -93,6 +103,19 @@ describe("chunkDocument", () => {
       ["B", 94],
     ]);
     expect(chunks.every((c) => c.text.length <= 200)).toBe(true);
+  });
+
+  it("fills a passage to exactly the limit, counting the blank line between paragraphs", () => {
+    const para = "word ".repeat(19).trim(); // 94 characters; two with a blank line between are 190
+    const text = Array(4).fill(para).join("\n\n");
+    expect(chunkDocument(doc(text), 190).map((c) => c.text.length)).toEqual([190, 190]);
+    expect(chunkDocument(doc(text), 189).map((c) => c.text.length)).toEqual([94, 94, 94, 94]);
+  });
+
+  it("splits a two-line paragraph at the line, and a two-word one at the space", () => {
+    const line = "alpha beta gamma delta epsilon zeta eta"; // 39 characters, no sentence end
+    expect(chunkDocument(doc(`${line}\n${line.toUpperCase()}`), 60).map((c) => c.text)).toEqual([line, line.toUpperCase()]);
+    expect(chunkDocument(doc(`${"x".repeat(40)} ${"y".repeat(40)}`), 60).map((c) => c.text)).toEqual(["x".repeat(40), "y".repeat(40)]);
   });
 
   it("splits a paragraph that is too long by lines, then sentences, then words, then characters", () => {
@@ -146,6 +169,12 @@ describe("HashingEmbedder", () => {
     expect(HASHING_EMBEDDER_DIMENSIONS).toBe(1024);
   });
 
+  it("hashes features to both signs, so collisions cancel rather than pile up", () => {
+    const v = embedder.embedOne("rings necklaces bracelets earrings pendants brooches watches chains charms anklets");
+    expect(v.some((x) => x > 0)).toBe(true);
+    expect(v.some((x) => x < 0)).toBe(true);
+  });
+
   it("gives zeros for text with no search terms", async () => {
     const [v] = await embedder.embed(["the and of | --- |"]);
     expect(v!.every((x) => x === 0)).toBe(true);
@@ -190,6 +219,7 @@ describe("searchTerms", () => {
     expect(searchTerms("How do I see the Payouts and Settings?")).toEqual(["see", "payout", "setting"]);
     expect(searchTerms("Café rings, stories, classes, tracked, a b UPS_CLIENT_ID")).toEqual(["cafe", "ring", "story", "class", "track", "ups", "client", "id"]);
     expect(searchTerms("is was ss bus")).toEqual(["ss", "bus"]);
+    expect(searchTerms("tracking glass naïve")).toEqual(["track", "glass", "naive"]);
   });
 });
 
@@ -271,6 +301,45 @@ describe("DocumentIndex", () => {
     const fresh = new HashingEmbedder().embedOne(chunkEmbeddingText("Stripe", "Stripe > Settings", "Set STRIPE_SECRET_KEY to a restricted key with read access."));
     expect(stored[1]!.embedding).toEqual(fresh);
     expect((await store.documents(ORG)).find((d) => d.id === stripe.id)?.version).toBe("v2");
+  });
+
+  it("saves a new version alone, without re-embedding", async () => {
+    const { index, store } = setup();
+    await index.sync(CORPUS);
+    expect(await index.sync([{ ...CORPUS[0]!, version: "v2" }, CORPUS[1]!, CORPUS[2]!])).toMatchObject({ unchanged: 2, saved: 1, embedded: 0 });
+    expect((await store.documents(ORG)).find((d) => d.id === CORPUS[0]!.id)?.version).toBe("v2");
+  });
+
+  it("saves a new source alone, without re-embedding", async () => {
+    const { index, store } = setup();
+    await index.sync(CORPUS);
+    expect(await index.sync([{ ...CORPUS[0]!, source: "docs/moved.md" }, CORPUS[1]!, CORPUS[2]!])).toMatchObject({ unchanged: 2, saved: 1, embedded: 0 });
+    expect((await store.documents(ORG)).find((d) => d.id === CORPUS[0]!.id)?.source).toBe("docs/moved.md");
+  });
+
+  it("re-embeds everything when the embedder's id changes, even at the same dimensions", async () => {
+    const store = new InMemoryDocChunkStore();
+    await setup(new HashingEmbedder(), store).index.sync(CORPUS);
+    const inner = new HashingEmbedder();
+    const renamed: Embedder = { id: "other-model", dimensions: inner.dimensions, embed: (t) => inner.embed(t) };
+    expect(await setup(renamed, store).index.sync(CORPUS)).toMatchObject({ saved: 3, embedded: 7, reused: 0 });
+  });
+
+  it("searches only passages from the embedder asked for", async () => {
+    const store = new InMemoryDocChunkStore();
+    const inner = new HashingEmbedder();
+    const vector = inner.embedOne("ups");
+    const chunk = { documentId: "d", ordinal: 0, heading: "", text: "ups", contentHash: "a".repeat(64), embedding: vector };
+    await store.save(ORG, { id: "d", title: "D", version: "v1", source: "s" }, [{ ...chunk, embedder: "other-model" }]);
+    expect(await store.search(ORG, { embedder: inner.id, vector, limit: 5 })).toEqual([]);
+    expect(await store.search(ORG, { embedder: "other-model", vector, limit: 5 })).toHaveLength(1);
+  });
+
+  it("doesn't ask the embedder about a blank query", async () => {
+    const embedder = new CountingEmbedder();
+    const { index } = setup(embedder);
+    expect(await index.search(" \n ")).toEqual([]);
+    expect(embedder.calls).toBe(0);
   });
 
   it("saves a new version, title or source without re-embedding text that is the same", async () => {

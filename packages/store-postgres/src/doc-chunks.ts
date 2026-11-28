@@ -163,7 +163,8 @@ export class PostgresDocChunkStore implements DocChunkStore {
       version: r.version,
       heading: r.heading,
       text: r.body,
-      score: r.score === null ? 0 : Number(r.score),
+      // Null (a passage with no direction, without pgvector) reads as 0.
+      score: Number(r.score),
     }));
   }
 }
