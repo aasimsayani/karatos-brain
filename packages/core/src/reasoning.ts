@@ -18,6 +18,8 @@ export interface Recommendation {
     eventIds: string[];
     signalIds: string[];
     documentIds: string[];
+    /** Rule recommendations a model finding rests on. Absent on the rules' own recommendations. */
+    recommendationIds?: string[];
   };
   /** True when reasoning ran against stale or mismatched documentation. */
   degraded: boolean;
@@ -138,4 +140,40 @@ export interface ReasoningRun {
   documentation: DocumentationState;
   degraded: boolean;
   recommendationIds: string[];
+  /** What the model reasoner did on this run. Absent when no model reasoner is set up. */
+  modelReasoning?: ModelReasoningRecord;
+}
+
+/** Token counts a model reported for one call. */
+export interface ModelUsage {
+  inputTokens: number;
+  outputTokens: number;
+  cacheReadInputTokens: number;
+  cacheCreationInputTokens: number;
+}
+
+/**
+ * The audit record of one model reasoner pass. It holds counts, ids and
+ * fixed reason codes only, never the summary sent or the text that came back.
+ */
+export interface ModelReasoningRecord {
+  /** The reasoner's rule name, such as "claude". */
+  reasoner: string;
+  /** The model that answered, or the one asked when no answer came. */
+  model: string;
+  promptVersion: string;
+  /** skipped: not called, such as when the summary can't fit the token cap. failed: called, but nothing usable came back. */
+  status: "succeeded" | "skipped" | "failed";
+  /** A fixed code for a skip or failure (token_cap, timeout, malformed_output, refusal, truncated, error:<ErrorClass>); null when it succeeded. */
+  reason: string | null;
+  /** The most tokens, in and out, one run may spend. */
+  tokenCap: number;
+  /** What the model reported spending; null when it wasn't called or didn't answer. */
+  usage: ModelUsage | null;
+  /** What the summary held, and what was left out to fit the cap. */
+  sent: { signals: number; recommendations: number; omittedSignals: number; omittedRecommendations: number };
+  /** Findings kept. */
+  findings: number;
+  /** Findings dropped: citations that didn't resolve to the summary, or a finding that didn't fit the schema. */
+  dropped: number;
 }

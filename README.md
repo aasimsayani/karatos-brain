@@ -294,7 +294,7 @@ This section updates itself from [docs/milestones.json](docs/milestones.json) an
 <!-- progress:start -->
 <!-- Generated from docs/milestones.json and the integration catalog by npm run progress:write. Edit those, not this block. -->
 
-**Roadmap:** 23 of 81 items done. An integration counts as done once it has run against a real or sandbox account, not when its tests pass.
+**Roadmap:** 24 of 81 items done. An integration counts as done once it has run against a real or sandbox account, not when its tests pass.
 
 **Integrations:** 103 of the 253 systems in the catalog are built and tested against mocks made from each vendor's docs. 0 have been checked live so far.
 
@@ -305,7 +305,7 @@ This section updates itself from [docs/milestones.json](docs/milestones.json) an
 | Core integrations | Connects what most jewelers already run: online store, POS, payments, bank and books. | █░░░░░░░░░ 14% (6 of 6 built, 0 checked live) | Nov 2026 |
 | Client instances | Each business gets its own isolated instance, in accounts it owns. | █████████░ 86% | Dec 2026 |
 | Website and demo | Jewelers can see what KaratOS does for their business before they talk to us. | ██████░░░░ 60% | Nov 2026 |
-| AI reasoning | Claude explains each recommendation in plain language and learns from the owner's decisions. | ███░░░░░░░ 33% | Jan 2027 |
+| AI reasoning | Claude explains each recommendation in plain language and learns from the owner's decisions. | ███████░░░ 67% | Jan 2027 |
 | Self-serve AI dashboards | Owners ask a question and get a dashboard, without a developer. | ███░░░░░░░ 33% | Mar 2027 |
 | Self-hosted and managed plans | Run it in your own accounts on Core, or let us host it on Managed. | ███░░░░░░░ 33% | Mar 2027 |
 | Integrations, next wave | Jewelry POS, CRM, messaging, marketing and diamond feeds join the catalog. | ░░░░░░░░░░ 0% (19 of 19 built, 0 checked live) | Dec 2026 |
@@ -377,7 +377,7 @@ On the Core plan, the database, the container and every credential sit in accoun
 | --- | --- |
 | `GET /healthz` | Liveness check, no key needed |
 | `POST /v1/events` | Ingest one event; a replay with the same idempotency key is never stored twice |
-| `POST /v1/reason` | Run the reasoners and return recommendations, shaped by what the owner did with earlier ones, and what was held back. See [the feedback loop](docs/feedback-loop.md) |
+| `POST /v1/reason` | Run the reasoners and return recommendations, shaped by what the owner did with earlier ones, and what was held back. See [the feedback loop](docs/feedback-loop.md). With `CLAUDE_REASONER=on`, [Claude's findings](docs/claude-reasoner.md) follow the rules' |
 | `GET /v1/recommendations` | Latest recommendations, with provenance |
 | `POST /v1/recommendations/:id/feedback` | Record an accept, reject or override |
 | `POST /v1/recommendations/:id/result` | Record what an acted-on recommendation returned, for the value ledger |
