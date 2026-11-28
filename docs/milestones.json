@@ -75,7 +75,7 @@
       "value": "Claude explains each recommendation in plain language and learns from the owner's decisions.",
       "target": "2027-01",
       "items": [
-        { "name": "Claude-powered reasoner with provenance and confidence", "done": false },
+        { "name": "Claude-powered reasoner with provenance and confidence", "done": true },
         { "name": "Owner feedback tunes future recommendations", "done": true },
         { "name": "Semantic search over the business's documents", "done": false }
       ]

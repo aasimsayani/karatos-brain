@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { DEFAULT_FEEDBACK_POLICY, DEFAULT_RAW_RETENTION_DAYS, INTEGRATIONS, MAX_FEEDBACK_COOLDOWN_DAYS, invalidWriteEntries, MAX_RAW_RETENTION_DAYS, MIN_RAW_RETENTION_DAYS } from "@karatos/core";
+import { DEFAULT_CLAUDE_TOKEN_CAP, DEFAULT_CLAUDE_TIMEOUT_MS, DEFAULT_FEEDBACK_POLICY, DEFAULT_RAW_RETENTION_DAYS, MAX_CLAUDE_TOKEN_CAP, MIN_CLAUDE_TOKEN_CAP, INTEGRATIONS, MAX_FEEDBACK_COOLDOWN_DAYS, invalidWriteEntries, MAX_RAW_RETENTION_DAYS, MIN_RAW_RETENTION_DAYS } from "@karatos/core";
 import { BENCH_METAL_LOSS_SHARE, parseDailyHours, parseLaborRates, parseStageLimits, type BenchSettings, type ProductionSettings } from "@karatos/manufacturing";
 import { DEFAULT_BRIEF_TIME_ZONE, DEFAULT_STORE_HOURS, isTimeZone, parseClosedDates, parseStoreHours, REPLY_BUSINESS_HOURS, type StoreHours } from "@karatos/retail";
 import { INSTANCE_DEPARTMENTS } from "./brain.js";
@@ -90,6 +90,18 @@ export const InstanceConfigSchema = z
    * confidence grew. 0 turns the cooldown off. See docs/feedback-loop.md.
    */
   FEEDBACK_COOLDOWN_DAYS: z.coerce.number().int().min(0).max(MAX_FEEDBACK_COOLDOWN_DAYS).default(DEFAULT_FEEDBACK_POLICY.cooldownDays),
+  /**
+   * The Claude reasoner, after the department rules: "on" runs it when
+   * ANTHROPIC_API_KEY is also set. Off by default. See docs/claude-reasoner.md.
+   */
+  CLAUDE_REASONER: z
+    .enum(["on", "off"])
+    .default("off")
+    .transform((v) => v === "on"),
+  /** The most tokens, in and out, the Claude reasoner may spend on one run. */
+  CLAUDE_REASONER_MAX_TOKENS: z.coerce.number().int().min(MIN_CLAUDE_TOKEN_CAP).max(MAX_CLAUDE_TOKEN_CAP).default(DEFAULT_CLAUDE_TOKEN_CAP),
+  /** Seconds the Claude reasoner waits for an answer before the run goes on without it. */
+  CLAUDE_REASONER_TIMEOUT_SECONDS: z.coerce.number().int().min(5).max(300).default(DEFAULT_CLAUDE_TIMEOUT_MS / 1000),
   /**
    * Days raw vendor data (event payloads, dead-letter input, uploaded file
    * contents) is kept before it is cleared. Facts, signals and source

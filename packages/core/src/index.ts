@@ -3,6 +3,7 @@ export * from "./entities.js";
 export * from "./identity.js";
 export * from "./signals.js";
 export * from "./reasoning.js";
+export * from "./claude-reasoner.js";
 export * from "./value.js";
 export * from "./feedback.js";
 export * from "./layers.js";

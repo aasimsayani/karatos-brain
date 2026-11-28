@@ -11,6 +11,7 @@ import {
   type Feedback,
   type IdentityLink,
   type MemoryStore,
+  type ModelReasoningRecord,
   type NormalizedEntity,
   type PurgeResult,
   type RawDataRetention,
@@ -84,6 +85,7 @@ interface ReasoningRunRow {
   documentation: ReasoningRun["documentation"];
   degraded: boolean;
   recommendation_ids: string[];
+  model_reasoning: ModelReasoningRecord | null;
 }
 
 interface FeedbackRow {
@@ -368,8 +370,8 @@ export class PostgresMemoryStore implements MemoryStore, RawDataRetention, Brief
 
   async recordReasoningRun(run: ReasoningRun): Promise<void> {
     await this.db.query(
-      `insert into reasoning_runs (id, organization_id, started_at, finished_at, reasoners, documentation, degraded, recommendation_ids)
-       values ($1, $2, $3, $4, $5, $6, $7, $8)`,
+      `insert into reasoning_runs (id, organization_id, started_at, finished_at, reasoners, documentation, degraded, recommendation_ids, model_reasoning)
+       values ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
       [
         run.id,
         run.organizationId,
@@ -379,6 +381,7 @@ export class PostgresMemoryStore implements MemoryStore, RawDataRetention, Brief
         JSON.stringify(run.documentation),
         run.degraded,
         run.recommendationIds,
+        run.modelReasoning ? JSON.stringify(run.modelReasoning) : null,
       ],
     );
   }
@@ -400,6 +403,7 @@ export class PostgresMemoryStore implements MemoryStore, RawDataRetention, Brief
       documentation: row.documentation,
       degraded: row.degraded,
       recommendationIds: row.recommendation_ids,
+      ...(row.model_reasoning ? { modelReasoning: row.model_reasoning } : {}),
     };
   }
 

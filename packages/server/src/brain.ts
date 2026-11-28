@@ -1,4 +1,4 @@
-import { BrainPipeline, type DocumentationSource, type MemoryStore } from "@karatos/core";
+import { BrainPipeline, type DocumentationSource, type MemoryStore, type ModelReasoner } from "@karatos/core";
 import { MANUFACTURING_DEPARTMENTS, manufacturingDepartments, type BenchSettings, type ProductionSettings } from "@karatos/manufacturing";
 import { combineDepartments, RETAIL_DEPARTMENTS, selectDepartments, type DepartmentModule, type StoreHours } from "@karatos/retail";
 
@@ -23,6 +23,8 @@ export interface InstancePipelineOptions extends InstanceDepartmentSettings {
   documentation: DocumentationSource;
   /** Department ids from ENABLED_DEPARTMENTS. Empty turns on every department. */
   departments: string[];
+  /** Runs after the rules, such as the Claude reasoner from instanceClaudeReasoner. Absent: rules only. */
+  modelReasoner?: ModelReasoner | null;
 }
 
 /** The departments ENABLED_DEPARTMENTS names, or all of them when it is empty, with the instance's settings applied. */
@@ -44,10 +46,11 @@ export function instanceDepartments(ids: string[], settings: InstanceDepartmentS
 
 /** Builds the pipeline for one instance with the departments that client uses. */
 export function createInstancePipeline(options: InstancePipelineOptions): BrainPipeline {
-  const { memory, documentation, departments, feedbackCooldownDays, ...settings } = options;
+  const { memory, documentation, departments, feedbackCooldownDays, modelReasoner, ...settings } = options;
   return new BrainPipeline({
     memory,
     documentation,
+    ...(modelReasoner ? { modelReasoner } : {}),
     ...(feedbackCooldownDays !== undefined ? { feedback: { cooldownDays: feedbackCooldownDays } } : {}),
     ...combineDepartments(instanceDepartments(departments, settings)),
   });
